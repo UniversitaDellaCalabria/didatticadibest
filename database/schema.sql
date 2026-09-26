@@ -174,6 +174,7 @@ CREATE TABLE IF NOT EXISTS `eventi` (
     `titolo`                varchar(255) NOT NULL,
     `luogo`                 varchar(255) DEFAULT '',
     `descrizione`           text         DEFAULT NULL,
+    `descrizione_breve`     varchar(500) DEFAULT NULL COMMENT 'testo delle card; la descrizione completa sta nella scheda',
     `locandina_path`        varchar(255) DEFAULT '',
     `is_evidenza`           tinyint(1)   DEFAULT 0,
     `richiede_prenotazione` tinyint(1)   DEFAULT 1,
@@ -211,6 +212,8 @@ CREATE TABLE IF NOT EXISTS `progetti_dettagli` (
     `obiettivi`         text         DEFAULT NULL,
     `conoscenze`        text         DEFAULT NULL,
     `competenze`        text         DEFAULT NULL,
+    `per_scuole`        tinyint(1)   NOT NULL DEFAULT 1 COMMENT '1 = una scuola per edizione',
+    `attestati`         tinyint(1)   NOT NULL DEFAULT 0 COMMENT 'attestati di partecipazione previsti',
     `updated_at`        datetime     DEFAULT NULL,
     PRIMARY KEY (`evento_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -259,7 +262,26 @@ CREATE TABLE IF NOT EXISTS `prenotazioni` (
     `email_post_evento_inviata` tinyint(1)  NOT NULL DEFAULT 0,
     `token_sondaggio`           varchar(64) DEFAULT NULL,
     `sondaggio_completato`      tinyint(1)  NOT NULL DEFAULT 0,
+    `promemoria_elenco_inviato` tinyint(1)  NOT NULL DEFAULT 0 COMMENT 'promemoria al docente per l''elenco studenti',
     PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ------------------------------------------------------------
+-- Tabella: partecipanti_prenotazione  (studenti di un'iscrizione ai progetti per le scuole, per gli attestati)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `partecipanti_prenotazione` (
+    `id`              int(11)      NOT NULL AUTO_INCREMENT,
+    `prenotazione_id` int(11)      NOT NULL,
+    `cognome`         varchar(100) NOT NULL DEFAULT '',
+    `nome`            varchar(100) NOT NULL DEFAULT '',
+    `codice`          varchar(20)  DEFAULT NULL COMMENT 'codice di verifica dell''attestato',
+    `escluso`         tinyint(1)   NOT NULL DEFAULT 0 COMMENT '1 = niente attestato (assente)',
+    `anonimizzato`    tinyint(1)   NOT NULL DEFAULT 0 COMMENT 'nome ridotto alle iniziali dopo 12 mesi',
+    `ordine`          int(11)      NOT NULL DEFAULT 0,
+    `created_at`      datetime     DEFAULT current_timestamp(),
+    PRIMARY KEY (`id`),
+    KEY `idx_pren` (`prenotazione_id`),
+    UNIQUE KEY `uq_codice` (`codice`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ------------------------------------------------------------

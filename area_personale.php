@@ -90,7 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_prenotazione_ute
     $email = strtolower(trim($_POST['email'] ?? ''));
     $matricola = trim($_POST['matricola'] ?? '');
 
-    $stmt_chk_prop = $conn->prepare("SELECT turno_id, num_posti FROM prenotazioni WHERE id = ? AND (utente_id = ? OR (email IS NOT NULL AND LOWER(email) = ?))");
+    $stmt_chk_prop = $conn->prepare("SELECT turno_id, num_posti, dati_custom_json FROM prenotazioni WHERE id = ? AND (utente_id = ? OR (email IS NOT NULL AND LOWER(email) = ?))");
     $stmt_chk_prop->bind_param("iis", $pr_id, $u_id, $u_email_sql);
     $stmt_chk_prop->execute();
     $res_prop = $stmt_chk_prop->get_result();
@@ -108,14 +108,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_prenotazione_ute
     $turno_da_salvare = $turno_attuale_id;
     $nuovo_stato = null;
 
-    $custom_data = [];
+    // Si parte dai dati già salvati: allegati e campi non mostrati nel modulo di modifica restano com'erano
+    $custom_data = json_decode((string)($old_data['dati_custom_json'] ?? ''), true) ?: [];
     foreach ($_POST as $k => $v) {
         if (strpos($k, 'custom_') === 0) {
             $field_name = str_replace('custom_', '', $k);
             $custom_data[$field_name] = is_array($v) ? implode(', ', $v) : trim($v);
         }
     }
-    $json_custom_bind = !empty($custom_data) ? json_encode($custom_data, JSON_UNESCAPED_UNICODE) : null;
+    $json_custom_bind = !empty($custom_data) ? json_encode($custom_data, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) : null;
+    // Progetti per le scuole: il numero di partecipanti modificato deve restare nei limiti del progetto
+    $r_evp = $conn->query("SELECT t.evento_id, e.tipo FROM turni t JOIN eventi e ON t.evento_id = e.id WHERE t.id = $turno_attuale_id");
+    $evp = $r_evp ? $r_evp->fetch_assoc() : null;
+    if ($evp && $evp['tipo'] === 'progetto') {
+        $err_part = valida_partecipanti_progetto($custom_data, get_dettagli_progetti($conn, [(int)$evp['evento_id']])[(int)$evp['evento_id']] ?? null);
+        if ($err_part !== null) {
+            $_SESSION['msg_area_pers'] = "<div class='alert alert-danger fw-bold text-center my-3 shadow-sm'><i class='fa fa-users me-1'></i> Modifica non salvata: " . htmlspecialchars($err_part) . "</div>";
+            header("Location: area_personale.php");
+            exit;
+        }
+    }
 
     // =====================================================================
     // FASE 2: SEZIONE CRITICA - transazione + lock pessimistico anti-overbooking
@@ -362,17 +374,42 @@ if (isset($_GET['conferma_posto'])) {
 // =======================================================================
 // ESTRAZIONE DATI PRENOTAZIONI DELL'UTENTE E TURNI ALTERNATIVI
 // =======================================================================
+
+// Pulsanti attestato / elenco studenti di una prenotazione (card dell'Area personale).
+// Eventi: attestato dopo il check-in. Progetti: solo se previsti; per le scuole elenco studenti + attestati
+// della classe (dopo l'invio), altrimenti attestato personale a progetto concluso.
+function pulsanti_attestato_pr($conn, array $pr): string {
+    $st = $pr['stato'] ?? 'confermata';
+    $confermata = in_array($st, ['confermata', 'confermato', 'confirmed'], true);
+    $code = urlencode($pr['codice_prenotazione']);
+    $btn_att = fn($label) => '<a href="stampa_attestato.php?code=' . $code . '" target="_blank" class="btn btn-success btn-sm fw-bold" style="background:#198754;border:none;"><i class="fa fa-graduation-cap me-1"></i>' . $label . '</a>';
+    if (($pr['evento_tipo'] ?? '') !== 'progetto') {
+        return ((int)$pr['presente'] === 1 && $confermata) ? $btn_att('Attestato') : '';
+    }
+    if ((int)($pr['attestati'] ?? 0) !== 1 || !$confermata) return '';
+    if ((int)($pr['per_scuole'] ?? 1) === 1) {
+        $r_n = $conn->query("SELECT COUNT(*) AS n FROM partecipanti_prenotazione WHERE prenotazione_id = " . (int)$pr['id']);
+        $n = $r_n ? (int)$r_n->fetch_assoc()['n'] : 0;
+        $out = '<a href="elenco_studenti.php?code=' . $code . '" class="btn btn-outline-success btn-sm fw-bold"><i class="fa fa-list-ol me-1"></i>Elenco studenti (' . $n . ')</a>';
+        if (!empty($pr['attestato_inviato'])) $out .= ' <a href="attestati_gruppo.php?code=' . $code . '" target="_blank" class="btn btn-success btn-sm fw-bold" style="background:#198754;border:none;"><i class="fa fa-graduation-cap me-1"></i>Attestati degli studenti</a>';
+        return $out;
+    }
+    $concluso = empty($pr['progetto_fine']) || $pr['progetto_fine'] < date('Y-m-d');
+    return ((int)$pr['presente'] === 1 && $concluso) ? $btn_att('Attestato') : '';
+}
 $prenotazioni_attive = [];
 $prenotazioni_passate = [];
 $now = date('Y-m-d H:i:s');
 
 $sql_pr = "SELECT pr.*, t.nome_turno, t.data_turno, t.orario_inizio, t.orario_fine,
-           e.titolo as evento_titolo, e.luogo as evento_luogo, e.id as evento_id, e.locandina_path, e.abilita_presenze,
+           e.titolo as evento_titolo, e.luogo as evento_luogo, e.id as evento_id, e.locandina_path, e.abilita_presenze, e.tipo AS evento_tipo,
+           pd.per_scuole, pd.attestati, pd.data_fine AS progetto_fine,
            pe.titolo as pagina_titolo, pe.colore_primario, pe.id as p_id
            FROM prenotazioni pr
            JOIN turni t ON pr.turno_id = t.id
            JOIN eventi e ON t.evento_id = e.id
            JOIN pagine_eventi pe ON e.pagina_id = pe.id
+           LEFT JOIN progetti_dettagli pd ON pd.evento_id = e.id
            WHERE (pr.utente_id = ? OR LOWER(pr.email) = ?)
            ORDER BY t.data_turno DESC, t.orario_inizio DESC";
 
@@ -701,11 +738,7 @@ require_once 'header.php';
                                             <i class="fa fa-file-pdf me-1"></i>Ricevuta&nbsp;/&nbsp;QR
                                         </a>
                                         <?php endif; ?>
-                                        <?php if ((int)$pr['presente'] === 1 && $st === 'confermata'): ?>
-                                        <a href="stampa_attestato.php?code=<?php echo urlencode($pr['codice_prenotazione']); ?>" target="_blank" class="btn btn-success btn-sm fw-bold" style="background:#198754;border:none;">
-                                            <i class="fa fa-graduation-cap me-1"></i>Attestato
-                                        </a>
-                                        <?php endif; ?>
+                                        <?php echo pulsanti_attestato_pr($conn, $pr); ?>
                                         <?php if ($st !== 'annullata' && $st !== 'rifiutata'): ?>
                                         <button type="button" class="btn btn-sm fw-bold text-white" style="background:<?php echo $col_p; ?>;border:none;" data-bs-toggle="modal" data-bs-target="#modEditUser<?php echo $pr['id']; ?>">
                                             <i class="fa fa-edit me-1"></i>Modifica
@@ -830,7 +863,9 @@ require_once 'header.php';
                                                 <div class="border-top pt-3 mt-4">
                                                     <h6 class="fw-bold text-primary mb-3"><i class="fa fa-list-check me-1"></i> Le tue risposte aggiuntive:</h6>
                                                     <div class="row g-3">
-                                                    <?php while ($cf = $res_cf->fetch_assoc()): ?>
+                                                    <?php while ($cf = $res_cf->fetch_assoc()):
+                                                        if (!campo_form_visibile($cf, ($pr['evento_tipo'] ?? '') === 'progetto', ['per_scuole' => $pr['per_scuole'] ?? 1])) continue;
+                                                        if ($cf['nome_campo'] === CAMPO_PARTECIPANTI) $cf['etichetta'] = 'Numero di studenti partecipanti'; ?>
                                                         <?php 
                                                             $input_name = htmlspecialchars($cf['nome_campo']);
                                                             $val_c = $json_c[$input_name] ?? '';
@@ -918,11 +953,7 @@ require_once 'header.php';
                                         <i class="fa fa-file-pdf me-1"></i>Ricevuta
                                     </a>
                                     <?php endif; ?>
-                                    <?php if ($presente === 1 && in_array($st, ['confermata','confermato','confirmed'])): ?>
-                                    <a href="stampa_attestato.php?code=<?php echo urlencode($pr['codice_prenotazione']); ?>" target="_blank" class="btn btn-success btn-sm fw-bold" style="background:#198754;border:none;">
-                                        <i class="fa fa-graduation-cap me-1"></i>Scarica Attestato
-                                    </a>
-                                    <?php endif; ?>
+                                        <?php echo pulsanti_attestato_pr($conn, $pr); ?>
                                 </div>
                             </div>
                         </div>

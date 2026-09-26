@@ -15,7 +15,7 @@ Portale open-source per la gestione eventi, prenotazioni e presenze del **Dipart
 
 - **Gestione eventi multi-area** con sezioni (Pagine) personalizzabili per colori, layout e accessi
 - **8 layout di pagina**: griglia per sezioni, lista cronologica, elenco avanzato con ricerca, calendario, timeline, agenda a schede per giorno, gruppi/corsi, progetti — tutti gestiscono anche i turni senza data fissa
-- **Progetti** (es. Formazione Scuola Lavoro): maschera dedicata con corso di laurea, periodo o "date da definire", requisiti di accesso, ore, studenti per scuola, articolazione in moduli/fasi/incontri, obiettivi, conoscenze e competenze, referenti con pagina personale; scheda pubblica di ogni progetto con link condivisibile; **edizioni** (repliche) da una scuola ciascuna con lista d'attesa in ordine di arrivo; iscrizione del docente referente con SSO, SPID o CIE e controllo del numero minimo e massimo di studenti
+- **Progetti** (es. Formazione Scuola Lavoro), **dedicati alle scuole o generici**: maschera dedicata con corso di laurea, periodo o "date da definire", requisiti di accesso, ore, articolazione in moduli/fasi/incontri, obiettivi, conoscenze e competenze, referenti con pagina personale; scheda pubblica di ogni progetto con link condivisibile; **edizioni** (repliche) con lista d'attesa in ordine di arrivo — per le scuole una scuola per edizione e numero di studenti controllato, altrimenti posti per edizione; iscrizione con SSO, SPID o CIE
 - **Prenotazioni con turni**: nome, data e orari facoltativi, apertura/chiusura automatica, multi-posto, approvazione manuale
 - **Lista d'attesa**: posizione in coda visibile all'utente ("Sei 3° in lista"), posto liberato offerto con 24 ore per confermare o rinunciare, promozione automatica
 - **Limite iscrizioni per area** (un solo evento o un solo turno per evento): le liste d'attesa non contano e decadono alla prima conferma
@@ -26,7 +26,9 @@ Portale open-source per la gestione eventi, prenotazioni e presenze del **Dipart
 - **Gestione iscritti**: azioni di massa (presenze, approvazione, promozione dalla lista d'attesa, annullamento), prenotazione manuale
 - **Duplicazione** di eventi e progetti (con turni, campi del form e sondaggi) e di singoli turni
 - **Aree senza file da generare**: ogni area è servita da `area.php` tramite `.htaccess`, gli slug che coincidono con file del sito vengono rifiutati
-- **Attestati** PDF generati automaticamente al completamento dell'evento
+- **Attestati** PDF generati automaticamente al completamento dell'evento, con **codice e QR di verifica** (pagina pubblica `verifica_attestato.php`)
+- **Attestati per gli studenti** nei progetti per le scuole: il docente inserisce l'elenco dall'Area personale (scritto, incollato da Excel o dal modello .xlsx/.csv), la segreteria può correggerlo e togliere gli assenti; a progetto concluso il docente riceve per email gli attestati di tutta la classe; promemoria automatico se l'elenco è ancora vuoto a 7 giorni dalla fine; dopo 12 mesi dalla fine del progetto i nomi vengono ridotti alle iniziali (i codici restano verificabili)
+- **Scheda di dettaglio di ogni evento** (`<area>.php?evento=ID`), raggiungibile da tutte le card e dalla ricerca (nelle card solo la **descrizione breve**, qui la completa con la locandina): turni in sequenza con posti liberi, prenotazione e aggiunta al calendario, luogo con link a Google Maps, referenti con email, telefono e pagina personale, link da condividere
 - **Sondaggi/questionari** collegabili agli eventi: 15 tipi di campo (rating, NPS, matrice, scelta, testo, data, email…), ordinamento drag & drop, logica condizionale ("mostra se…"), anteprima interattiva, statistiche NPS ed export XLS
 - **Dashboard amministrativa** con KPI, grafici (Chart.js), messaggi non letti
 - **Statistiche & report**: presenze effettive, tasso di presenza, annullate, riempimento, trend iscrizioni 30 giorni, presenti vs assenti per evento, vista Live/Storico, export CSV/Excel e stampa PDF
@@ -34,7 +36,7 @@ Portale open-source per la gestione eventi, prenotazioni e presenze del **Dipart
 - **Profilo utente**: pagina dedicata con dati SSO e modifica email personale
 - **Form builder** per campi prenotazione personalizzati per area/evento
 - **Email automatiche**: conferma, cancellazione, promemoria (via SMTP configurabile), con layout nel colore dell'area, registro degli invii ed email di prova dal pannello
-- **Notifiche delle prenotazioni** ai gestori, a indirizzi in copia scelti per ogni evento e ai referenti dei progetti, con il riepilogo completo della prenotazione (campi aggiuntivi compresi)
+- **Notifiche delle prenotazioni** ai gestori, a indirizzi in copia scelti per ogni evento e ai referenti di eventi e progetti, con il riepilogo completo della prenotazione (campi aggiuntivi compresi)
 - **Badge e barre dei posti disponibili** in tempo reale sulle card eventi e in home (liberi / lista d'attesa / esauriti / concluso)
 - **Colore dell'area coerente** su pagine, badge, ricevute ed email, con testo a contrasto calcolato automaticamente
 - **Accessibilità**: struttura dei titoli, landmark, focus da tastiera visibile, contrasti verificati con axe-core
@@ -128,7 +130,7 @@ Gli script `cron_background.php`, `cron_attestati.php`, `admin/cron_reminders.ph
 
 ### Aggiornamenti del database
 
-Non servono script SQL manuali dopo un aggiornamento del codice. Al primo accesso la funzione `assicura_schema()` in `functions.php` crea le tabelle e le colonne mancanti e corregge i tipi di colonna dei database più vecchi, poi scrive un marcatore (es. `cache/schema_v10.ok`) e da quel momento non interroga più lo schema. Le pagine non modificano mai la struttura del database: ogni nuova colonna va aggiunta lì, cambiando il nome del marcatore.
+Non servono script SQL manuali dopo un aggiornamento del codice. Al primo accesso la funzione `assicura_schema()` in `functions.php` crea le tabelle e le colonne mancanti e corregge i tipi di colonna dei database più vecchi, poi scrive un marcatore (es. `cache/schema_v13.ok`) e da quel momento non interroga più lo schema. Le pagine non modificano mai la struttura del database: ogni nuova colonna va aggiunta lì, cambiando il nome del marcatore.
 
 ### 6. Configura il SSO (opzionale)
 
@@ -153,8 +155,9 @@ eventidibest-cms/
 ├── admin/              # Pannello di amministrazione
 │   ├── admin_header.php        # Autenticazione, RBAC, sidebar
 │   ├── dashboard.php           # Dashboard con KPI e grafici
-│   ├── eventi.php              # CRUD eventi, turni e sezioni, duplicazione
-│   ├── progetti.php            # Progetti: scheda completa, edizioni, iscrizione delle scuole
+│   ├── eventi.php              # CRUD eventi, turni, sezioni e referenti, duplicazione
+│   ├── progetti.php            # Progetti: scheda completa, tipo (scuole o generico), edizioni, attestati
+│   ├── partecipanti.php        # Studenti di un'iscrizione e invio degli attestati al docente
 │   ├── iscritti.php            # Gestione prenotazioni (ricerca, presenza, azioni di massa)
 │   ├── scanner.php             # Scanner check-in integrato con contatore in tempo reale
 │   ├── impostazioni_area.php   # Colori, layout e regole di ogni area
@@ -167,7 +170,7 @@ eventidibest-cms/
 │   ├── audit_log.php           # Log attivita sistema
 │   └── ...
 ├── database/
-│   └── schema.sql          # Schema completo del database (22 tabelle)
+│   └── schema.sql          # Schema completo del database (23 tabelle)
 ├── uploads/            # File caricati (escluso da git)
 ├── cache/              # Cache runtime (escluso da git)
 ├── assets/             # Icone PWA
@@ -180,6 +183,9 @@ eventidibest-cms/
 ├── checkin.php         # Esito del QR letto con la fotocamera del telefono (admin)
 ├── self_checkin.php    # Self check-in studente
 ├── area_personale.php  # Area utente loggato (prenotazioni, messaggi)
+├── elenco_studenti.php # Elenco degli studenti inserito dal docente (progetti per le scuole)
+├── attestati_gruppo.php # Attestati della classe, uno per pagina
+├── verifica_attestato.php # Verifica pubblica di un attestato dal codice o dal QR
 ├── profilo.php         # Profilo utente: dati SSO e modifica email
 ├── sw.js               # Service Worker (PWA)
 └── manifest.json       # Web App Manifest (PWA)
@@ -189,7 +195,7 @@ eventidibest-cms/
 
 ## Schema Database
 
-Il database e` composto da **22 tabelle**:
+Il database e` composto da **23 tabelle**:
 
 | Tabella | Descrizione |
 |---|---|
@@ -198,7 +204,8 @@ Il database e` composto da **22 tabelle**:
 | `pagine_eventi` | Sezioni/aree del portale (Welcome Week, OpenLab, ...) |
 | `sottocategorie` | Sezioni degli eventi per area (con opzione "affiancata in alto" nel layout Griglia) |
 | `eventi` | Singoli eventi e progetti (campo `tipo`) con locandina e accesso per ruolo |
-| `progetti_dettagli` | Scheda dei progetti: periodo, requisiti, studenti per scuola, referenti, moduli, obiettivi e competenze |
+| `progetti_dettagli` | Scheda di progetti ed eventi (per gli eventi: i referenti). Progetti: tipo (scuole o generico), attestati, periodo, requisiti, partecipanti per iscrizione, referenti, moduli, obiettivi e competenze |
+| `partecipanti_prenotazione` | Studenti di un'iscrizione ai progetti per le scuole, con il codice di verifica dell'attestato |
 | `turni` | Slot orari con posti, apertura/chiusura, lista attesa |
 | `prenotazioni` | Prenotazioni con QR code univoco e stato |
 | `campi_form` | Campi custom del form prenotazione per area/evento |

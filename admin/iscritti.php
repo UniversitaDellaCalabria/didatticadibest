@@ -130,6 +130,17 @@ function turno_isc_autorizzato($conn, int $t_id, int $p_id, string $rbac): bool 
 }
 function nega_accesso_isc(): void { http_response_code(403); die("Accesso negato."); }
 
+// AJAX: campi del Form Builder dell'evento del turno scelto nella prenotazione manuale
+if (isset($_GET['ajax_campi_turno'])) {
+    $t_aj = (int)$_GET['ajax_campi_turno'];
+    while (ob_get_level() > 0) ob_end_clean();
+    header('Content-Type: text/html; charset=utf-8');
+    if (!turno_isc_autorizzato($conn, $t_aj, $filtro_p, $sql_filtro_eventi_rbac)) { http_response_code(403); exit; }
+    $r_aj = $conn->query("SELECT evento_id FROM turni WHERE id = $t_aj");
+    echo html_campi_form_admin($conn, $r_aj ? (int)($r_aj->fetch_assoc()['evento_id'] ?? 0) : 0, [], 'man');
+    exit;
+}
+
 // Email "posto confermato" con ricevuta (approvazione o promozione manuale)
 function email_conferma_da_admin($conn, array $p_data, string $motivo): void {
     if (empty($p_data['email'])) return;
@@ -297,6 +308,8 @@ if (!$is_archivio) {
         if (!pren_autorizzata($conn, $pr_del_id, $filtro_p, $sql_filtro_eventi_rbac)) nega_accesso_isc();
         $p_data = get_prenotazione_con_turno_evento($conn, $pr_del_id);
         if ($p_data) {
+            $conn->query("DELETE FROM partecipanti_prenotazione WHERE prenotazione_id = $pr_del_id");
+            $conn->query("DELETE FROM messaggi_prenotazioni WHERE prenotazione_id = $pr_del_id");
             $conn->query("DELETE FROM prenotazioni WHERE id = $pr_del_id");
             if (!empty($p_data['email'])) { inviaNotificaEmail($p_data['email'], "Cancellazione Prenotazione", "La tua prenotazione per <strong>{$p_data['evento_titolo']}</strong> è stata cancellata.", $conn, colore_area_turno($conn, $p_data['turno_id'])); }
             if (in_array($p_data['stato'], ['confermata', 'richiesta_conferma', 'da_approvare'], true)) { promuovi_lista_attesa($conn, $p_data['turno_id']); }
@@ -361,22 +374,46 @@ if (!$is_archivio) {
         $email = strtolower(trim($_POST['email'] ?? ''));
         $matricola = trim($_POST['matricola'] ?? '');
         $num_posti = isset($_POST['num_posti']) ? max(1, (int)$_POST['num_posti']) : 1;
+        // Campi del Form Builder dell'evento (caricati nel modale quando si sceglie il turno)
+        $custom_data = [];
+        foreach ($_POST as $k => $v) { if (strpos($k, 'custom_') === 0) { $custom_data[substr($k, 7)] = is_array($v) ? implode(', ', $v) : trim($v); } }
+        $custom_data = array_filter($custom_data, fn($v) => $v !== '');
+        $json_custom = $custom_data ? json_encode($custom_data, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) : null;
 
         $t_info = get_turno_admin($conn, $turno_id);
         if ($t_info) {
+            $stato_man = 'confermata';
+            // Progetti: stesse regole del modulo pubblico (numero di partecipanti, una sola edizione, posti e lista d'attesa)
+            $r_tp = $conn->query("SELECT t.evento_id, t.max_posti, t.abilita_lista_attesa, e.tipo FROM turni t JOIN eventi e ON t.evento_id = e.id WHERE t.id = $turno_id");
+            $tp = $r_tp ? $r_tp->fetch_assoc() : null;
+            if ($tp && $tp['tipo'] === 'progetto') {
+                $ev_man = (int)$tp['evento_id'];
+                $num_posti = 1;
+                $err_man = valida_partecipanti_progetto($custom_data, get_dettagli_progetti($conn, [$ev_man])[$ev_man] ?? null);
+                if ($err_man === null && $email !== '') {
+                    $stmt_ed = $conn->prepare("SELECT 1 FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id WHERE t.evento_id = ? AND IFNULL(pr.stato, 'confermata') NOT IN ('annullata', 'rifiutata', 'scaduta') AND LOWER(pr.email) = ? LIMIT 1");
+                    $stmt_ed->bind_param("is", $ev_man, $email); $stmt_ed->execute();
+                    if ($stmt_ed->get_result()->num_rows > 0) $err_man = "questa email è già iscritta (o in lista d'attesa) a un'edizione del progetto";
+                }
+                if ($err_man !== null) { flash_set("Prenotazione non inserita: $err_man", 'danger'); admin_redirect("iscritti.php?p_id=$filtro_p$url_suffix"); }
+                if (getPostiOccupati($conn, $turno_id) + $num_posti > (int)$tp['max_posti']) {
+                    if ((int)$tp['abilita_lista_attesa'] !== 1) { flash_set("Prenotazione non inserita: l'edizione è al completo.", 'danger'); admin_redirect("iscritti.php?p_id=$filtro_p$url_suffix"); }
+                    $stato_man = 'in_attesa';
+                }
+            }
             $codice_p = strtoupper(substr($t_info['slug'] ?: 'EV', 0, 2)) . '-' . strtoupper(substr(md5(uniqid(rand(), true)), 0, 8));
-            $stmt_man = $conn->prepare("INSERT INTO prenotazioni (turno_id, codice_prenotazione, stato, num_posti, nome, cognome, email, matricola) VALUES (?, ?, 'confermata', ?, ?, ?, ?, ?)");
-            $stmt_man->bind_param("isisss" . "s", $turno_id, $codice_p, $num_posti, $nome, $cognome, $email, $matricola);
+            $stmt_man = $conn->prepare("INSERT INTO prenotazioni (turno_id, codice_prenotazione, stato, num_posti, nome, cognome, email, matricola, dati_custom_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt_man->bind_param("ississsss", $turno_id, $codice_p, $stato_man, $num_posti, $nome, $cognome, $email, $matricola, $json_custom);
             if ($stmt_man->execute()) {
-                decadi_attese_vincolate($conn, (int)$stmt_man->insert_id);
-                flash_set("✅ Prenotazione manuale inserita! Codice: <strong>$codice_p</strong>");
+                if ($stato_man === 'confermata') decadi_attese_vincolate($conn, (int)$stmt_man->insert_id);
+                flash_set($stato_man === 'confermata' ? "Prenotazione manuale inserita. Codice: $codice_p" : "Edizione al completo: prenotazione inserita in lista d'attesa. Codice: $codice_p", $stato_man === 'confermata' ? 'success' : 'warning');
                 if (!empty($email)) {
                     $body_conf = "<p>Gentile <strong>" . htmlspecialchars($nome . ' ' . $cognome) . "</strong>,</p>"
-                        . "<p>La tua prenotazione per l'evento <strong>" . htmlspecialchars($t_info['evento_titolo']) . "</strong> è stata inserita dalla segreteria.</p>"
+                        . "<p>La tua " . ($stato_man === 'confermata' ? "prenotazione" : "richiesta, in <strong>lista d'attesa</strong>,") . " per <strong>" . htmlspecialchars($t_info['evento_titolo']) . "</strong> è stata inserita dalla segreteria.</p>"
                         . "<p><strong>Codice prenotazione:</strong> <span style='font-family:monospace;font-size:1.2em;color:#B80000;'>$codice_p</span></p>"
-                        . "<p>Conserva questo codice: ti servirà per il check-in il giorno dell'evento.</p>"
+                        . "<p>Conserva questo codice: ti servirà per il check-in.</p>"
                         . "<p>Cordiali saluti,<br>Segreteria DiBEST</p>";
-                    inviaNotificaEmail($email, "Conferma Prenotazione: " . $t_info['evento_titolo'], $body_conf, $conn, colore_area_turno($conn, $turno_id));
+                    inviaNotificaEmail($email, ($stato_man === 'confermata' ? "Conferma Prenotazione: " : "Lista d'attesa: ") . $t_info['evento_titolo'], $body_conf, $conn, colore_area_turno($conn, $turno_id));
                 }
             }
         }
@@ -393,9 +430,11 @@ if (!$is_archivio) {
         $email = strtolower(trim($_POST['email'] ?? ''));
         $matricola = trim($_POST['matricola'] ?? '');
 
-        $custom_data = [];
-        foreach ($_POST as $k => $v) { if (strpos($k, 'custom_') === 0) { $custom_data[str_replace('custom_', '', $k)] = is_array($v) ? implode(', ', $v) : trim($v); } }
-        $json_custom_val = !empty($custom_data) ? json_encode($custom_data, JSON_UNESCAPED_UNICODE) : null;
+        // Si parte dai dati salvati: allegati e campi non presenti nel modale restano com'erano
+        $r_old = $conn->query("SELECT dati_custom_json FROM prenotazioni WHERE id = $pr_id");
+        $custom_data = json_decode((string)($r_old ? ($r_old->fetch_assoc()['dati_custom_json'] ?? '') : ''), true) ?: [];
+        foreach ($_POST as $k => $v) { if (strpos($k, 'custom_') === 0) { $custom_data[substr($k, 7)] = is_array($v) ? implode(', ', $v) : trim($v); } }
+        $json_custom_val = !empty($custom_data) ? json_encode($custom_data, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) : null;
 
         $stmt_ep = $conn->prepare("UPDATE prenotazioni SET turno_id=?, nome=?, cognome=?, email=?, matricola=?, dati_custom_json=? WHERE id=?");
         $stmt_ep->bind_param("isssssi", $nuovo_turno_id, $nome, $cognome, $email, $matricola, $json_custom_val, $pr_id);
@@ -417,7 +456,13 @@ if (isset($_POST['export_xls']) || isset($_POST['export_csv'])) {
     
     $custom_cols = get_campi_custom_export($conn, $p_export);
 
-    $sql_export = "SELECT pr.codice_prenotazione, pr.presente, IFNULL(pr.stato, 'confermata') as stato, COALESCE(pr.num_posti, 1) as num_posti, pr.nome, pr.cognome, COALESCE(NULLIF(pr.matricola, ''), u.matricola_studente, u.matricola_dipendente, u.matricola, '') as matricola_effettiva, pr.email, e.titolo as evento, t.nome_turno, t.data_turno, t.orario_inizio, pr.dati_custom_json, pr.data_prenotazione
+    // Elenco degli studenti (progetti per le scuole con attestati): colonna solo se l'area ne ha
+    $r_ms = $conn->query("SELECT 1 FROM partecipanti_prenotazione pp JOIN prenotazioni pr ON pp.prenotazione_id = pr.id JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id WHERE e.pagina_id = $p_export LIMIT 1");
+    $mostra_studenti = $r_ms && $r_ms->num_rows > 0;
+    $conn->query("SET SESSION group_concat_max_len = 100000");
+    $sql_export = "SELECT (SELECT GROUP_CONCAT(TRIM(CONCAT(pp.cognome, ' ', pp.nome)) ORDER BY pp.ordine, pp.id SEPARATOR '; ') FROM partecipanti_prenotazione pp WHERE pp.prenotazione_id = pr.id) AS studenti,
+                          (SELECT COUNT(*) FROM partecipanti_prenotazione pp2 WHERE pp2.prenotazione_id = pr.id) AS n_studenti,
+                          pr.codice_prenotazione, pr.presente, IFNULL(pr.stato, 'confermata') as stato, COALESCE(pr.num_posti, 1) as num_posti, pr.nome, pr.cognome, COALESCE(NULLIF(pr.matricola, ''), u.matricola_studente, u.matricola_dipendente, u.matricola, '') as matricola_effettiva, pr.email, e.titolo as evento, t.nome_turno, t.data_turno, t.orario_inizio, pr.dati_custom_json, pr.data_prenotazione
                 FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id LEFT JOIN utenti u ON pr.utente_id = u.id
                 WHERE e.pagina_id = $p_export $cond_turno_exp $cond_stato_exp ORDER BY (t.data_turno IS NULL), t.data_turno ASC, t.nome_turno ASC, pr.data_prenotazione DESC";
     $res_export = $conn->query($sql_export);
@@ -430,6 +475,7 @@ if (isset($_POST['export_xls']) || isset($_POST['export_csv'])) {
         echo '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"></head><body><table border="1">';
         echo '<tr><th>Codice</th><th>Stato</th><th>Presenza</th><th>Posti</th><th>Nome</th><th>Cognome</th><th>Matricola</th><th>Email</th><th>Evento</th><th>Turno</th><th>Data</th><th>Ora</th>';
         foreach ($custom_cols as $key => $label) echo '<th>' . htmlspecialchars($label) . '</th>';
+        if ($mostra_studenti) echo '<th>N. studenti in elenco</th><th>Studenti (per gli attestati)</th>';
         echo '<th>Data Registrazione</th></tr>';
         while($row = $res_export->fetch_assoc()) { 
             $json = json_decode($row['dati_custom_json'] ?? '', true) ?: [];
@@ -439,6 +485,7 @@ if (isset($_POST['export_xls']) || isset($_POST['export_csv'])) {
                 if ($val_c === '') { foreach ($json as $jk => $jv) { if (strtolower($jk) === strtolower($key) || strtolower($jk) === strtolower(str_replace(' ', '_', $label))) { $val_c = $jv; break; } } }
                 echo '<td>' . htmlspecialchars($val_c) . '</td>';
             }
+            if ($mostra_studenti) echo '<td>' . (int)$row['n_studenti'] . '</td><td>' . htmlspecialchars((string)$row['studenti']) . '</td>';
             echo '<td>' . htmlspecialchars($row['data_prenotazione']) . '</td></tr>';
         }
         echo '</table></body></html>'; exit;
@@ -448,6 +495,7 @@ if (isset($_POST['export_xls']) || isset($_POST['export_csv'])) {
         $output = fopen('php://output', 'w');
         $headers = ['Codice', 'Stato', 'Presenza', 'Posti', 'Nome', 'Cognome', 'Matricola', 'Email', 'Evento', 'Turno', 'Data', 'Ora'];
         foreach ($custom_cols as $key => $label) $headers[] = $label;
+        if ($mostra_studenti) { $headers[] = 'N. studenti in elenco'; $headers[] = 'Studenti (per gli attestati)'; }
         $headers[] = 'Data Registrazione';
         fputcsv($output, $headers);
         while($row = $res_export->fetch_assoc()) { 
@@ -458,6 +506,7 @@ if (isset($_POST['export_xls']) || isset($_POST['export_csv'])) {
                 if ($val_c === '') { foreach ($json as $jk => $jv) { if (strtolower($jk) === strtolower($key) || strtolower($jk) === strtolower(str_replace(' ', '_', $label))) { $val_c = $jv; break; } } }
                 $line[] = $val_c;
             }
+            if ($mostra_studenti) { $line[] = (int)$row['n_studenti']; $line[] = (string)$row['studenti']; }
             $line[] = $row['data_prenotazione'];
             fputcsv($output, $line); 
         }
@@ -496,8 +545,10 @@ $total_pages = max(1, (int)ceil($total_count / $per_page));
 $page = min($page, $total_pages);
 $offset = ($page - 1) * $per_page;
 $sql_pr = "SELECT pr.*, COALESCE(NULLIF(pr.matricola, ''), u.matricola_studente, u.matricola_dipendente, u.matricola) as matricola_effettiva,
-           t.nome_turno, t.data_turno, t.orario_inizio, t.orario_fine, t.evento_id, e.titolo as evento_titolo, e.luogo as evento_luogo, e.abilita_presenze
-           FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id LEFT JOIN utenti u ON pr.utente_id = u.id
+           t.nome_turno, t.data_turno, t.orario_inizio, t.orario_fine, t.evento_id, e.titolo as evento_titolo, e.luogo as evento_luogo, e.abilita_presenze,
+           e.tipo AS evento_tipo, pd.per_scuole, pd.attestati AS progetto_attestati,
+           (SELECT COUNT(*) FROM partecipanti_prenotazione pp WHERE pp.prenotazione_id = pr.id) AS n_studenti
+           FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id LEFT JOIN utenti u ON pr.utente_id = u.id LEFT JOIN progetti_dettagli pd ON pd.evento_id = e.id
            $where_pr ORDER BY pr.data_prenotazione DESC LIMIT $per_page OFFSET $offset";
 $res_pr = $conn->query($sql_pr);
 if($res_pr) while($r = $res_pr->fetch_assoc()) $prenotazioni[] = $r;
@@ -776,7 +827,10 @@ $col_area_i = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
                     <td>
                         <div class="d-flex gap-1 justify-content-end flex-wrap">
                             <a href="../stampa_ricevuta.php?code=<?php echo urlencode($pr['codice_prenotazione']); ?>" target="_blank" class="act-btn" title="Ricevuta PDF"><i class="fa fa-file-pdf"></i></a>
-                            <?php if ($ev_chk_attivo === 1 && $is_presente && $st_val === 'confermata'): ?>
+                            <?php $prog_row = ($pr['evento_tipo'] ?? '') === 'progetto'; ?>
+                            <?php if ($prog_row && (int)($pr['progetto_attestati'] ?? 0) === 1 && (int)($pr['per_scuole'] ?? 1) === 1 && $st_val === 'confermata'): ?>
+                                <a href="partecipanti.php?p_id=<?php echo $filtro_p; ?>&pr=<?php echo (int)$pr['id']; ?>" class="act-btn green" title="Studenti e attestati (<?php echo (int)$pr['n_studenti']; ?>)" aria-label="Studenti e attestati"><i class="fa fa-graduation-cap"></i><?php if ((int)$pr['n_studenti'] > 0): ?><span class="ms-1" style="font-size:.7rem;"><?php echo (int)$pr['n_studenti']; ?></span><?php endif; ?></a>
+                            <?php elseif ($ev_chk_attivo === 1 && $is_presente && $st_val === 'confermata' && (!$prog_row || (int)($pr['progetto_attestati'] ?? 0) === 1)): ?>
                                 <a href="../stampa_attestato.php?code=<?php echo urlencode($pr['codice_prenotazione']); ?>" target="_blank" class="act-btn green" title="Attestato PDF"><i class="fa fa-graduation-cap"></i></a>
                             <?php endif; ?>
                             <?php if (!$is_archivio): ?>
@@ -905,11 +959,18 @@ $col_area_i = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
                                                     </select>
                                                 </div>
                                                 <div class="row g-2 mb-3">
-                                                    <div class="col-md-6"><label class="form-label small fw-bold">Nome</label><input type="text" name="nome" class="form-control form-control-sm" value="<?php echo htmlspecialchars($pr['nome']); ?>" required></div>
-                                                    <div class="col-md-6"><label class="form-label small fw-bold">Cognome</label><input type="text" name="cognome" class="form-control form-control-sm" value="<?php echo htmlspecialchars($pr['cognome']); ?>" required></div>
-                                                    <div class="col-md-6"><label class="form-label small fw-bold">Email</label><input type="email" name="email" class="form-control form-control-sm" value="<?php echo htmlspecialchars($pr['email']); ?>" required></div>
-                                                    <div class="col-md-6"><label class="form-label small fw-bold">Matricola</label><input type="text" name="matricola" class="form-control form-control-sm" value="<?php echo htmlspecialchars($pr['matricola']); ?>"></div>
+                                                    <div class="col-md-6"><label class="form-label small fw-bold">Nome</label><input type="text" name="nome" class="form-control form-control-sm" value="<?php echo htmlspecialchars($pr['nome'] ?? ''); ?>" required></div>
+                                                    <div class="col-md-6"><label class="form-label small fw-bold">Cognome</label><input type="text" name="cognome" class="form-control form-control-sm" value="<?php echo htmlspecialchars($pr['cognome'] ?? ''); ?>" required></div>
+                                                    <div class="col-md-6"><label class="form-label small fw-bold">Email</label><input type="email" name="email" class="form-control form-control-sm" value="<?php echo htmlspecialchars($pr['email'] ?? ''); ?>" required></div>
+                                                    <div class="col-md-6"><label class="form-label small fw-bold">Matricola</label><input type="text" name="matricola" class="form-control form-control-sm" value="<?php echo htmlspecialchars($pr['matricola'] ?? ''); ?>"></div>
                                                 </div>
+                                                <?php $campi_ed = html_campi_form_admin($conn, (int)$pr['evento_id'], json_decode($pr['dati_custom_json'] ?? '', true) ?: [], 'ed' . (int)$pr['id']); ?>
+                                                <?php if ($campi_ed !== ''): ?>
+                                                    <div class="border-top pt-2">
+                                                        <div class="fw-bold small text-primary mb-2"><i class="fa fa-list-check me-1"></i> Informazioni aggiuntive</div>
+                                                        <div class="row g-2"><?php echo $campi_ed; ?></div>
+                                                    </div>
+                                                <?php endif; ?>
                                             </div>
                                             <div class="modal-footer py-2">
                                                 <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Annulla</button>
@@ -1027,7 +1088,7 @@ $col_area_i = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
                 <div class="modal-body text-start">
                     <div class="mb-3">
                         <label class="form-label small fw-bold">Seleziona Evento e Turno</label>
-                        <select name="turno_id" class="form-select border-primary fw-bold" required>
+                        <select name="turno_id" id="manTurno" class="form-select border-primary fw-bold" required>
                             <option value="">-- Seleziona un Turno --</option>
                             <?php foreach ($tutti_gli_eventi as $ev_m): ?>
                                 <?php foreach ($ev_m['turni'] as $t_m): ?>
@@ -1060,6 +1121,7 @@ $col_area_i = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
                         <div class="col-md-6"><label class="form-label small fw-bold">Email</label><input type="email" id="manEmail" name="email" class="form-control form-control-sm" required placeholder="mario.rossi@unical.it"></div>
                         <div class="col-md-6"><label class="form-label small fw-bold">Matricola (Opzionale)</label><input type="text" id="manMatricola" name="matricola" class="form-control form-control-sm" placeholder="Es. 210000"></div>
                     </div>
+                    <div id="manCampi" class="row g-2" aria-live="polite"></div>
                 </div>
                 <div class="modal-footer py-2">
                     <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Annulla</button>
@@ -1072,6 +1134,20 @@ $col_area_i = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
 
 <script>
     var _csrfToken = '<?php echo htmlspecialchars($_ev_csrf_val, ENT_QUOTES); ?>';
+    // Prenotazione manuale: al cambio del turno carica i campi del Form Builder di quell'evento/progetto
+    (function () {
+        var sel = document.getElementById('manTurno'), box = document.getElementById('manCampi');
+        if (!sel || !box) return;
+        sel.addEventListener('change', function () {
+            box.innerHTML = '';
+            if (!sel.value) return;
+            fetch('iscritti.php?p_id=<?php echo (int)$filtro_p; ?>&ajax_campi_turno=' + encodeURIComponent(sel.value), { credentials: 'same-origin' })
+                .then(function (r) { return r.ok ? r.text() : ''; })
+                .then(function (html) {
+                    box.innerHTML = html ? '<div class="col-12 border-top pt-2 fw-bold small text-primary"><i class="fa fa-list-check me-1"></i> Informazioni aggiuntive</div>' + html : '';
+                });
+        });
+    })();
     document.addEventListener('DOMContentLoaded', function() {
         $('#formMailMassiva').on('submit', function(e) {
             e.preventDefault();

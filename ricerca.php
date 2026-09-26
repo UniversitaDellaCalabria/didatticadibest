@@ -56,7 +56,7 @@ $risultati = !empty($q_raw) ? cerca_eventi($conn, $q_raw) : [];
                 
                 // Determinare il link corretto (Pagina Attiva o Archivio Storico)
                 $link_destinazione = $is_archived ? ($ev['slug_area'] . '_archivio.php') : ($ev['slug_area'] . '.php');
-                if (!$is_archived && ($ev['tipo'] ?? '') === 'progetto') $link_destinazione .= '?progetto=' . (int)$ev['id']; // scheda del progetto
+                if (!$is_archived) $link_destinazione .= (($ev['tipo'] ?? '') === 'progetto' ? '?progetto=' : '?evento=') . (int)$ev['id']; // scheda del progetto o dell'evento
             ?>
                 <div class="col-md-6 col-lg-4">
                     <div class="card shadow-sm border-0 h-100 bg-white" style="border-radius: 8px; overflow: hidden; <?php echo $is_archived ? 'filter: grayscale(40%);' : ''; ?>">
@@ -81,7 +81,7 @@ $risultati = !empty($q_raw) ? cerca_eventi($conn, $q_raw) : [];
                             <?php endif; ?>
 
                             <div class="text-secondary mb-4 flex-grow-1" style="font-size: 0.9rem; line-height: 1.5;">
-                                <?php echo mb_strimwidth(strip_tags($ev['descrizione']), 0, 120, '...'); ?>
+                                <?php echo mb_strimwidth(strip_tags($ev['descrizione'] ?? ''), 0, 120, '...'); ?>
                             </div>
                             
                             <div class="mt-auto">

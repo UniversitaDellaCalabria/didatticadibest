@@ -35,8 +35,8 @@ $now = date('Y-m-d H:i:s');
 $email_inviate = 0;
 
 // Cerchiamo chi deve ricevere l'email (Evento finito, Presente, Mai inviata prima)
-$sql = "SELECT p.id, p.turno_id, p.nome, p.cognome, p.email, p.codice_prenotazione, 
-               t.data_turno, e.titolo 
+$sql = "SELECT p.id, p.turno_id, p.nome, p.cognome, p.email, p.codice_prenotazione,
+               t.data_turno, t.evento_id, e.titolo
         FROM prenotazioni p
         JOIN turni t ON p.turno_id = t.id
         JOIN eventi e ON t.evento_id = e.id
@@ -51,6 +51,11 @@ if ($res && $res->num_rows > 0) {
     $domain = "https://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . rtrim(dirname($_SERVER['PHP_SELF']), '/\\');
     
     while ($row = $res->fetch_assoc()) {
+        // Progetti: attestato solo se previsto e a progetto concluso; per le scuole gli attestati degli studenti vanno al docente
+        $regola = regola_attestato_evento($conn, (int)$row['evento_id']);
+        if ($regola === 'no' || $regola === 'attendi') continue;
+        if ($regola === 'gruppo') { if (invia_attestati_gruppo($conn, (int)$row['id']) === true) $email_inviate++; continue; }
+
         $oggetto = "Il tuo Attestato è pronto: " . $row['titolo'];
         $link_attestato = $domain . "/stampa_attestato.php?code=" . urlencode($row['codice_prenotazione']);
         $link_area = $domain . "/area_personale.php";

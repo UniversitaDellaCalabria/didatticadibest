@@ -45,6 +45,29 @@ function inserisci_turno($conn, int $ev_id, array $t): void {
     $stmt->execute();
 }
 
+// Righe "Referenti" (nome, ruolo, email, telefono, pagina personale, riceve le prenotazioni) nei modali degli eventi
+function html_referenti_evento(array $referenti): string {
+    if (!$referenti) $referenti = [['ruolo' => 'Referente', 'notifiche' => 0]];
+    $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+    $out = '<div class="ref-box">';
+    foreach ($referenti as $r) {
+        $n = !empty($r['notifiche']);
+        $out .= '<div class="ref-riga border rounded p-2 mb-2 bg-light">'
+              . '<div class="row g-2">'
+              . '<div class="col-md-3"><input type="text" name="ref_ruolo[]" class="form-control form-control-sm" value="' . $h($r['ruolo'] ?? '') . '" placeholder="Ruolo (es. Docente referente)" aria-label="Ruolo" list="refRuoliEv"></div>'
+              . '<div class="col-md-4"><input type="text" name="ref_nome[]" class="form-control form-control-sm" value="' . $h($r['nome'] ?? '') . '" placeholder="Nome e cognome" aria-label="Nome e cognome"></div>'
+              . '<div class="col-md-5"><input type="email" name="ref_email[]" class="form-control form-control-sm" value="' . $h($r['email'] ?? '') . '" placeholder="email@unical.it" aria-label="Email"></div>'
+              . '<div class="col-md-3"><input type="tel" name="ref_tel[]" class="form-control form-control-sm" value="' . $h($r['telefono'] ?? '') . '" placeholder="Telefono" aria-label="Telefono"></div>'
+              . '<div class="col-md-5"><input type="url" name="ref_link[]" class="form-control form-control-sm" value="' . $h($r['link'] ?? '') . '" placeholder="Link pagina personale (facoltativo)" aria-label="Link alla pagina personale"></div>'
+              . '<div class="col-md-4 d-flex align-items-center justify-content-between gap-2">'
+              . '<input type="hidden" name="ref_notifiche[]" value="' . ($n ? '1' : '0') . '">'
+              . '<label class="form-check form-switch m-0 small fw-bold"><input class="form-check-input ref-notif" type="checkbox"' . ($n ? ' checked' : '') . '> Riceve le prenotazioni</label>'
+              . '<button type="button" class="btn btn-sm btn-outline-danger ref-rimuovi" title="Rimuovi" aria-label="Rimuovi referente"><i class="fa fa-times" aria-hidden="true"></i></button>'
+              . '</div></div></div>';
+    }
+    return $out . '</div><button type="button" class="btn btn-sm btn-outline-secondary fw-bold ref-aggiungi"><i class="fa fa-plus me-1" aria-hidden="true"></i>Aggiungi referente</button>';
+}
+
 
 if (isset($_POST['duplica_turno'])) {
     csrf_verify($_POST['csrf_token'] ?? '');
@@ -105,6 +128,9 @@ if (isset($_POST['add_evento'])) {
     $titolo = $_POST['titolo'] ?? '';
     $luogo = $_POST['luogo'] ?? '';
     $desc = $_POST['descrizione'] ?? '';
+    // Descrizione breve: testo semplice per le card (max 300 caratteri); la completa va nella scheda dell'evento
+    $desc_breve = mb_substr(trim(strip_tags((string)($_POST['descrizione_breve'] ?? ''))), 0, 300);
+    $desc_breve = $desc_breve === '' ? null : $desc_breve;
     $ord = (int)($_POST['ordine_evento'] ?? 0);
     $evid = isset($_POST['is_evidenza']) ? 1 : 0;
     $req_pren = isset($_POST['richiede_prenotazione']) ? 1 : 0;
@@ -134,7 +160,13 @@ if (isset($_POST['add_evento'])) {
     $stmt_nx = $conn->prepare("UPDATE eventi SET email_notifiche_extra = ? WHERE id = ?");
     $stmt_nx->bind_param("si", $notif_csv, $ev_id);
     $stmt_nx->execute();
+    $stmt_db = $conn->prepare("UPDATE eventi SET descrizione_breve = ? WHERE id = ?");
+    $stmt_db->bind_param("si", $desc_breve, $ev_id);
+    $stmt_db->execute();
     $avviso_notif = $notif_scartati ? " Indirizzi non validi ignorati: " . htmlspecialchars(implode(', ', $notif_scartati)) . "." : '';
+    $ref_ev = leggi_referenti_post($ref_scartate);
+    if ($ref_ev) salva_referenti_evento($conn, $ev_id, $ref_ev);
+    if ($ref_scartate) $avviso_notif .= " Email dei referenti non valide ignorate: " . implode(", ", $ref_scartate) . ".";
 
     $primo_turno = leggi_turno_post();
     if ($primo_turno) inserisci_turno($conn, $ev_id, $primo_turno);
@@ -152,6 +184,9 @@ if (isset($_POST['edit_evento'])) {
     $titolo = $_POST['titolo'] ?? '';
     $luogo = $_POST['luogo'] ?? '';
     $desc = $_POST['descrizione'] ?? '';
+    // Descrizione breve: testo semplice per le card (max 300 caratteri); la completa va nella scheda dell'evento
+    $desc_breve = mb_substr(trim(strip_tags((string)($_POST['descrizione_breve'] ?? ''))), 0, 300);
+    $desc_breve = $desc_breve === '' ? null : $desc_breve;
     $ord = (int)($_POST['ordine_evento'] ?? 0);
     $evid = isset($_POST['is_evidenza']) ? 1 : 0;
     $req_pren = isset($_POST['richiede_prenotazione']) ? 1 : 0;
@@ -191,7 +226,13 @@ if (isset($_POST['edit_evento'])) {
     $stmt_nx = $conn->prepare("UPDATE eventi SET email_notifiche_extra = ? WHERE id = ?");
     $stmt_nx->bind_param("si", $notif_csv, $ev_id);
     $stmt_nx->execute();
+    $stmt_db = $conn->prepare("UPDATE eventi SET descrizione_breve = ? WHERE id = ?");
+    $stmt_db->bind_param("si", $desc_breve, $ev_id);
+    $stmt_db->execute();
     $avviso_notif = $notif_scartati ? " Indirizzi non validi ignorati: " . htmlspecialchars(implode(', ', $notif_scartati)) . "." : '';
+    $ref_ev = leggi_referenti_post($ref_scartate);
+    salva_referenti_evento($conn, $ev_id, $ref_ev);
+    if ($ref_scartate) $avviso_notif .= " Email dei referenti non valide ignorate: " . implode(", ", $ref_scartate) . ".";
     if (function_exists('registra_log_audit')) registra_log_audit($conn, "Modifica Evento", ["Evento ID" => $ev_id]);
     flash_set("Evento modificato!" . $avviso_notif, $avviso_notif ? 'warning' : 'success');
     admin_redirect("eventi.php?p_id=$filtro_p&f_ev=$filtro_ev");
@@ -319,6 +360,7 @@ if ($res_ev) {
         if ($filtro_ev === 0 || $filtro_ev == $row['id']) { $eventi[] = $row; }
     }
 }
+$schede_ev = get_dettagli_progetti($conn, array_column($eventi, 'id'));
 ?>
 
 <?php
@@ -631,11 +673,21 @@ $col_area = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
                         <div class="col-md-4 mb-2 pt-2 border-top"><div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="is_evidenza" id="checkEvid" value="1"><label class="form-check-label small fw-bold text-danger" for="checkEvid">⭐ In EVIDENZA</label></div></div>
                         <div class="col-md-4 mb-2 pt-2 border-top"><div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="abilita_presenze" id="checkPres" value="1" checked><label class="form-check-label small fw-bold text-success" for="checkPres">Check-in / Scanner QR</label></div></div>
                         
-                        <div class="col-12 mt-2 mb-2"><label class="form-label small fw-bold">Descrizione Evento</label><textarea name="descrizione" class="form-control form-control-sm editor-html" rows="3"></textarea></div>
+                        <div class="col-12 mt-2 mb-1">
+                            <label for="descBreveNuovo" class="form-label small fw-bold">Descrizione breve <span class="fw-normal text-muted">(compare nelle card)</span></label>
+                            <textarea name="descrizione_breve" id="descBreveNuovo" class="form-control form-control-sm desc-breve" rows="2" maxlength="300" placeholder="Una o due frasi che invogliano ad aprire la scheda dell'evento"></textarea>
+                            <small class="text-muted"><span class="desc-breve-conta">0</span>/300 caratteri. La descrizione completa qui sotto si vede nella scheda dell'evento.</small>
+                        </div>
+                        <div class="col-12 mt-2 mb-2"><label class="form-label small fw-bold">Descrizione completa <span class="fw-normal text-muted">(scheda dell'evento)</span></label><textarea name="descrizione" class="form-control form-control-sm editor-html" rows="3"></textarea></div>
                         <div class="col-12 mb-2">
                             <label for="notifExtraNuovo" class="form-label small fw-bold"><i class="fa fa-envelope me-1" aria-hidden="true"></i> Invia copia delle prenotazioni a</label>
                             <input type="text" name="email_notifiche_extra" id="notifExtraNuovo" class="form-control form-control-sm" placeholder="es. segreteria@unical.it, docente@unical.it">
                             <small class="text-muted">Facoltativo. Oltre ai gestori, questi indirizzi ricevono il riepilogo completo di ogni prenotazione e disdetta (campi aggiuntivi compresi). Separali con una virgola, massimo 10.</small>
+                        </div>
+                        <div class="col-12 mb-2">
+                            <label class="form-label small fw-bold"><i class="fa fa-address-book me-1" aria-hidden="true"></i> Referenti dell'evento</label>
+                            <?php echo html_referenti_evento([]); ?>
+                            <small class="text-muted d-block">Facoltativi: compaiono nella scheda dell'evento con email, telefono e pagina personale. Chi ha "Riceve le prenotazioni" riceve il riepilogo di ogni prenotazione e disdetta.</small>
                         </div>
                     </div>
 
@@ -720,11 +772,21 @@ $col_area = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
                             </div>
                         </div>
 
-                        <div class="mb-2 bg-white p-2 rounded border"><label class="form-label small fw-bold">Descrizione Evento</label><textarea name="descrizione" class="form-control form-control-sm editor-html" rows="4"><?php echo htmlspecialchars($ev['descrizione'] ?? ''); ?></textarea></div>
+                        <div class="mb-2 bg-white p-2 rounded border">
+                            <label for="descBreve<?php echo $ev['id']; ?>" class="form-label small fw-bold">Descrizione breve <span class="fw-normal text-muted">(compare nelle card)</span></label>
+                            <textarea name="descrizione_breve" id="descBreve<?php echo $ev['id']; ?>" class="form-control form-control-sm desc-breve" rows="2" maxlength="300" placeholder="Una o due frasi che invogliano ad aprire la scheda dell'evento"><?php echo htmlspecialchars($ev['descrizione_breve'] ?? ''); ?></textarea>
+                            <small class="text-muted"><span class="desc-breve-conta">0</span>/300 caratteri. Se è vuota, nelle card compare l'inizio della descrizione completa.</small>
+                        </div>
+                        <div class="mb-2 bg-white p-2 rounded border"><label class="form-label small fw-bold">Descrizione completa <span class="fw-normal text-muted">(scheda dell'evento)</span></label><textarea name="descrizione" class="form-control form-control-sm editor-html" rows="4"><?php echo htmlspecialchars($ev['descrizione'] ?? ''); ?></textarea></div>
                         <div class="mb-2 bg-white p-2 rounded border">
                             <label for="notifExtra<?php echo $ev['id']; ?>" class="form-label small fw-bold"><i class="fa fa-envelope me-1" aria-hidden="true"></i> Invia copia delle prenotazioni a</label>
                             <input type="text" name="email_notifiche_extra" id="notifExtra<?php echo $ev['id']; ?>" class="form-control form-control-sm" value="<?php echo htmlspecialchars(implode(', ', normalizza_lista_email($ev['email_notifiche_extra'] ?? ''))); ?>" placeholder="es. segreteria@unical.it, docente@unical.it">
                             <small class="text-muted">Oltre ai gestori, questi indirizzi ricevono il riepilogo completo di ogni prenotazione e disdetta. Separali con una virgola, massimo 10. Lascia vuoto per nessuno.</small>
+                        </div>
+                        <div class="mb-2 bg-white p-2 rounded border">
+                            <label class="form-label small fw-bold"><i class="fa fa-address-book me-1" aria-hidden="true"></i> Referenti dell'evento</label>
+                            <?php echo html_referenti_evento($schede_ev[(int)$ev['id']]['referenti'] ?? []); ?>
+                            <small class="text-muted d-block">Compaiono nella scheda dell'evento. Chi ha "Riceve le prenotazioni" riceve il riepilogo di ogni prenotazione e disdetta.</small>
                         </div>
                     </div>
                     <div class="modal-footer py-2 bg-white border-top">
@@ -785,5 +847,31 @@ document.addEventListener("DOMContentLoaded", function () {
     var el = document.getElementById(id);
     if (el && window.bootstrap) bootstrap.Modal.getOrCreateInstance(el).show();
 });
+// Referenti nei modali degli eventi: aggiungi, rimuovi, "riceve le prenotazioni"
+document.addEventListener('click', function (e) {
+    var add = e.target.closest('.ref-aggiungi');
+    if (add) {
+        var box = add.previousElementSibling, modello = box.lastElementChild, nuova = modello.cloneNode(true);
+        nuova.querySelectorAll('input').forEach(function (i) { if (i.type === 'checkbox') i.checked = false; else if (i.type === 'hidden') i.value = '0'; else i.value = ''; });
+        box.appendChild(nuova); nuova.querySelector('input').focus();
+        return;
+    }
+    var rim = e.target.closest('.ref-rimuovi');
+    if (rim) {
+        var riga = rim.closest('.ref-riga');
+        if (riga.parentElement.children.length > 1) riga.remove();
+        else riga.querySelectorAll('input').forEach(function (i) { if (i.type === 'checkbox') i.checked = false; else if (i.type === 'hidden') i.value = '0'; else i.value = ''; });
+    }
+});
+document.addEventListener('change', function (e) {
+    if (e.target.classList.contains('ref-notif')) e.target.closest('.ref-riga').querySelector('input[name="ref_notifiche[]"]').value = e.target.checked ? '1' : '0';
+});
+// Contatore dei caratteri della descrizione breve
+document.querySelectorAll('.desc-breve').forEach(function (ta) {
+    var out = ta.parentElement.querySelector('.desc-breve-conta');
+    var agg = function () { if (out) out.textContent = ta.value.length; };
+    ta.addEventListener('input', agg); agg();
+});
 </script>
+<datalist id="refRuoliEv"><option value="Docente referente"><option value="Referente"><option value="Relatore"><option value="Tutor"><option value="Segreteria"></datalist>
 <?php require_once 'admin_footer.php'; ?>

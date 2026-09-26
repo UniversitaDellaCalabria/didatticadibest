@@ -1,7 +1,7 @@
 <?php
-// progetti.php - Progetti (es. Formazione Scuola Lavoro): scheda completa del progetto e iscrizione della scuola.
+// progetti.php - Progetti (es. Formazione Scuola Lavoro): scheda completa del progetto, edizioni e iscrizioni.
 // Un progetto è un evento con tipo = 'progetto', una scheda in progetti_dettagli e un solo turno di iscrizione
-// da 1 posto con lista d'attesa: la prima scuola è confermata, le altre attendono in ordine di arrivo.
+// per edizione. Progetti per le scuole: 1 posto per edizione (una scuola, le altre in lista d'attesa); progetti generici: posti a scelta.
 // Iscritti, messaggi, archivio, form builder e notifiche funzionano come per gli altri eventi.
 require_once 'admin_header.php';
 
@@ -87,27 +87,7 @@ if (isset($_POST['salva_progetto'])) {
     if ($errori) { flash_set("Progetto non salvato: " . implode('; ', $errori) . ".", 'danger'); admin_redirect($url_form); }
 
     // Referenti e tutor: righe con almeno nome o email; email non valide scartate e segnalate
-    $referenti = []; $email_scartate = [];
-    foreach ((array)($_POST['ref_nome'] ?? []) as $i => $nome_r) {
-        $r = [
-            'ruolo'    => mb_substr(trim((string)($_POST['ref_ruolo'][$i] ?? '')), 0, 60),
-            'nome'     => mb_substr(trim((string)$nome_r), 0, 120),
-            'email'    => mb_substr(strtolower(trim((string)($_POST['ref_email'][$i] ?? ''))), 0, 150),
-            'telefono' => mb_substr(trim((string)($_POST['ref_tel'][$i] ?? '')), 0, 40),
-            'link'     => mb_substr(trim((string)($_POST['ref_link'][$i] ?? '')), 0, 300),
-            // Riceve il riepilogo di ogni iscrizione e disdetta (come i gestori)
-            'notifiche' => (($_POST['ref_notifiche'][$i] ?? '0') === '1') ? 1 : 0,
-        ];
-        if ($r['email'] !== '' && !filter_var($r['email'], FILTER_VALIDATE_EMAIL)) { $email_scartate[] = $r['email']; $r['email'] = ''; }
-        if ($r['telefono'] !== '' && !preg_match('/^[0-9 +().\/-]{5,40}$/', $r['telefono'])) $r['telefono'] = '';
-        // Pagina personale: solo indirizzi http(s), es. https://www.unical.it/... ("www.…" senza schema diventa https://)
-        if ($r['link'] !== '' && !preg_match('#^https?://#i', $r['link'])) $r['link'] = 'https://' . $r['link'];
-        if ($r['link'] !== '' && !filter_var($r['link'], FILTER_VALIDATE_URL)) $r['link'] = '';
-        if ($r['email'] === '') $r['notifiche'] = 0;
-        if ($r['nome'] === '' && $r['email'] === '') continue;
-        $referenti[] = $r;
-        if (count($referenti) >= 10) break;
-    }
+    $referenti = leggi_referenti_post($email_scartate);
     // Informazioni aggiuntive: coppie etichetta / valore
     $info_extra = [];
     foreach ((array)($_POST['info_etichetta'] ?? []) as $i => $et) {
@@ -139,13 +119,20 @@ if (isset($_POST['salva_progetto'])) {
     $conoscenze = trim((string)($_POST['conoscenze'] ?? '')) ?: null;
     $competenze = trim((string)($_POST['competenze'] ?? '')) ?: null;
 
-    // Edizioni (repliche): ogni riga è un turno da 1 scuola. ed_id = turno esistente (0 = nuova)
+    // Tipo di progetto: per le scuole (una scuola per edizione, numero di partecipanti) o generico (posti per edizione)
+    $per_scuole = isset($_POST['per_scuole']) ? 1 : 0;
+    $attestati  = isset($_POST['attestati']) ? 1 : 0;
+
+    // Edizioni (repliche): ogni riga è un turno. ed_id = turno esistente (0 = nuova).
+    // Per le scuole ogni edizione ha 1 posto; altrimenti i posti indicati (predefinito 30).
     $edizioni = [];
     foreach ((array)($_POST['ed_nome'] ?? []) as $i => $nome_ed) {
-        $edizioni[] = ['id' => (int)($_POST['ed_id'][$i] ?? 0), 'nome' => mb_substr(trim((string)$nome_ed), 0, 150)];
+        $posti_ed = (int)($_POST['ed_posti'][$i] ?? 0);
+        $edizioni[] = ['id' => (int)($_POST['ed_id'][$i] ?? 0), 'nome' => mb_substr(trim((string)$nome_ed), 0, 150),
+                       'posti' => $per_scuole ? 1 : ($posti_ed > 0 ? min($posti_ed, 9999) : 30)];
         if (count($edizioni) >= 20) break;
     }
-    if (!$edizioni) $edizioni[] = ['id' => 0, 'nome' => ''];
+    if (!$edizioni) $edizioni[] = ['id' => 0, 'nome' => '', 'posti' => $per_scuole ? 1 : 30];
 
     $upload_dir = dirname(__DIR__) . '/uploads/';
     $new_locandina = null; $new_pdf = null;
@@ -170,14 +157,14 @@ if (isset($_POST['salva_progetto'])) {
         if ($ev_id === 0) {
             // Iscrizione solo con accesso (SSO Unical, SPID, CIE): ruolo_accesso_id = -1
             $stmt = $conn->prepare("INSERT INTO eventi (pagina_id, sottocategoria_id, titolo, luogo, descrizione, locandina_path, allegato_pdf, is_evidenza, richiede_prenotazione, abilita_presenze, ruolo_accesso_id, ordine, gestori_utenti_ids, tipo, email_notifiche_extra)
-                                    VALUES (?, NULL, ?, ?, ?, ?, ?, ?, 1, 0, -1, ?, '', 'progetto', ?)");
+                                    VALUES (?, NULL, ?, ?, ?, ?, ?, ?, 1, ?, -1, ?, '', 'progetto', ?)");
             $loc = $new_locandina ?? '';
-            $stmt->bind_param("isssssiis", $filtro_p, $titolo, $luogo, $desc, $loc, $new_pdf, $evid, $ord, $notif_csv);
+            $stmt->bind_param("isssssiiis", $filtro_p, $titolo, $luogo, $desc, $loc, $new_pdf, $evid, $attestati, $ord, $notif_csv); // presenze (check-in) attive se servono gli attestati
             if (!$stmt->execute()) throw new RuntimeException($conn->error);
             $ev_id = (int)$conn->insert_id;
         } else {
-            $sql = "UPDATE eventi SET titolo=?, luogo=?, descrizione=?, is_evidenza=?, ordine=?, email_notifiche_extra=?, richiede_prenotazione=1, ruolo_accesso_id=-1";
-            $types = "sssiis"; $params = [$titolo, $luogo, $desc, $evid, $ord, $notif_csv];
+            $sql = "UPDATE eventi SET titolo=?, luogo=?, descrizione=?, is_evidenza=?, ordine=?, email_notifiche_extra=?, richiede_prenotazione=1, ruolo_accesso_id=-1, abilita_presenze=IF(? = 1, 1, abilita_presenze)";
+            $types = "sssiisi"; $params = [$titolo, $luogo, $desc, $evid, $ord, $notif_csv, $attestati];
             if (isset($_POST['elimina_locandina'])) $sql .= ", locandina_path=''";
             if (isset($_POST['elimina_pdf']))       $sql .= ", allegato_pdf=NULL";
             if ($new_locandina !== null) { $sql .= ", locandina_path=?"; $types .= "s"; $params[] = $new_locandina; }
@@ -188,41 +175,42 @@ if (isset($_POST['salva_progetto'])) {
             if (!$stmt->execute()) throw new RuntimeException($conn->error);
         }
 
-        $stmt_d = $conn->prepare("INSERT INTO progetti_dettagli (evento_id, struttura, data_inizio, data_fine, periodo_note, destinatari, modalita, ore_totali, incontri_previsti, min_studenti, max_studenti, referenti_json, info_extra_json, moduli_json, obiettivi, conoscenze, competenze, updated_at)
-                                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+        $stmt_d = $conn->prepare("INSERT INTO progetti_dettagli (evento_id, struttura, data_inizio, data_fine, periodo_note, destinatari, modalita, ore_totali, incontri_previsti, min_studenti, max_studenti, referenti_json, info_extra_json, moduli_json, obiettivi, conoscenze, competenze, per_scuole, attestati, updated_at)
+                                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
                                   ON DUPLICATE KEY UPDATE struttura=VALUES(struttura), data_inizio=VALUES(data_inizio), data_fine=VALUES(data_fine), periodo_note=VALUES(periodo_note),
                                       destinatari=VALUES(destinatari), modalita=VALUES(modalita), ore_totali=VALUES(ore_totali), incontri_previsti=VALUES(incontri_previsti),
                                       min_studenti=VALUES(min_studenti), max_studenti=VALUES(max_studenti),
                                       referenti_json=VALUES(referenti_json), info_extra_json=VALUES(info_extra_json), moduli_json=VALUES(moduli_json),
-                                      obiettivi=VALUES(obiettivi), conoscenze=VALUES(conoscenze), competenze=VALUES(competenze), updated_at=NOW()");
-        $stmt_d->bind_param("issssssiiiissssss", $ev_id, $d['struttura'], $d['data_inizio'], $d['data_fine'], $d['periodo_note'], $d['destinatari'], $d['modalita'],
-                            $d['ore_totali'], $d['incontri_previsti'], $d['min_studenti'], $d['max_studenti'], $ref_json, $info_json, $mod_json, $obiettivi, $conoscenze, $competenze);
+                                      obiettivi=VALUES(obiettivi), conoscenze=VALUES(conoscenze), competenze=VALUES(competenze),
+                                      per_scuole=VALUES(per_scuole), attestati=VALUES(attestati), updated_at=NOW()");
+        $stmt_d->bind_param("issssssiiiissssssii", $ev_id, $d['struttura'], $d['data_inizio'], $d['data_fine'], $d['periodo_note'], $d['destinatari'], $d['modalita'],
+                            $d['ore_totali'], $d['incontri_previsti'], $d['min_studenti'], $d['max_studenti'], $ref_json, $info_json, $mod_json, $obiettivi, $conoscenze, $competenze, $per_scuole, $attestati);
         if (!$stmt_d->execute()) throw new RuntimeException($conn->error);
 
-        // Edizioni = turni di iscrizione: 1 scuola ciascuno, lista d'attesa attiva, niente approvazione (ordine di arrivo).
+        // Edizioni = turni di iscrizione (posti: 1 per le scuole), lista d'attesa attiva, niente approvazione (ordine di arrivo).
         // Apertura e chiusura delle iscrizioni sono le stesse per tutte le edizioni.
         $turni_esistenti = [];
         $r_t = $conn->query("SELECT id FROM turni WHERE evento_id = $ev_id ORDER BY id ASC");
         while ($r_t && $rt = $r_t->fetch_assoc()) $turni_esistenti[] = (int)$rt['id'];
         $tenuti = [];
-        $stmt_up = $conn->prepare("UPDATE turni SET nome_turno = ?, max_posti = 1, data_apertura = ?, data_chiusura = ?, abilita_lista_attesa = 1, abilita_multi_posto = 0, richiede_approvazione = 0 WHERE id = ?");
+        $stmt_up = $conn->prepare("UPDATE turni SET nome_turno = ?, max_posti = ?, data_apertura = ?, data_chiusura = ?, abilita_lista_attesa = 1, abilita_multi_posto = 0, richiede_approvazione = 0 WHERE id = ?");
         $stmt_in = $conn->prepare("INSERT INTO turni (evento_id, nome_turno, data_turno, orario_inizio, orario_fine, max_posti, data_apertura, data_chiusura, abilita_lista_attesa, abilita_multi_posto, richiede_approvazione)
-                                   VALUES (?, ?, NULL, NULL, NULL, 1, ?, ?, 1, 0, 0)");
+                                   VALUES (?, ?, NULL, NULL, NULL, ?, ?, ?, 1, 0, 0)");
         $n_ed = count($edizioni);
         foreach ($edizioni as $k => $ed) {
-            // Nome dell'edizione: quello scritto, altrimenti "Edizione N" (o "Iscrizione scuole" se è l'unica)
-            $nome_ed = $ed['nome'] !== '' ? $ed['nome'] : ($n_ed > 1 ? 'Edizione ' . ($k + 1) : 'Iscrizione scuole');
+            // Nome dell'edizione: quello scritto, altrimenti "Edizione N" (o "Iscrizioni" se è l'unica)
+            $nome_ed = $ed['nome'] !== '' ? $ed['nome'] : ($n_ed > 1 ? 'Edizione ' . ($k + 1) : 'Iscrizioni');
             if ($ed['id'] > 0 && in_array($ed['id'], $turni_esistenti, true)) {
-                $stmt_up->bind_param("sssi", $nome_ed, $apertura, $chiusura, $ed['id']);
+                $stmt_up->bind_param("sissi", $nome_ed, $ed['posti'], $apertura, $chiusura, $ed['id']);
                 if (!$stmt_up->execute()) throw new RuntimeException($conn->error);
                 $tenuti[] = $ed['id'];
             } else {
-                $stmt_in->bind_param("isss", $ev_id, $nome_ed, $apertura, $chiusura);
+                $stmt_in->bind_param("isiss", $ev_id, $nome_ed, $ed['posti'], $apertura, $chiusura);
                 if (!$stmt_in->execute()) throw new RuntimeException($conn->error);
                 $tenuti[] = (int)$conn->insert_id;
             }
         }
-        // Edizioni tolte dalla maschera: eliminate solo se nessuna scuola è iscritta o in attesa
+        // Edizioni tolte dalla maschera: eliminate solo se nessuno è iscritto o in attesa
         foreach (array_diff($turni_esistenti, $tenuti) as $t_via) {
             $r_n = $conn->query("SELECT COUNT(*) AS n FROM prenotazioni WHERE turno_id = $t_via AND IFNULL(stato, 'confermata') NOT IN ('annullata', 'rifiutata', 'scaduta')");
             if ($r_n && (int)$r_n->fetch_assoc()['n'] > 0) {
@@ -246,7 +234,7 @@ if (isset($_POST['salva_progetto'])) {
     $avvisi = [];
     if ($notif_scartati) $avvisi[] = "indirizzi per le notifiche non validi ignorati: " . implode(', ', $notif_scartati);
     if ($email_scartate) $avvisi[] = "email dei referenti non valide ignorate: " . implode(', ', $email_scartate);
-    if ($edizioni_non_tolte) $avvisi[] = "non ho eliminato le edizioni con scuole iscritte o in attesa (" . implode(', ', $edizioni_non_tolte) . "): annulla prima le loro iscrizioni";
+    if ($edizioni_non_tolte) $avvisi[] = "non ho eliminato le edizioni con iscritti o persone in attesa (" . implode(', ', $edizioni_non_tolte) . "): annulla prima le loro iscrizioni";
     registra_log_audit($conn, (int)($_POST['evento_id'] ?? 0) ? "Modifica Progetto" : "Creazione Progetto", ["Evento ID" => $ev_id, "Titolo" => $titolo]);
     flash_set("Progetto salvato." . ($avvisi ? " Attenzione: " . implode('; ', $avvisi) . "." : ''), $avvisi ? 'warning' : 'success');
     admin_redirect("progetti.php?p_id=$filtro_p");
@@ -324,6 +312,7 @@ if ($mostra_form):
 .pj-mod { padding-bottom:.6rem; margin-bottom:.6rem; border-bottom:1px dashed #e2e8f0; display:grid; gap:.4rem; }
 .pj-mod-riga { display:grid; grid-template-columns: 1fr 80px 170px 38px; gap:.5rem; }
 .pj-mod-riga2 { display:grid; grid-template-columns: 1fr 1fr; gap:.5rem; padding-right:46px; }
+.pj-form-generico .pj-solo-scuole, .pj-form-scuole .pj-solo-generico { display:none !important; }
 .pj-ed { display:flex; gap:.5rem; align-items:center; margin-bottom:.5rem; }
 .pj-riga-2 { display:grid; grid-template-columns: 1fr auto; gap:.75rem; align-items:center; padding-right:46px; }
 @media (max-width: 767.98px) { .pj-riga, .pj-riga-info, .pj-riga-2, .pj-mod-riga, .pj-mod-riga2 { grid-template-columns: 1fr; padding-right:0; } .pj-riga-info { padding-bottom:.5rem; border-bottom:1px dashed #e2e8f0; } }
@@ -383,15 +372,15 @@ if ($mostra_form):
                         <label for="pjInc" class="form-label small fw-bold">Incontri previsti</label>
                         <input type="number" name="incontri_previsti" id="pjInc" class="form-control form-control-sm" min="1" value="<?php echo $v($dp, 'incontri_previsti'); ?>">
                     </div>
-                    <div class="col-6 col-md-3">
-                        <label for="pjMin" class="form-label small fw-bold">Studenti per scuola: min</label>
+                    <div class="col-6 col-md-3 pj-solo-scuole">
+                        <label for="pjMin" class="form-label small fw-bold">Partecipanti per iscrizione: min</label>
                         <input type="number" name="min_studenti" id="pjMin" class="form-control form-control-sm" min="1" value="<?php echo $v($dp, 'min_studenti'); ?>">
                     </div>
-                    <div class="col-6 col-md-3">
-                        <label for="pjMax" class="form-label small fw-bold">Studenti per scuola: max</label>
+                    <div class="col-6 col-md-3 pj-solo-scuole">
+                        <label for="pjMax" class="form-label small fw-bold">Partecipanti per iscrizione: max</label>
                         <input type="number" name="max_studenti" id="pjMax" class="form-control form-control-sm" min="1" value="<?php echo $v($dp, 'max_studenti'); ?>">
                     </div>
-                    <div class="col-12"><div class="form-text mt-0">La scuola indica nel modulo di iscrizione il numero minimo e massimo dei suoi studenti: il portale controlla che stiano in questi limiti.</div></div>
+                    <div class="col-12 pj-solo-scuole"><div class="form-text mt-0">Chi iscrive il gruppo indica nel modulo il numero di partecipanti: il portale controlla che stia tra il minimo e il massimo.</div></div>
                 </div>
             </section>
 
@@ -473,6 +462,21 @@ if ($mostra_form):
         </div>
 
         <div class="col-xl-4">
+            <section class="pj-sez" style="border-left:4px solid <?php echo h($col_area); ?>;">
+                <h2><i class="fa fa-toggle-on me-1" aria-hidden="true"></i>Tipo di progetto</h2>
+                <?php $per_scuole_v = !isset($dp['per_scuole']) || (int)$dp['per_scuole'] === 1; ?>
+                <div class="form-check form-switch mb-1">
+                    <input class="form-check-input" type="checkbox" name="per_scuole" id="pjScuole" value="1" <?php echo $per_scuole_v ? 'checked' : ''; ?>>
+                    <label class="form-check-label small fw-bold" for="pjScuole">Dedicato alle scuole</label>
+                </div>
+                <p class="form-text mt-0 mb-3">Acceso: si iscrive il docente per la sua scuola, una scuola per edizione, indicando il numero di studenti. Spento: iscrizioni singole, con i posti di ogni edizione.</p>
+                <div class="form-check form-switch mb-1">
+                    <input class="form-check-input" type="checkbox" name="attestati" id="pjAttestati" value="1" <?php echo !empty($dp['attestati']) ? 'checked' : ''; ?>>
+                    <label class="form-check-label small fw-bold" for="pjAttestati">Prevedi attestati di partecipazione</label>
+                </div>
+                <p class="form-text mt-0 mb-0"><span class="pj-solo-scuole">Il docente inserisce l'elenco degli studenti; a progetto concluso riceve per email gli attestati di tutta la classe, con codice di verifica.</span><span class="pj-solo-generico">A progetto concluso ogni partecipante presente riceve il suo attestato, con codice di verifica.</span> Serve la presenza segnata in Iscrizioni.</p>
+            </section>
+
             <section class="pj-sez">
                 <h2><i class="fa fa-calendar-days me-1" aria-hidden="true"></i>Durata del progetto</h2>
                 <div class="row g-2">
@@ -487,14 +491,15 @@ if ($mostra_form):
             </section>
 
             <section class="pj-sez">
-                <h2><i class="fa fa-school me-1" aria-hidden="true"></i>Edizioni e iscrizione della scuola</h2>
-                <p class="form-text mt-0 mb-2">Una riga per edizione (le "repliche"): ogni edizione accoglie <strong>una scuola</strong>, le altre vanno in lista d'attesa. Con più edizioni la scuola sceglie quella che preferisce.</p>
+                <h2><i class="fa fa-clone me-1" aria-hidden="true"></i>Edizioni e iscrizione</h2>
+                <p class="form-text mt-0 mb-2">Una riga per edizione (le "repliche"). <span class="pj-solo-scuole">Nei progetti per le scuole ogni edizione accoglie <strong>una scuola</strong>, le altre vanno in lista d'attesa.</span><span class="pj-solo-generico">Indica i <strong>posti</strong> di ogni edizione: quando finiscono si entra in lista d'attesa.</span> Con più edizioni si sceglie quella preferita.</p>
                 <div id="pjEdizioni">
                     <?php foreach ($turni_ed as $k => $te): ?>
                         <div class="pj-ed">
                             <input type="hidden" name="ed_id[]" value="<?php echo (int)$te['id']; ?>">
                             <input type="text" name="ed_nome[]" class="form-control form-control-sm" value="<?php echo h($te['nome_turno'] ?? ''); ?>" placeholder="es. Edizione 1 – ottobre 2026" aria-label="Nome dell'edizione" maxlength="150">
-                            <?php if ((int)($te['n_iscr'] ?? 0) > 0): ?><span class="badge bg-success-subtle text-success-emphasis" title="Scuole iscritte o in attesa"><i class="fa fa-school" aria-hidden="true"></i> <?php echo (int)$te['n_iscr']; ?></span><?php endif; ?>
+                            <input type="number" name="ed_posti[]" class="form-control form-control-sm pj-solo-generico" style="max-width:90px;" value="<?php echo (int)($te['max_posti'] ?? 0) > 1 ? (int)$te['max_posti'] : 30; ?>" min="1" max="9999" aria-label="Posti dell'edizione" title="Posti">
+                            <?php if ((int)($te['n_iscr'] ?? 0) > 0): ?><span class="badge bg-success-subtle text-success-emphasis" title="Iscritti o in attesa"><i class="fa fa-user-check" aria-hidden="true"></i> <?php echo (int)$te['n_iscr']; ?></span><?php endif; ?>
                             <button type="button" class="btn btn-sm btn-outline-danger pj-rimuovi" title="Rimuovi edizione" aria-label="Rimuovi edizione"><i class="fa fa-times" aria-hidden="true"></i></button>
                         </div>
                     <?php endforeach; ?>
@@ -506,9 +511,9 @@ if ($mostra_form):
                 </div>
                 <div class="alert alert-light border small mt-3 mb-2">
                     <i class="fa fa-circle-info me-1" aria-hidden="true"></i>
-                    Le iscrizioni vanno in <strong>ordine di arrivo</strong>; una scuola può iscriversi a <strong>una sola edizione</strong> dello stesso progetto.
-                    L'iscrizione la fa il docente referente con <strong>SPID, CIE o credenziali Unical</strong>.
-                    Le domande del modulo (scuola, classe, contatti…) si impostano dal <a href="form_builder.php?p_id=<?php echo $filtro_p; ?>">Form Builder</a>.
+                    Le iscrizioni vanno in <strong>ordine di arrivo</strong>; ci si può iscrivere a <strong>una sola edizione</strong> dello stesso progetto.
+                    Per iscriversi serve l'accesso con <strong>SPID, CIE o credenziali Unical</strong>.
+                    Le domande del modulo (es. scuola, classe, contatti) si impostano dal <a href="form_builder.php?p_id=<?php echo $filtro_p; ?>">Form Builder</a>.
                 </div>
             </section>
 
@@ -575,6 +580,13 @@ document.addEventListener('click', function (e) {
         else svuota(riga);
     }
 });
+// Tipo di progetto: mostra i campi delle scuole (min/max per iscrizione) o quelli generici (posti per edizione)
+(function () {
+    var sw = document.getElementById('pjScuole'), form = sw ? sw.closest('form') : null;
+    if (!form) return;
+    function aggiorna() { form.classList.toggle('pj-form-scuole', sw.checked); form.classList.toggle('pj-form-generico', !sw.checked); }
+    sw.addEventListener('change', aggiorna); aggiorna();
+})();
 // Riga vuota: testi cancellati, "Riceve le iscrizioni" spento
 function svuota(riga) {
     riga.querySelectorAll('.badge').forEach(function (b) { b.remove(); });
@@ -613,6 +625,8 @@ foreach ($progetti as $id => &$p) {
     $p['dett']  = $dettagli[$id] ?? [];
     $p['ied']   = info_edizioni_progetto($conn, $p['dett'], $turni_p);
     $p['stato'] = $p['ied']['stato'];
+    $p['per_scuole'] = (int)($p['dett']['per_scuole'] ?? 1) === 1;
+    $p['attestati']  = (int)($p['dett']['attestati'] ?? 0) === 1;
 }
 unset($p);
 
@@ -663,6 +677,8 @@ $n_eventi_normali = (int)($conn->query("SELECT COUNT(*) AS n FROM eventi WHERE p
                 <div style="min-width:0;">
                     <span class="pj-stato" style="background:<?php echo $st['bg']; ?>;color:<?php echo $st['fg']; ?>;"><?php echo h($st['etichetta']); ?></span>
                     <?php if (!empty($p['is_evidenza'])): ?><span class="badge bg-warning text-dark ms-1" style="font-size:.65rem;">⭐ EVIDENZA</span><?php endif; ?>
+                    <span class="badge ms-1 <?php echo $p['per_scuole'] ? 'bg-primary-subtle text-primary-emphasis' : 'bg-secondary-subtle text-secondary-emphasis'; ?>" style="font-size:.65rem;"><?php echo $p['per_scuole'] ? 'Scuole' : 'Iscrizioni singole'; ?></span>
+                    <?php if ($p['attestati']): ?><span class="badge ms-1 bg-success-subtle text-success-emphasis" style="font-size:.65rem;"><i class="fa fa-graduation-cap me-1" aria-hidden="true"></i>Attestati</span><?php endif; ?>
                     <div class="fw-bold fs-6 text-dark mt-1"><?php echo h($p['titolo']); ?></div>
                     <div class="pj-meta d-flex flex-wrap gap-3 mt-1">
                         <span><i class="fa fa-calendar-days" aria-hidden="true"></i> <?php echo h(periodo_progetto($d)); ?></span>
@@ -671,7 +687,7 @@ $n_eventi_normali = (int)($conn->query("SELECT COUNT(*) AS n FROM eventi WHERE p
                             echo !empty($t['data_apertura']) ? 'dal ' . date('d/m/Y H:i', strtotime($t['data_apertura'])) : 'già aperte';
                             echo !empty($t['data_chiusura']) ? ' al ' . date('d/m/Y H:i', strtotime($t['data_chiusura'])) : '';
                         ?></span><?php endif; ?>
-                        <?php if (!empty($d['min_studenti']) || !empty($d['max_studenti'])): ?><span><i class="fa fa-users" aria-hidden="true"></i> <?php echo (int)($d['min_studenti'] ?? 0) ?: 1; ?>–<?php echo !empty($d['max_studenti']) ? (int)$d['max_studenti'] : '…'; ?> studenti</span><?php endif; ?>
+                        <?php if ($p['per_scuole'] && (!empty($d['min_studenti']) || !empty($d['max_studenti']))): ?><span><i class="fa fa-users" aria-hidden="true"></i> <?php echo (int)($d['min_studenti'] ?? 0) ?: 1; ?>–<?php echo !empty($d['max_studenti']) ? (int)$d['max_studenti'] : '…'; ?> partecipanti per iscrizione</span><?php endif; ?>
                     </div>
                 </div>
                 <div class="d-flex gap-1 flex-shrink-0">
@@ -694,16 +710,23 @@ $n_eventi_normali = (int)($conn->query("SELECT COUNT(*) AS n FROM eventi WHERE p
                 <?php foreach ($p['ied']['edizioni'] as $ed): $as = $ed['assegnata']; ?>
                     <div class="d-flex flex-wrap align-items-center gap-2">
                         <?php if (count($p['ied']['edizioni']) > 1): ?><span class="fw-bold text-dark" style="min-width:150px;"><?php echo h($ed['etichetta']); ?></span><?php endif; ?>
-                        <?php if ($as):
+                        <?php if (!$p['per_scuole']): // generico: posti occupati sull'edizione ?>
+                            <span class="badge <?php echo $ed['libera'] ? 'bg-light text-dark border' : 'bg-danger'; ?>"><i class="fa fa-users me-1" aria-hidden="true"></i><?php echo (int)$ed['occ']; ?> / <?php echo (int)$ed['t']['max_posti']; ?> iscritti</span>
+                        <?php elseif ($as):
                             $scuola = nome_scuola_prenotazione($as);
                             $lbl_st = ['confermata' => 'Assegnato', 'richiesta_conferma' => 'Posto offerto, in attesa di conferma', 'da_approvare' => 'Da approvare'][$as['stato'] ?? 'confermata'] ?? 'Assegnato';
                         ?>
-                            <span class="badge bg-success"><i class="fa fa-school me-1" aria-hidden="true"></i><?php echo h($lbl_st); ?></span>
+                            <span class="badge bg-success"><i class="fa fa-user-check me-1" aria-hidden="true"></i><?php echo h($lbl_st); ?></span>
                             <span class="text-dark fw-semibold"><?php echo h($scuola !== '' ? $scuola : trim($as['nome'] . ' ' . $as['cognome'])); ?></span>
                             <?php if ($scuola !== ''): ?><span class="text-muted">· <?php echo h(trim($as['nome'] . ' ' . $as['cognome'])); ?></span><?php endif; ?>
                             <a href="mailto:<?php echo h($as['email']); ?>" class="text-muted"><?php echo h($as['email']); ?></a>
+                            <?php if ($p['attestati'] && $can_manage_iscritti):
+                                $n_stud = (int)($conn->query("SELECT COUNT(*) AS n FROM partecipanti_prenotazione WHERE prenotazione_id = " . (int)$as['id'])->fetch_assoc()['n'] ?? 0); ?>
+                                <a href="partecipanti.php?p_id=<?php echo $filtro_p; ?>&pr=<?php echo (int)$as['id']; ?>" class="btn btn-sm btn-outline-success py-0 fw-bold"><i class="fa fa-graduation-cap me-1" aria-hidden="true"></i>Studenti e attestati (<?php echo $n_stud; ?>)</a>
+                                <?php if (!empty($as['attestato_inviato'])): ?><span class="badge bg-success-subtle text-success-emphasis">Attestati inviati</span><?php endif; ?>
+                            <?php endif; ?>
                         <?php else: ?>
-                            <span class="badge bg-light text-secondary border"><i class="fa fa-school me-1" aria-hidden="true"></i>Nessuna scuola iscritta</span>
+                            <span class="badge bg-light text-secondary border"><i class="fa fa-user-clock me-1" aria-hidden="true"></i>Nessuna iscrizione</span>
                         <?php endif; ?>
                         <?php if ($ed['attesa'] > 0): ?><span class="badge" style="background:#fef3c7;color:#92400e;"><?php echo $ed['attesa']; ?> in lista d'attesa</span><?php endif; ?>
                         <?php if ($can_manage_iscritti): ?>

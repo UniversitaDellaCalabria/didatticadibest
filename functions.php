@@ -638,6 +638,13 @@ if (!function_exists('invia_email_attestato_se_concluso')) {
         if (!empty($row['attestato_inviato'])) return false;
         if (empty($row['email'])) return false;
 
+        // Progetti: niente attestato se non previsto o se il progetto non è finito; per le scuole
+        // partono gli attestati degli studenti (al docente), non quello personale
+        $r_ev = $conn->query("SELECT t.evento_id FROM turni t WHERE t.id = " . (int)$row['turno_id']);
+        $regola = regola_attestato_evento($conn, $r_ev ? (int)($r_ev->fetch_assoc()['evento_id'] ?? 0) : 0);
+        if ($regola === 'no' || $regola === 'attendi') return false;
+        if ($regola === 'gruppo') return invia_attestati_gruppo($conn, (int)$pr_id) === true;
+
         // Turni senza data: l'attestato parte alla registrazione della presenza
         if (!empty($row['data_turno']) && !turno_concluso($row)) return false;
 
@@ -699,6 +706,44 @@ if (!function_exists('turno_concluso')) {
         if (empty($t['data_turno'])) return false;
         $fine = $t['data_turno'] . ' ' . (!empty($t['orario_fine']) ? substr($t['orario_fine'], 0, 8) : '23:59:59');
         return date('Y-m-d H:i:s') > $fine;
+    }
+}
+
+if (!function_exists('testo_card_evento')) {
+    // Testo delle card: la descrizione breve; se manca, l'inizio della descrizione completa senza formattazione
+    function testo_card_evento(array $ev, int $max = 220): string {
+        $breve = trim((string)($ev['descrizione_breve'] ?? ''));
+        if ($breve !== '') return $breve;
+        $testo = trim(preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags(str_replace('<', ' <', (string)($ev['descrizione'] ?? ''))), ENT_QUOTES, 'UTF-8')));
+        return mb_strimwidth($testo, 0, $max, '…');
+    }
+}
+
+if (!function_exists('finestra_prenotazione')) {
+    // Scadenza/apertura delle prenotazioni di un turno, o di un insieme di turni (card dell'evento):
+    // tra i turni non conclusi, se qualcuno è prenotabile ora -> la chiusura più vicina ("Prenota entro…"),
+    // altrimenti l'apertura più vicina ("Prenotazioni dal…"), altrimenti "Prenotazioni chiuse".
+    // Ritorna ['testo', 'icona', 'bg', 'fg'] oppure null se non c'è nulla da dire (nessuna data impostata).
+    function finestra_prenotazione(array $turni): ?array {
+        $ora = date('Y-m-d H:i:s');
+        $aperti = 0; $chiusura = null; $apertura = null; $chiusi = 0; $attivi = 0;
+        foreach ($turni as $t) {
+            if (turno_concluso($t)) continue;
+            $attivi++;
+            if (!empty($t['data_apertura']) && $ora < $t['data_apertura']) { if ($apertura === null || $t['data_apertura'] < $apertura) $apertura = $t['data_apertura']; continue; }
+            if (!empty($t['data_chiusura']) && $ora > $t['data_chiusura']) { $chiusi++; continue; }
+            $aperti++;
+            if (!empty($t['data_chiusura']) && ($chiusura === null || $t['data_chiusura'] < $chiusura)) $chiusura = $t['data_chiusura'];
+        }
+        $fmt = fn($d) => date('d/m/Y', strtotime($d)) . ' alle ' . date('H:i', strtotime($d));
+        if ($aperti > 0 && $chiusura !== null) {
+            $urgente = strtotime($chiusura) - time() < 48 * 3600;
+            return ['testo' => 'Prenota entro il ' . $fmt($chiusura), 'icona' => 'fa-hourglass-half', 'bg' => $urgente ? '#FEE2E2' : '#FEF3C7', 'fg' => $urgente ? '#991B1B' : '#92400E'];
+        }
+        if ($aperti > 0) return null;
+        if ($apertura !== null) return ['testo' => 'Prenotazioni dal ' . $fmt($apertura), 'icona' => 'fa-door-open', 'bg' => '#DBEAFE', 'fg' => '#1E40AF'];
+        if ($attivi > 0 && $chiusi === $attivi) return ['testo' => 'Prenotazioni chiuse', 'icona' => 'fa-lock', 'bg' => '#F1F5F9', 'fg' => '#334155'];
+        return null;
     }
 }
 
@@ -1829,6 +1874,7 @@ if (!function_exists('elimina_turno')) {
     // Elimina un turno con le sue prenotazioni e i messaggi collegati. Da usare dentro una transazione se serve.
     function elimina_turno($conn, int $t_id): void {
         $conn->query("DELETE m FROM messaggi_prenotazioni m JOIN prenotazioni pr ON m.prenotazione_id = pr.id WHERE pr.turno_id = $t_id");
+        $conn->query("DELETE pp FROM partecipanti_prenotazione pp JOIN prenotazioni pr ON pp.prenotazione_id = pr.id WHERE pr.turno_id = $t_id");
         $conn->query("DELETE FROM prenotazioni WHERE turno_id = $t_id");
         $conn->query("DELETE FROM turni WHERE id = $t_id");
     }
@@ -2051,11 +2097,14 @@ if (!function_exists('get_widgets_home')) {
 
 // =======================================================================
 // PROGETTI (es. Formazione Scuola Lavoro): un progetto è un evento con tipo = 'progetto',
-// una scheda in progetti_dettagli e un solo turno "Iscrizione" da 1 posto: la prima scuola
-// è confermata, le altre vanno in lista d'attesa in ordine di arrivo.
+// una scheda in progetti_dettagli e un turno per edizione.
+// - Dedicato alle scuole (per_scuole = 1): ogni edizione accoglie UNA scuola (1 posto), le altre
+//   in lista d'attesa in ordine di arrivo; la scuola indica il numero di partecipanti.
+// - Generico: ogni edizione ha i suoi posti, una persona per posto, come gli eventi.
 // =======================================================================
-if (!defined('CAMPO_STUDENTI_MIN')) define('CAMPO_STUDENTI_MIN', 'numero_studenti_minimo');
-if (!defined('CAMPO_STUDENTI_MAX')) define('CAMPO_STUDENTI_MAX', 'numero_studenti_massimo');
+if (!defined('CAMPO_PARTECIPANTI')) define('CAMPO_PARTECIPANTI', 'numero_partecipanti');
+// Dopo quanti mesi dalla fine del progetto i nomi degli studenti vengono ridotti alle iniziali (cron_background.php)
+if (!defined('MESI_CONSERVAZIONE_STUDENTI')) define('MESI_CONSERVAZIONE_STUDENTI', 12);
 
 if (!function_exists('get_dettagli_progetti')) {
     // Schede dei progetti indicati: [evento_id => riga di progetti_dettagli con referenti e info già decodificati]
@@ -2124,7 +2173,7 @@ if (!function_exists('info_edizioni_progetto')) {
             $t_id = (int)$t['id'];
             $occ = getPostiOccupati($conn, $t_id);
             $r_w = $conn->query("SELECT COUNT(*) AS n FROM prenotazioni WHERE turno_id = $t_id AND stato = 'in_attesa'");
-            $r_a = $conn->query("SELECT nome, cognome, email, stato, dati_custom_json FROM prenotazioni WHERE turno_id = $t_id AND IFNULL(stato, 'confermata') IN ('confermata', 'richiesta_conferma', 'da_approvare') ORDER BY data_prenotazione ASC, id ASC LIMIT 1");
+            $r_a = $conn->query("SELECT id, nome, cognome, email, stato, presente, attestato_inviato, dati_custom_json FROM prenotazioni WHERE turno_id = $t_id AND IFNULL(stato, 'confermata') IN ('confermata', 'richiesta_conferma', 'da_approvare') ORDER BY data_prenotazione ASC, id ASC LIMIT 1");
             $max = max(1, (int)$t['max_posti']);
             $edizioni[] = [
                 't' => $t, 'numero' => $i + 1,
@@ -2157,46 +2206,543 @@ if (!function_exists('nome_scuola_prenotazione')) {
 }
 
 if (!function_exists('assicura_campi_progetto')) {
-    // Il modulo di iscrizione dei progetti chiede sempre il numero minimo e massimo di studenti:
-    // campi dell'area (valgono per tutti i progetti), creati se mancano. Gli altri campi si gestiscono dal Form Builder.
+    // Il modulo di iscrizione dei progetti per le scuole chiede il numero di partecipanti: campo dell'area,
+    // creato se manca, mostrato SOLO nei progetti dedicati alle scuole (vedi campo_form_visibile).
+    // Gli altri campi si gestiscono dal Form Builder.
     function assicura_campi_progetto($conn, int $pagina_id): void {
-        $campi = [
-            [CAMPO_STUDENTI_MIN, 'Numero minimo di studenti partecipanti', -20],
-            [CAMPO_STUDENTI_MAX, 'Numero massimo di studenti partecipanti', -19],
+        $nome = CAMPO_PARTECIPANTI;
+        $stmt = $conn->prepare("SELECT 1 FROM campi_form WHERE pagina_id = ? AND nome_campo = ? LIMIT 1");
+        $stmt->bind_param("is", $pagina_id, $nome);
+        $stmt->execute();
+        if ($stmt->get_result()->num_rows > 0) return;
+        $ins = $conn->prepare("INSERT INTO campi_form (pagina_id, evento_id, nome_campo, etichetta, tipo_campo, opzioni_select, obbligatorio, ordine) VALUES (?, NULL, ?, 'Numero di partecipanti', 'number', '', 1, -20)");
+        $ins->bind_param("is", $pagina_id, $nome);
+        $ins->execute();
+    }
+}
+
+if (!function_exists('campo_form_visibile')) {
+    // Il campo "numero di partecipanti" vale solo per i progetti dedicati alle scuole: negli altri eventi
+    // e progetti dell'area non va mostrato né richiesto. $dett = scheda del progetto (null se evento).
+    function campo_form_visibile(array $cf, bool $is_progetto, ?array $dett): bool {
+        if (($cf['nome_campo'] ?? '') !== CAMPO_PARTECIPANTI) return true;
+        return $is_progetto && (int)($dett['per_scuole'] ?? 1) === 1;
+    }
+}
+
+if (!function_exists('leggi_referenti_post')) {
+    // Referenti dal form (ref_ruolo[], ref_nome[], ref_email[], ref_tel[], ref_link[], ref_notifiche[]) di progetti ed eventi:
+    // righe con almeno nome o email, email/telefono/link non validi scartati (le email scartate finiscono in $email_scartate).
+    function leggi_referenti_post(?array &$email_scartate = null): array {
+        $referenti = []; $email_scartate = [];
+        foreach ((array)($_POST['ref_nome'] ?? []) as $i => $nome_r) {
+            $r = [
+                'ruolo'    => mb_substr(trim((string)($_POST['ref_ruolo'][$i] ?? '')), 0, 60),
+                'nome'     => mb_substr(trim((string)$nome_r), 0, 120),
+                'email'    => mb_substr(strtolower(trim((string)($_POST['ref_email'][$i] ?? ''))), 0, 150),
+                'telefono' => mb_substr(trim((string)($_POST['ref_tel'][$i] ?? '')), 0, 40),
+                'link'     => mb_substr(trim((string)($_POST['ref_link'][$i] ?? '')), 0, 300),
+                // Riceve il riepilogo di ogni iscrizione e disdetta (come i gestori)
+                'notifiche' => (($_POST['ref_notifiche'][$i] ?? '0') === '1') ? 1 : 0,
+            ];
+            if ($r['email'] !== '' && !filter_var($r['email'], FILTER_VALIDATE_EMAIL)) { $email_scartate[] = $r['email']; $r['email'] = ''; }
+            if ($r['telefono'] !== '' && !preg_match('/^[0-9 +().\/-]{5,40}$/', $r['telefono'])) $r['telefono'] = '';
+            // Pagina personale: solo indirizzi http(s), es. https://www.unical.it/... ("www.…" senza schema diventa https://)
+            if ($r['link'] !== '' && !preg_match('#^https?://#i', $r['link'])) $r['link'] = 'https://' . $r['link'];
+            if ($r['link'] !== '' && !filter_var($r['link'], FILTER_VALIDATE_URL)) $r['link'] = '';
+            if ($r['email'] === '') $r['notifiche'] = 0;
+            if ($r['nome'] === '' && $r['email'] === '') continue;
+            $referenti[] = $r;
+            if (count($referenti) >= 10) break;
+        }
+        return $referenti;
+    }
+}
+
+if (!function_exists('salva_referenti_evento')) {
+    // Referenti di un evento normale: stessi dati dei progetti, salvati nella scheda (progetti_dettagli.referenti_json)
+    function salva_referenti_evento($conn, int $ev_id, array $referenti): void {
+        $json = $referenti ? json_encode($referenti, JSON_UNESCAPED_UNICODE) : null;
+        $stmt = $conn->prepare("INSERT INTO progetti_dettagli (evento_id, referenti_json, updated_at) VALUES (?, ?, NOW())
+                                ON DUPLICATE KEY UPDATE referenti_json = VALUES(referenti_json), updated_at = NOW()");
+        $stmt->bind_param("is", $ev_id, $json);
+        $stmt->execute();
+    }
+}
+
+if (!function_exists('html_campi_form_admin')) {
+    // Campi del Form Builder per l'evento indicato, da usare nell'admin (prenotazione manuale e modifica).
+    // $valori = dati_custom_json già salvati. Condizioni "mostra se" ignorate: in admin si vede tutto, niente obbligatori.
+    // Gli allegati non si caricano da qui: si mostrano i link a quelli esistenti.
+    function html_campi_form_admin($conn, int $evento_id, array $valori = [], string $pref = 'cf'): string {
+        $r_ev = $conn->query("SELECT e.pagina_id, e.tipo FROM eventi e WHERE e.id = $evento_id LIMIT 1");
+        $ev = $r_ev ? $r_ev->fetch_assoc() : null;
+        if (!$ev) return '';
+        $is_progetto = $ev['tipo'] === 'progetto';
+        $dett = $is_progetto ? (get_dettagli_progetti($conn, [$evento_id])[$evento_id] ?? null) : null;
+        $pag = (int)$ev['pagina_id'];
+        $res = $conn->query("SELECT * FROM campi_form WHERE (pagina_id = $pag AND (evento_id IS NULL OR evento_id = 0)) OR evento_id = $evento_id ORDER BY ordine ASC, id ASC");
+        $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+        $out = '';
+        while ($res && $cf = $res->fetch_assoc()) {
+            if (!campo_form_visibile($cf, $is_progetto, $dett)) continue;
+            $tipo = $cf['tipo_campo']; $nome = $cf['nome_campo']; $name = 'custom_' . $nome;
+            $val = (string)($valori[$nome] ?? '');
+            $id = $pref . '_' . (int)$cf['id'];
+            $etichetta = $nome === CAMPO_PARTECIPANTI ? 'Numero di studenti partecipanti' : $cf['etichetta'];
+            $opts = !empty($cf['opzioni_select']) ? array_map('trim', explode(',', $cf['opzioni_select'])) : [];
+            if ($tipo === 'hidden') { $out .= '<input type="hidden" name="' . $h($name) . '" value="' . $h($val !== '' ? $val : ($opts[0] ?? '')) . '">'; continue; }
+            if ($tipo === 'separator') { $out .= '<div class="col-12"><hr class="my-1">' . ($etichetta !== '-' ? '<div class="small fw-bold text-uppercase text-secondary">' . $h($etichetta) . '</div>' : '') . '</div>'; continue; }
+            $col = in_array($tipo, ['textarea', 'checkboxes', 'radio'], true) ? 'col-12' : 'col-md-6';
+            $out .= '<div class="' . $col . '"><label class="form-label small fw-bold mb-1" for="' . $id . '">' . $h($etichetta) . '</label>';
+            if ($tipo === 'file') {
+                if ($val !== '') {
+                    $link = [];
+                    foreach (array_filter(array_map('trim', explode(',', $val))) as $i => $path) $link[] = '<a href="../' . $h($path) . '" target="_blank">Allegato ' . ($i + 1) . '</a>';
+                    $out .= '<div class="small p-2 border rounded bg-light">' . implode(' · ', $link) . '</div>';
+                } else $out .= '<div class="small text-muted p-2 border rounded bg-light">Nessun allegato (si carica solo dal modulo pubblico)</div>';
+            } elseif ($tipo === 'select' || $tipo === 'radio') {
+                $out .= '<select name="' . $h($name) . '" id="' . $id . '" class="form-select form-select-sm"><option value="">--</option>';
+                foreach ($opts as $o) $out .= '<option value="' . $h($o) . '"' . ($o === $val ? ' selected' : '') . '>' . $h($o) . '</option>';
+                $out .= '</select>';
+            } elseif ($tipo === 'checkboxes') {
+                $sel = array_map('trim', explode(',', $val));
+                foreach ($opts as $k => $o) $out .= '<div class="form-check form-check-inline"><input class="form-check-input" type="checkbox" name="' . $h($name) . '[]" id="' . $id . '_' . $k . '" value="' . $h($o) . '"' . (in_array($o, $sel, true) ? ' checked' : '') . '><label class="form-check-label small" for="' . $id . '_' . $k . '">' . $h($o) . '</label></div>';
+            } elseif ($tipo === 'checkbox') {
+                $out .= '<div class="form-check"><input type="hidden" name="' . $h($name) . '" value=""><input class="form-check-input" type="checkbox" name="' . $h($name) . '" id="' . $id . '" value="Sì"' . ($val !== '' ? ' checked' : '') . '><label class="form-check-label small" for="' . $id . '">Sì</label></div>';
+            } elseif ($tipo === 'textarea') {
+                $out .= '<textarea name="' . $h($name) . '" id="' . $id . '" class="form-control form-control-sm" rows="2">' . $h($val) . '</textarea>';
+            } else {
+                $html_tipo = in_array($tipo, ['number', 'email', 'tel', 'url', 'date', 'time'], true) ? $tipo : 'text';
+                $extra = '';
+                if ($nome === CAMPO_PARTECIPANTI) {
+                    $extra = ' min="' . (!empty($dett['min_studenti']) ? (int)$dett['min_studenti'] : 1) . '"' . (!empty($dett['max_studenti']) ? ' max="' . (int)$dett['max_studenti'] . '"' : '') . ' required';
+                }
+                if ($tipo === 'rating') { $html_tipo = 'number'; $extra = ' min="1" max="' . max(5, count($opts)) . '"'; }
+                $out .= '<input type="' . $html_tipo . '" name="' . $h($name) . '" id="' . $id . '" class="form-control form-control-sm" value="' . $h($val) . '"' . $extra . '>';
+            }
+            $out .= '</div>';
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('valida_partecipanti_progetto')) {
+    // Progetti per le scuole: numero di partecipanti obbligatorio, intero, dentro i limiti del progetto.
+    // Ritorna null se va bene (o se il progetto non è per le scuole), altrimenti il messaggio di errore.
+    function valida_partecipanti_progetto(array $custom, ?array $d): ?string {
+        if ((int)($d['per_scuole'] ?? 1) !== 1) return null;
+        $v = trim((string)($custom[CAMPO_PARTECIPANTI] ?? ''));
+        if ($v === '') return "Indica il numero di studenti partecipanti.";
+        if (!preg_match('/^\d+$/', $v)) return "Il numero di studenti deve essere un numero intero.";
+        $n = (int)$v;
+        $lim_min = !empty($d['min_studenti']) ? (int)$d['min_studenti'] : 1;
+        $lim_max = !empty($d['max_studenti']) ? (int)$d['max_studenti'] : null;
+        if ($n < $lim_min || ($lim_max !== null && $n > $lim_max)) {
+            return "Il numero di studenti deve essere compreso tra $lim_min e " . ($lim_max ?? 'il massimo previsto') . ".";
+        }
+        return null;
+    }
+}
+
+// =======================================================================
+// ATTESTATI: singoli (una prenotazione = un attestato) e di gruppo (progetti per le scuole:
+// un attestato per ogni studente dell'elenco inserito dal docente, inviati al docente).
+// Ogni attestato ha un codice verificabile su verifica_attestato.php.
+// =======================================================================
+if (!function_exists('regola_attestato_evento')) {
+    // Come si comporta l'attestato per l'evento della prenotazione:
+    // 'evento'  = evento normale (regole di sempre)
+    // 'no'      = progetto senza attestati
+    // 'attendi' = progetto non ancora concluso (data di fine futura)
+    // 'gruppo'  = progetto per le scuole: attestati per gli studenti dell'elenco
+    // 'singolo' = progetto generico concluso: attestato alla persona iscritta
+    function regola_attestato_evento($conn, int $evento_id): string {
+        $r = $conn->query("SELECT e.tipo, d.per_scuole, d.attestati, d.data_fine FROM eventi e LEFT JOIN progetti_dettagli d ON d.evento_id = e.id WHERE e.id = $evento_id LIMIT 1");
+        $row = $r ? $r->fetch_assoc() : null;
+        if (!$row || ($row['tipo'] ?? '') !== 'progetto') return 'evento';
+        if ((int)($row['attestati'] ?? 0) !== 1) return 'no';
+        if (!empty($row['data_fine']) && $row['data_fine'] >= date('Y-m-d')) return 'attendi';
+        return (int)($row['per_scuole'] ?? 1) === 1 ? 'gruppo' : 'singolo';
+    }
+}
+
+if (!function_exists('get_partecipanti_prenotazione')) {
+    // Elenco degli studenti di una prenotazione (ordine di inserimento)
+    function get_partecipanti_prenotazione($conn, int $pr_id): array {
+        $out = [];
+        $r = $conn->query("SELECT * FROM partecipanti_prenotazione WHERE prenotazione_id = $pr_id ORDER BY ordine ASC, id ASC");
+        while ($r && $row = $r->fetch_assoc()) $out[] = $row;
+        return $out;
+    }
+}
+
+if (!function_exists('nome_partecipante')) {
+    function nome_partecipante(array $p): string {
+        return trim(($p['cognome'] ?? '') . ' ' . ($p['nome'] ?? ''));
+    }
+}
+
+if (!function_exists('leggi_elenco_partecipanti')) {
+    // Righe incollate da Excel o da un file CSV: "Cognome<TAB>Nome", "Cognome;Nome", "Cognome,Nome".
+    // Una riga senza separatori è tenuta intera (es. "Rossi Mario"). L'intestazione "Cognome/Nome" è ignorata.
+    // Ritorna [['cognome' => ..., 'nome' => ...], ...] senza righe vuote né doppioni.
+    function leggi_elenco_partecipanti(string $testo, int $max = 500): array {
+        $testo = preg_replace('/^\xEF\xBB\xBF/', '', $testo); // BOM dei CSV di Excel
+        $out = []; $visti = [];
+        foreach (preg_split('/\r\n|\r|\n/', $testo) as $riga) {
+            $riga = trim($riga);
+            if ($riga === '') continue;
+            $parti = preg_split('/\t|;|,/', $riga);
+            $parti = array_values(array_filter(array_map(fn($x) => trim($x, " \t\"'"), $parti), fn($x) => $x !== ''));
+            if (!$parti) continue;
+            $cognome = mb_substr($parti[0], 0, 100);
+            $nome    = mb_substr(implode(' ', array_slice($parti, 1)), 0, 100);
+            if (preg_match('/^cognome$/i', $cognome) && ($nome === '' || preg_match('/^nome$/i', $nome))) continue;
+            $chiave = mb_strtolower($cognome . '|' . $nome);
+            if (isset($visti[$chiave])) continue;
+            $visti[$chiave] = true;
+            $out[] = ['cognome' => $cognome, 'nome' => $nome];
+            if (count($out) >= $max) break;
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('testo_da_file_elenco')) {
+    // Testo "Cognome;Nome" da un file caricato: CSV/TXT (anche salvato da Excel) oppure XLSX (prime due colonne
+    // del primo foglio; serve l'estensione zip di PHP). Ritorna il testo oppure null con $errore valorizzato.
+    function testo_da_file_elenco(array $file, ?string &$errore = null): ?string {
+        if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) { $errore = "Caricamento del file non riuscito."; return null; }
+        if ((int)$file['size'] > 2 * 1024 * 1024) { $errore = "Il file supera i 2 MB."; return null; }
+        $ext = strtolower(pathinfo((string)$file['name'], PATHINFO_EXTENSION));
+        if (in_array($ext, ['csv', 'txt'], true)) {
+            $t = (string)file_get_contents($file['tmp_name']);
+            if (!mb_check_encoding($t, 'UTF-8')) $t = mb_convert_encoding($t, 'UTF-8', 'Windows-1252'); // CSV di Excel in italiano
+            return $t;
+        }
+        if ($ext === 'xlsx') {
+            if (!class_exists('ZipArchive')) { $errore = "Su questo server non si possono leggere i file .xlsx: salva il file come CSV oppure copia e incolla i nomi."; return null; }
+            $zip = new ZipArchive();
+            if ($zip->open($file['tmp_name']) !== true) { $errore = "Il file .xlsx non è leggibile."; return null; }
+            $condivise = [];
+            if (($ss = $zip->getFromName('xl/sharedStrings.xml')) !== false) {
+                $xml = @simplexml_load_string($ss);
+                if ($xml) foreach ($xml->si as $si) { $condivise[] = isset($si->t) ? (string)$si->t : implode('', array_map('strval', $si->xpath('.//*[local-name()="t"]') ?: [])); }
+            }
+            $foglio = $zip->getFromName('xl/worksheets/sheet1.xml');
+            $zip->close();
+            $xml = $foglio !== false ? @simplexml_load_string($foglio) : false;
+            if (!$xml) { $errore = "Nel file .xlsx non trovo il primo foglio."; return null; }
+            $righe = [];
+            foreach ($xml->sheetData->row as $row) {
+                $celle = [];
+                foreach ($row->c as $c) {
+                    $col = preg_replace('/\d+/', '', (string)$c['r']);
+                    if (!in_array($col, ['A', 'B'], true)) continue;
+                    $v = (string)($c->v ?? '');
+                    if ((string)$c['t'] === 's') $v = $condivise[(int)$v] ?? '';
+                    elseif ((string)$c['t'] === 'inlineStr') $v = (string)($c->is->t ?? '');
+                    $celle[$col] = str_replace(["\t", ';'], ' ', trim($v));
+                }
+                if ($celle) $righe[] = ($celle['A'] ?? '') . "\t" . ($celle['B'] ?? '');
+            }
+            return implode("\n", $righe);
+        }
+        $errore = "Formato non supportato: carica un file .xlsx o .csv.";
+        return null;
+    }
+}
+
+if (!function_exists('invia_modello_elenco')) {
+    // Scarica il modello da compilare (colonne Cognome, Nome): .xlsx se il server ha l'estensione zip, altrimenti .csv
+    // (si apre comunque con Excel). $righe = eventuali nomi già inseriti. Termina lo script.
+    function invia_modello_elenco(array $righe = [], string $nome_file = 'elenco_studenti'): void {
+        while (ob_get_level() > 0) ob_end_clean();
+        $x = fn($s) => htmlspecialchars((string)$s, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+        if (class_exists('ZipArchive')) {
+            $tmp = tempnam(sys_get_temp_dir(), 'xlsx');
+            $zip = new ZipArchive();
+            if ($tmp && $zip->open($tmp, ZipArchive::OVERWRITE) === true) {
+                $righe_xml = '<row r="1"><c r="A1" t="inlineStr" s="1"><is><t>Cognome</t></is></c><c r="B1" t="inlineStr" s="1"><is><t>Nome</t></is></c></row>';
+                foreach (array_values($righe) as $i => $r) {
+                    $n = $i + 2;
+                    $righe_xml .= '<row r="' . $n . '"><c r="A' . $n . '" t="inlineStr"><is><t>' . $x($r['cognome']) . '</t></is></c><c r="B' . $n . '" t="inlineStr"><is><t>' . $x($r['nome']) . '</t></is></c></row>';
+                }
+                $zip->addFromString('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>');
+                $zip->addFromString('_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
+                $zip->addFromString('xl/workbook.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Studenti" sheetId="1" r:id="rId1"/></sheets></workbook>');
+                $zip->addFromString('xl/_rels/workbook.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>');
+                $zip->addFromString('xl/styles.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="1"><fill><patternFill patternType="none"/></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="2"><xf/><xf fontId="1" applyFont="1"/></cellXfs></styleSheet>');
+                $zip->addFromString('xl/worksheets/sheet1.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="2" width="32" customWidth="1"/></cols><sheetData>' . $righe_xml . '</sheetData></worksheet>');
+                $zip->close();
+                header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+                header('Content-Disposition: attachment; filename="' . $nome_file . '.xlsx"');
+                header('Content-Length: ' . filesize($tmp));
+                readfile($tmp);
+                @unlink($tmp);
+                exit;
+            }
+        }
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $nome_file . '.csv"');
+        echo "\xEF\xBB\xBF" . "Cognome;Nome\r\n";
+        foreach ($righe as $r) echo str_replace(';', ' ', $r['cognome']) . ';' . str_replace(';', ' ', $r['nome']) . "\r\n";
+        exit;
+    }
+}
+
+if (!function_exists('salva_elenco_partecipanti')) {
+    // Sostituisce l'elenco degli studenti (usata dal docente prima dell'invio degli attestati).
+    function salva_elenco_partecipanti($conn, int $pr_id, array $righe): void {
+        $conn->begin_transaction();
+        try {
+            $conn->query("DELETE FROM partecipanti_prenotazione WHERE prenotazione_id = $pr_id");
+            $ins = $conn->prepare("INSERT INTO partecipanti_prenotazione (prenotazione_id, cognome, nome, ordine) VALUES (?, ?, ?, ?)");
+            foreach (array_values($righe) as $i => $r) {
+                $ins->bind_param("issi", $pr_id, $r['cognome'], $r['nome'], $i);
+                $ins->execute();
+            }
+            $conn->commit();
+        } catch (Throwable $e) { $conn->rollback(); throw $e; }
+    }
+}
+
+if (!function_exists('max_partecipanti_prenotazione')) {
+    // Quanti studenti può contenere l'elenco: il numero dichiarato nell'iscrizione, altrimenti il massimo del progetto
+    function max_partecipanti_prenotazione(array $pren, ?array $dett): int {
+        $custom = json_decode((string)($pren['dati_custom_json'] ?? ''), true) ?: [];
+        $dich = (int)($custom[CAMPO_PARTECIPANTI] ?? 0);
+        if ($dich > 0) return $dich;
+        return !empty($dett['max_studenti']) ? (int)$dett['max_studenti'] : 200;
+    }
+}
+
+if (!function_exists('nuovo_codice_attestato')) {
+    function nuovo_codice_attestato(): string {
+        $alfabeto = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // senza caratteri ambigui (0/O, 1/I)
+        $c = '';
+        for ($i = 0; $i < 10; $i++) $c .= $alfabeto[random_int(0, strlen($alfabeto) - 1)];
+        return 'AT-' . $c;
+    }
+}
+
+if (!function_exists('url_verifica_attestato')) {
+    function url_verifica_attestato(string $codice): string {
+        return url_base_sito() . '/verifica_attestato.php?c=' . urlencode($codice);
+    }
+}
+
+if (!function_exists('prenotazione_per_attestati')) {
+    // Prenotazione con evento, area, portale e scheda del progetto: i dati che servono agli attestati
+    function prenotazione_per_attestati($conn, int $pr_id): ?array {
+        $r = $conn->query("SELECT pr.*, t.data_turno, t.orario_inizio, t.orario_fine, t.nome_turno, t.evento_id,
+                                  e.titolo AS evento_titolo, e.luogo AS evento_luogo, e.tipo AS evento_tipo, e.pagina_id,
+                                  pe.titolo AS pagina_titolo, pe.firma_nome, pe.firma_titolo, pe.logo_attestato_path, pe.colore_primario,
+                                  cp.logo_path, cp.nome_portale, cp.sottotitolo_portale,
+                                  d.per_scuole, d.attestati, d.data_inizio, d.data_fine, d.ore_totali
+                           FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id
+                           LEFT JOIN pagine_eventi pe ON e.pagina_id = pe.id
+                           LEFT JOIN progetti_dettagli d ON d.evento_id = e.id
+                           LEFT JOIN configurazione_portale cp ON cp.id = 1
+                           WHERE pr.id = $pr_id LIMIT 1");
+        return $r ? ($r->fetch_assoc() ?: null) : null;
+    }
+}
+
+if (!function_exists('dati_attestato')) {
+    // Campi dell'attestato a partire da una prenotazione (prenotazione_per_attestati o get_attestato).
+    // Nei progetti: ore totali e periodo del progetto; negli eventi: data e durata del turno.
+    function dati_attestato(array $p, string $nome_completo, string $codice, string $matricola = ''): array {
+        $ore = ''; $quando = '';
+        if (($p['evento_tipo'] ?? '') === 'progetto') {
+            if (!empty($p['ore_totali'])) $ore = (string)(int)$p['ore_totali'];
+            if (!empty($p['data_inizio']) || !empty($p['data_fine'])) $quando = periodo_progetto($p);
+        } else {
+            if (!empty($p['orario_inizio']) && !empty($p['orario_fine'])) {
+                $ore = str_replace('.0', '', (string)round((strtotime($p['orario_fine']) - strtotime($p['orario_inizio'])) / 3600, 1));
+            }
+            if (!empty($p['data_turno'])) $quando = 'In data ' . date('d/m/Y', strtotime($p['data_turno']));
+        }
+        return [
+            'nome'       => $nome_completo,
+            'matricola'  => $matricola,
+            'evento'     => (string)($p['evento_titolo'] ?? ''),
+            'luogo'      => (string)($p['evento_luogo'] ?? ''),
+            'quando'     => $quando,
+            'ore'        => $ore,
+            'area'       => (string)($p['pagina_titolo'] ?? ''),
+            'logo'       => !empty($p['logo_attestato_path']) ? $p['logo_attestato_path'] : ($p['logo_path'] ?? ''),
+            'portale'    => (string)($p['nome_portale'] ?? ''),
+            'sottotitolo'=> (string)($p['sottotitolo_portale'] ?? ''),
+            'firma_nome' => !empty($p['firma_nome']) ? $p['firma_nome'] : 'Mauro F. La Russa',
+            'firma_titolo' => !empty($p['firma_titolo']) ? $p['firma_titolo'] : 'Il Direttore del Dipartimento',
+            'codice'     => $codice,
         ];
-        foreach ($campi as [$nome, $etichetta, $ordine]) {
-            $stmt = $conn->prepare("SELECT 1 FROM campi_form WHERE pagina_id = ? AND nome_campo = ? LIMIT 1");
-            $stmt->bind_param("is", $pagina_id, $nome);
-            $stmt->execute();
-            if ($stmt->get_result()->num_rows > 0) continue;
-            $ins = $conn->prepare("INSERT INTO campi_form (pagina_id, evento_id, nome_campo, etichetta, tipo_campo, opzioni_select, obbligatorio, ordine) VALUES (?, NULL, ?, ?, 'number', '', 1, ?)");
-            $ins->bind_param("issi", $pagina_id, $nome, $etichetta, $ordine);
-            $ins->execute();
+    }
+}
+
+if (!function_exists('pagina_attestati')) {
+    // Documento HTML stampabile con uno o più attestati (uno per pagina A4 orizzontale).
+    // Ogni attestato riporta il codice di verifica e il QR che apre verifica_attestato.php.
+    function pagina_attestati(array $lista, string $titolo_doc): string {
+        $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+        ob_start(); ?>
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title><?php echo $h($titolo_doc); ?></title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet">
+    <style>
+        body, html { margin: 0; padding: 0; background-color: #e2e8f0; font-family: 'Georgia', 'Times New Roman', serif; color: #1e293b; box-sizing: border-box; }
+        @page { size: A4 landscape; margin: 0; }
+        @media print {
+            body { background-color: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; margin: 0; padding: 0; }
+            .no-print { display: none !important; }
+            .cert-container { box-shadow: none !important; margin: 0 !important; width: 297mm !important; height: 209mm !important; padding: 12mm !important; page-break-after: always; break-after: page; page-break-inside: avoid; }
+            .cert-container:last-of-type { page-break-after: auto; break-after: auto; }
+        }
+        .cert-container { width: 297mm; height: 210mm; margin: 20px auto; background: #ffffff; box-shadow: 0 10px 30px rgba(0,0,0,0.15); padding: 10mm; position: relative; box-sizing: border-box; overflow: hidden; }
+        .cert-border-outer { border: 4px solid #B30000; padding: 5px; height: 100%; border-radius: 4px; box-sizing: border-box; }
+        .cert-border-inner { border: 2px solid #0056b3; height: 100%; padding: 20px 40px; text-align: center; position: relative; border-radius: 2px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; }
+        .cert-header { display: flex; justify-content: center; align-items: center; gap: 20px; }
+        .cert-logo { max-height: 80px; object-fit: contain; padding: 5px; border-radius: 6px; }
+        .cert-main-content { display: flex; flex-direction: column; justify-content: center; flex-grow: 1; }
+        .cert-title { font-size: 3.2rem; font-weight: bold; color: #B30000; letter-spacing: 2px; margin: 0 0 10px 0; text-transform: uppercase; line-height: 1.1; }
+        .cert-subtitle { font-size: 1.4rem; color: #64748b; font-style: italic; margin-bottom: 20px; }
+        .cert-body { font-size: 1.3rem; line-height: 1.5; }
+        .cert-name { font-size: 2.3rem; font-weight: bold; color: #1e293b; border-bottom: 1px solid #cbd5e1; display: inline-block; padding: 0 40px; margin: 10px 0; }
+        .cert-event { font-size: 1.6rem; font-weight: bold; color: #0056b3; margin: 10px 0; display: block; line-height: 1.2; }
+        .cert-footer { display: flex; justify-content: space-between; align-items: flex-end; padding: 0 20px; gap: 20px; }
+        .cert-verifica { display: flex; align-items: flex-end; gap: 12px; text-align: left; font-size: 1.05rem; padding-bottom: 6px; }
+        .cert-verifica img { width: 84px; height: 84px; }
+        .cert-signature { width: 300px; text-align: center; font-size: 1.1rem; }
+        .signature-text { font-family: 'Dancing Script', cursive; font-size: 2.6rem; color: #1e293b; line-height: 0.6; margin-bottom: 10px; transform: rotate(-3deg); white-space: nowrap; }
+        .cert-stamp { position: absolute; bottom: 50%; left: 50%; transform: translate(-50%, 50%); opacity: 0.05; font-size: 15rem; color: #B30000; pointer-events: none; }
+        .cert-id { position: absolute; bottom: 5px; left: 10px; font-size: 0.75rem; color: #94a3b8; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="text-center my-3 no-print">
+        <button onclick="window.print()" class="btn btn-danger fw-bold px-4 py-2 shadow-sm fs-5" style="background:#B30000; border:none;"><i class="fa fa-print me-2"></i> Stampa / Salva in PDF<?php echo count($lista) > 1 ? ' (' . count($lista) . ' attestati)' : ''; ?></button>
+        <button onclick="window.close()" class="btn btn-outline-secondary py-2 px-4 ms-2 fw-bold fs-5">Chiudi</button>
+        <p class="text-muted mt-2 small mb-0"><i class="fa fa-info-circle me-1"></i> <strong>Consiglio:</strong> nelle impostazioni di stampa seleziona <strong>Orizzontale</strong>, margini <strong>Nessuno</strong> e abilita la <strong>Grafica in background</strong>.</p>
+    </div>
+    <?php foreach ($lista as $a): $url_ver = url_verifica_attestato($a['codice']); ?>
+    <div class="cert-container">
+        <div class="cert-border-outer">
+            <div class="cert-border-inner">
+                <i class="fa fa-award cert-stamp" aria-hidden="true"></i>
+                <div class="cert-header">
+                    <?php if (!empty($a['logo'])): ?><img src="<?php echo $h($a['logo']); ?>" class="cert-logo" alt="Logo"><?php endif; ?>
+                    <div>
+                        <h4 class="fw-bold m-0" style="color: #334155;"><?php echo $h($a['portale']); ?></h4>
+                        <span style="font-size: 1.1rem; color: #64748b;"><?php echo $h($a['sottotitolo']); ?></span>
+                    </div>
+                </div>
+                <div class="cert-main-content">
+                    <h1 class="cert-title">Attestato di Partecipazione</h1>
+                    <div class="cert-subtitle">Si attesta che</div>
+                    <div class="cert-body">
+                        <span class="cert-name"><?php echo $h(mb_strtoupper($a['nome'])); ?></span><br>
+                        <?php if ($a['matricola'] !== ''): ?><span style="font-size: 1.1rem; color: #64748b;">(Matricola: <?php echo $h($a['matricola']); ?>)</span><br><?php endif; ?>
+                        <span class="mt-3 d-block">ha partecipato all'attività formativa/evento denominata:</span>
+                        <span class="cert-event">"<?php echo $h($a['evento']); ?>"</span>
+                        <span class="d-block mt-2">
+                            <?php echo $a['quando'] !== '' ? $h($a['quando']) . ',' : 'Svoltasi'; ?> presso <?php echo $h($a['luogo'] ?: 'le nostre strutture'); ?><?php if ($a['ore'] !== ''): ?>
+                            <strong>per un numero di ore pari a <?php echo $h($a['ore']); ?></strong><?php endif; ?>.
+                        </span>
+                    </div>
+                </div>
+                <div class="cert-footer">
+                    <div class="cert-verifica">
+                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=168x168&margin=0&data=<?php echo urlencode($url_ver); ?>" alt="QR per verificare l'attestato">
+                        <div>
+                            <strong>Data di rilascio:</strong> <?php echo date('d/m/Y'); ?><br>
+                            <?php if ($a['area'] !== ''): ?><strong>Rif. Iniziativa:</strong> <?php echo $h($a['area']); ?><br><?php endif; ?>
+                            <span style="font-size: .9rem; color: #475569;">Verifica: inquadra il QR o inserisci il codice <strong style="font-family: monospace;"><?php echo $h($a['codice']); ?></strong> su <?php echo $h(preg_replace('#^https?://#', '', url_base_sito())); ?>/verifica_attestato.php</span>
+                        </div>
+                    </div>
+                    <div class="cert-signature">
+                        <div class="signature-text"><?php echo $h($a['firma_nome']); ?></div>
+                        <div class="border-top border-dark pt-1 mt-1">
+                            <span class="fw-bold d-block">Prof. <?php echo $h($a['firma_nome']); ?></span>
+                            <small style="color: #64748b;"><?php echo $h($a['firma_titolo']); ?></small>
+                        </div>
+                    </div>
+                </div>
+                <div class="cert-id">Codice Verifica Autenticità: <?php echo $h($a['codice']); ?></div>
+            </div>
+        </div>
+    </div>
+    <?php endforeach; ?>
+</body>
+</html>
+<?php
+        return (string)ob_get_clean();
+    }
+}
+
+if (!function_exists('assegna_codici_partecipanti')) {
+    // Codice di verifica per gli studenti che non l'hanno ancora (assegnato una volta, non cambia più)
+    function assegna_codici_partecipanti($conn, int $pr_id): void {
+        $r = $conn->query("SELECT id FROM partecipanti_prenotazione WHERE prenotazione_id = $pr_id AND (codice IS NULL OR codice = '')");
+        $upd = $conn->prepare("UPDATE partecipanti_prenotazione SET codice = ? WHERE id = ?");
+        while ($r && $row = $r->fetch_assoc()) {
+            for ($tent = 0; $tent < 5; $tent++) {
+                $c = nuovo_codice_attestato(); $id = (int)$row['id'];
+                $upd->bind_param("si", $c, $id);
+                if ($upd->execute()) break; // codice UNIQUE: in caso (rarissimo) di doppione si riprova
+            }
         }
     }
 }
 
-if (!function_exists('valida_studenti_progetto')) {
-    // Controlla i numeri indicati dalla scuola: interi, minimo <= massimo, dentro i limiti del progetto.
-    // Ritorna null se va bene, altrimenti il messaggio di errore. Campi assenti = nessun controllo.
-    function valida_studenti_progetto(array $custom, ?array $d): ?string {
-        $has_min = isset($custom[CAMPO_STUDENTI_MIN]) && $custom[CAMPO_STUDENTI_MIN] !== '';
-        $has_max = isset($custom[CAMPO_STUDENTI_MAX]) && $custom[CAMPO_STUDENTI_MAX] !== '';
-        if (!$has_min && !$has_max) return null;
-        $lim_min = !empty($d['min_studenti']) ? (int)$d['min_studenti'] : 1;
-        $lim_max = !empty($d['max_studenti']) ? (int)$d['max_studenti'] : null;
-        foreach ([CAMPO_STUDENTI_MIN => $has_min, CAMPO_STUDENTI_MAX => $has_max] as $k => $presente) {
-            if (!$presente) continue;
-            if (!preg_match('/^\d+$/', (string)$custom[$k])) return "Il numero di studenti deve essere un numero intero.";
-            $n = (int)$custom[$k];
-            if ($n < $lim_min || ($lim_max !== null && $n > $lim_max)) {
-                return "Il numero di studenti deve essere compreso tra $lim_min e " . ($lim_max ?? 'il massimo previsto') . ".";
-            }
-        }
-        if ($has_min && $has_max && (int)$custom[CAMPO_STUDENTI_MIN] > (int)$custom[CAMPO_STUDENTI_MAX]) {
-            return "Il numero minimo di studenti non può superare il massimo.";
-        }
-        return null;
+if (!function_exists('invia_attestati_gruppo')) {
+    // Progetti per le scuole: genera i codici degli studenti e manda al docente il link agli attestati.
+    // Condizioni: iscrizione confermata e presente, progetto con attestati, almeno uno studente non escluso,
+    // progetto concluso (oppure $forza, dal pulsante "Invia attestati ora" dell'admin). Ritorna true o il motivo.
+    function invia_attestati_gruppo($conn, int $pr_id, bool $forza = false) {
+        $p = prenotazione_per_attestati($conn, $pr_id);
+        if (!$p || ($p['evento_tipo'] ?? '') !== 'progetto' || (int)($p['attestati'] ?? 0) !== 1 || (int)($p['per_scuole'] ?? 1) !== 1) return "Il progetto non prevede attestati per gli studenti.";
+        if (($p['stato'] ?? 'confermata') !== 'confermata') return "L'iscrizione non è confermata.";
+        if ((int)$p['presente'] !== 1) return "Segna prima la presenza della scuola.";
+        if (!$forza && !empty($p['attestato_inviato'])) return "Attestati già inviati.";
+        if (!$forza && (empty($p['data_fine']) || $p['data_fine'] >= date('Y-m-d'))) return "Il progetto non è ancora concluso.";
+        $r_n = $conn->query("SELECT COUNT(*) AS n FROM partecipanti_prenotazione WHERE prenotazione_id = $pr_id AND escluso = 0");
+        $n = $r_n ? (int)$r_n->fetch_assoc()['n'] : 0;
+        if ($n === 0) return "L'elenco degli studenti è vuoto.";
+        if (empty($p['email'])) return "Manca l'email del docente.";
+
+        assegna_codici_partecipanti($conn, $pr_id);
+        $link = url_base_sito() . '/attestati_gruppo.php?code=' . urlencode($p['codice_prenotazione']);
+        $corpo = "<p>Gentile <strong>" . htmlspecialchars($p['nome'] . ' ' . $p['cognome']) . "</strong>,</p>"
+               . "<p>grazie per aver partecipato con la tua classe al progetto <strong>" . htmlspecialchars($p['evento_titolo']) . "</strong>.</p>"
+               . "<p>Sono pronti gli <strong>attestati di partecipazione di $n " . ($n === 1 ? 'studente' : 'studenti') . "</strong>: li trovi tutti in un'unica pagina, uno per foglio, pronti da stampare o salvare in PDF. Ogni attestato ha un codice e un QR per verificarne l'autenticità.</p>"
+               . "<p style='text-align:center; margin:30px 0;'><a href='" . htmlspecialchars($link) . "' style='background-color:#198754; color:white; padding:12px 24px; text-decoration:none; border-radius:6px; font-weight:bold; font-size:16px;'>📄 Apri gli attestati</a></p>"
+               . "<p>Per aprirli accedi con le stesse credenziali usate per l'iscrizione. Li ritrovi anche nella tua <a href='" . htmlspecialchars(url_base_sito() . '/area_personale.php') . "'>Area Personale</a>.</p>";
+        inviaNotificaEmail($p['email'], "Attestati degli studenti: " . $p['evento_titolo'], $corpo, $conn, colore_area_turno($conn, (int)$p['turno_id']));
+        $conn->query("UPDATE prenotazioni SET attestato_inviato = 1 WHERE id = $pr_id");
+        return true;
+    }
+}
+
+if (!function_exists('puo_vedere_prenotazione')) {
+    // L'utente loggato è il titolare della prenotazione, un amministratore o un gestore
+    function puo_vedere_prenotazione(array $p): bool {
+        $u_id = (int)($_SESSION['utente_id'] ?? 0);
+        if ($u_id <= 0) return false;
+        $ruolo = (int)($_SESSION['utente_ruolo_id'] ?? 5);
+        $sec = isset($_SESSION['utente_ruoli_secondari']) ? explode(',', $_SESSION['utente_ruoli_secondari']) : [];
+        if (in_array($ruolo, [1, 2], true) || in_array('1', $sec, true) || in_array('2', $sec, true)) return true;
+        return (int)($p['utente_id'] ?? 0) === $u_id
+            || (!empty($_SESSION['utente_email']) && strtolower((string)$p['email']) === strtolower($_SESSION['utente_email']));
     }
 }
 
@@ -2206,7 +2752,7 @@ if (!function_exists('valida_studenti_progetto')) {
 // richiesta: quando aggiungi qualcosa qui, cambia anche il nome del marcatore.
 if (!function_exists('assicura_schema')) {
     function assicura_schema($conn) {
-        $marker = __DIR__ . '/cache/schema_v10.ok';
+        $marker = __DIR__ . '/cache/schema_v13.ok';
         if (is_file($marker)) return;
 
         // 1. Tabelle di servizio (prima create dalle singole pagine a ogni richiesta)
@@ -2236,7 +2782,14 @@ if (!function_exists('assicura_schema')) {
                 periodo_note VARCHAR(255) DEFAULT '', destinatari VARCHAR(255) DEFAULT '', modalita VARCHAR(100) DEFAULT '',
                 ore_totali INT DEFAULT NULL, incontri_previsti INT DEFAULT NULL, min_studenti INT DEFAULT NULL, max_studenti INT DEFAULT NULL,
                 referenti_json TEXT DEFAULT NULL, info_extra_json TEXT DEFAULT NULL, moduli_json TEXT DEFAULT NULL,
-                obiettivi TEXT DEFAULT NULL, conoscenze TEXT DEFAULT NULL, competenze TEXT DEFAULT NULL, updated_at DATETIME DEFAULT NULL
+                obiettivi TEXT DEFAULT NULL, conoscenze TEXT DEFAULT NULL, competenze TEXT DEFAULT NULL,
+                per_scuole TINYINT(1) NOT NULL DEFAULT 1, attestati TINYINT(1) NOT NULL DEFAULT 0, updated_at DATETIME DEFAULT NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            // v11: elenco degli studenti di un'iscrizione (progetti per le scuole) con il codice di verifica dell'attestato
+            'partecipanti_prenotazione' => "CREATE TABLE IF NOT EXISTS partecipanti_prenotazione (
+                id INT AUTO_INCREMENT PRIMARY KEY, prenotazione_id INT NOT NULL, cognome VARCHAR(100) NOT NULL DEFAULT '', nome VARCHAR(100) NOT NULL DEFAULT '',
+                codice VARCHAR(20) DEFAULT NULL, escluso TINYINT(1) NOT NULL DEFAULT 0, anonimizzato TINYINT(1) NOT NULL DEFAULT 0, ordine INT NOT NULL DEFAULT 0, created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_pren (prenotazione_id), UNIQUE KEY uq_codice (codice)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         ];
         foreach ($tabelle as $nome => $ddl) {
@@ -2271,6 +2824,8 @@ if (!function_exists('assicura_schema')) {
                 'email_post_evento_inviata' => "ADD COLUMN email_post_evento_inviata TINYINT(1) NOT NULL DEFAULT 0",
                 'token_sondaggio'           => "ADD COLUMN token_sondaggio VARCHAR(64) DEFAULT NULL",
                 'sondaggio_completato'      => "ADD COLUMN sondaggio_completato TINYINT(1) NOT NULL DEFAULT 0",
+                // v11: promemoria al docente per l'elenco degli studenti (progetti con attestati)
+                'promemoria_elenco_inviato' => "ADD COLUMN promemoria_elenco_inviato TINYINT(1) NOT NULL DEFAULT 0",
             ],
             'eventi' => [
                 'abilita_presenze'      => "ADD COLUMN abilita_presenze TINYINT(1) NOT NULL DEFAULT 1",
@@ -2281,6 +2836,8 @@ if (!function_exists('assicura_schema')) {
                 'allegato_pdf'          => "ADD COLUMN allegato_pdf VARCHAR(255) DEFAULT NULL",
                 // v9: 'evento' | 'progetto' (i progetti si gestiscono da admin/progetti.php)
                 'tipo'                  => "ADD COLUMN tipo VARCHAR(20) NOT NULL DEFAULT 'evento'",
+                // v13: testo breve mostrato nelle card (la descrizione completa sta nella scheda dell'evento)
+                'descrizione_breve'     => "ADD COLUMN descrizione_breve VARCHAR(500) DEFAULT NULL AFTER descrizione",
             ],
             // v10: articolazione del percorso (moduli/fasi/incontri) e sezioni obiettivi/conoscenze/competenze
             'progetti_dettagli' => [
@@ -2288,6 +2845,13 @@ if (!function_exists('assicura_schema')) {
                 'obiettivi'   => "ADD COLUMN obiettivi TEXT DEFAULT NULL",
                 'conoscenze'  => "ADD COLUMN conoscenze TEXT DEFAULT NULL",
                 'competenze'  => "ADD COLUMN competenze TEXT DEFAULT NULL",
+                // v11: progetto dedicato alle scuole (1 scuola per edizione) e attestati per gli studenti
+                'per_scuole'  => "ADD COLUMN per_scuole TINYINT(1) NOT NULL DEFAULT 1",
+                'attestati'   => "ADD COLUMN attestati TINYINT(1) NOT NULL DEFAULT 0",
+            ],
+            // v12: nomi degli studenti ridotti alle iniziali dopo il periodo di conservazione (i codici restano verificabili)
+            'partecipanti_prenotazione' => [
+                'anonimizzato' => "ADD COLUMN anonimizzato TINYINT(1) NOT NULL DEFAULT 0 AFTER escluso",
             ],
             'pagine_eventi' => [
                 'copertina_path'        => "ADD COLUMN copertina_path VARCHAR(255) DEFAULT NULL",
