@@ -31,11 +31,20 @@ if (isset($_GET['modello'])) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$bloccato) {
     csrf_verify($_POST['csrf_token'] ?? '');
-    $testo = null; $errore = null;
-    if (isset($_POST['carica_file']) && !empty($_FILES['file_elenco']['name'])) $testo = testo_da_file_elenco($_FILES['file_elenco'], $errore);
-    elseif (isset($_POST['salva_elenco'])) $testo = (string)($_POST['elenco'] ?? '');
-    if ($testo !== null) {
-        $righe = leggi_elenco_partecipanti($testo);
+    $righe = null; $errore = null;
+    if (isset($_POST['carica_file']) && !empty($_FILES['file_elenco']['name'])) {
+        $testo = testo_da_file_elenco($_FILES['file_elenco'], $errore);
+        if ($testo !== null) $righe = leggi_elenco_partecipanti($testo);
+    } elseif (isset($_POST['salva_elenco'])) {
+        $righe = leggi_elenco_da_campi((array)($_POST['stud_cognome'] ?? []), (array)($_POST['stud_nome'] ?? []));
+        $senza_cognome = count(array_filter($righe, fn($x) => $x['cognome'] === ''));
+        $senza_nome    = count(array_filter($righe, fn($x) => $x['nome'] === ''));
+        if ($senza_cognome || $senza_nome) {
+            $errore = "Ogni studente deve avere cognome e nome: " . ($senza_cognome + $senza_nome === 1 ? "manca un dato" : "mancano alcuni dati") . ". L'elenco non è stato salvato.";
+            $righe = null;
+        }
+    }
+    if ($righe !== null) {
         if (count($righe) > $max) $errore = "Hai inserito " . count($righe) . " nomi, ma l'iscrizione è per $max studenti. Correggi l'elenco (o chiedi alla segreteria di aggiornare il numero).";
         else {
             salva_elenco_partecipanti($conn, $pr_id, $righe);
@@ -48,7 +57,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$bloccato) {
 }
 
 $studenti = get_partecipanti_prenotazione($conn, $pr_id);
-$testo_attuale = implode("\n", array_map(fn($s) => $s['cognome'] . ($s['nome'] !== '' ? ';' . $s['nome'] : ''), $studenti));
 $col = colore_valido($p['colore_primario'] ?? '', '#0056B3');
 
 $page_cfg['titolo'] = "Elenco studenti";
@@ -86,14 +94,25 @@ require_once 'header.php';
             <div class="col-lg-7">
                 <div class="card border-0 shadow-sm h-100" style="border-radius: 12px;">
                     <div class="card-body p-4">
-                        <h2 class="fs-5 fw-bold mb-2"><i class="fa fa-keyboard me-1" aria-hidden="true"></i>Scrivi o incolla l'elenco</h2>
-                        <p class="small text-secondary">Uno studente per riga, <strong>Cognome;Nome</strong>. Puoi anche selezionare in Excel le due colonne Cognome e Nome, copiarle e incollarle qui.</p>
-                        <form method="POST">
+                        <h2 class="fs-5 fw-bold mb-2"><i class="fa fa-keyboard me-1" aria-hidden="true"></i>Inserisci gli studenti</h2>
+                        <p class="small text-secondary">Una riga per studente, con <strong>cognome</strong> e <strong>nome</strong>. Hai l'elenco in Excel? Seleziona le due colonne, copia e incolla nella prima casella libera: le righe si riempiono da sole.</p>
+                        <form method="POST" id="elencoForm">
                             <?php csrf_field(); ?>
                             <input type="hidden" name="code" value="<?php echo h($code); ?>">
-                            <label for="elencoTesto" class="visually-hidden">Elenco degli studenti</label>
-                            <textarea name="elenco" id="elencoTesto" class="form-control font-monospace" rows="14" placeholder="Rossi;Mario&#10;Bianchi;Giulia&#10;De Luca;Anna Maria"><?php echo h($testo_attuale); ?></textarea>
-                            <div class="d-flex justify-content-between align-items-center mt-2 flex-wrap gap-2">
+                            <div class="el-righe-testa d-none d-sm-grid small fw-bold text-secondary mb-1"><span></span><span>Cognome</span><span>Nome</span><span></span></div>
+                            <div id="elencoRighe">
+                                <?php $righe_form = $studenti ?: array_fill(0, 3, ['cognome' => '', 'nome' => '']);
+                                foreach ($righe_form as $i => $s): ?>
+                                    <div class="el-riga">
+                                        <span class="el-num small text-secondary text-end"><?php echo $i + 1; ?>.</span>
+                                        <input type="text" name="stud_cognome[]" class="form-control form-control-sm" value="<?php echo h($s['cognome']); ?>" placeholder="Cognome" aria-label="Cognome dello studente" maxlength="100" autocomplete="off">
+                                        <input type="text" name="stud_nome[]" class="form-control form-control-sm" value="<?php echo h($s['nome']); ?>" placeholder="Nome" aria-label="Nome dello studente" maxlength="100" autocomplete="off">
+                                        <button type="button" class="btn btn-sm btn-outline-danger el-rimuovi" title="Rimuovi studente" aria-label="Rimuovi studente"><i class="fa fa-times" aria-hidden="true"></i></button>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                            <button type="button" id="elencoAggiungi" class="btn btn-sm btn-outline-secondary fw-bold mt-1"><i class="fa fa-plus me-1" aria-hidden="true"></i>Aggiungi studente</button>
+                            <div class="d-flex justify-content-between align-items-center mt-3 pt-3 border-top flex-wrap gap-2">
                                 <span class="small text-secondary" id="elencoConta" aria-live="polite"></span>
                                 <button type="submit" name="salva_elenco" value="1" class="btn fw-bold px-4" style="background: <?php echo $col; ?>; color: <?php echo colore_testo_su($col); ?>;"><i class="fa fa-save me-1" aria-hidden="true"></i>Salva l'elenco</button>
                             </div>
@@ -125,15 +144,64 @@ require_once 'header.php';
                 </div>
             </div>
         </div>
+        <style>
+            .el-riga, .el-righe-testa { display: grid; grid-template-columns: 28px 1fr 1fr 34px; gap: .4rem; align-items: center; }
+            .el-riga { margin-bottom: .4rem; }
+            .el-riga .el-rimuovi { width: 34px; height: 34px; min-height: 0; padding: 0; display: flex; align-items: center; justify-content: center; }
+            @media (max-width: 575.98px) { .el-riga { grid-template-columns: 22px 1fr 1fr 34px; gap: .25rem; } }
+        </style>
         <script>
         (function () {
-            var ta = document.getElementById('elencoTesto'), out = document.getElementById('elencoConta'), max = <?php echo (int)$max; ?>;
-            function conta() {
-                var n = ta.value.split(/\r?\n/).filter(function (r) { return r.trim() !== ''; }).length;
-                out.textContent = n + ' / ' + max + ' studenti' + (n > max ? ' — troppi nomi' : '');
+            var box = document.getElementById('elencoRighe'), out = document.getElementById('elencoConta'), form = document.getElementById('elencoForm');
+            var max = <?php echo (int)$max; ?>;
+            var righe = function () { return Array.prototype.slice.call(box.querySelectorAll('.el-riga')); };
+            var campi = function (r) { return r.querySelectorAll('input'); };
+            function aggiorna() {
+                var n = 0;
+                righe().forEach(function (r, i) {
+                    var c = campi(r), piena = c[0].value.trim() !== '' || c[1].value.trim() !== '';
+                    r.querySelector('.el-num').textContent = (i + 1) + '.';
+                    // In una riga iniziata servono entrambi i campi
+                    c[0].required = piena; c[1].required = piena;
+                    if (piena) n++;
+                });
+                out.textContent = n + ' / ' + max + ' studenti' + (n > max ? ' — troppi nomi: l\'iscrizione è per ' + max + ' studenti' : '');
                 out.className = 'small fw-semibold ' + (n > max ? 'text-danger' : 'text-secondary');
             }
-            ta.addEventListener('input', conta); conta();
+            function nuovaRiga(cognome, nome) {
+                var r = righe()[0].cloneNode(true), c = campi(r);
+                c[0].value = cognome || ''; c[1].value = nome || '';
+                box.appendChild(r);
+                return r;
+            }
+            document.getElementById('elencoAggiungi').addEventListener('click', function () { campi(nuovaRiga())[0].focus(); aggiorna(); });
+            box.addEventListener('click', function (e) {
+                var b = e.target.closest('.el-rimuovi'); if (!b) return;
+                var r = b.closest('.el-riga');
+                if (righe().length > 1) r.remove(); else { campi(r)[0].value = ''; campi(r)[1].value = ''; }
+                aggiorna();
+            });
+            box.addEventListener('input', aggiorna);
+            // Incolla da Excel (più righe o due colonne): riempie le righe a partire da quella in cui si incolla
+            box.addEventListener('paste', function (e) {
+                var t = (e.clipboardData || window.clipboardData).getData('text');
+                if (!/[\t\n;]/.test(t.trim())) return;
+                e.preventDefault();
+                var righe_in = t.split(/\r?\n/).map(function (l) { return l.split(/\t|;/).map(function (x) { return x.trim(); }); })
+                                .filter(function (p) { return p.join('') !== '' && !/^cognome$/i.test(p[0]); });
+                var r = e.target.closest('.el-riga');
+                righe_in.forEach(function (p, i) {
+                    if (i > 0) { r = r.nextElementSibling && campi(r.nextElementSibling)[0].value === '' && campi(r.nextElementSibling)[1].value === '' ? r.nextElementSibling : nuovaRiga(); }
+                    campi(r)[0].value = p[0] || ''; campi(r)[1].value = p.slice(1).join(' ');
+                });
+                aggiorna();
+            });
+            form.addEventListener('submit', function (e) {
+                aggiorna();
+                var n = righe().filter(function (r) { var c = campi(r); return c[0].value.trim() || c[1].value.trim(); }).length;
+                if (n > max) { e.preventDefault(); out.scrollIntoView({ block: 'center' }); }
+            });
+            aggiorna();
         })();
         </script>
     <?php endif; ?>

@@ -2463,6 +2463,24 @@ if (!function_exists('leggi_elenco_partecipanti')) {
     }
 }
 
+if (!function_exists('leggi_elenco_da_campi')) {
+    // Elenco dai campi separati Cognome[] e Nome[] del modulo: righe vuote ignorate, doppioni tolti
+    function leggi_elenco_da_campi(array $cognomi, array $nomi, int $max = 500): array {
+        $out = []; $visti = [];
+        foreach (array_values($cognomi) as $i => $c) {
+            $cognome = mb_substr(trim(preg_replace('/\s+/u', ' ', (string)$c)), 0, 100);
+            $nome    = mb_substr(trim(preg_replace('/\s+/u', ' ', (string)(array_values($nomi)[$i] ?? ''))), 0, 100);
+            if ($cognome === '' && $nome === '') continue;
+            $chiave = mb_strtolower($cognome . '|' . $nome);
+            if (isset($visti[$chiave])) continue;
+            $visti[$chiave] = true;
+            $out[] = ['cognome' => $cognome, 'nome' => $nome];
+            if (count($out) >= $max) break;
+        }
+        return $out;
+    }
+}
+
 if (!function_exists('testo_da_file_elenco')) {
     // Testo "Cognome;Nome" da un file caricato: CSV/TXT (anche salvato da Excel) oppure XLSX (prime due colonne
     // del primo foglio; serve l'estensione zip di PHP). Ritorna il testo oppure null con $errore valorizzato.
