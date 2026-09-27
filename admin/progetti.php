@@ -130,6 +130,7 @@ if (isset($_POST['salva_progetto'])) {
     // Tipo di progetto: per le scuole (una scuola per edizione, numero di partecipanti) o generico (posti per edizione)
     $per_scuole = isset($_POST['per_scuole']) ? 1 : 0;
     $attestati  = isset($_POST['attestati']) ? 1 : 0;
+    $lista_attesa = isset($_POST['lista_attesa']) ? 1 : 0; // vale per tutte le edizioni
 
     // Edizioni (repliche): ogni riga è un turno. ed_id = turno esistente (0 = nuova).
     // Per le scuole ogni edizione ha 1 posto; altrimenti i posti indicati (predefinito 30).
@@ -216,25 +217,25 @@ if (isset($_POST['salva_progetto'])) {
                             $d['ore_totali'], $d['incontri_previsti'], $d['min_studenti'], $d['max_studenti'], $ref_json, $info_json, $mod_json, $obiettivi, $conoscenze, $competenze, $per_scuole, $attestati);
         if (!$stmt_d->execute()) throw new RuntimeException($conn->error);
 
-        // Edizioni = turni di iscrizione (posti: 1 per le scuole), lista d'attesa attiva, niente approvazione (ordine di arrivo).
+        // Edizioni = turni di iscrizione (posti: 1 per le scuole), lista d'attesa se attivata, niente approvazione (ordine di arrivo).
         // Ogni turno ha la sua finestra e i suoi limiti (con una sola edizione: quelli generali, limiti NULL = del progetto).
         $turni_esistenti = [];
         $r_t = $conn->query("SELECT id FROM turni WHERE evento_id = $ev_id ORDER BY id ASC");
         while ($r_t && $rt = $r_t->fetch_assoc()) $turni_esistenti[] = (int)$rt['id'];
         $tenuti = [];
-        $stmt_up = $conn->prepare("UPDATE turni SET nome_turno = ?, max_posti = ?, data_apertura = ?, data_chiusura = ?, min_partecipanti = ?, max_partecipanti = ?, abilita_lista_attesa = 1, abilita_multi_posto = 0, richiede_approvazione = 0 WHERE id = ?");
+        $stmt_up = $conn->prepare("UPDATE turni SET nome_turno = ?, max_posti = ?, data_apertura = ?, data_chiusura = ?, min_partecipanti = ?, max_partecipanti = ?, abilita_lista_attesa = ?, abilita_multi_posto = 0, richiede_approvazione = 0 WHERE id = ?");
         $stmt_in = $conn->prepare("INSERT INTO turni (evento_id, nome_turno, data_turno, orario_inizio, orario_fine, max_posti, data_apertura, data_chiusura, min_partecipanti, max_partecipanti, abilita_lista_attesa, abilita_multi_posto, richiede_approvazione)
-                                   VALUES (?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, 1, 0, 0)");
+                                   VALUES (?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, 0, 0)");
         $n_ed = count($edizioni);
         foreach ($edizioni as $k => $ed) {
             // Nome dell'edizione: quello scritto, altrimenti "Edizione N" (o "Iscrizioni" se è l'unica)
             $nome_ed = $ed['nome'] !== '' ? $ed['nome'] : ($n_ed > 1 ? 'Edizione ' . ($k + 1) : 'Iscrizioni');
             if ($ed['id'] > 0 && in_array($ed['id'], $turni_esistenti, true)) {
-                $stmt_up->bind_param("sissiii", $nome_ed, $ed['posti'], $ed['apertura'], $ed['chiusura'], $ed['min'], $ed['max'], $ed['id']);
+                $stmt_up->bind_param("sissiiii", $nome_ed, $ed['posti'], $ed['apertura'], $ed['chiusura'], $ed['min'], $ed['max'], $lista_attesa, $ed['id']);
                 if (!$stmt_up->execute()) throw new RuntimeException($conn->error);
                 $tenuti[] = $ed['id'];
             } else {
-                $stmt_in->bind_param("isissii", $ev_id, $nome_ed, $ed['posti'], $ed['apertura'], $ed['chiusura'], $ed['min'], $ed['max']);
+                $stmt_in->bind_param("isissiii", $ev_id, $nome_ed, $ed['posti'], $ed['apertura'], $ed['chiusura'], $ed['min'], $ed['max'], $lista_attesa);
                 if (!$stmt_in->execute()) throw new RuntimeException($conn->error);
                 $tenuti[] = (int)$conn->insert_id;
             }
@@ -260,6 +261,11 @@ if (isset($_POST['salva_progetto'])) {
     $avvisi = [];
     if ($notif_scartati) $avvisi[] = "indirizzi per le notifiche non validi ignorati: " . implode(', ', $notif_scartati);
     if ($email_scartate) $avvisi[] = "email dei referenti non valide ignorate: " . implode(', ', $email_scartate);
+    if (!$lista_attesa) {
+        $r_att = $conn->query("SELECT COUNT(*) AS n FROM prenotazioni p JOIN turni t ON p.turno_id = t.id WHERE t.evento_id = $ev_id AND p.stato = 'in_attesa'");
+        $n_att = $r_att ? (int)$r_att->fetch_assoc()['n'] : 0;
+        if ($n_att > 0) $avvisi[] = "lista d'attesa disattivata, ma $n_att " . ($n_att === 1 ? "iscrizione è" : "iscrizioni sono") . " già in attesa: restano in coda finché non le annulli da Iscrizioni";
+    }
     if ($edizioni_non_tolte) $avvisi[] = "non ho eliminato le edizioni con iscritti o persone in attesa (" . implode(', ', $edizioni_non_tolte) . "): annulla prima le loro iscrizioni";
     registra_log_audit($conn, (int)($_POST['evento_id'] ?? 0) ? "Modifica Progetto" : "Creazione Progetto", ["Evento ID" => $ev_id, "Titolo" => $titolo]);
     flash_set("Progetto salvato." . ($avvisi ? " Attenzione: " . implode('; ', $avvisi) . "." : ''), $avvisi ? 'warning' : 'success');
@@ -538,7 +544,13 @@ if ($mostra_form):
 
             <section class="pj-sez">
                 <h2><i class="fa fa-clone me-1" aria-hidden="true"></i>Edizioni e iscrizione</h2>
-                <p class="form-text mt-0 mb-2">Una riga per edizione (le "repliche"). <span class="pj-solo-scuole">Nei progetti per le scuole ogni edizione accoglie <strong>una scuola</strong>, le altre vanno in lista d'attesa.</span><span class="pj-solo-generico">Indica i <strong>posti</strong> di ogni edizione: quando finiscono si entra in lista d'attesa.</span> Con più edizioni si sceglie quella preferita.</p>
+                <p class="form-text mt-0 mb-2">Una riga per edizione (le "repliche"). <span class="pj-solo-scuole">Nei progetti per le scuole ogni edizione accoglie <strong>una scuola</strong>.</span><span class="pj-solo-generico">Indica i <strong>posti</strong> di ogni edizione.</span> Con più edizioni si sceglie quella preferita.</p>
+                <?php $lista_v = $id_modifica ? (int)($tu['abilita_lista_attesa'] ?? 1) === 1 : true; ?>
+                <div class="form-check form-switch mb-1">
+                    <input class="form-check-input" type="checkbox" name="lista_attesa" id="pjLista" value="1" <?php echo $lista_v ? 'checked' : ''; ?>>
+                    <label class="form-check-label small fw-bold" for="pjLista">Lista d'attesa</label>
+                </div>
+                <p class="form-text mt-0 mb-3">Acceso: quando un'edizione è piena <span class="pj-solo-scuole">le altre scuole</span><span class="pj-solo-generico">gli altri</span> entrano in lista d'attesa, in ordine di arrivo, e ricevono il posto se si libera. Spento: a edizione piena le iscrizioni si chiudono.</p>
                 <div id="pjEdizioni">
                     <?php foreach ($turni_ed as $k => $te): ?>
                         <div class="pj-ed-blocco">

@@ -478,6 +478,7 @@ $pulsante_progetto = function (array $ev, array $ip, ?array $ed = null) use ($co
         $ed = $ip['edizioni'][0];
     }
     $t_id = (int)$ed['t']['id'];
+    if (!$ed['libera'] && empty($ed['t']['abilita_lista_attesa'])) return '<button class="btn btn-outline-secondary fw-bold w-100" disabled>' . ($sc ? 'Edizione già assegnata' : 'Posti esauriti') . '</button>';
     if (!$ed['libera']) return '<button type="button" class="btn btn-warning fw-bold text-dark w-100" data-bs-toggle="modal" data-bs-target="#modPrenota' . $t_id . '"><i class="fa fa-hourglass-half me-1" aria-hidden="true"></i>Mettiti in lista d\'attesa</button>';
     return '<button type="button" class="btn fw-bold w-100" style="' . $stile . '" data-bs-toggle="modal" data-bs-target="#modPrenota' . $t_id . '"><i class="fa ' . ($sc ? 'fa-school' : 'fa-user-plus') . ' me-1" aria-hidden="true"></i>' . ($sc ? 'Iscrivi la scuola' : 'Iscriviti') . '</button>';
 };
@@ -1127,7 +1128,7 @@ function evSetRating(btn) {
                                             <?php if (!in_array($ed['stato']['codice'], ['aperte', 'attesa'], true)): ?><span class="badge mt-1" style="background: <?php echo $ed['stato']['bg']; ?>; color: <?php echo $ed['stato']['fg']; ?>;"><?php echo htmlspecialchars($ed['stato']['etichetta']); ?></span><?php endif; ?>
                                         <?php endif; ?>
                                         <div class="<?php echo $piu_ed ? 'small text-secondary' : 'fw-bold'; ?>"><?php echo htmlspecialchars($txt_ed); ?></div>
-                                        <?php if (!$ed['libera']): ?><div class="small text-secondary"><?php echo $ed['attesa'] > 0 ? $ed['attesa'] . ($sc_p ? ($ed['attesa'] === 1 ? ' scuola' : ' scuole') : ($ed['attesa'] === 1 ? ' persona' : ' persone')) . " in lista d'attesa" : "Lista d'attesa vuota"; ?></div><?php endif; ?>
+                                        <?php if (!$ed['libera'] && !empty($ed['t']['abilita_lista_attesa'])): ?><div class="small text-secondary"><?php echo $ed['attesa'] > 0 ? $ed['attesa'] . ($sc_p ? ($ed['attesa'] === 1 ? ' scuola' : ' scuole') : ($ed['attesa'] === 1 ? ' persona' : ' persone')) . " in lista d'attesa" : "Lista d'attesa vuota"; ?></div><?php endif; ?>
                                         <?php if ($sc_p && !$piu_ed && $ed['libera']): ?><div class="small text-secondary">Il progetto accoglie una sola scuola.</div><?php endif; ?>
                                         <?php if (!$sc_p && $ed['libera'] && (int)$ed['t']['max_posti'] > 0 && (int)$ed['t']['max_posti'] < 9000):
                                             $pct_ed = min(100, (int)round($ed['occ'] / max(1, (int)$ed['t']['max_posti']) * 100)); ?>
