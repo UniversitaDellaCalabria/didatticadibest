@@ -43,6 +43,8 @@ if (isset($_POST['save_pagina_config'])) {
     // NUOVI CAMPI FIRMA ATTESTATO AREA
     $firma_nome = $conn->real_escape_string($_POST['firma_nome'] ?? '');
     $firma_titolo = $conn->real_escape_string($_POST['firma_titolo'] ?? '');
+    $testo_att = mb_substr(trim(strip_tags((string)($_POST['testo_attestato'] ?? ''))), 0, 300);
+    $testo_att_sql = $testo_att === '' ? 'NULL' : "'" . $conn->real_escape_string($testo_att) . "'";
 
     $res_curr_p = $conn->query("SELECT allegati_box_info, allegati_sidebar FROM pagine_eventi WHERE id = $p_id");
     $curr_row = ($res_curr_p && $res_curr_p->num_rows > 0) ? $res_curr_p->fetch_assoc() : ['allegati_box_info'=>'', 'allegati_sidebar'=>''];
@@ -114,7 +116,7 @@ if (isset($_POST['save_pagina_config'])) {
         if ($fn) $logo_att_query = ", logo_attestato_path='uploads/$fn'";
     }
 
-    $conn->query("UPDATE pagine_eventi SET titolo='$titolo', sottotitolo='$sottotitolo', colore_primario='$col_prim', colore_secondario='$col_sec', larghezza_contenitore='$larg_cont', layout_template='$tmpl', mostra_in_home=$mostra_home, limite_iscrizioni='$limite_isc', num_colonne=$num_col, spazio_card=$spazio_c, mostra_sidebar=$m_sidebar, chiedi_matricola=$ch_matr, sidebar_titolo='$sb_titolo', sidebar_intervallo_date='$sb_date', sidebar_testo='$sb_testo', posizione_box_info='$pos_box_info', hero_descrizione='$hero_desc', box_info_html='$box_info', allegati_box_info='$allegati_box_info_final', allegati_sidebar='$allegati_sidebar_final', firma_nome='$firma_nome', firma_titolo='$firma_titolo' $logo_att_query $banner_query $copertina_query WHERE id = $p_id");
+    $conn->query("UPDATE pagine_eventi SET titolo='$titolo', sottotitolo='$sottotitolo', colore_primario='$col_prim', colore_secondario='$col_sec', larghezza_contenitore='$larg_cont', layout_template='$tmpl', mostra_in_home=$mostra_home, limite_iscrizioni='$limite_isc', num_colonne=$num_col, spazio_card=$spazio_c, mostra_sidebar=$m_sidebar, chiedi_matricola=$ch_matr, sidebar_titolo='$sb_titolo', sidebar_intervallo_date='$sb_date', sidebar_testo='$sb_testo', posizione_box_info='$pos_box_info', hero_descrizione='$hero_desc', box_info_html='$box_info', allegati_box_info='$allegati_box_info_final', allegati_sidebar='$allegati_sidebar_final', firma_nome='$firma_nome', firma_titolo='$firma_titolo', testo_attestato=$testo_att_sql $logo_att_query $banner_query $copertina_query WHERE id = $p_id");
     flash_set("Impostazioni Pagina salvate con successo!");
     admin_redirect("impostazioni_area.php?p_id=$p_id");
 }
@@ -318,6 +320,11 @@ if (isset($_POST['save_pagina_config'])) {
                 <div class="col-md-6 mt-3">
                     <label class="form-label small fw-bold">Qualifica / Sottotitolo Firmatario</label>
                     <input type="text" name="firma_titolo" class="form-control" value="<?php echo htmlspecialchars($page_cfg['firma_titolo'] ?? ''); ?>">
+                </div>
+                <div class="col-12 mt-3">
+                    <label for="testoAttestato" class="form-label small fw-bold">Testo dell'attestato (prima del titolo)</label>
+                    <input type="text" name="testo_attestato" id="testoAttestato" class="form-control" maxlength="300" value="<?php echo htmlspecialchars($page_cfg['testo_attestato'] ?? ''); ?>" placeholder="es. ha partecipato al progetto di Formazione Scuola Lavoro dal titolo:">
+                    <div class="form-text">Compare così: "Si attesta che <strong>MARIO ROSSI</strong> <em>[questo testo]</em> <strong>"Titolo dell'evento o del progetto"</strong>". Se lo lasci vuoto: "ha partecipato all'attività formativa/evento denominata:" per gli eventi, "ha partecipato al progetto dal titolo:" per i progetti.</div>
                 </div>
             </div>
         </div><!-- /tab-attestati -->

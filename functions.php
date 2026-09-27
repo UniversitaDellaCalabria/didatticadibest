@@ -556,9 +556,11 @@ if (!function_exists('url_base_sito')) {
     // URL della radice del portale (es. https://dibest2.unical.it/eventi), senza slash finale.
     // Calcolato dalla posizione di functions.php: corretto anche se chiamato da /admin o da un cron.
     function url_base_sito(): string {
-        $proto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
+        // Da riga di comando (cron) non ci sono HTTPS, host né document root: si usa l'indirizzo pubblico
+        $cli = PHP_SAPI === 'cli';
+        $proto = ($cli || (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')) ? 'https://' : 'http://';
         $host = $_SERVER['HTTP_HOST'] ?? 'dibest2.unical.it';
-        $doc_root = isset($_SERVER['DOCUMENT_ROOT']) ? realpath($_SERVER['DOCUMENT_ROOT']) : '';
+        $doc_root = (!$cli && !empty($_SERVER['DOCUMENT_ROOT'])) ? realpath($_SERVER['DOCUMENT_ROOT']) : '';
         $func_root = realpath(__DIR__);
         $rel = ($doc_root && strpos($func_root, $doc_root) === 0) ? str_replace('\\', '/', substr($func_root, strlen($doc_root))) : '/eventi';
         return $proto . $host . rtrim($rel, '/');
@@ -2590,7 +2592,7 @@ if (!function_exists('prenotazione_per_attestati')) {
     function prenotazione_per_attestati($conn, int $pr_id): ?array {
         $r = $conn->query("SELECT pr.*, t.data_turno, t.orario_inizio, t.orario_fine, t.nome_turno, t.evento_id, t.min_partecipanti, t.max_partecipanti,
                                   e.titolo AS evento_titolo, e.luogo AS evento_luogo, e.tipo AS evento_tipo, e.pagina_id,
-                                  pe.titolo AS pagina_titolo, pe.firma_nome, pe.firma_titolo, pe.logo_attestato_path, pe.colore_primario,
+                                  pe.titolo AS pagina_titolo, pe.firma_nome, pe.firma_titolo, pe.logo_attestato_path, pe.colore_primario, pe.testo_attestato,
                                   cp.logo_path, cp.nome_portale, cp.sottotitolo_portale,
                                   d.per_scuole, d.attestati, d.data_inizio, d.data_fine, d.ore_totali
                            FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id
@@ -2630,6 +2632,9 @@ if (!function_exists('dati_attestato')) {
             'firma_nome' => !empty($p['firma_nome']) ? $p['firma_nome'] : 'Mauro F. La Russa',
             'firma_titolo' => !empty($p['firma_titolo']) ? $p['firma_titolo'] : 'Il Direttore del Dipartimento',
             'codice'     => $codice,
+            // Frase prima del titolo: quella dell'area (Impostazioni area → Attestati), altrimenti una predefinita
+            'formula'    => trim((string)($p['testo_attestato'] ?? '')) !== '' ? trim($p['testo_attestato'])
+                            : (($p['evento_tipo'] ?? '') === 'progetto' ? "ha partecipato al progetto dal titolo:" : "ha partecipato all'attività formativa/evento denominata:"),
         ];
     }
 }
@@ -2673,7 +2678,8 @@ if (!function_exists('pagina_attestati')) {
         .cert-event { font-size: 1.6rem; font-weight: bold; color: #0056b3; margin: 10px 0; display: block; line-height: 1.2; }
         .cert-footer { display: flex; justify-content: space-between; align-items: flex-end; padding: 0 20px; gap: 20px; }
         .cert-verifica { display: flex; align-items: flex-end; gap: 12px; text-align: left; font-size: 1.05rem; padding-bottom: 6px; }
-        .cert-verifica img { width: 84px; height: 84px; }
+        .cert-qr { width: 84px; height: 84px; flex-shrink: 0; font-size: .6rem; color: #94a3b8; }
+        .cert-qr svg { width: 100%; height: 100%; display: block; }
         .cert-signature { width: 300px; text-align: center; font-size: 1.1rem; }
         .signature-text { font-family: 'Dancing Script', cursive; font-size: 2.6rem; color: #1e293b; line-height: 0.6; margin-bottom: 10px; transform: rotate(-3deg); white-space: nowrap; }
         .cert-stamp { position: absolute; bottom: 50%; left: 50%; transform: translate(-50%, 50%); opacity: 0.05; font-size: 15rem; color: #B30000; pointer-events: none; }
@@ -2704,7 +2710,7 @@ if (!function_exists('pagina_attestati')) {
                     <div class="cert-body">
                         <span class="cert-name"><?php echo $h(mb_strtoupper($a['nome'])); ?></span><br>
                         <?php if ($a['matricola'] !== ''): ?><span style="font-size: 1.1rem; color: #64748b;">(Matricola: <?php echo $h($a['matricola']); ?>)</span><br><?php endif; ?>
-                        <span class="mt-3 d-block">ha partecipato all'attività formativa/evento denominata:</span>
+                        <span class="mt-3 d-block"><?php echo $h($a['formula']); ?></span>
                         <span class="cert-event">"<?php echo $h($a['evento']); ?>"</span>
                         <span class="d-block mt-2">
                             <?php echo $a['quando'] !== '' ? $h($a['quando']) . ',' : 'Svoltasi'; ?> presso <?php echo $h($a['luogo'] ?: 'le nostre strutture'); ?><?php if ($a['ore'] !== ''): ?>
@@ -2714,7 +2720,7 @@ if (!function_exists('pagina_attestati')) {
                 </div>
                 <div class="cert-footer">
                     <div class="cert-verifica">
-                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=168x168&margin=0&data=<?php echo urlencode($url_ver); ?>" alt="QR per verificare l'attestato">
+                        <div class="cert-qr" data-qr="<?php echo $h($url_ver); ?>" role="img" aria-label="QR per verificare l'attestato"></div>
                         <div>
                             <strong>Data di rilascio:</strong> <?php echo date('d/m/Y'); ?><br>
                             <?php if ($a['area'] !== ''): ?><strong>Rif. Iniziativa:</strong> <?php echo $h($a['area']); ?><br><?php endif; ?>
@@ -2734,6 +2740,15 @@ if (!function_exists('pagina_attestati')) {
         </div>
     </div>
     <?php endforeach; ?>
+    <!-- QR generati nella pagina: nessun servizio esterno riceve l'indirizzo di verifica -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+    <script>
+    document.querySelectorAll('.cert-qr').forEach(function (el) {
+        if (typeof qrcode !== 'function') { el.textContent = 'QR non disponibile: usa il codice'; return; }
+        var q = qrcode(0, 'M'); q.addData(el.dataset.qr); q.make();
+        el.innerHTML = q.createSvgTag({ cellSize: 3, margin: 0, scalable: true });
+    });
+    </script>
 </body>
 </html>
 <?php
@@ -2804,7 +2819,7 @@ if (!function_exists('puo_vedere_prenotazione')) {
 // richiesta: quando aggiungi qualcosa qui, cambia anche il nome del marcatore.
 if (!function_exists('assicura_schema')) {
     function assicura_schema($conn) {
-        $marker = __DIR__ . '/cache/schema_v15.ok';
+        $marker = __DIR__ . '/cache/schema_v16.ok';
         if (is_file($marker)) return;
 
         // 1. Tabelle di servizio (prima create dalle singole pagine a ogni richiesta)
@@ -2921,6 +2936,8 @@ if (!function_exists('assicura_schema')) {
                 'logo_attestato_path'   => "ADD COLUMN logo_attestato_path VARCHAR(255) DEFAULT ''",
                 'allegati_box_info'     => "ADD COLUMN allegati_box_info TEXT DEFAULT NULL",
                 'allegati_sidebar'      => "ADD COLUMN allegati_sidebar TEXT DEFAULT NULL",
+                // v16: frase dell'attestato prima del titolo (NULL = predefinita per eventi/progetti)
+                'testo_attestato'       => "ADD COLUMN testo_attestato VARCHAR(300) DEFAULT NULL",
             ],
             'impostazioni_sistema' => [
                 'email_attestato_oggetto' => "ADD COLUMN email_attestato_oggetto VARCHAR(255) DEFAULT ''",

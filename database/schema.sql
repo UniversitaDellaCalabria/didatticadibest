@@ -147,6 +147,7 @@ CREATE TABLE IF NOT EXISTS `pagine_eventi` (
     `logo_attestato_path`       varchar(255) DEFAULT '',
     `allegati_box_info`         text         DEFAULT NULL,
     `allegati_sidebar`          text         DEFAULT NULL,
+    `testo_attestato`           varchar(300) DEFAULT NULL COMMENT 'frase dell''attestato prima del titolo (NULL = predefinita)',
     `copertina_path`            varchar(255) DEFAULT NULL,
     PRIMARY KEY (`id`),
     UNIQUE KEY `slug` (`slug`)

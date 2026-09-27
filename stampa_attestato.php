@@ -2,9 +2,7 @@
 // stampa_attestato.php - Attestato personale (PDF da stampare), con codice e QR di verifica.
 // Eventi: dopo il check-in. Progetti: solo se prevedono attestati e a progetto concluso; nei progetti
 // per le scuole gli attestati sono quelli degli studenti (attestati_gruppo.php).
-if (session_status() === PHP_SESSION_NONE) { session_start(); }
-
-require_once 'config.php';
+require_once 'config.php'; // apre la sessione con i parametri sicuri del cookie
 require_once 'functions.php';
 
 sync_sso_user($conn);
