@@ -33,7 +33,7 @@ if ($widgets['prossimi_eventi'] && !empty($pagine_home_ids)) {
     $ids_home = implode(',', $pagine_home_ids);
     $lim_ev   = (int)$widgets['eventi_num'];
     $res_pr = @$conn->query(
-        "SELECT e.id, e.titolo, e.locandina_path, e.pagina_id,
+        "SELECT e.id, e.titolo, e.tipo, e.locandina_path, e.pagina_id,
                 p.titolo as area_titolo, p.colore_primario, p.slug,
                 MIN(CONCAT(COALESCE(t.data_turno, '9999-12-31'), ' ', COALESCE(t.orario_inizio, '99:99:99'))) AS prossimo
          FROM eventi e
@@ -41,7 +41,7 @@ if ($widgets['prossimi_eventi'] && !empty($pagine_home_ids)) {
          JOIN turni t ON t.evento_id = e.id
          WHERE e.archiviato = 0 AND p.visibile = 1 AND e.pagina_id IN ($ids_home)
            AND (t.data_turno IS NULL OR t.data_turno >= CURDATE())
-         GROUP BY e.id, e.titolo, e.locandina_path, e.pagina_id, p.titolo, p.colore_primario, p.slug
+         GROUP BY e.id, e.titolo, e.tipo, e.locandina_path, e.pagina_id, p.titolo, p.colore_primario, p.slug
          ORDER BY prossimo ASC
          LIMIT $lim_ev"
     );
@@ -310,7 +310,7 @@ ob_start(); ?>
             }
         ?>
         <div class="col-sm-6 col-lg-3">
-            <a href="<?php echo htmlspecialchars($up['slug']); ?>.php" class="text-decoration-none">
+            <a href="<?php echo htmlspecialchars($up['slug']); ?>.php?<?php echo ($up['tipo'] ?? '') === 'progetto' ? 'progetto' : 'evento'; ?>=<?php echo (int)$up['evento_id']; ?>" class="text-decoration-none">
                 <div class="card h-100 border-0 shadow-sm" style="border-top:3px solid <?php echo $col_up; ?> !important;border-radius:10px;overflow:hidden;">
                     <?php if ($ha_foto): ?>
                         <div style="height:90px;background:url('<?php echo htmlspecialchars($up['locandina_path']); ?>') center/cover;"></div>
@@ -454,7 +454,7 @@ ob_start(); ?>
             $ora_fmt  = $ev['prossimo_orario'];
             $ha_foto  = !empty($ev['locandina_path']) && preg_match('/\.(jpg|jpeg|png|gif|webp)$/i', $ev['locandina_path']);
         ?>
-        <a href="<?php echo htmlspecialchars($ev['slug']); ?>.php" class="text-decoration-none <?php echo $griglia ? 'col-6 col-md-4 col-lg-3' : 'flex-shrink-0'; ?>" style="<?php echo $griglia ? '' : 'scroll-snap-align:start;width:210px;'; ?>">
+        <a href="<?php echo htmlspecialchars($ev['slug']); ?>.php?<?php echo ($ev['tipo'] ?? '') === 'progetto' ? 'progetto' : 'evento'; ?>=<?php echo (int)$ev['id']; ?>" class="text-decoration-none <?php echo $griglia ? 'col-6 col-md-4 col-lg-3' : 'flex-shrink-0'; ?>" style="<?php echo $griglia ? '' : 'scroll-snap-align:start;width:210px;'; ?>">
             <div class="card h-100 border-0 shadow-sm" style="border-top:3px solid <?php echo $col1; ?> !important;border-radius:10px;overflow:hidden;">
                 <?php if ($ha_foto): ?>
                 <div style="height:<?php echo $griglia ? 110 : 85; ?>px;background:url('<?php echo htmlspecialchars($ev['locandina_path']); ?>') center/cover;"></div>

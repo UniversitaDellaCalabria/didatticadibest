@@ -34,6 +34,18 @@
 
 <script>
     tinymce.init({ selector: 'textarea.editor-html', plugins: 'table lists link code', toolbar: 'undo redo | bold italic underline | alignleft aligncenter alignright | bullist numlist | link code', menubar: false, height: 200 });
+    // Campi brevi (card): solo formattazione in linea; il contatore conta il testo visibile
+    tinymce.init({
+        selector: 'textarea.editor-breve', menubar: false, statusbar: false, height: 130,
+        toolbar: 'undo redo | bold italic underline | removeformat', valid_elements: 'strong/b,em/i,u,br,p',
+        setup: function (ed) {
+            var conta = function () {
+                var out = ed.getElement().parentElement.querySelector('.desc-breve-conta');
+                if (out) { var n = ed.getContent({ format: 'text' }).trim().length; out.textContent = n; out.parentElement.classList.toggle('text-danger', n > 300); }
+            };
+            ed.on('init input change keyup SetContent', conta);
+        }
+    });
 
     // ── Confirm modal globale (intercetta data-confirm su qualsiasi elemento) ───
     (function() {

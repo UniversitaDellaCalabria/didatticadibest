@@ -709,13 +709,28 @@ if (!function_exists('turno_concluso')) {
     }
 }
 
+if (!function_exists('pulisci_descrizione_breve')) {
+    // HTML della descrizione breve: solo grassetto, corsivo, sottolineato e a capo, senza attributi.
+    // Oltre 300 caratteri visibili si perde la formattazione e il testo viene troncato.
+    function pulisci_descrizione_breve(string $html): string {
+        $html = preg_replace('#</p>\s*<p[^>]*>#i', '<br>', $html);
+        $html = strip_tags($html, '<strong><b><em><i><u><br>');
+        $html = preg_replace('#<(/?)(strong|b|em|i|u|br)\b[^>]*>#i', '<$1$2>', $html);
+        $html = trim(preg_replace('#^(?:\s|&nbsp;|<br>)+|(?:\s|&nbsp;|<br>)+$#iu', '', $html));
+        $testo = trim(html_entity_decode(strip_tags($html), ENT_QUOTES, 'UTF-8'));
+        if ($testo === '') return '';
+        if (mb_strlen($testo) > 300) return htmlspecialchars(mb_substr($testo, 0, 300));
+        return $html;
+    }
+}
+
 if (!function_exists('testo_card_evento')) {
-    // Testo delle card: la descrizione breve; se manca, l'inizio della descrizione completa senza formattazione
+    // HTML delle card: la descrizione breve; se manca, l'inizio della descrizione completa senza formattazione
     function testo_card_evento(array $ev, int $max = 220): string {
-        $breve = trim((string)($ev['descrizione_breve'] ?? ''));
+        $breve = pulisci_descrizione_breve((string)($ev['descrizione_breve'] ?? ''));
         if ($breve !== '') return $breve;
         $testo = trim(preg_replace('/\s+/u', ' ', html_entity_decode(strip_tags(str_replace('<', ' <', (string)($ev['descrizione'] ?? ''))), ENT_QUOTES, 'UTF-8')));
-        return mb_strimwidth($testo, 0, $max, '…');
+        return htmlspecialchars(mb_strimwidth($testo, 0, $max, '…'));
     }
 }
 
@@ -1976,7 +1991,7 @@ if (!function_exists('get_turni_ultimi_posti')) {
         $res = $conn->query(
             "SELECT x.* FROM (
                 SELECT t.id AS turno_id, t.nome_turno, t.data_turno, t.orario_inizio, t.orario_fine, t.max_posti, t.data_chiusura,
-                       e.id AS evento_id, e.titolo, e.locandina_path,
+                       e.id AS evento_id, e.titolo, e.tipo, e.locandina_path,
                        pe.titolo AS area_titolo, pe.colore_primario, pe.slug,
                        (SELECT COALESCE(SUM(pr.num_posti), 0) FROM prenotazioni pr
                          WHERE pr.turno_id = t.id
@@ -2752,7 +2767,7 @@ if (!function_exists('puo_vedere_prenotazione')) {
 // richiesta: quando aggiungi qualcosa qui, cambia anche il nome del marcatore.
 if (!function_exists('assicura_schema')) {
     function assicura_schema($conn) {
-        $marker = __DIR__ . '/cache/schema_v13.ok';
+        $marker = __DIR__ . '/cache/schema_v14.ok';
         if (is_file($marker)) return;
 
         // 1. Tabelle di servizio (prima create dalle singole pagine a ogni richiesta)
@@ -2837,7 +2852,7 @@ if (!function_exists('assicura_schema')) {
                 // v9: 'evento' | 'progetto' (i progetti si gestiscono da admin/progetti.php)
                 'tipo'                  => "ADD COLUMN tipo VARCHAR(20) NOT NULL DEFAULT 'evento'",
                 // v13: testo breve mostrato nelle card (la descrizione completa sta nella scheda dell'evento)
-                'descrizione_breve'     => "ADD COLUMN descrizione_breve VARCHAR(500) DEFAULT NULL AFTER descrizione",
+                'descrizione_breve'     => "ADD COLUMN descrizione_breve TEXT DEFAULT NULL AFTER descrizione",
             ],
             // v10: articolazione del percorso (moduli/fasi/incontri) e sezioni obiettivi/conoscenze/competenze
             'progetti_dettagli' => [
@@ -2907,6 +2922,8 @@ if (!function_exists('assicura_schema')) {
             ['prenotazioni', 'stato', fn($t) => str_contains($t, 'enum'), "MODIFY COLUMN stato VARCHAR(50) DEFAULT 'confermata'"],
             // matricola nata numerica, ma può contenere lettere (prima ALTER in saml_login.php a ogni login)
             ['utenti', 'matricola', fn($t) => !str_contains($t, 'varchar'), "MODIFY COLUMN matricola VARCHAR(50) DEFAULT NULL"],
+            // v14: descrizione breve con formattazione (l'HTML è più lungo dei 300 caratteri visibili)
+            ['eventi', 'descrizione_breve', fn($t) => str_contains($t, 'varchar'), "MODIFY COLUMN descrizione_breve TEXT DEFAULT NULL"],
         ];
         foreach ($tipi as [$tabella, $col, $da_correggere, $alter]) {
             $res = $conn->query("SHOW COLUMNS FROM `$tabella` LIKE '$col'");

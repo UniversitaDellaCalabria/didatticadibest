@@ -174,7 +174,7 @@ CREATE TABLE IF NOT EXISTS `eventi` (
     `titolo`                varchar(255) NOT NULL,
     `luogo`                 varchar(255) DEFAULT '',
     `descrizione`           text         DEFAULT NULL,
-    `descrizione_breve`     varchar(500) DEFAULT NULL COMMENT 'testo delle card; la descrizione completa sta nella scheda',
+    `descrizione_breve`     text DEFAULT NULL COMMENT 'testo delle card (grassetto/corsivo); la descrizione completa sta nella scheda',
     `locandina_path`        varchar(255) DEFAULT '',
     `is_evidenza`           tinyint(1)   DEFAULT 0,
     `richiede_prenotazione` tinyint(1)   DEFAULT 1,

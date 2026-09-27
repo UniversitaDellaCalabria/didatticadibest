@@ -128,8 +128,7 @@ if (isset($_POST['add_evento'])) {
     $titolo = $_POST['titolo'] ?? '';
     $luogo = $_POST['luogo'] ?? '';
     $desc = $_POST['descrizione'] ?? '';
-    // Descrizione breve: testo semplice per le card (max 300 caratteri); la completa va nella scheda dell'evento
-    $desc_breve = mb_substr(trim(strip_tags((string)($_POST['descrizione_breve'] ?? ''))), 0, 300);
+    $desc_breve = pulisci_descrizione_breve((string)($_POST['descrizione_breve'] ?? ''));
     $desc_breve = $desc_breve === '' ? null : $desc_breve;
     $ord = (int)($_POST['ordine_evento'] ?? 0);
     $evid = isset($_POST['is_evidenza']) ? 1 : 0;
@@ -184,8 +183,7 @@ if (isset($_POST['edit_evento'])) {
     $titolo = $_POST['titolo'] ?? '';
     $luogo = $_POST['luogo'] ?? '';
     $desc = $_POST['descrizione'] ?? '';
-    // Descrizione breve: testo semplice per le card (max 300 caratteri); la completa va nella scheda dell'evento
-    $desc_breve = mb_substr(trim(strip_tags((string)($_POST['descrizione_breve'] ?? ''))), 0, 300);
+    $desc_breve = pulisci_descrizione_breve((string)($_POST['descrizione_breve'] ?? ''));
     $desc_breve = $desc_breve === '' ? null : $desc_breve;
     $ord = (int)($_POST['ordine_evento'] ?? 0);
     $evid = isset($_POST['is_evidenza']) ? 1 : 0;
@@ -675,7 +673,7 @@ $col_area = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
                         
                         <div class="col-12 mt-2 mb-1">
                             <label for="descBreveNuovo" class="form-label small fw-bold">Descrizione breve <span class="fw-normal text-muted">(compare nelle card)</span></label>
-                            <textarea name="descrizione_breve" id="descBreveNuovo" class="form-control form-control-sm desc-breve" rows="2" maxlength="300" placeholder="Una o due frasi che invogliano ad aprire la scheda dell'evento"></textarea>
+                            <textarea name="descrizione_breve" id="descBreveNuovo" class="form-control form-control-sm editor-breve" rows="2" placeholder="Una o due frasi che invogliano ad aprire la scheda dell'evento"></textarea>
                             <small class="text-muted"><span class="desc-breve-conta">0</span>/300 caratteri. La descrizione completa qui sotto si vede nella scheda dell'evento.</small>
                         </div>
                         <div class="col-12 mt-2 mb-2"><label class="form-label small fw-bold">Descrizione completa <span class="fw-normal text-muted">(scheda dell'evento)</span></label><textarea name="descrizione" class="form-control form-control-sm editor-html" rows="3"></textarea></div>
@@ -774,7 +772,7 @@ $col_area = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
 
                         <div class="mb-2 bg-white p-2 rounded border">
                             <label for="descBreve<?php echo $ev['id']; ?>" class="form-label small fw-bold">Descrizione breve <span class="fw-normal text-muted">(compare nelle card)</span></label>
-                            <textarea name="descrizione_breve" id="descBreve<?php echo $ev['id']; ?>" class="form-control form-control-sm desc-breve" rows="2" maxlength="300" placeholder="Una o due frasi che invogliano ad aprire la scheda dell'evento"><?php echo htmlspecialchars($ev['descrizione_breve'] ?? ''); ?></textarea>
+                            <textarea name="descrizione_breve" id="descBreve<?php echo $ev['id']; ?>" class="form-control form-control-sm editor-breve" rows="2" placeholder="Una o due frasi che invogliano ad aprire la scheda dell'evento"><?php echo htmlspecialchars($ev['descrizione_breve'] ?? ''); ?></textarea>
                             <small class="text-muted"><span class="desc-breve-conta">0</span>/300 caratteri. Se è vuota, nelle card compare l'inizio della descrizione completa.</small>
                         </div>
                         <div class="mb-2 bg-white p-2 rounded border"><label class="form-label small fw-bold">Descrizione completa <span class="fw-normal text-muted">(scheda dell'evento)</span></label><textarea name="descrizione" class="form-control form-control-sm editor-html" rows="4"><?php echo htmlspecialchars($ev['descrizione'] ?? ''); ?></textarea></div>
@@ -865,12 +863,6 @@ document.addEventListener('click', function (e) {
 });
 document.addEventListener('change', function (e) {
     if (e.target.classList.contains('ref-notif')) e.target.closest('.ref-riga').querySelector('input[name="ref_notifiche[]"]').value = e.target.checked ? '1' : '0';
-});
-// Contatore dei caratteri della descrizione breve
-document.querySelectorAll('.desc-breve').forEach(function (ta) {
-    var out = ta.parentElement.querySelector('.desc-breve-conta');
-    var agg = function () { if (out) out.textContent = ta.value.length; };
-    ta.addEventListener('input', agg); agg();
 });
 </script>
 <datalist id="refRuoliEv"><option value="Docente referente"><option value="Referente"><option value="Relatore"><option value="Tutor"><option value="Segreteria"></datalist>

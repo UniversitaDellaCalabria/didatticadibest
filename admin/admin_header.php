@@ -154,24 +154,14 @@ if ($res_all_p) {
         if ($is_full_admin) {
             $pagine_disponibili[] = $p_row;
         } else {
-            $p_id = $p_row['id'];
-            $has_access = false;
-            $u_id_str = (string)$u_id_curr;
+            $p_id = (int)$p_row['id'];
+            $has_access = in_array((int)$u_id_curr, ids_gestori_da_campi($p_row['gestore_utente_id'], $p_row['gestori_utenti_ids'], $p_row['permessi_gestori_json']), true);
 
-            // A. Gestore Principale dell'Area
-            if ($p_row['gestore_utente_id'] == $u_id_curr) $has_access = true;
-
-            // B. Ricerca Flessibile nei permessi dell'Area (ignora sporcizia del DB)
-            if (!$has_access && preg_match('/\b' . $u_id_str . '\b/', $p_row['gestori_utenti_ids'] ?? '')) $has_access = true;
-            if (!$has_access && preg_match('/\b' . $u_id_str . '\b/', $p_row['permessi_gestori_json'] ?? '')) $has_access = true;
-
-            // C. Ricerca Flessibile nei Singoli Eventi
             if (!$has_access) {
                 $res_ev = $conn->query("SELECT gestori_utenti_ids, permessi_gestori_json FROM eventi WHERE pagina_id = $p_id");
                 if ($res_ev) {
                     while ($e_row = $res_ev->fetch_assoc()) {
-                        if (preg_match('/\b' . $u_id_str . '\b/', $e_row['gestori_utenti_ids'] ?? '')) { $has_access = true; break; }
-                        if (preg_match('/\b' . $u_id_str . '\b/', $e_row['permessi_gestori_json'] ?? '')) { $has_access = true; break; }
+                        if (in_array((int)$u_id_curr, ids_gestori_da_campi(0, $e_row['gestori_utenti_ids'], $e_row['permessi_gestori_json']), true)) { $has_access = true; break; }
                     }
                 }
             }
@@ -183,7 +173,9 @@ if ($res_all_p) {
     }
 }
 
-$filtro_p = isset($_GET['p_id']) ? (int)$_GET['p_id'] : ($pagine_disponibili[0]['id'] ?? 0);
+$ids_aree_consentite = array_map('intval', array_column($pagine_disponibili, 'id'));
+$filtro_p = isset($_GET['p_id']) ? (int)$_GET['p_id'] : 0;
+if (!in_array($filtro_p, $ids_aree_consentite, true)) $filtro_p = $ids_aree_consentite[0] ?? 0;
 $page_cfg = null;
 if ($filtro_p > 0) {
     $stmt_cfg = $conn->prepare("SELECT * FROM pagine_eventi WHERE id = ?");
@@ -207,12 +199,8 @@ $is_area_manager = $is_full_admin;
 $allowed_events_ids = [];
 
 if (!$is_full_admin && $page_cfg) {
-    $u_id_str = (string)$u_id_curr;
-    
     // Controlla se è Manager di Tutta l'Area
-    if ($page_cfg['gestore_utente_id'] == $u_id_curr || 
-        preg_match('/\b' . $u_id_str . '\b/', $page_cfg['gestori_utenti_ids'] ?? '') || 
-        preg_match('/\b' . $u_id_str . '\b/', $page_cfg['permessi_gestori_json'] ?? '')) {
+    if (in_array((int)$u_id_curr, ids_gestori_da_campi($page_cfg['gestore_utente_id'], $page_cfg['gestori_utenti_ids'], $page_cfg['permessi_gestori_json']), true)) {
         
         $is_area_manager = true;
         
@@ -239,8 +227,7 @@ if (!$is_full_admin && $page_cfg) {
             $ev_id = $ev_row['id'];
             $has_event_access = false;
             
-            if (preg_match('/\b' . $u_id_str . '\b/', $ev_row['gestori_utenti_ids'] ?? '') || 
-                preg_match('/\b' . $u_id_str . '\b/', $ev_row['permessi_gestori_json'] ?? '')) {
+            if (in_array((int)$u_id_curr, ids_gestori_da_campi(0, $ev_row['gestori_utenti_ids'], $ev_row['permessi_gestori_json']), true)) {
                 $has_event_access = true;
             }
             

@@ -545,7 +545,7 @@ if (!function_exists('renderCardUniversal')) {
         
         // Nelle card solo la descrizione breve: la completa è nella scheda dell'evento
         $testo_card = testo_card_evento($ev);
-        if ($testo_card !== '') echo '<p class="text-secondary mb-3 flex-grow-1" style="font-size: 0.95rem; line-height: 1.55;">' . htmlspecialchars($testo_card) . '</p>';
+        if ($testo_card !== '') echo '<p class="text-secondary mb-3 flex-grow-1" style="font-size: 0.95rem; line-height: 1.55;">' . $testo_card . '</p>';
         
         if (!empty($ev['allegato_pdf'])) {
             echo '<div class="mb-3 p-3 rounded" style="background-color: #f8f9fa; border-left: 4px solid '.$col_primaria.'; font-size:0.9rem;">
@@ -1258,7 +1258,7 @@ function evSetRating(btn) {
                 <?php elseif ($ruolo_s > 0): ?><span class="ev-chip"><i class="fa fa-lock" aria-hidden="true"></i><?php echo htmlspecialchars($etichette_riservato[$ruolo_s] ?? 'Riservato'); ?></span><?php endif; ?>
             </div>
             <h1 class="mb-3"><?php echo htmlspecialchars($ev_s['titolo']); ?></h1>
-            <?php if (trim((string)($ev_s['descrizione_breve'] ?? '')) !== ''): ?><p class="fs-5 mb-3" style="opacity:.92; max-width: 820px;"><?php echo htmlspecialchars($ev_s['descrizione_breve']); ?></p><?php endif; ?>
+            <?php $breve_s = pulisci_descrizione_breve((string)($ev_s['descrizione_breve'] ?? '')); if ($breve_s !== ''): ?><p class="fs-5 mb-3" style="opacity:.92; max-width: 820px;"><?php echo $breve_s; ?></p><?php endif; ?>
             <div class="d-flex flex-wrap gap-3 fw-semibold">
                 <?php if ($prossima_s): ?><span><i class="fa fa-calendar-days me-1" aria-hidden="true"></i><?php echo count($turni_s) > 1 ? 'Prossimo: ' : ''; ?><?php echo date('d/m/Y', strtotime($prossima_s)); ?></span><?php endif; ?>
                 <?php if ($luogo_s !== ''): ?><span><i class="fa fa-location-dot me-1" aria-hidden="true"></i><?php echo htmlspecialchars($luogo_s); ?><?php if ($url_maps): ?> · <a href="<?php echo htmlspecialchars($url_maps); ?>" target="_blank" rel="noopener" class="text-decoration-underline">Apri in Google Maps<span class="visually-hidden"> (nuova scheda)</span></a><?php endif; ?></span><?php endif; ?>
@@ -2024,7 +2024,7 @@ function evSetRating(btn) {
                                         <?php endif; ?>
 
                                         <?php $testo_g = testo_card_evento($ev); if ($testo_g !== ''): ?>
-                                            <p class="text-secondary mb-3" style="font-size: .9rem; line-height: 1.5;"><?php echo htmlspecialchars($testo_g); ?></p>
+                                            <p class="text-secondary mb-3" style="font-size: .9rem; line-height: 1.5;"><?php echo $testo_g; ?></p>
                                         <?php endif; ?>
 
                                         <div class="mt-auto">
