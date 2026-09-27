@@ -31,5 +31,6 @@ if ($regola === 'gruppo') {
     exit;
 }
 
-$dati = dati_attestato($p, trim($p['nome'] . ' ' . $p['cognome']), (string)$p['codice_prenotazione'], (string)($base['matricola_effettiva'] ?? ''));
+$dati = dati_attestato($p, trim($p['nome'] . ' ' . $p['cognome']), (string)$p['codice_prenotazione'], (string)($base['matricola_effettiva'] ?? ''))
+      + ['file' => 'attestato_' . slug_file($p['cognome'] . ' ' . $p['nome'])];
 echo pagina_attestati([$dati], 'Attestato - ' . $p['nome'] . ' ' . $p['cognome']);

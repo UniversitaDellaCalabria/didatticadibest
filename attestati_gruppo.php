@@ -31,7 +31,8 @@ $lista = [];
 foreach (get_partecipanti_prenotazione($conn, $pr_id) as $s) {
     if (!empty($s['escluso'])) continue;
     if ($solo !== '' && $s['codice'] !== $solo) continue;
-    $lista[] = dati_attestato($p, trim($s['nome'] . ' ' . $s['cognome']), (string)$s['codice']);
+    $lista[] = dati_attestato($p, trim($s['nome'] . ' ' . $s['cognome']), (string)$s['codice'])
+             + ['file' => 'attestato_' . slug_file($s['cognome'] . ' ' . $s['nome'])];
 }
 if (!$lista) die("<div style='text-align:center;font-family:sans-serif;margin-top:60px;'><h2>Nessun attestato</h2><p>L'elenco degli studenti è vuoto.</p></div>");
 

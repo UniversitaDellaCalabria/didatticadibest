@@ -2657,6 +2657,16 @@ if (!function_exists('dati_attestato')) {
     }
 }
 
+if (!function_exists('slug_file')) {
+    // Testo adatto a un nome di file: minuscole, senza accenti né apostrofi, parole separate da _
+    function slug_file(string $s): string {
+        $s = strtr(mb_strtolower(trim($s)), ['à' => 'a', 'á' => 'a', 'â' => 'a', 'ä' => 'a', 'è' => 'e', 'é' => 'e', 'ê' => 'e', 'ë' => 'e',
+            'ì' => 'i', 'í' => 'i', 'î' => 'i', 'ï' => 'i', 'ò' => 'o', 'ó' => 'o', 'ô' => 'o', 'ö' => 'o', 'ù' => 'u', 'ú' => 'u', 'û' => 'u', 'ü' => 'u',
+            'ç' => 'c', 'ñ' => 'n', 'ß' => 'ss', "'" => '', '’' => '']);
+        return trim(preg_replace('/[^a-z0-9]+/', '_', $s), '_');
+    }
+}
+
 if (!function_exists('pagina_attestati')) {
     // Documento HTML stampabile con uno o più attestati (uno per pagina A4 orizzontale).
     // Ogni attestato riporta il codice di verifica e il QR che apre verifica_attestato.php.
@@ -2706,12 +2716,17 @@ if (!function_exists('pagina_attestati')) {
 </head>
 <body>
     <div class="text-center my-3 no-print">
-        <button onclick="window.print()" class="btn btn-danger fw-bold px-4 py-2 shadow-sm fs-5" style="background:#B30000; border:none;"><i class="fa fa-print me-2"></i> Stampa / Salva in PDF<?php echo count($lista) > 1 ? ' (' . count($lista) . ' attestati)' : ''; ?></button>
-        <button onclick="window.close()" class="btn btn-outline-secondary py-2 px-4 ms-2 fw-bold fs-5">Chiudi</button>
-        <p class="text-muted mt-2 small mb-0"><i class="fa fa-info-circle me-1"></i> <strong>Consiglio:</strong> nelle impostazioni di stampa seleziona <strong>Orizzontale</strong>, margini <strong>Nessuno</strong> e abilita la <strong>Grafica in background</strong>.</p>
+        <?php $n_att = count($lista); $zip_nome = 'attestati_' . (slug_file(preg_replace('/^Attestati? - /', '', $titolo_doc)) ?: 'partecipazione'); ?>
+        <div class="d-flex flex-wrap justify-content-center gap-2">
+            <button type="button" onclick="window.print()" class="btn btn-danger fw-bold px-4 py-2 shadow-sm fs-5" style="background:#B30000; border:none;"><i class="fa fa-print me-2"></i>Stampa / PDF unico<?php echo $n_att > 1 ? " ($n_att attestati)" : ''; ?></button>
+            <button type="button" id="btnScaricaAtt" data-zip="<?php echo $h($zip_nome); ?>" class="btn btn-success fw-bold px-4 py-2 shadow-sm fs-5"><i class="fa <?php echo $n_att > 1 ? 'fa-file-zipper' : 'fa-file-pdf'; ?> me-2"></i><?php echo $n_att > 1 ? "Scarica ZIP ($n_att PDF separati)" : 'Scarica PDF'; ?></button>
+            <button type="button" onclick="window.close()" class="btn btn-outline-secondary py-2 px-4 fw-bold fs-5">Chiudi</button>
+        </div>
+        <p class="text-muted mt-2 small mb-0"><i class="fa fa-info-circle me-1"></i> <strong>Stampa / PDF unico:</strong> seleziona <strong>Orizzontale</strong>, margini <strong>Nessuno</strong> e <strong>Grafica in background</strong>.<?php if ($n_att > 1): ?> <strong>Scarica ZIP:</strong> un PDF per studente (attestato_cognome_nome.pdf), comodo da inviare per email.<?php endif; ?></p>
+        <p id="attAvanzamento" class="fw-semibold mt-2 mb-0" aria-live="polite"></p>
     </div>
     <?php foreach ($lista as $a): $url_ver = url_verifica_attestato($a['codice']); ?>
-    <div class="cert-container">
+    <div class="cert-container" data-file="<?php echo $h(($a['file'] ?? '') !== '' ? $a['file'] : 'attestato_' . slug_file($a['nome'])); ?>">
         <div class="cert-border-outer">
             <div class="cert-border-inner">
                 <i class="fa fa-award cert-stamp" aria-hidden="true"></i>
@@ -2766,6 +2781,54 @@ if (!function_exists('pagina_attestati')) {
         var q = qrcode(0, 'M'); q.addData(el.dataset.qr); q.make();
         el.innerHTML = q.createSvgTag({ cellSize: 3, margin: 0, scalable: true });
     });
+
+    // Scarica: ogni attestato diventa un PDF A4 orizzontale (immagine ad alta risoluzione della pagina);
+    // con più attestati i PDF vanno in un unico ZIP. Tutto nel browser: librerie caricate solo al clic.
+    (function () {
+        var btn = document.getElementById('btnScaricaAtt'), stato = document.getElementById('attAvanzamento');
+        if (!btn) return;
+        var carica = function (src) {
+            return new Promise(function (ok, ko) { var s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = ko; document.head.appendChild(s); });
+        };
+        var salva = function (blob, nome) {
+            var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nome;
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(function () { URL.revokeObjectURL(a.href); }, 10000);
+        };
+        btn.addEventListener('click', async function () {
+            var fogli = Array.prototype.slice.call(document.querySelectorAll('.cert-container'));
+            var testo = btn.innerHTML; btn.disabled = true;
+            try {
+                stato.textContent = 'Preparazione in corso…';
+                var lib = 'https://cdnjs.cloudflare.com/ajax/libs/';
+                await carica(lib + 'html2canvas/1.4.1/html2canvas.min.js');
+                await carica(lib + 'jspdf/2.5.1/jspdf.umd.min.js');
+                if (fogli.length > 1) await carica(lib + 'jszip/3.10.1/jszip.min.js');
+                if (document.fonts && document.fonts.ready) await document.fonts.ready;
+                var zip = fogli.length > 1 ? new JSZip() : null, usati = {};
+                for (var i = 0; i < fogli.length; i++) {
+                    stato.textContent = 'Creazione del PDF ' + (i + 1) + ' di ' + fogli.length + '…';
+                    var canvas = await html2canvas(fogli[i], { scale: 2, backgroundColor: '#ffffff', useCORS: true, windowWidth: 1400 });
+                    var pdf = new jspdf.jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4', compress: true });
+                    pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, 297, 210);
+                    // Nomi uguali (omonimi): attestato_rossi_mario_2.pdf
+                    var base = fogli[i].dataset.file || ('attestato_' + (i + 1));
+                    usati[base] = (usati[base] || 0) + 1;
+                    var nome = base + (usati[base] > 1 ? '_' + usati[base] : '') + '.pdf';
+                    if (zip) zip.file(nome, pdf.output('blob')); else salva(pdf.output('blob'), nome);
+                }
+                if (zip) {
+                    stato.textContent = 'Creazione dello ZIP…';
+                    salva(await zip.generateAsync({ type: 'blob' }), btn.dataset.zip + '.zip');
+                }
+                stato.textContent = 'Download completato.';
+            } catch (e) {
+                console.error(e);
+                stato.textContent = 'Download non riuscito: riprova, oppure usa "Stampa / PDF unico".';
+            }
+            btn.disabled = false; btn.innerHTML = testo;
+        });
+    })();
     </script>
 </body>
 </html>
