@@ -32,9 +32,12 @@ function post_testo(string $k, int $max = 255): ?string {
     $v = trim((string)($_POST[$k] ?? ''));
     return $v === '' ? null : mb_substr($v, 0, $max);
 }
-function post_intero(string $k): ?int {
-    $v = trim((string)($_POST[$k] ?? ''));
+function intero_da($v): ?int {
+    $v = trim((string)$v);
     return ($v === '' || !preg_match('/^\d+$/', $v)) ? null : (int)$v;
+}
+function post_intero(string $k): ?int {
+    return intero_da($_POST[$k] ?? '');
 }
 function post_data(string $k): ?string {
     $v = trim((string)($_POST[$k] ?? ''));
@@ -42,7 +45,10 @@ function post_data(string $k): ?string {
     return ($d && $d->format('Y-m-d') === $v) ? $v : null;
 }
 function post_data_ora(string $k): ?string {
-    $v = trim((string)($_POST[$k] ?? ''));
+    return data_ora_da($_POST[$k] ?? '');
+}
+function data_ora_da($v): ?string {
+    $v = trim((string)$v);
     if ($v === '') return null;
     $d = DateTime::createFromFormat('Y-m-d\TH:i', $v) ?: DateTime::createFromFormat('Y-m-d H:i:s', $v);
     return $d ? $d->format('Y-m-d H:i:s') : null;
@@ -81,9 +87,11 @@ if (isset($_POST['salva_progetto'])) {
     $chiusura = post_data_ora('data_chiusura');
 
     $errori = [];
+    // Con più edizioni i campi generali sono nascosti: contano quelli delle edizioni, controllati più sotto
+    $una_edizione = count((array)($_POST['ed_nome'] ?? [])) <= 1;
     if ($d['data_inizio'] && $d['data_fine'] && $d['data_fine'] < $d['data_inizio']) $errori[] = "la fine del progetto è precedente all'inizio";
-    if ($apertura && $chiusura && $chiusura <= $apertura) $errori[] = "la chiusura delle iscrizioni è precedente all'apertura";
-    if ($d['min_studenti'] !== null && $d['max_studenti'] !== null && $d['min_studenti'] > $d['max_studenti']) $errori[] = "il numero minimo di studenti supera il massimo";
+    if ($una_edizione && $apertura && $chiusura && $chiusura <= $apertura) $errori[] = "la chiusura delle iscrizioni è precedente all'apertura";
+    if ($una_edizione && $d['min_studenti'] !== null && $d['max_studenti'] !== null && $d['min_studenti'] > $d['max_studenti']) $errori[] = "il numero minimo di studenti supera il massimo";
     if ($errori) { flash_set("Progetto non salvato: " . implode('; ', $errori) . ".", 'danger'); admin_redirect($url_form); }
 
     // Referenti e tutor: righe con almeno nome o email; email non valide scartate e segnalate
@@ -125,14 +133,35 @@ if (isset($_POST['salva_progetto'])) {
 
     // Edizioni (repliche): ogni riga è un turno. ed_id = turno esistente (0 = nuova).
     // Per le scuole ogni edizione ha 1 posto; altrimenti i posti indicati (predefinito 30).
+    // Una sola edizione: valgono apertura/chiusura e min/max generali. Più edizioni: ognuna ha i suoi, obbligatori
+    // (min/max solo per le scuole).
     $edizioni = [];
     foreach ((array)($_POST['ed_nome'] ?? []) as $i => $nome_ed) {
         $posti_ed = (int)($_POST['ed_posti'][$i] ?? 0);
         $edizioni[] = ['id' => (int)($_POST['ed_id'][$i] ?? 0), 'nome' => mb_substr(trim((string)$nome_ed), 0, 150),
-                       'posti' => $per_scuole ? 1 : ($posti_ed > 0 ? min($posti_ed, 9999) : 30)];
+                       'posti' => $per_scuole ? 1 : ($posti_ed > 0 ? min($posti_ed, 9999) : 30),
+                       'apertura' => $apertura, 'chiusura' => $chiusura, 'min' => null, 'max' => null,
+                       'post' => ['ap' => $_POST['ed_apertura'][$i] ?? '', 'ch' => $_POST['ed_chiusura'][$i] ?? '', 'min' => $_POST['ed_min'][$i] ?? '', 'max' => $_POST['ed_max'][$i] ?? '']];
         if (count($edizioni) >= 20) break;
     }
-    if (!$edizioni) $edizioni[] = ['id' => 0, 'nome' => '', 'posti' => $per_scuole ? 1 : 30];
+    if (!$edizioni) $edizioni[] = ['id' => 0, 'nome' => '', 'posti' => $per_scuole ? 1 : 30, 'apertura' => $apertura, 'chiusura' => $chiusura, 'min' => null, 'max' => null];
+    $piu_edizioni = count($edizioni) > 1;
+    if ($piu_edizioni) {
+        foreach ($edizioni as $k => &$ed) {
+            $nome_err = $ed['nome'] !== '' ? '"' . $ed['nome'] . '"' : 'edizione ' . ($k + 1);
+            $ed['apertura'] = data_ora_da($ed['post']['ap']);
+            $ed['chiusura'] = data_ora_da($ed['post']['ch']);
+            if (!$ed['apertura'] || !$ed['chiusura']) $errori[] = "$nome_err: indica apertura e chiusura delle iscrizioni";
+            elseif ($ed['chiusura'] <= $ed['apertura']) $errori[] = "$nome_err: la chiusura delle iscrizioni è precedente all'apertura";
+            if ($per_scuole) {
+                $ed['min'] = intero_da($ed['post']['min']); $ed['max'] = intero_da($ed['post']['max']);
+                if (!$ed['min'] || !$ed['max']) $errori[] = "$nome_err: indica il numero minimo e massimo di partecipanti";
+                elseif ($ed['min'] > $ed['max']) $errori[] = "$nome_err: il minimo di partecipanti supera il massimo";
+            }
+        }
+        unset($ed);
+        if ($errori) { flash_set("Progetto non salvato: " . implode('; ', $errori) . ".", 'danger'); admin_redirect($url_form); }
+    }
 
     $upload_dir = dirname(__DIR__) . '/uploads/';
     $new_locandina = null; $new_pdf = null;
@@ -188,35 +217,32 @@ if (isset($_POST['salva_progetto'])) {
         if (!$stmt_d->execute()) throw new RuntimeException($conn->error);
 
         // Edizioni = turni di iscrizione (posti: 1 per le scuole), lista d'attesa attiva, niente approvazione (ordine di arrivo).
-        // Apertura e chiusura delle iscrizioni sono le stesse per tutte le edizioni.
+        // Ogni turno ha la sua finestra e i suoi limiti (con una sola edizione: quelli generali, limiti NULL = del progetto).
         $turni_esistenti = [];
         $r_t = $conn->query("SELECT id FROM turni WHERE evento_id = $ev_id ORDER BY id ASC");
         while ($r_t && $rt = $r_t->fetch_assoc()) $turni_esistenti[] = (int)$rt['id'];
         $tenuti = [];
-        $stmt_up = $conn->prepare("UPDATE turni SET nome_turno = ?, max_posti = ?, data_apertura = ?, data_chiusura = ?, abilita_lista_attesa = 1, abilita_multi_posto = 0, richiede_approvazione = 0 WHERE id = ?");
-        $stmt_in = $conn->prepare("INSERT INTO turni (evento_id, nome_turno, data_turno, orario_inizio, orario_fine, max_posti, data_apertura, data_chiusura, abilita_lista_attesa, abilita_multi_posto, richiede_approvazione)
-                                   VALUES (?, ?, NULL, NULL, NULL, ?, ?, ?, 1, 0, 0)");
+        $stmt_up = $conn->prepare("UPDATE turni SET nome_turno = ?, max_posti = ?, data_apertura = ?, data_chiusura = ?, min_partecipanti = ?, max_partecipanti = ?, abilita_lista_attesa = 1, abilita_multi_posto = 0, richiede_approvazione = 0 WHERE id = ?");
+        $stmt_in = $conn->prepare("INSERT INTO turni (evento_id, nome_turno, data_turno, orario_inizio, orario_fine, max_posti, data_apertura, data_chiusura, min_partecipanti, max_partecipanti, abilita_lista_attesa, abilita_multi_posto, richiede_approvazione)
+                                   VALUES (?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, 1, 0, 0)");
         $n_ed = count($edizioni);
         foreach ($edizioni as $k => $ed) {
             // Nome dell'edizione: quello scritto, altrimenti "Edizione N" (o "Iscrizioni" se è l'unica)
             $nome_ed = $ed['nome'] !== '' ? $ed['nome'] : ($n_ed > 1 ? 'Edizione ' . ($k + 1) : 'Iscrizioni');
             if ($ed['id'] > 0 && in_array($ed['id'], $turni_esistenti, true)) {
-                $stmt_up->bind_param("sissi", $nome_ed, $ed['posti'], $apertura, $chiusura, $ed['id']);
+                $stmt_up->bind_param("sissiii", $nome_ed, $ed['posti'], $ed['apertura'], $ed['chiusura'], $ed['min'], $ed['max'], $ed['id']);
                 if (!$stmt_up->execute()) throw new RuntimeException($conn->error);
                 $tenuti[] = $ed['id'];
             } else {
-                $stmt_in->bind_param("isiss", $ev_id, $nome_ed, $ed['posti'], $apertura, $chiusura);
+                $stmt_in->bind_param("isissii", $ev_id, $nome_ed, $ed['posti'], $ed['apertura'], $ed['chiusura'], $ed['min'], $ed['max']);
                 if (!$stmt_in->execute()) throw new RuntimeException($conn->error);
                 $tenuti[] = (int)$conn->insert_id;
             }
         }
-        // Edizioni tolte dalla maschera: eliminate solo se nessuno è iscritto o in attesa
+        // Edizioni tolte dalla maschera: eliminate solo se nessuno è iscritto o in attesa (restano con le loro date)
         foreach (array_diff($turni_esistenti, $tenuti) as $t_via) {
             $r_n = $conn->query("SELECT COUNT(*) AS n FROM prenotazioni WHERE turno_id = $t_via AND IFNULL(stato, 'confermata') NOT IN ('annullata', 'rifiutata', 'scaduta')");
             if ($r_n && (int)$r_n->fetch_assoc()['n'] > 0) {
-                $stmt_fin = $conn->prepare("UPDATE turni SET data_apertura = ?, data_chiusura = ? WHERE id = ?"); // resta, con la stessa finestra delle altre
-                $stmt_fin->bind_param("ssi", $apertura, $chiusura, $t_via);
-                $stmt_fin->execute();
                 $r_nome = $conn->query("SELECT nome_turno FROM turni WHERE id = $t_via");
                 $edizioni_non_tolte[] = (string)($r_nome ? $r_nome->fetch_assoc()['nome_turno'] : $t_via);
                 continue;
@@ -330,6 +356,10 @@ if ($mostra_form):
 .pj-mod-riga2 { display:grid; grid-template-columns: 1fr 1fr; gap:.5rem; padding-right:46px; }
 .pj-form-generico .pj-solo-scuole, .pj-form-scuole .pj-solo-generico { display:none !important; }
 .pj-ed { display:flex; gap:.5rem; align-items:center; margin-bottom:.5rem; }
+.pj-ed-blocco + .pj-ed-blocco { border-top:1px dashed #e2e8f0; padding-top:.5rem; }
+.pj-ed-campi { display:grid; grid-template-columns:1fr 1fr; gap:.4rem .5rem; margin-bottom:.6rem; }
+.pj-ed-campi label { display:flex; flex-direction:column; gap:.15rem; margin:0; }
+.pj-form-una-ed .pj-ed-campi, .pj-form-una-ed .pj-solo-piu-ed, .pj-form-piu-ed .pj-solo-una-ed { display:none !important; }
 .pj-riga-2 { display:grid; grid-template-columns: 1fr auto; gap:.75rem; align-items:center; padding-right:46px; }
 @media (max-width: 767.98px) { .pj-riga, .pj-riga-info, .pj-riga-2, .pj-mod-riga, .pj-mod-riga2 { grid-template-columns: 1fr; padding-right:0; } .pj-riga-info { padding-bottom:.5rem; border-bottom:1px dashed #e2e8f0; } }
 </style>
@@ -388,15 +418,15 @@ if ($mostra_form):
                         <label for="pjInc" class="form-label small fw-bold">Incontri previsti</label>
                         <input type="number" name="incontri_previsti" id="pjInc" class="form-control form-control-sm" min="1" value="<?php echo $v($dp, 'incontri_previsti'); ?>">
                     </div>
-                    <div class="col-6 col-md-3 pj-solo-scuole">
+                    <div class="col-6 col-md-3 pj-solo-scuole pj-solo-una-ed">
                         <label for="pjMin" class="form-label small fw-bold">Partecipanti per iscrizione: min</label>
                         <input type="number" name="min_studenti" id="pjMin" class="form-control form-control-sm" min="1" value="<?php echo $v($dp, 'min_studenti'); ?>">
                     </div>
-                    <div class="col-6 col-md-3 pj-solo-scuole">
+                    <div class="col-6 col-md-3 pj-solo-scuole pj-solo-una-ed">
                         <label for="pjMax" class="form-label small fw-bold">Partecipanti per iscrizione: max</label>
                         <input type="number" name="max_studenti" id="pjMax" class="form-control form-control-sm" min="1" value="<?php echo $v($dp, 'max_studenti'); ?>">
                     </div>
-                    <div class="col-12 pj-solo-scuole"><div class="form-text mt-0">Chi iscrive il gruppo indica nel modulo il numero di partecipanti: il portale controlla che stia tra il minimo e il massimo.</div></div>
+                    <div class="col-12 pj-solo-scuole"><div class="form-text mt-0">Chi iscrive il gruppo indica nel modulo il numero di partecipanti: il portale controlla che stia tra il minimo e il massimo<span class="pj-solo-piu-ed"> dell'edizione scelta (li imposti in "Edizioni e iscrizione")</span>.</div></div>
                 </div>
             </section>
 
@@ -511,20 +541,29 @@ if ($mostra_form):
                 <p class="form-text mt-0 mb-2">Una riga per edizione (le "repliche"). <span class="pj-solo-scuole">Nei progetti per le scuole ogni edizione accoglie <strong>una scuola</strong>, le altre vanno in lista d'attesa.</span><span class="pj-solo-generico">Indica i <strong>posti</strong> di ogni edizione: quando finiscono si entra in lista d'attesa.</span> Con più edizioni si sceglie quella preferita.</p>
                 <div id="pjEdizioni">
                     <?php foreach ($turni_ed as $k => $te): ?>
-                        <div class="pj-ed">
-                            <input type="hidden" name="ed_id[]" value="<?php echo (int)$te['id']; ?>">
-                            <input type="text" name="ed_nome[]" class="form-control form-control-sm" value="<?php echo h($te['nome_turno'] ?? ''); ?>" placeholder="es. Edizione 1 – ottobre 2026" aria-label="Nome dell'edizione" maxlength="150">
-                            <input type="number" name="ed_posti[]" class="form-control form-control-sm pj-solo-generico" style="max-width:90px;" value="<?php echo (int)($te['max_posti'] ?? 0) > 1 ? (int)$te['max_posti'] : 30; ?>" min="1" max="9999" aria-label="Posti dell'edizione" title="Posti">
-                            <?php if ((int)($te['n_iscr'] ?? 0) > 0): ?><span class="badge bg-success-subtle text-success-emphasis" title="Iscritti o in attesa"><i class="fa fa-user-check" aria-hidden="true"></i> <?php echo (int)$te['n_iscr']; ?></span><?php endif; ?>
-                            <button type="button" class="btn btn-sm btn-outline-danger pj-rimuovi" title="Rimuovi edizione" aria-label="Rimuovi edizione"><i class="fa fa-times" aria-hidden="true"></i></button>
+                        <div class="pj-ed-blocco">
+                            <div class="pj-ed">
+                                <input type="hidden" name="ed_id[]" value="<?php echo (int)$te['id']; ?>">
+                                <input type="text" name="ed_nome[]" class="form-control form-control-sm" value="<?php echo h($te['nome_turno'] ?? ''); ?>" placeholder="es. Edizione 1 – ottobre 2026" aria-label="Nome dell'edizione" maxlength="150">
+                                <input type="number" name="ed_posti[]" class="form-control form-control-sm pj-solo-generico" style="max-width:90px;" value="<?php echo (int)($te['max_posti'] ?? 0) > 1 ? (int)$te['max_posti'] : 30; ?>" min="1" max="9999" aria-label="Posti dell'edizione" title="Posti">
+                                <?php if ((int)($te['n_iscr'] ?? 0) > 0): ?><span class="badge bg-success-subtle text-success-emphasis" title="Iscritti o in attesa"><i class="fa fa-user-check" aria-hidden="true"></i> <?php echo (int)$te['n_iscr']; ?></span><?php endif; ?>
+                                <button type="button" class="btn btn-sm btn-outline-danger pj-rimuovi" title="Rimuovi edizione" aria-label="Rimuovi edizione"><i class="fa fa-times" aria-hidden="true"></i></button>
+                            </div>
+                            <div class="pj-ed-campi">
+                                <label class="small fw-bold">Apertura iscrizioni *<input type="datetime-local" name="ed_apertura[]" class="form-control form-control-sm pj-ed-obbl" data-generale="pjAp" value="<?php echo $dt($te['data_apertura'] ?? ''); ?>"></label>
+                                <label class="small fw-bold">Chiusura iscrizioni *<input type="datetime-local" name="ed_chiusura[]" class="form-control form-control-sm pj-ed-obbl" data-generale="pjCh" value="<?php echo $dt($te['data_chiusura'] ?? ''); ?>"></label>
+                                <label class="small fw-bold pj-solo-scuole">Partecipanti min *<input type="number" name="ed_min[]" class="form-control form-control-sm pj-ed-obbl pj-ed-scuole" data-generale="pjMin" min="1" value="<?php echo (int)($te['min_partecipanti'] ?? 0) ?: ''; ?>"></label>
+                                <label class="small fw-bold pj-solo-scuole">Partecipanti max *<input type="number" name="ed_max[]" class="form-control form-control-sm pj-ed-obbl pj-ed-scuole" data-generale="pjMax" min="1" value="<?php echo (int)($te['max_partecipanti'] ?? 0) ?: ''; ?>"></label>
+                            </div>
                         </div>
                     <?php endforeach; ?>
                 </div>
                 <button type="button" class="btn btn-sm btn-outline-secondary fw-bold mb-3" data-pj-aggiungi="pjEdizioni"><i class="fa fa-plus me-1" aria-hidden="true"></i>Aggiungi edizione</button>
-                <div class="row g-2">
+                <div class="row g-2 pj-solo-una-ed">
                     <div class="col-12"><label for="pjAp" class="form-label small fw-bold">Apertura iscrizioni</label><input type="datetime-local" name="data_apertura" id="pjAp" class="form-control form-control-sm" value="<?php echo $dt($tu['data_apertura'] ?? ''); ?>"></div>
                     <div class="col-12"><label for="pjCh" class="form-label small fw-bold">Chiusura iscrizioni</label><input type="datetime-local" name="data_chiusura" id="pjCh" class="form-control form-control-sm" value="<?php echo $dt($tu['data_chiusura'] ?? ''); ?>"></div>
                 </div>
+                <p class="form-text pj-solo-piu-ed mt-0">Con più edizioni apertura, chiusura<span class="pj-solo-scuole"> e numero di partecipanti</span> si indicano per ogni edizione e sono obbligatori.</p>
                 <div class="alert alert-light border small mt-3 mb-2">
                     <i class="fa fa-circle-info me-1" aria-hidden="true"></i>
                     Le iscrizioni vanno in <strong>ordine di arrivo</strong>; ci si può iscrivere a <strong>una sola edizione</strong> dello stesso progetto.
@@ -586,21 +625,36 @@ document.addEventListener('click', function (e) {
         var nuova = modello.cloneNode(true);
         svuota(nuova);
         box.appendChild(nuova);
-        nuova.querySelector('input').focus();
+        aggiornaEdizioni();
+        nuova.querySelector('input:not([type=hidden])').focus();
         return;
     }
     var rim = e.target.closest('.pj-rimuovi');
     if (rim) {
-        var riga = rim.closest('.pj-ref, .pj-riga-info, .pj-mod, .pj-ed'), box2 = riga.parentElement;
+        var riga = rim.closest('.pj-ref, .pj-riga-info, .pj-mod, .pj-ed-blocco'), box2 = riga.parentElement;
         if (box2.children.length > 1) riga.remove();
         else svuota(riga);
+        aggiornaEdizioni();
     }
 });
+// Una edizione: campi generali. Più edizioni: campi per edizione, obbligatori (min/max solo per le scuole);
+// quelli vuoti partono dai valori generali già inseriti.
+function aggiornaEdizioni() {
+    var box = document.getElementById('pjEdizioni'), form = box.closest('form');
+    var piu = box.children.length > 1, scuole = document.getElementById('pjScuole').checked;
+    form.classList.toggle('pj-form-piu-ed', piu); form.classList.toggle('pj-form-una-ed', !piu);
+    box.querySelectorAll('.pj-ed-obbl').forEach(function (i) {
+        var serve = piu && (scuole || !i.classList.contains('pj-ed-scuole'));
+        i.required = serve;
+        var gen = document.getElementById(i.dataset.generale);
+        if (serve && i.value === '' && gen && gen.value !== '') i.value = gen.value;
+    });
+}
 // Tipo di progetto: mostra i campi delle scuole (min/max per iscrizione) o quelli generici (posti per edizione)
 (function () {
     var sw = document.getElementById('pjScuole'), form = sw ? sw.closest('form') : null;
     if (!form) return;
-    function aggiorna() { form.classList.toggle('pj-form-scuole', sw.checked); form.classList.toggle('pj-form-generico', !sw.checked); }
+    function aggiorna() { form.classList.toggle('pj-form-scuole', sw.checked); form.classList.toggle('pj-form-generico', !sw.checked); aggiornaEdizioni(); }
     sw.addEventListener('change', aggiorna); aggiorna();
 })();
 // Riga vuota: testi cancellati, "Riceve le iscrizioni" spento
@@ -646,6 +700,8 @@ foreach ($progetti as $id => &$p) {
 }
 unset($p);
 
+$finestra_txt = fn(array $t) => (!empty($t['data_apertura']) ? 'dal ' . date('d/m/Y H:i', strtotime($t['data_apertura'])) : 'già aperte')
+                               . (!empty($t['data_chiusura']) ? ' al ' . date('d/m/Y H:i', strtotime($t['data_chiusura'])) : '');
 $n_eventi_normali = (int)($conn->query("SELECT COUNT(*) AS n FROM eventi WHERE pagina_id = $filtro_p AND archiviato = 0 AND IFNULL(tipo, 'evento') <> 'progetto'")->fetch_assoc()['n'] ?? 0);
 ?>
 <style>
@@ -721,11 +777,9 @@ $n_eventi_normali = (int)($conn->query("SELECT COUNT(*) AS n FROM eventi WHERE p
                     <div class="pj-meta d-flex flex-wrap gap-3 mt-1">
                         <span><i class="fa fa-calendar-days" aria-hidden="true"></i> <?php echo h(periodo_progetto($d)); ?></span>
                         <?php if (!empty($d['struttura'])): ?><span><i class="fa fa-building-columns" aria-hidden="true"></i> <?php echo h($d['struttura']); ?></span><?php endif; ?>
-                        <?php if ($t): ?><span><i class="fa fa-door-open" aria-hidden="true"></i> Iscrizioni: <?php
-                            echo !empty($t['data_apertura']) ? 'dal ' . date('d/m/Y H:i', strtotime($t['data_apertura'])) : 'già aperte';
-                            echo !empty($t['data_chiusura']) ? ' al ' . date('d/m/Y H:i', strtotime($t['data_chiusura'])) : '';
-                        ?></span><?php endif; ?>
-                        <?php if ($p['per_scuole'] && (!empty($d['min_studenti']) || !empty($d['max_studenti']))): ?><span><i class="fa fa-users" aria-hidden="true"></i> <?php echo (int)($d['min_studenti'] ?? 0) ?: 1; ?>–<?php echo !empty($d['max_studenti']) ? (int)$d['max_studenti'] : '…'; ?> partecipanti per iscrizione</span><?php endif; ?>
+                        <?php $una_ed = count($p['ied']['edizioni']) <= 1; ?>
+                        <?php if ($t && $una_ed): ?><span><i class="fa fa-door-open" aria-hidden="true"></i> Iscrizioni: <?php echo h($finestra_txt($t)); ?></span><?php endif; ?>
+                        <?php if ($p['per_scuole'] && $una_ed && ($lim_t = testo_limiti_partecipanti(...array_values(limiti_partecipanti($d, $t)))) !== ''): ?><span><i class="fa fa-users" aria-hidden="true"></i> <?php echo h(ucfirst($lim_t)); ?> partecipanti per iscrizione</span><?php endif; ?>
                     </div>
                 </div>
                 <div class="d-flex gap-1 flex-shrink-0">
@@ -747,7 +801,12 @@ $n_eventi_normali = (int)($conn->query("SELECT COUNT(*) AS n FROM eventi WHERE p
             <div class="mt-3 pt-2 border-top small d-flex flex-column gap-1">
                 <?php foreach ($p['ied']['edizioni'] as $ed): $as = $ed['assegnata']; ?>
                     <div class="d-flex flex-wrap align-items-center gap-2">
-                        <?php if (count($p['ied']['edizioni']) > 1): ?><span class="fw-bold text-dark" style="min-width:150px;"><?php echo h($ed['etichetta']); ?></span><?php endif; ?>
+                        <?php if (!$una_ed): ?>
+                            <span class="fw-bold text-dark" style="min-width:150px;"><?php echo h($ed['etichetta']); ?></span>
+                            <span class="text-muted"><i class="fa fa-door-open me-1" aria-hidden="true"></i><?php echo h($finestra_txt($ed['t'])); ?></span>
+                            <?php if ($p['per_scuole'] && ($lim_e = testo_limiti_partecipanti($ed['min'], $ed['max'])) !== ''): ?><span class="text-muted"><i class="fa fa-users me-1" aria-hidden="true"></i><?php echo h($lim_e); ?> partecipanti</span><?php endif; ?>
+                            <span class="pj-stato" style="background:<?php echo $ed['stato']['bg']; ?>;color:<?php echo $ed['stato']['fg']; ?>;"><?php echo h($ed['stato']['etichetta']); ?></span>
+                        <?php endif; ?>
                         <?php if (!$p['per_scuole']): // generico: posti occupati sull'edizione ?>
                             <span class="badge <?php echo $ed['libera'] ? 'bg-light text-dark border' : 'bg-danger'; ?>"><i class="fa fa-users me-1" aria-hidden="true"></i><?php echo (int)$ed['occ']; ?> / <?php echo (int)$ed['t']['max_posti']; ?> iscritti</span>
                         <?php elseif ($as):

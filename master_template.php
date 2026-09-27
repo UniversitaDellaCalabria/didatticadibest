@@ -150,7 +150,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['invia_prenotazione'])
         // Progetti per le scuole: numero di partecipanti obbligatorio e dentro i limiti del progetto
         if (($t_info['evento_tipo'] ?? '') === 'progetto') {
             $ev_pr = (int)$t_info['evento_id'];
-            $err_studenti = valida_partecipanti_progetto($custom_data, get_dettagli_progetti($conn, [$ev_pr])[$ev_pr] ?? null);
+            $err_studenti = valida_partecipanti_progetto($custom_data, get_dettagli_progetti($conn, [$ev_pr])[$ev_pr] ?? null, $t_info);
             if ($err_studenti !== null) {
                 $_SESSION['errore_prenotazione'] = $err_studenti;
                 if (isset($lock_iscr)) { $conn->query("SELECT RELEASE_LOCK('" . $conn->real_escape_string($lock_iscr) . "')"); }
@@ -413,8 +413,7 @@ ksort($eventi_per_data);
 $dettagli_progetti = get_dettagli_progetti($conn, array_keys($eventi_by_id));
 foreach ($all_turni_flat as &$t_fl) {
     $d_fl = $dettagli_progetti[(int)$t_fl['evento_id']] ?? [];
-    $t_fl['limite_studenti_min'] = !empty($d_fl['min_studenti']) ? (int)$d_fl['min_studenti'] : 1;
-    $t_fl['limite_studenti_max'] = !empty($d_fl['max_studenti']) ? (int)$d_fl['max_studenti'] : null;
+    ['min' => $t_fl['limite_studenti_min'], 'max' => $t_fl['limite_studenti_max']] = limiti_partecipanti($d_fl, $t_fl);
     $t_fl['per_scuole'] = (int)($d_fl['per_scuole'] ?? 1) === 1;
     $t_fl['dett_progetto'] = $d_fl ?: null;
 }
@@ -443,7 +442,12 @@ $info_progetto = function (array $ev) use ($conn, $dettagli_progetti, &$mie_iscr
     $ie = info_edizioni_progetto($conn, $d, $ev['turni'] ?? [], $mie_iscrizioni[(int)$ev['id']] ?? []);
     $mio_ed = null;
     foreach ($ie['edizioni'] as $ed) if ($ed['mio'] !== null) { $mio_ed = $ed; break; }
+    $min_ed = $ie['edizioni'] ? min(array_column($ie['edizioni'], 'min')) : null;
+    $max_ed = array_filter(array_column($ie['edizioni'], 'max'));
+    // Con limiti diversi tra le edizioni: dal minimo più basso al massimo più alto (senza massimo se un'edizione non ne ha)
+    $max_ed = ($max_ed && count($max_ed) === count($ie['edizioni'])) ? max($max_ed) : null;
     return ['d' => $d, 't' => $ev['turni'][0] ?? null, 'edizioni' => $ie['edizioni'], 'liberi' => $ie['liberi'],
+            'prossima_apertura' => $ie['prossima_apertura'], 'limiti' => testo_limiti_partecipanti($min_ed, $max_ed), 'max_studenti' => $max_ed,
             // Senza date, la nota sul periodo (es. "novembre-dicembre 2026") vale più di "Date da definire"
             'stato' => $ie['stato'], 'periodo' => (empty($d['data_inizio']) && empty($d['data_fine']) && !empty($d['periodo_note'])) ? $d['periodo_note'] : periodo_progetto($d), 'mio' => $ie['mio'], 'mio_ed' => $mio_ed,
             'attesa' => array_sum(array_column($ie['edizioni'], 'attesa')), 'scuole' => (int)($d['per_scuole'] ?? 1) === 1];
@@ -462,10 +466,11 @@ $pulsante_progetto = function (array $ev, array $ip, ?array $ed = null) use ($co
     // Si partecipa a una sola edizione: già iscritti (o in attesa) su un'altra
     if ($ed && $ip['mio'] !== null) return '';
     if (!$ip['edizioni'] || (int)($ev['richiede_prenotazione'] ?? 1) === 0) return '';
-    $c = $ip['stato']['codice'];
-    $t0 = $ip['t'];
+    // Ogni edizione ha la sua finestra: con $ed vale lo stato di quell'edizione, altrimenti quello del progetto
+    $c = $ed ? $ed['stato']['codice'] : $ip['stato']['codice'];
+    $apre = $ed ? ($ed['t']['data_apertura'] ?? null) : ($ip['prossima_apertura'] ?? null);
     if ($c === 'concluso') return '<button class="btn btn-secondary fw-bold w-100" disabled>Progetto concluso</button>';
-    if ($c === 'arrivo') return '<button class="btn btn-outline-secondary fw-bold w-100" disabled>Iscrizioni dal ' . date('d/m/Y H:i', strtotime($t0['data_apertura'])) . '</button>';
+    if ($c === 'arrivo' && $apre) return '<button class="btn btn-outline-secondary fw-bold w-100" disabled>Iscrizioni dal ' . date('d/m/Y H:i', strtotime($apre)) . '</button>';
     if (!in_array($c, ['aperte', 'attesa'], true)) return '<button class="btn btn-outline-secondary fw-bold w-100" disabled>Iscrizioni chiuse</button>';
     if (!$utente_logged && (int)($ev['ruolo_accesso_id'] ?? 0) !== 0) {
         $rit = urlencode($current_filename . '.php?progetto=' . (int)$ev['id']);
@@ -963,9 +968,7 @@ function evSetRating(btn) {
         ['fa-clock', 'Ore totali', !empty($dp['ore_totali']) ? (int)$dp['ore_totali'] . ' ore' : ''],
         ['fa-clone', 'Edizioni', count($ip['edizioni']) > 1 ? count($ip['edizioni']) . ($ip['scuole'] ? ' (una scuola per edizione)' : '') : ''],
         ['fa-people-arrows', 'Incontri previsti', !empty($dp['incontri_previsti']) ? (string)(int)$dp['incontri_previsti'] : ''],
-        ['fa-users', 'Studenti per scuola', $ip['scuole'] && (!empty($dp['min_studenti']) || !empty($dp['max_studenti']))
-            ? (!empty($dp['min_studenti']) && !empty($dp['max_studenti']) ? 'da ' . (int)$dp['min_studenti'] . ' a ' . (int)$dp['max_studenti']
-               : (!empty($dp['min_studenti']) ? 'almeno ' . (int)$dp['min_studenti'] : 'fino a ' . (int)$dp['max_studenti'])) : ''],
+        ['fa-users', 'Studenti per scuola', $ip['scuole'] ? $ip['limiti'] . (count($ip['edizioni']) > 1 && $ip['limiti'] !== '' ? ' (secondo l\'edizione)' : '') : ''],
         ['fa-laptop-house', 'Modalità', $dp['modalita'] ?? ''],
         ['fa-graduation-cap', 'Attestato', !empty($dp['attestati']) ? ($ip['scuole'] ? 'Per ogni studente partecipante' : 'Di partecipazione') : ''],
     ], fn($r) => trim((string)$r[2]) !== '');
@@ -1118,7 +1121,14 @@ function evSetRating(btn) {
                                   <div class="d-flex align-items-center gap-3">
                                     <i class="fa <?php echo ($ed['mio'] !== null || $ed['libera']) ? 'fa-circle-check text-success' : 'fa-lock text-warning'; ?> fs-4" aria-hidden="true"></i>
                                     <div class="flex-grow-1" style="min-width: 0;">
-                                        <?php if ($piu_ed): ?><div class="fw-bold"><?php echo htmlspecialchars($ed['etichetta']); ?></div><?php endif; ?>
+                                        <?php if ($piu_ed):
+                                            $ta_ed = $ed['t']['data_apertura'] ?? null; $tc_ed = $ed['t']['data_chiusura'] ?? null;
+                                            $lim_ed = $sc_p ? testo_limiti_partecipanti($ed['min'], $ed['max']) : ''; ?>
+                                            <div class="fw-bold"><?php echo htmlspecialchars($ed['etichetta']); ?></div>
+                                            <div class="small text-secondary"><i class="fa fa-door-open me-1" aria-hidden="true"></i>Iscrizioni <?php echo $ta_ed ? 'dal ' . date('d/m/Y H:i', strtotime($ta_ed)) : 'già aperte'; ?><?php echo $tc_ed ? ' al ' . date('d/m/Y H:i', strtotime($tc_ed)) : ''; ?></div>
+                                            <?php if ($lim_ed !== ''): ?><div class="small text-secondary"><i class="fa fa-users me-1" aria-hidden="true"></i><?php echo htmlspecialchars(ucfirst($lim_ed)); ?> studenti</div><?php endif; ?>
+                                            <?php if (!in_array($ed['stato']['codice'], ['aperte', 'attesa'], true)): ?><span class="badge mt-1" style="background: <?php echo $ed['stato']['bg']; ?>; color: <?php echo $ed['stato']['fg']; ?>;"><?php echo htmlspecialchars($ed['stato']['etichetta']); ?></span><?php endif; ?>
+                                        <?php endif; ?>
                                         <div class="<?php echo $piu_ed ? 'small text-secondary' : 'fw-bold'; ?>"><?php echo htmlspecialchars($txt_ed); ?></div>
                                         <?php if (!$ed['libera']): ?><div class="small text-secondary"><?php echo $ed['attesa'] > 0 ? $ed['attesa'] . ($sc_p ? ($ed['attesa'] === 1 ? ' scuola' : ' scuole') : ($ed['attesa'] === 1 ? ' persona' : ' persone')) . " in lista d'attesa" : "Lista d'attesa vuota"; ?></div><?php endif; ?>
                                         <?php if ($sc_p && !$piu_ed && $ed['libera']): ?><div class="small text-secondary">Il progetto accoglie una sola scuola.</div><?php endif; ?>
@@ -1134,10 +1144,12 @@ function evSetRating(btn) {
                                 </div>
                             <?php endforeach; ?>
                         </div>
+                        <?php if (!$piu_ed): ?>
                         <ul class="list-unstyled small mb-3">
                             <li class="mb-1"><i class="fa fa-door-open me-2 text-secondary" aria-hidden="true"></i>Apertura: <strong><?php echo !empty($tp['data_apertura']) ? date('d/m/Y \o\r\e H:i', strtotime($tp['data_apertura'])) : 'già aperte'; ?></strong></li>
                             <?php if (!empty($tp['data_chiusura'])): ?><li><i class="fa fa-door-closed me-2 text-secondary" aria-hidden="true"></i>Chiusura: <strong><?php echo date('d/m/Y \o\r\e H:i', strtotime($tp['data_chiusura'])); ?></strong></li><?php endif; ?>
                         </ul>
+                        <?php endif; ?>
                         <?php if ($pulsante_unico) echo $pulsante_progetto($ev_p, $ip, $piu_ed ? null : $ip['edizioni'][0]); ?>
                         <?php if ($ip['mio_ed'] && $piu_ed): ?><p class="small text-success fw-semibold mt-2 mb-0"><i class="fa fa-check me-1" aria-hidden="true"></i><?php echo $sc_p ? 'La tua scuola' : 'La tua edizione'; ?>: <?php echo htmlspecialchars($ip['mio_ed']['etichetta']); ?></p><?php endif; ?>
                         <?php if ((int)($ev_p['ruolo_accesso_id'] ?? 0) !== 0 && !$utente_logged): ?>
@@ -2243,7 +2255,7 @@ function evSetRating(btn) {
                                 <span class="pjl-chip"><i class="fa fa-calendar-days" aria-hidden="true"></i><?php echo htmlspecialchars($ip_l['periodo']); ?></span>
                                 <?php if (count($ip_l['edizioni']) > 1): ?><span class="pjl-chip"><i class="fa fa-clone" aria-hidden="true"></i><?php echo count($ip_l['edizioni']); ?> edizioni</span><?php endif; ?>
                                 <?php if (!empty($d_l['ore_totali'])): ?><span class="pjl-chip"><i class="fa fa-clock" aria-hidden="true"></i><?php echo (int)$d_l['ore_totali']; ?> ore</span><?php endif; ?>
-                                <?php if ($ip_l['scuole'] && !empty($d_l['max_studenti'])): ?><span class="pjl-chip"><i class="fa fa-users" aria-hidden="true"></i>fino a <?php echo (int)$d_l['max_studenti']; ?> studenti</span><?php endif; ?>
+                                <?php if ($ip_l['scuole'] && $ip_l['limiti'] !== ''): ?><span class="pjl-chip"><i class="fa fa-users" aria-hidden="true"></i><?php echo htmlspecialchars($ip_l['limiti']); ?> studenti</span><?php endif; ?>
                                 <?php if (!empty($d_l['destinatari'])): ?><span class="pjl-chip"><i class="fa fa-user-graduate" aria-hidden="true"></i><?php echo htmlspecialchars($d_l['destinatari']); ?></span><?php endif; ?>
                             </div>
                             <?php if ($estratto !== ''): ?><p class="pjl-estratto"><?php echo htmlspecialchars(mb_strimwidth($estratto, 0, 320, '…')); ?></p><?php endif; ?>

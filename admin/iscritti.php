@@ -137,7 +137,7 @@ if (isset($_GET['ajax_campi_turno'])) {
     header('Content-Type: text/html; charset=utf-8');
     if (!turno_isc_autorizzato($conn, $t_aj, $filtro_p, $sql_filtro_eventi_rbac)) { http_response_code(403); exit; }
     $r_aj = $conn->query("SELECT evento_id FROM turni WHERE id = $t_aj");
-    echo html_campi_form_admin($conn, $r_aj ? (int)($r_aj->fetch_assoc()['evento_id'] ?? 0) : 0, [], 'man');
+    echo html_campi_form_admin($conn, $r_aj ? (int)($r_aj->fetch_assoc()['evento_id'] ?? 0) : 0, [], 'man', $t_aj);
     exit;
 }
 
@@ -384,12 +384,12 @@ if (!$is_archivio) {
         if ($t_info) {
             $stato_man = 'confermata';
             // Progetti: stesse regole del modulo pubblico (numero di partecipanti, una sola edizione, posti e lista d'attesa)
-            $r_tp = $conn->query("SELECT t.evento_id, t.max_posti, t.abilita_lista_attesa, e.tipo FROM turni t JOIN eventi e ON t.evento_id = e.id WHERE t.id = $turno_id");
+            $r_tp = $conn->query("SELECT t.evento_id, t.max_posti, t.abilita_lista_attesa, t.min_partecipanti, t.max_partecipanti, e.tipo FROM turni t JOIN eventi e ON t.evento_id = e.id WHERE t.id = $turno_id");
             $tp = $r_tp ? $r_tp->fetch_assoc() : null;
             if ($tp && $tp['tipo'] === 'progetto') {
                 $ev_man = (int)$tp['evento_id'];
                 $num_posti = 1;
-                $err_man = valida_partecipanti_progetto($custom_data, get_dettagli_progetti($conn, [$ev_man])[$ev_man] ?? null);
+                $err_man = valida_partecipanti_progetto($custom_data, get_dettagli_progetti($conn, [$ev_man])[$ev_man] ?? null, $tp);
                 if ($err_man === null && $email !== '') {
                     $stmt_ed = $conn->prepare("SELECT 1 FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id WHERE t.evento_id = ? AND IFNULL(pr.stato, 'confermata') NOT IN ('annullata', 'rifiutata', 'scaduta') AND LOWER(pr.email) = ? LIMIT 1");
                     $stmt_ed->bind_param("is", $ev_man, $email); $stmt_ed->execute();
@@ -964,7 +964,7 @@ $col_area_i = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
                                                     <div class="col-md-6"><label class="form-label small fw-bold">Email</label><input type="email" name="email" class="form-control form-control-sm" value="<?php echo htmlspecialchars($pr['email'] ?? ''); ?>" required></div>
                                                     <div class="col-md-6"><label class="form-label small fw-bold">Matricola</label><input type="text" name="matricola" class="form-control form-control-sm" value="<?php echo htmlspecialchars($pr['matricola'] ?? ''); ?>"></div>
                                                 </div>
-                                                <?php $campi_ed = html_campi_form_admin($conn, (int)$pr['evento_id'], json_decode($pr['dati_custom_json'] ?? '', true) ?: [], 'ed' . (int)$pr['id']); ?>
+                                                <?php $campi_ed = html_campi_form_admin($conn, (int)$pr['evento_id'], json_decode($pr['dati_custom_json'] ?? '', true) ?: [], 'ed' . (int)$pr['id'], (int)($pr['turno_id'] ?? 0)); ?>
                                                 <?php if ($campi_ed !== ''): ?>
                                                     <div class="border-top pt-2">
                                                         <div class="fw-bold small text-primary mb-2"><i class="fa fa-list-check me-1"></i> Informazioni aggiuntive</div>

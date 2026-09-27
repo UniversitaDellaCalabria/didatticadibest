@@ -118,10 +118,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_prenotazione_ute
     }
     $json_custom_bind = !empty($custom_data) ? json_encode($custom_data, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) : null;
     // Progetti per le scuole: il numero di partecipanti modificato deve restare nei limiti del progetto
-    $r_evp = $conn->query("SELECT t.evento_id, e.tipo FROM turni t JOIN eventi e ON t.evento_id = e.id WHERE t.id = $turno_attuale_id");
+    $r_evp = $conn->query("SELECT t.evento_id, t.min_partecipanti, t.max_partecipanti, e.tipo FROM turni t JOIN eventi e ON t.evento_id = e.id WHERE t.id = $turno_attuale_id");
     $evp = $r_evp ? $r_evp->fetch_assoc() : null;
     if ($evp && $evp['tipo'] === 'progetto') {
-        $err_part = valida_partecipanti_progetto($custom_data, get_dettagli_progetti($conn, [(int)$evp['evento_id']])[(int)$evp['evento_id']] ?? null);
+        $err_part = valida_partecipanti_progetto($custom_data, get_dettagli_progetti($conn, [(int)$evp['evento_id']])[(int)$evp['evento_id']] ?? null, $evp);
         if ($err_part !== null) {
             $_SESSION['msg_area_pers'] = "<div class='alert alert-danger fw-bold text-center my-3 shadow-sm'><i class='fa fa-users me-1'></i> Modifica non salvata: " . htmlspecialchars($err_part) . "</div>";
             header("Location: area_personale.php");

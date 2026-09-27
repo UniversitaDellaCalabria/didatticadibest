@@ -2183,13 +2183,15 @@ if (!function_exists('info_edizioni_progetto')) {
     // $mie = [turno_id => stato] dell'utente corrente. Ritorna le edizioni con posti, coda e scuola assegnata,
     // lo stato complessivo (stato_progetto su un turno "riassuntivo") e l'eventuale iscrizione dell'utente.
     function info_edizioni_progetto($conn, ?array $d, array $turni, array $mie = []): array {
-        $edizioni = []; $occupate = 0; $posti = 0; $mio = null; $mio_turno = null;
+        $edizioni = []; $occupate = 0; $posti = 0; $mio = null; $mio_turno = null; $prossima_apertura = null;
         foreach (array_values($turni) as $i => $t) {
             $t_id = (int)$t['id'];
             $occ = getPostiOccupati($conn, $t_id);
             $r_w = $conn->query("SELECT COUNT(*) AS n FROM prenotazioni WHERE turno_id = $t_id AND stato = 'in_attesa'");
             $r_a = $conn->query("SELECT id, nome, cognome, email, stato, presente, attestato_inviato, dati_custom_json FROM prenotazioni WHERE turno_id = $t_id AND IFNULL(stato, 'confermata') IN ('confermata', 'richiesta_conferma', 'da_approvare') ORDER BY data_prenotazione ASC, id ASC LIMIT 1");
             $max = max(1, (int)$t['max_posti']);
+            $st_ed = stato_progetto($d, $t + ['abilita_lista_attesa' => 1], $occ);
+            $lim = limiti_partecipanti($d, $t);
             $edizioni[] = [
                 't' => $t, 'numero' => $i + 1,
                 'etichetta' => trim((string)($t['nome_turno'] ?? '')) !== '' ? $t['nome_turno'] : 'Edizione ' . ($i + 1),
@@ -2197,15 +2199,19 @@ if (!function_exists('info_edizioni_progetto')) {
                 'attesa' => $r_w ? (int)$r_w->fetch_assoc()['n'] : 0,
                 'assegnata' => $r_a ? $r_a->fetch_assoc() : null,
                 'mio' => $mie[$t_id] ?? null,
+                // Ogni edizione ha la sua finestra di iscrizione e i suoi limiti di partecipanti
+                'stato' => $st_ed, 'min' => $lim['min'], 'max' => $lim['max'],
             ];
-            $posti += $max; $occupate += min($max, $occ);
+            // Posti liberi contati solo sulle edizioni con iscrizioni aperte o ancora da aprire
+            if (in_array($st_ed['codice'], ['aperte', 'attesa', 'arrivo'], true)) { $posti += $max; $occupate += min($max, $occ); }
             if (isset($mie[$t_id]) && $mio === null) { $mio = $mie[$t_id]; $mio_turno = $t_id; }
+            if ($st_ed['codice'] === 'arrivo' && ($prossima_apertura === null || $t['data_apertura'] < $prossima_apertura)) $prossima_apertura = $t['data_apertura'];
         }
-        // Finestra di iscrizione: la stessa per tutte le edizioni (quella del primo turno)
-        $rif = $turni ? ['data_apertura' => $turni[array_key_first($turni)]['data_apertura'] ?? null, 'data_chiusura' => $turni[array_key_first($turni)]['data_chiusura'] ?? null,
-                         'max_posti' => $posti, 'abilita_lista_attesa' => 1] : null;
-        return ['edizioni' => $edizioni, 'stato' => stato_progetto($d, $rif, $occupate), 'liberi' => $posti - $occupate,
-                'mio' => $mio, 'mio_turno' => $mio_turno, 'rif' => $rif];
+        // Stato del progetto: il più favorevole tra le edizioni (una aperta basta per "Iscrizioni aperte")
+        $stato = $edizioni ? $edizioni[0]['stato'] : stato_progetto($d, null, 0);
+        foreach ($edizioni as $ed) if ($ed['stato']['ordine'] < $stato['ordine']) $stato = $ed['stato'];
+        return ['edizioni' => $edizioni, 'stato' => $stato, 'liberi' => $posti - $occupate,
+                'mio' => $mio, 'mio_turno' => $mio_turno, 'prossima_apertura' => $prossima_apertura];
     }
 }
 
@@ -2289,12 +2295,14 @@ if (!function_exists('html_campi_form_admin')) {
     // Campi del Form Builder per l'evento indicato, da usare nell'admin (prenotazione manuale e modifica).
     // $valori = dati_custom_json già salvati. Condizioni "mostra se" ignorate: in admin si vede tutto, niente obbligatori.
     // Gli allegati non si caricano da qui: si mostrano i link a quelli esistenti.
-    function html_campi_form_admin($conn, int $evento_id, array $valori = [], string $pref = 'cf'): string {
+    function html_campi_form_admin($conn, int $evento_id, array $valori = [], string $pref = 'cf', int $turno_id = 0): string {
         $r_ev = $conn->query("SELECT e.pagina_id, e.tipo FROM eventi e WHERE e.id = $evento_id LIMIT 1");
         $ev = $r_ev ? $r_ev->fetch_assoc() : null;
         if (!$ev) return '';
         $is_progetto = $ev['tipo'] === 'progetto';
         $dett = $is_progetto ? (get_dettagli_progetti($conn, [$evento_id])[$evento_id] ?? null) : null;
+        $r_tl = ($is_progetto && $turno_id > 0) ? $conn->query("SELECT min_partecipanti, max_partecipanti FROM turni WHERE id = $turno_id AND evento_id = $evento_id") : null;
+        $lim = limiti_partecipanti($dett, $r_tl ? $r_tl->fetch_assoc() : null);
         $pag = (int)$ev['pagina_id'];
         $res = $conn->query("SELECT * FROM campi_form WHERE (pagina_id = $pag AND (evento_id IS NULL OR evento_id = 0)) OR evento_id = $evento_id ORDER BY ordine ASC, id ASC");
         $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
@@ -2331,7 +2339,7 @@ if (!function_exists('html_campi_form_admin')) {
                 $html_tipo = in_array($tipo, ['number', 'email', 'tel', 'url', 'date', 'time'], true) ? $tipo : 'text';
                 $extra = '';
                 if ($nome === CAMPO_PARTECIPANTI) {
-                    $extra = ' min="' . (!empty($dett['min_studenti']) ? (int)$dett['min_studenti'] : 1) . '"' . (!empty($dett['max_studenti']) ? ' max="' . (int)$dett['max_studenti'] . '"' : '') . ' required';
+                    $extra = ' min="' . $lim['min'] . '"' . ($lim['max'] ? ' max="' . $lim['max'] . '"' : '') . ' required';
                 }
                 if ($tipo === 'rating') { $html_tipo = 'number'; $extra = ' min="1" max="' . max(5, count($opts)) . '"'; }
                 $out .= '<input type="' . $html_tipo . '" name="' . $h($name) . '" id="' . $id . '" class="form-control form-control-sm" value="' . $h($val) . '"' . $extra . '>';
@@ -2342,17 +2350,35 @@ if (!function_exists('html_campi_form_admin')) {
     }
 }
 
+if (!function_exists('limiti_partecipanti')) {
+    // Minimo e massimo di partecipanti per iscrizione: quelli dell'edizione (turno) se indicati,
+    // altrimenti quelli generali del progetto. max = null se non c'è un massimo.
+    function limiti_partecipanti(?array $d, ?array $turno = null): array {
+        $min = !empty($turno['min_partecipanti']) ? (int)$turno['min_partecipanti'] : (!empty($d['min_studenti']) ? (int)$d['min_studenti'] : 1);
+        $max = !empty($turno['max_partecipanti']) ? (int)$turno['max_partecipanti'] : (!empty($d['max_studenti']) ? (int)$d['max_studenti'] : null);
+        return ['min' => $min, 'max' => $max];
+    }
+}
+
+if (!function_exists('testo_limiti_partecipanti')) {
+    // "da 15 a 30", "almeno 15", "fino a 30" o '' se non ci sono limiti
+    function testo_limiti_partecipanti(?int $min, ?int $max): string {
+        if ($min > 1 && $max) return $min === $max ? (string)$min : "da $min a $max";
+        if ($min > 1) return "almeno $min";
+        return $max ? "fino a $max" : '';
+    }
+}
+
 if (!function_exists('valida_partecipanti_progetto')) {
     // Progetti per le scuole: numero di partecipanti obbligatorio, intero, dentro i limiti del progetto.
     // Ritorna null se va bene (o se il progetto non è per le scuole), altrimenti il messaggio di errore.
-    function valida_partecipanti_progetto(array $custom, ?array $d): ?string {
+    function valida_partecipanti_progetto(array $custom, ?array $d, ?array $turno = null): ?string {
         if ((int)($d['per_scuole'] ?? 1) !== 1) return null;
         $v = trim((string)($custom[CAMPO_PARTECIPANTI] ?? ''));
         if ($v === '') return "Indica il numero di studenti partecipanti.";
         if (!preg_match('/^\d+$/', $v)) return "Il numero di studenti deve essere un numero intero.";
         $n = (int)$v;
-        $lim_min = !empty($d['min_studenti']) ? (int)$d['min_studenti'] : 1;
-        $lim_max = !empty($d['max_studenti']) ? (int)$d['max_studenti'] : null;
+        ['min' => $lim_min, 'max' => $lim_max] = limiti_partecipanti($d, $turno);
         if ($n < $lim_min || ($lim_max !== null && $n > $lim_max)) {
             return "Il numero di studenti deve essere compreso tra $lim_min e " . ($lim_max ?? 'il massimo previsto') . ".";
         }
@@ -2529,7 +2555,7 @@ if (!function_exists('max_partecipanti_prenotazione')) {
         $custom = json_decode((string)($pren['dati_custom_json'] ?? ''), true) ?: [];
         $dich = (int)($custom[CAMPO_PARTECIPANTI] ?? 0);
         if ($dich > 0) return $dich;
-        return !empty($dett['max_studenti']) ? (int)$dett['max_studenti'] : 200;
+        return limiti_partecipanti($dett, $pren)['max'] ?? 200;
     }
 }
 
@@ -2551,7 +2577,7 @@ if (!function_exists('url_verifica_attestato')) {
 if (!function_exists('prenotazione_per_attestati')) {
     // Prenotazione con evento, area, portale e scheda del progetto: i dati che servono agli attestati
     function prenotazione_per_attestati($conn, int $pr_id): ?array {
-        $r = $conn->query("SELECT pr.*, t.data_turno, t.orario_inizio, t.orario_fine, t.nome_turno, t.evento_id,
+        $r = $conn->query("SELECT pr.*, t.data_turno, t.orario_inizio, t.orario_fine, t.nome_turno, t.evento_id, t.min_partecipanti, t.max_partecipanti,
                                   e.titolo AS evento_titolo, e.luogo AS evento_luogo, e.tipo AS evento_tipo, e.pagina_id,
                                   pe.titolo AS pagina_titolo, pe.firma_nome, pe.firma_titolo, pe.logo_attestato_path, pe.colore_primario,
                                   cp.logo_path, cp.nome_portale, cp.sottotitolo_portale,
@@ -2767,7 +2793,7 @@ if (!function_exists('puo_vedere_prenotazione')) {
 // richiesta: quando aggiungi qualcosa qui, cambia anche il nome del marcatore.
 if (!function_exists('assicura_schema')) {
     function assicura_schema($conn) {
-        $marker = __DIR__ . '/cache/schema_v14.ok';
+        $marker = __DIR__ . '/cache/schema_v15.ok';
         if (is_file($marker)) return;
 
         // 1. Tabelle di servizio (prima create dalle singole pagine a ogni richiesta)
@@ -2816,6 +2842,9 @@ if (!function_exists('assicura_schema')) {
             'turni' => [
                 'nome_turno' => "ADD COLUMN nome_turno VARCHAR(150) DEFAULT NULL AFTER evento_id, MODIFY data_turno DATE NULL DEFAULT NULL, MODIFY orario_inizio TIME NULL DEFAULT NULL, MODIFY orario_fine TIME NULL DEFAULT NULL",
                 'token_checkin' => "ADD COLUMN token_checkin VARCHAR(64) DEFAULT NULL",
+                // v15: partecipanti per iscrizione della singola edizione di un progetto (NULL = limiti generali del progetto)
+                'min_partecipanti' => "ADD COLUMN min_partecipanti INT DEFAULT NULL",
+                'max_partecipanti' => "ADD COLUMN max_partecipanti INT DEFAULT NULL",
             ],
             'sondaggi_domande' => [
                 'condizione_json' => "ADD COLUMN condizione_json TEXT NULL",

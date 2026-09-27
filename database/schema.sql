@@ -232,6 +232,8 @@ CREATE TABLE IF NOT EXISTS `turni` (
     `data_apertura`         datetime DEFAULT NULL,
     `data_chiusura`         datetime DEFAULT NULL,
     `token_checkin`         varchar(64) DEFAULT NULL,
+    `min_partecipanti`      int(11) DEFAULT NULL COMMENT 'progetti: minimo per iscrizione dell''edizione (NULL = generale)',
+    `max_partecipanti`      int(11) DEFAULT NULL COMMENT 'progetti: massimo per iscrizione dell''edizione (NULL = generale)',
     `abilita_lista_attesa`  tinyint(1) DEFAULT 0,
     `abilita_multi_posto`   tinyint(1) DEFAULT 0,
     `richiede_approvazione` tinyint(1) DEFAULT 0,
