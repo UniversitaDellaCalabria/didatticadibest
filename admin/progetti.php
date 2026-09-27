@@ -268,6 +268,22 @@ if (isset($_POST['elimina_progetto'])) {
     admin_redirect("progetti.php?p_id=$filtro_p");
 }
 
+if (isset($_POST['salva_ordine_progetti'])) {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    if (!$puo_creare) nega_accesso();
+    $ids = array_values(array_unique(array_filter(array_map('intval', (array)($_POST['ordine_ids'] ?? [])))));
+    $stmt_o = $conn->prepare("UPDATE eventi SET ordine = ? WHERE id = ? AND pagina_id = ? AND tipo = 'progetto'");
+    foreach ($ids as $pos => $id_o) {
+        $n = $pos + 1;
+        $stmt_o->bind_param("iii", $n, $id_o, $filtro_p);
+        $stmt_o->execute();
+    }
+    $stmt_o->close();
+    registra_log_audit($conn, "Ordine Progetti", ["Area" => $filtro_p, "Progetti" => count($ids)]);
+    flash_set("Ordine dei progetti salvato: la pagina pubblica li mostra in questa sequenza.");
+    admin_redirect("progetti.php?p_id=$filtro_p");
+}
+
 $col_area = colore_valido($page_cfg['colore_primario'] ?? '', '#0056B3');
 $txt_area = colore_testo_su($col_area);
 $slug_area = $page_cfg['slug'] ?? '';
@@ -638,6 +654,8 @@ $n_eventi_normali = (int)($conn->query("SELECT COUNT(*) AS n FROM eventi WHERE p
 .pj-stato { display:inline-block; font-size:.72rem; font-weight:700; padding:.25rem .6rem; border-radius:999px; }
 .pj-meta { font-size:.8rem; color:#475569; }
 .pj-meta i { color:#94a3b8; width:14px; }
+.pj-maniglia { cursor:grab; background:#f8fafc; border-right:1px solid #e2e8f0; }
+.pj-maniglia:active { cursor:grabbing; }
 </style>
 
 <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
@@ -667,10 +685,30 @@ $n_eventi_normali = (int)($conn->query("SELECT COUNT(*) AS n FROM eventi WHERE p
     </div>
 <?php endif; ?>
 
+<?php $ordinabile = $puo_creare && count($progetti) > 1; ?>
+<?php if ($ordinabile): ?>
+    <form method="POST" id="pjOrdineForm" class="d-flex flex-wrap align-items-center gap-2 mb-3 p-2 bg-light border rounded-3">
+        <?php csrf_field(); ?>
+        <span class="small text-muted"><i class="fa fa-grip-vertical me-1" aria-hidden="true"></i>Trascina le schede per cambiare l'ordine della pagina pubblica, oppure</span>
+        <label for="pjOrdinaPer" class="visually-hidden">Ordina per</label>
+        <select id="pjOrdinaPer" class="form-select form-select-sm" style="max-width:230px;">
+            <option value="">ordina per...</option>
+            <option value="titolo">Titolo (A-Z)</option>
+            <option value="inizio">Data di inizio</option>
+            <option value="stato">Stato (iscrizioni aperte prima)</option>
+            <option value="recenti">Più recenti prima</option>
+        </select>
+        <span id="pjOrdineAvviso" class="small fw-bold text-warning-emphasis d-none">Ordine modificato, non ancora salvato</span>
+        <button type="submit" name="salva_ordine_progetti" id="pjOrdineSalva" class="btn btn-sm btn-primary fw-bold ms-auto" disabled><i class="fa fa-save me-1" aria-hidden="true"></i>Salva ordine</button>
+    </form>
+<?php endif; ?>
+
+<div id="pjLista">
 <?php foreach ($progetti as $id => $p):
     $d = $p['dett']; $t = $p['turno']; $st = $p['stato'];
 ?>
-    <div class="pj-card d-flex">
+    <div class="pj-card d-flex" data-id="<?php echo $id; ?>" data-titolo="<?php echo h(mb_strtolower($p['titolo'])); ?>" data-inizio="<?php echo h($d['data_inizio'] ?? ''); ?>" data-stato="<?php echo (int)($st['ordine'] ?? 99); ?>">
+        <?php if ($ordinabile): ?><div class="pj-maniglia d-flex align-items-center px-1 text-muted" title="Trascina per spostare" aria-hidden="true"><i class="fa fa-grip-vertical"></i></div><?php endif; ?>
         <div style="width:5px;flex-shrink:0;background:<?php echo h($col_area); ?>;"></div>
         <div class="flex-grow-1 p-3">
             <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
@@ -738,5 +776,40 @@ $n_eventi_normali = (int)($conn->query("SELECT COUNT(*) AS n FROM eventi WHERE p
         </div>
     </div>
 <?php endforeach; ?>
+</div>
+
+<?php if ($ordinabile): ?>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script>
+(function () {
+    var lista = document.getElementById('pjLista'), form = document.getElementById('pjOrdineForm');
+    var salva = document.getElementById('pjOrdineSalva'), avviso = document.getElementById('pjOrdineAvviso');
+    var modificato = function () { salva.disabled = false; avviso.classList.remove('d-none'); };
+    if (window.Sortable) Sortable.create(lista, { handle: '.pj-maniglia', animation: 150, ghostClass: 'opacity-50', onEnd: modificato });
+
+    var confronti = {
+        titolo:  function (a, b) { return a.dataset.titolo.localeCompare(b.dataset.titolo, 'it'); },
+        inizio:  function (a, b) { return (a.dataset.inizio || '9999') < (b.dataset.inizio || '9999') ? -1 : (a.dataset.inizio || '9999') > (b.dataset.inizio || '9999') ? 1 : 0; },
+        stato:   function (a, b) { return (a.dataset.stato - b.dataset.stato) || confronti.inizio(a, b); },
+        recenti: function (a, b) { return b.dataset.id - a.dataset.id; }
+    };
+    document.getElementById('pjOrdinaPer').addEventListener('change', function () {
+        var f = confronti[this.value]; if (!f) return;
+        Array.from(lista.children).sort(f).forEach(function (c) { lista.appendChild(c); });
+        modificato();
+    });
+
+    form.addEventListener('submit', function () {
+        form.querySelectorAll('input[name="ordine_ids[]"]').forEach(function (i) { i.remove(); });
+        Array.from(lista.children).forEach(function (c) {
+            var i = document.createElement('input'); i.type = 'hidden'; i.name = 'ordine_ids[]'; i.value = c.dataset.id; form.appendChild(i);
+        });
+        salva.disabled = false;
+    });
+    window.addEventListener('beforeunload', function (e) { if (!salva.disabled && !form.dataset.invio) { e.preventDefault(); e.returnValue = ''; } });
+    form.addEventListener('submit', function () { form.dataset.invio = '1'; });
+})();
+</script>
+<?php endif; ?>
 
 <?php require_once 'admin_footer.php'; ?>

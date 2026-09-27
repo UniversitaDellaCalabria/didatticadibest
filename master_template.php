@@ -2139,9 +2139,9 @@ function evSetRating(btn) {
         if (($ev_l['tipo'] ?? '') !== 'progetto') { $altri_eventi[] = $ev_l; continue; }
         $lista_pj[] = ['ev' => $ev_l, 'ip' => $info_progetto($ev_l)];
     }
-    // Prima i progetti a cui ci si può iscrivere, poi in arrivo, chiusi, in corso, conclusi; a parità per data di inizio
-    usort($lista_pj, fn($a, $b) => [$a['ip']['stato']['ordine'], empty($a['ip']['d']['data_inizio']), $a['ip']['d']['data_inizio'] ?? '', (int)$a['ev']['ordine'], (int)$a['ev']['id']]
-                               <=> [$b['ip']['stato']['ordine'], empty($b['ip']['d']['data_inizio']), $b['ip']['d']['data_inizio'] ?? '', (int)$b['ev']['ordine'], (int)$b['ev']['id']]);
+    // Prima l'ordine scelto in admin (trascinamento); a parità: iscrizioni aperte, in arrivo, chiuse, in corso, concluse, poi data di inizio
+    usort($lista_pj, fn($a, $b) => [(int)$a['ev']['ordine'], $a['ip']['stato']['ordine'], empty($a['ip']['d']['data_inizio']), $a['ip']['d']['data_inizio'] ?? '', (int)$a['ev']['id']]
+                               <=> [(int)$b['ev']['ordine'], $b['ip']['stato']['ordine'], empty($b['ip']['d']['data_inizio']), $b['ip']['d']['data_inizio'] ?? '', (int)$b['ev']['id']]);
     $filtri_stato = ['aperte' => 'Iscrizioni aperte', 'arrivo' => 'In arrivo', 'attesa' => "Con lista d'attesa", 'in_corso' => 'In corso', 'chiuse' => 'Iscrizioni chiuse', 'concluso' => 'Conclusi'];
     $conta_stato = array_count_values(array_map(fn($x) => $x['ip']['stato']['codice'], $lista_pj));
     $strutture_pj = array_values(array_unique(array_filter(array_map(fn($x) => trim((string)($x['ip']['d']['struttura'] ?? '')), $lista_pj))));
@@ -2206,17 +2206,26 @@ function evSetRating(btn) {
                         <?php foreach ($strutture_pj as $s_pj): ?><option value="<?php echo htmlspecialchars(mb_strtolower($s_pj)); ?>"><?php echo htmlspecialchars($s_pj); ?></option><?php endforeach; ?>
                     </select>
                 <?php endif; ?>
+                <?php if (count($lista_pj) > 1): ?>
+                    <label for="pjlOrdina" class="small fw-semibold text-secondary mb-0 <?php echo count($strutture_pj) > 1 ? '' : 'ms-lg-auto'; ?>">Ordina per</label>
+                    <select id="pjlOrdina" class="form-select form-select-sm" style="max-width: 220px;">
+                        <option value="">Predefinito</option>
+                        <option value="stato">Iscrizioni aperte prima</option>
+                        <option value="inizio">Data di inizio</option>
+                        <option value="titolo">Titolo (A-Z)</option>
+                    </select>
+                <?php endif; ?>
             </div>
 
             <div class="d-flex flex-column gap-3" id="pjlLista">
-                <?php foreach ($lista_pj as ['ev' => $ev_l, 'ip' => $ip_l]):
+                <?php foreach ($lista_pj as $pos_l => ['ev' => $ev_l, 'ip' => $ip_l]):
                     $d_l = $ip_l['d']; $st_l = $ip_l['stato'];
                     $url_scheda = htmlspecialchars($current_filename) . '.php?progetto=' . (int)$ev_l['id'];
                     $cerca_l = mb_strtolower($ev_l['titolo'] . ' ' . ($d_l['struttura'] ?? '') . ' ' . ($d_l['destinatari'] ?? '') . ' ' . ($ev_l['luogo'] ?? '') . ' '
                              . implode(' ', array_map(fn($r) => ($r['nome'] ?? ''), $d_l['referenti'] ?? [])) . ' ' . strip_tags($ev_l['descrizione'] ?? ''));
                     $estratto = trim(preg_replace('/\s+/', ' ', html_entity_decode(strip_tags(str_replace('<', ' <', $ev_l['descrizione'] ?? '')), ENT_QUOTES, 'UTF-8')));
                 ?>
-                    <article class="pjl-card<?php echo $st_l['codice'] === 'concluso' ? ' concluso' : ''; ?>" data-cerca="<?php echo htmlspecialchars($cerca_l); ?>" data-stato="<?php echo $st_l['codice']; ?>" data-struttura="<?php echo htmlspecialchars(mb_strtolower(trim((string)($d_l['struttura'] ?? '')))); ?>">
+                    <article class="pjl-card<?php echo $st_l['codice'] === 'concluso' ? ' concluso' : ''; ?>" data-cerca="<?php echo htmlspecialchars($cerca_l); ?>" data-stato="<?php echo $st_l['codice']; ?>" data-struttura="<?php echo htmlspecialchars(mb_strtolower(trim((string)($d_l['struttura'] ?? '')))); ?>" data-pos="<?php echo (int)$pos_l; ?>" data-ord-stato="<?php echo (int)$st_l['ordine']; ?>" data-inizio="<?php echo htmlspecialchars($d_l['data_inizio'] ?? ''); ?>" data-titolo="<?php echo htmlspecialchars(mb_strtolower($ev_l['titolo'])); ?>">
                         <div class="pjl-data" aria-hidden="true">
                             <?php if (!empty($d_l['data_inizio'])): $ts_l = strtotime($d_l['data_inizio']); ?>
                                 <span class="g"><?php echo date('j', $ts_l); ?></span><span class="m"><?php echo $mesi_pj[(int)date('n', $ts_l)]; ?></span><span class="a"><?php echo date('Y', $ts_l); ?></span>
@@ -2272,6 +2281,17 @@ function evSetRating(btn) {
                 }
                 cerca.addEventListener('input', applica);
                 if (strutt) strutt.addEventListener('change', applica);
+                var ordina = document.getElementById('pjlOrdina'), lista = document.getElementById('pjlLista');
+                var inizio = function (c) { return c.dataset.inizio || '9999'; };
+                var confronti = {
+                    '':     function (a, b) { return a.dataset.pos - b.dataset.pos; },
+                    stato:  function (a, b) { return (a.dataset.ordStato - b.dataset.ordStato) || inizio(a).localeCompare(inizio(b)) || (a.dataset.pos - b.dataset.pos); },
+                    inizio: function (a, b) { return inizio(a).localeCompare(inizio(b)) || (a.dataset.pos - b.dataset.pos); },
+                    titolo: function (a, b) { return a.dataset.titolo.localeCompare(b.dataset.titolo, 'it'); }
+                };
+                if (ordina) ordina.addEventListener('change', function () {
+                    Array.from(lista.querySelectorAll('.pjl-card')).sort(confronti[ordina.value] || confronti['']).forEach(function (c) { lista.appendChild(c); });
+                });
                 pills.forEach(function (p) {
                     p.addEventListener('click', function () {
                         pills.forEach(function (x) { x.classList.remove('active'); x.setAttribute('aria-pressed', 'false'); });
