@@ -1,8 +1,5 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-// Rimosso require_once 'config.php' per evitare i redirect automatici di sicurezza
+// Nessuna sessione qui: la pagina non la usa e ne creerebbe una nuova, vuota, subito dopo il logout
 ?>
 <!DOCTYPE html>
 <html lang="it">

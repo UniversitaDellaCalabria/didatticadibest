@@ -76,10 +76,21 @@ if (!function_exists('check_rate_limit')) {
     }
 }
 
+if (!defined('COOKIE_USCITO')) define('COOKIE_USCITO', 'dibest_uscito');
+if (!function_exists('imposta_cookie_uscito')) {
+    // true = l'utente ha fatto "Esci" (30 giorni); false = ha rifatto l'accesso
+    function imposta_cookie_uscito(bool $uscito): void {
+        setcookie(COOKIE_USCITO, $uscito ? '1' : '', ['expires' => $uscito ? time() + 30 * 86400 : time() - 3600,
+                  'path' => '/', 'secure' => true, 'httponly' => true, 'samesite' => 'Lax']);
+    }
+}
+
 // 1. GESTIONE AUTENTICAZIONE SSO UNIFICATA (Con Auto-Riparazione Email)
 if (!function_exists('sync_sso_user')) {
     function sync_sso_user($conn) {
         if (!empty($_SESSION['utente_id'])) return true;
+        // Dopo "Esci" niente accesso automatico dalla sessione SSO di Ateneo: si rientra solo con "Accedi"
+        if (!empty($_COOKIE[COOKIE_USCITO])) return false;
 
         $simplesaml_path = '/opt/simplesamlphp/lib/_autoload.php';
         if (!file_exists($simplesaml_path)) return false;

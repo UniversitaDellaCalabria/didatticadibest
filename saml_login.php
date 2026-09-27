@@ -129,11 +129,13 @@ if (file_exists($simplesaml_path)) {
             $u_info = $stmt_info->get_result()->fetch_assoc();
         }
 
+        imposta_cookie_uscito(false); // accesso esplicito: torna attivo l'accesso automatico SSO
         $_SESSION['utente_id']       = (int)$u_info['id'];
         $_SESSION['utente_cf']       = $u_info['codice_fiscale'];
         $_SESSION['utente_nome']     = trim($u_info['nome'] . ' ' . $u_info['cognome']);
         $_SESSION['utente_email']    = $u_info['email'];
         $_SESSION['utente_ruolo_id'] = (int)$u_info['ruolo_id'];
+        $_SESSION['utente_ruoli_secondari'] = $u_info['ruoli_secondari'] ?? '';
 
         // Registra accesso (usa registra_accesso_sso che crea la tabella autonomamente)
         if (empty($_SESSION['accesso_sso_loggato']) && function_exists('registra_accesso_sso')) {

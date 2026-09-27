@@ -5,8 +5,7 @@ ini_set('log_errors', 1);
 ini_set('display_startup_errors', 0);
 error_reporting(E_ALL);
 
-if (session_status() === PHP_SESSION_NONE) { session_start(); }
-require_once '../config.php';
+require_once '../config.php'; // apre la sessione con i parametri sicuri del cookie
 require_once '../functions.php';
 
 // 1. SINCRONIZZAZIONE SSO E CONTROLLO ACCESSO
@@ -23,13 +22,22 @@ if ($u_id_curr) {
     $stmt_ua->close();
 }
 
+if (!$utente_admin && !isset($_GET['sso_tentato'])) {
+    // Accesso diretto: login SSO e ritorno a questa stessa pagina (sso_tentato evita un ciclo se il login non riesce)
+    $qs = $_GET; $qs['sso_tentato'] = 1;
+    $ritorno = 'admin/' . basename($_SERVER['PHP_SELF']) . '?' . http_build_query($qs);
+    while (ob_get_level() > 0) ob_end_clean();
+    header('Location: ../saml_login.php?redirect=' . urlencode($ritorno));
+    exit;
+}
 if (!$utente_admin) {
     ?>
     <!DOCTYPE html><html lang="it"><head><meta charset="UTF-8"><title>Accesso Riservato</title><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"></head>
     <body class="bg-light d-flex align-items-center justify-content-center" style="height: 100vh;">
         <div class="card shadow-sm p-4 text-center" style="max-width: 500px; border-top: 4px solid #990000;">
             <h4 class="fw-bold mb-3 text-danger"><i class="fa fa-lock"></i> Autenticazione Richiesta</h4>
-            <div class="mt-3"><a href="../saml_login.php" class="btn btn-danger px-4 fw-bold" style="background-color: #990000;">Accedi con SSO Unical</a></div>
+            <p class="text-secondary small mb-0">L'accesso non è andato a buon fine. Riprova; se il problema continua, chiudi il browser e riaprilo.</p>
+            <div class="mt-3"><a href="../saml_login.php?redirect=<?php echo urlencode('admin/index.php'); ?>" class="btn btn-danger px-4 fw-bold" style="background-color: #990000;">Accedi con SSO Unical</a></div>
         </div>
     </body></html>
     <?php exit;
