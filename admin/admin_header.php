@@ -51,14 +51,15 @@ $is_full_admin = ($u_ruolo_curr === 1) || in_array('1', $u_sec_roles);
 // GESTIONE AZIONI GLOBALI AREA DI LAVORO
 // ==============================================================================
 if (isset($_POST['toggle_visibilita_pagina']) && $is_full_admin) {
-    $st_vis = (int)$_POST['stato_visibile'];
+    csrf_verify($_POST['csrf_token'] ?? '');
+    $st_vis = (int)$_POST['stato_visibile'] === 1 ? 1 : 0;
     $p_id_toggle = (int)$_POST['pagina_id'];
     $stmt_vis = $conn->prepare("UPDATE pagine_eventi SET visibile = ? WHERE id = ?");
     $stmt_vis->bind_param("ii", $st_vis, $p_id_toggle);
     $stmt_vis->execute();
     $stmt_vis->close();
-    flash_set("Stato visibilità dell'area aggiornato!");
-    echo "<script>window.location.replace('".$_SERVER['PHP_SELF']."?p_id=$p_id_toggle');</script>";
+    flash_set($st_vis ? "Area visibile al pubblico." : "Area nascosta al pubblico: la vedono solo i gestori.");
+    echo "<script>window.location.replace('aree.php?p_id=$p_id_toggle');</script>";
     exit;
 }
 
@@ -146,7 +147,7 @@ if (isset($_POST['del_pagina_completa']) && $is_full_admin) {
         }
         
         flash_set("Area di lavoro eliminata definitivamente!", 'warning');
-        echo "<script>window.location.replace('index.php');</script>";
+        echo "<script>window.location.replace('aree.php');</script>";
         exit;
     }
 }
@@ -322,6 +323,8 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
         .nav-pills .nav-link { color: #cbd5e1; border-radius: 8px; margin-bottom: 5px; text-align: left; font-weight: 600; padding: 10px 15px; }
         .nav-pills .nav-link.active { background-color: #990000; color: #fff; }
         .nav-pills .nav-link:hover:not(.active) { background-color: rgba(255,255,255,0.1); color: #fff; }
+        #sidebar .nav > li { width: 100%; min-width: 0; }
+        .side-area { background: rgba(255,255,255,0.06); overflow: hidden; }
         @media (max-width: 991.98px) {
             #sidebar { margin-left: -260px; position: fixed; height: 100%; overflow-y: auto; }
             #sidebar.active { margin-left: 0; box-shadow: 5px 0 15px rgba(0,0,0,0.5); }
@@ -343,18 +346,34 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
         
         <div class="p-3">
             <ul class="nav nav-pills flex-column">
-                <li class="nav-item mb-1">
+                <li class="nav-item">
                     <a class="nav-link w-100 <?php echo ($current_page == 'dashboard.php' || $current_page == 'index.php') ? 'active' : ''; ?>" href="dashboard.php?p_id=<?php echo $filtro_p; ?>">
                         <i class="fa fa-gauge-high me-2 text-center" style="width:20px;"></i> Dashboard
                     </a>
                 </li>
-                <li class="nav-item mb-2">
-                    <div class="text-secondary small fw-bold px-3 mb-1 text-uppercase">Gestione Contenuti</div>
+                <li class="nav-item mb-1">
+                    <a class="nav-link w-100 <?php echo ($current_page == 'aree.php') ? 'active' : ''; ?>" href="aree.php?p_id=<?php echo $filtro_p; ?>">
+                        <i class="fa fa-layer-group me-2 text-center" style="width:20px;"></i> Aree
+                        <span class="badge rounded-pill bg-secondary ms-1" style="font-size:.65rem;"><?php echo count($pagine_disponibili); ?></span>
+                    </a>
+                </li>
+
+                <?php if ($filtro_p > 0 && $page_cfg): $col_side = colore_valido($page_cfg['colore_primario'] ?? '', '#0056B3'); ?>
+                <!-- ── Area corrente: tutto ciò che riguarda l'area ── -->
+                <li class="nav-item mt-3 mb-2">
+                    <div class="side-area px-3 py-2 rounded" style="border-left:4px solid <?php echo $col_side; ?>;">
+                        <div class="text-secondary fw-bold text-uppercase" style="font-size:.66rem;letter-spacing:.06em;">Area</div>
+                        <div class="d-flex align-items-center justify-content-between gap-2">
+                            <span class="fw-bold text-white text-truncate" style="min-width:0;" title="<?php echo htmlspecialchars($page_cfg['titolo']); ?>"><?php echo htmlspecialchars($page_cfg['titolo']); ?></span>
+                            <?php if (count($pagine_disponibili) > 1): ?><a href="aree.php?p_id=<?php echo $filtro_p; ?>" class="small text-info text-decoration-none text-nowrap">Cambia</a><?php endif; ?>
+                        </div>
+                        <?php if ((int)($page_cfg['visibile'] ?? 1) === 0): ?><span class="badge bg-warning text-dark mt-1" style="font-size:.65rem;"><i class="fa fa-eye-slash me-1"></i>Nascosta al pubblico</span><?php endif; ?>
+                    </div>
                 </li>
 
                 <?php if ($can_manage_eventi): ?>
                 <li class="nav-item">
-                    <a class="nav-link w-100 <?php echo ($current_page == 'eventi.php' || $current_page == 'index.php') ? 'active' : ''; ?>" href="eventi.php?p_id=<?php echo $filtro_p; ?>">
+                    <a class="nav-link w-100 <?php echo ($current_page == 'eventi.php') ? 'active' : ''; ?>" href="eventi.php?p_id=<?php echo $filtro_p; ?>">
                         <i class="fa fa-calendar-alt me-2 text-center" style="width:20px;"></i> Eventi e Turni
                     </a>
                 </li>
@@ -437,34 +456,29 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
                     </li>
                 <?php endif; ?>
                 
-                <?php if ($can_manage_settings || $is_full_admin): ?>
-                    <li class="nav-item mt-3 mb-2">
-                        <div class="text-secondary small fw-bold px-3 mb-1 text-uppercase">Configurazione Pagina</div>
+                <?php if ($can_manage_settings): ?>
+                    <li class="nav-item mt-2">
+                        <a class="nav-link w-100 <?php echo ($current_page == 'impostazioni_area.php') ? 'active' : ''; ?>" href="impostazioni_area.php?p_id=<?php echo $filtro_p; ?>">
+                            <i class="fa fa-paint-brush me-2 text-center" style="width:20px;"></i> Impostazioni Area
+                        </a>
                     </li>
-                    <?php if ($can_manage_settings): ?>
-                        <li class="nav-item">
-                            <a class="nav-link w-100 <?php echo ($current_page == 'impostazioni_area.php') ? 'active' : ''; ?>" href="impostazioni_area.php?p_id=<?php echo $filtro_p; ?>">
-                                <i class="fa fa-paint-brush me-2 text-center" style="width:20px;"></i> Impostazioni Area
-                            </a>
-                        </li>
-                    <?php endif; ?>
-                    <?php if ($is_full_admin): ?>
-                        <li class="nav-item">
-                            <a class="nav-link w-100 <?php echo ($current_page == 'testata.php') ? 'active' : ''; ?>" href="testata.php?p_id=<?php echo $filtro_p; ?>">
-                                <i class="fa fa-image me-2 text-center" style="width:20px;"></i> Testata & Logo
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link w-100 <?php echo ($current_page == 'menu.php') ? 'active' : ''; ?>" href="menu.php?p_id=<?php echo $filtro_p; ?>">
-                                <i class="fa fa-link me-2 text-center" style="width:20px;"></i> Menu Navigazione
-                            </a>
-                        </li>
-                    <?php endif; ?>
                 <?php endif; ?>
-                
+                <?php endif; // fine area corrente ?>
+
                 <?php if ($is_full_admin): ?>
-                    <li class="nav-item mt-3 mb-2">
-                        <div class="text-secondary small fw-bold px-3 mb-1 text-uppercase">Sicurezza & Server</div>
+                    <!-- ── Portale: impostazioni generali, valide per tutte le aree ── -->
+                    <li class="nav-item mt-4 mb-2">
+                        <div class="text-secondary small fw-bold px-3 mb-1 text-uppercase">Portale</div>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link w-100 <?php echo ($current_page == 'testata.php') ? 'active' : ''; ?>" href="testata.php?p_id=<?php echo $filtro_p; ?>">
+                            <i class="fa fa-image me-2 text-center" style="width:20px;"></i> Testata, Logo & Home
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link w-100 <?php echo ($current_page == 'menu.php') ? 'active' : ''; ?>" href="menu.php?p_id=<?php echo $filtro_p; ?>">
+                            <i class="fa fa-link me-2 text-center" style="width:20px;"></i> Menu Navigazione
+                        </a>
                     </li>
                     <li class="nav-item">
                         <a href="utenti.php?p_id=<?php echo $filtro_p; ?>" class="nav-link w-100 <?php echo ($current_page == 'utenti.php') ? 'active' : ''; ?>">
@@ -518,56 +532,7 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
         <div class="container-fluid p-4" style="max-width: 1400px;">
             <?php echo flash_html(); ?>
 
-            <div class="card mb-4 shadow-sm border-0 bg-white">
-                <div class="card-body d-flex justify-content-between align-items-center py-2 flex-wrap gap-2">
-                    <div class="d-flex align-items-center gap-3 w-100 flex-wrap">
-                        
-                        <form method="GET" id="formAreaLavoro" class="d-flex align-items-center m-0 bg-white p-2 rounded shadow-sm border">
-                            <label class="fw-bold small text-primary me-2 mb-0"><i class="fa fa-layer-group"></i> AREA DI LAVORO:</label>
-                            <select name="p_id" class="form-select form-select-sm fw-bold border-primary text-primary" onchange="window.location.href='<?php echo $current_page; ?>?p_id='+this.value" style="min-width: 200px;">
-                                <?php if (empty($pagine_disponibili)): ?>
-                                    <option value="0">Nessuna Area Assegnata</option>
-                                <?php else: ?>
-                                    <?php foreach($pagine_disponibili as $p_opt): ?>
-                                        <option value="<?php echo $p_opt['id']; ?>" <?php echo $filtro_p == $p_opt['id'] ? 'selected' : ''; ?>>
-                                            <?php echo htmlspecialchars($p_opt['titolo']); ?>
-                                            <?php if (($p_opt['visibile'] ?? 1) == 0): ?> 🙈 [Nascosta]<?php endif; ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
-                            </select>
-                        </form>
-
-                        <div class="ms-auto d-flex gap-2">
-                            <?php if ($is_full_admin && $filtro_p > 0): ?>
-                                <form method="POST" class="m-0">
-                                    <input type="hidden" name="pagina_id" value="<?php echo $filtro_p; ?>">
-                                    <?php 
-                                        $stmt_rvis = $conn->prepare("SELECT visibile FROM pagine_eventi WHERE id = ?");
-                                        $stmt_rvis->bind_param("i", $filtro_p); $stmt_rvis->execute();
-                                        $res_vis = $stmt_rvis->get_result(); $stmt_rvis->close();
-                                        $vis_val = ($res_vis && $row_vis = $res_vis->fetch_assoc()) ? $row_vis['visibile'] : 1;
-                                    ?>
-                                    <?php if ($vis_val == 1): ?>
-                                        <input type="hidden" name="stato_visibile" value="0">
-                                        <button type="submit" name="toggle_visibilita_pagina" class="btn btn-outline-success btn-sm fw-bold bg-white shadow-sm"><i class="fa fa-eye me-1"></i> Area Visibile (Clicca per nascondere)</button>
-                                    <?php else: ?>
-                                        <input type="hidden" name="stato_visibile" value="1">
-                                        <button type="submit" name="toggle_visibilita_pagina" class="btn btn-warning text-dark btn-sm fw-bold shadow-sm"><i class="fa fa-eye-slash me-1"></i> Area Nascosta (Clicca per mostrare)</button>
-                                    <?php endif; ?>
-                                </form>
-                                <button type="button" class="btn btn-primary btn-sm fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modNuovaAreaTop"><i class="fa fa-plus-circle me-1"></i> Nuova Area</button>
-                                <?php if ($filtro_p > 0): ?>
-                                    <button type="button" class="btn btn-outline-danger bg-white btn-sm fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modEliminaAreaTop"><i class="fa fa-trash-alt me-1"></i> Elimina Area</button>
-                                <?php endif; ?>
-                            <?php endif; ?>
-                        </div>
-
-                    </div>
-                </div>
-            </div>
-
-            <!-- MODALI GLOBALI DELLA TESTATA -->
+            <!-- Finestra "Nuova area" (pulsante nella pagina Aree) -->
             <?php if ($is_full_admin): ?>
                 <div class="modal fade" id="modNuovaAreaTop" tabindex="-1">
                     <div class="modal-dialog">
@@ -590,24 +555,6 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
                     </div>
                 </div>
 
-                <?php if (isset($filtro_p) && $filtro_p > 0 && isset($page_cfg)): ?>
-                <div class="modal fade" id="modEliminaAreaTop" tabindex="-1">
-                    <div class="modal-dialog modal-dialog-centered">
-                        <div class="modal-content text-start border-danger">
-                            <form method="POST">
-                                <?php csrf_field(); ?>
-                                <input type="hidden" name="pagina_id_del" value="<?php echo $filtro_p; ?>">
-                                <div class="modal-header bg-danger text-white py-2">
-                                    <h6 class="modal-title fw-bold"><i class="fa fa-exclamation-triangle me-1"></i> Conferma Eliminazione</h6>
-                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                                </div>
-                                <div class="modal-body"><p class="text-danger fw-bold mb-2">Attenzione: operazione irreversibile!</p><p class="small text-secondary mb-0">Stai per eliminare definitivamente questa area.</p></div>
-                                <div class="modal-footer py-2"><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Annulla</button><button type="submit" name="del_pagina_completa" class="btn btn-danger btn-sm fw-bold">Sì, Elimina Definitivamente</button></div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-                <?php endif; ?>
             <?php endif; ?>
 
 <!-- Modal avviso scadenza sessione -->

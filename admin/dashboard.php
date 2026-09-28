@@ -171,7 +171,17 @@ foreach ($stati_data as $sd) {
 <!-- ── HEADER ──────────────────────────────────────────────── -->
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <div>
-        <h4 class="fw-bold mb-0 text-dark">Dashboard</h4>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <h4 class="fw-bold mb-0 text-dark">Dashboard</h4>
+            <?php if (count($pagine_disponibili) > 1): ?>
+                <label for="dashArea" class="visually-hidden">Area da visualizzare</label>
+                <select id="dashArea" class="form-select form-select-sm fw-bold" style="width:auto;min-width:220px;border-color:<?php echo $colore_area; ?>;color:<?php echo $colore_area; ?>;" onchange="location.href='dashboard.php?p_id=' + this.value">
+                    <?php foreach ($pagine_disponibili as $p_opt): ?>
+                        <option value="<?php echo (int)$p_opt['id']; ?>" <?php echo (int)$p_opt['id'] === (int)$filtro_p ? 'selected' : ''; ?>><?php echo htmlspecialchars($p_opt['titolo']); ?><?php echo (int)($p_opt['visibile'] ?? 1) === 0 ? ' (nascosta)' : ''; ?></option>
+                    <?php endforeach; ?>
+                </select>
+            <?php endif; ?>
+        </div>
         <div class="text-muted mt-1" style="font-size:.83rem;">
             Benvenuto/a, <strong><?php echo htmlspecialchars($utente_admin['nome'] ?? ''); ?></strong>
             &mdash; <span style="color:<?php echo $colore_area; ?>;"><?php echo $area_nome; ?></span>

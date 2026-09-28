@@ -245,9 +245,12 @@ if ($filtro_p > 0) {
     </div>
     <small class="text-muted"><?php echo count($utenti); ?> utenti totali</small>
     <?php if ($filtro_p > 0): ?>
-        <span class="badge rounded-pill" style="background:#ede9fe;color:#5b21b6;font-size:.75rem;">
-            <i class="fa fa-key me-1"></i>Abilitazioni: <?php echo htmlspecialchars($page_cfg['titolo'] ?? ''); ?>
-        </span>
+        <label for="selAreaAbil" class="small fw-bold ms-md-auto mb-0" style="color:#5b21b6;"><i class="fa fa-key me-1" aria-hidden="true"></i>Abilitazioni sull'area</label>
+        <select id="selAreaAbil" class="form-select form-select-sm fw-bold" style="max-width:280px;border-color:#c4b5fd;color:#5b21b6;" onchange="location.href='utenti.php?p_id=' + this.value">
+            <?php foreach ($pagine_disponibili as $p_opt): ?>
+                <option value="<?php echo (int)$p_opt['id']; ?>" <?php echo (int)$p_opt['id'] === (int)$filtro_p ? 'selected' : ''; ?>><?php echo htmlspecialchars($p_opt['titolo']); ?><?php echo (int)($p_opt['visibile'] ?? 1) === 0 ? ' (nascosta)' : ''; ?></option>
+            <?php endforeach; ?>
+        </select>
     <?php else: ?>
         <span class="badge rounded-pill bg-warning text-dark" style="font-size:.75rem;">
             <i class="fa fa-exclamation-triangle me-1"></i>Seleziona un'area per gestire le abilitazioni
