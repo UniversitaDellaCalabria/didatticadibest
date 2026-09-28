@@ -1,7 +1,6 @@
 <?php
 // admin/api_unread.php - Endpoint JSON per il badge messaggi non letti (polling AJAX)
 ini_set('display_errors', 0);
-if (session_status() === PHP_SESSION_NONE) session_start();
 
 require_once '../config.php';
 

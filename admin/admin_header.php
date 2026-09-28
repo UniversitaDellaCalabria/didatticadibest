@@ -299,7 +299,7 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
     <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha384-1H217gwSVyLSIfaLxHbE7dRb3v4mYCKbpQvzx0cegeju1MVsGrX5xXxAvs/HgeFs" crossorigin="anonymous"></script>
     <script>
       // Applica il tema prima del render per evitare il flash
       (function() {
@@ -370,6 +370,21 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
                 <li class="nav-item">
                     <a class="nav-link w-100 <?php echo ($current_page == 'progetti.php') ? 'active' : ''; ?>" href="progetti.php?p_id=<?php echo $filtro_p; ?>">
                         <i class="fa fa-diagram-project me-2 text-center" style="width:20px;"></i> Progetti
+                    </a>
+                </li>
+                <?php endif; ?>
+                <?php
+                // Studenti e attestati: aree con progetti per le scuole o eventi con attestati per la classe
+                $mostra_classi = false;
+                if ($filtro_p && $can_manage_iscritti) {
+                    $r_cl = $conn->query("SELECT 1 FROM eventi e LEFT JOIN progetti_dettagli d ON d.evento_id = e.id WHERE e.pagina_id = " . (int)$filtro_p . " AND e.archiviato = 0
+                                          AND ((e.tipo = 'progetto' AND IFNULL(d.per_scuole, 1) = 1) OR (IFNULL(e.tipo, 'evento') <> 'progetto' AND d.attestati = 1)) LIMIT 1");
+                    $mostra_classi = $r_cl && $r_cl->num_rows > 0;
+                }
+                if ($mostra_classi): ?>
+                <li class="nav-item">
+                    <a class="nav-link w-100 <?php echo ($current_page == 'partecipanti.php') ? 'active' : ''; ?>" href="partecipanti.php?p_id=<?php echo $filtro_p; ?>">
+                        <i class="fa fa-graduation-cap me-2 text-center" style="width:20px;"></i> Studenti e attestati
                     </a>
                 </li>
                 <?php endif; ?>

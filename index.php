@@ -193,7 +193,7 @@ if ($mp['stato'] === 'in_attesa') {
     if ($pa_mp) $st_lbl = $pa_mp['posizione'] === 1 ? "In lista: sei il prossimo" : "In lista: sei " . $pa_mp['posizione'] . "°";
 }
 $url_ricevuta = 'stampa_ricevuta.php?code=' . urlencode($mp['codice_prenotazione']);
-$url_qr_mp    = 'https://api.qrserver.com/v1/create-qr-code/?size=360x360&margin=10&data=' . urlencode(url_base_sito() . '/checkin.php?code=' . urlencode($mp['codice_prenotazione']));
+$url_qr_mp    = url_base_sito() . '/checkin.php?code=' . urlencode($mp['codice_prenotazione']);
 ob_start(); ?>
 <div class="container mt-4" style="max-width:1200px;">
     <div class="card border-0 shadow-sm overflow-hidden" style="border-left:6px solid <?php echo $col_mp; ?> !important;border-radius:12px;">
@@ -251,7 +251,7 @@ ob_start(); ?>
             <div class="modal-body d-flex flex-column align-items-center justify-content-center p-4">
                 <div class="fw-bold fs-5 mb-1"><?php echo htmlspecialchars($mp['evento_titolo']); ?></div>
                 <div class="text-secondary small fw-semibold mb-3"><?php echo htmlspecialchars(etichetta_turno($mp)); ?></div>
-                <img src="<?php echo htmlspecialchars($url_qr_mp); ?>" alt="QR code del biglietto <?php echo htmlspecialchars($mp['codice_prenotazione']); ?>" class="img-fluid border rounded p-2 bg-white" style="width:320px;max-width:100%;" loading="lazy">
+                <?php echo qr_html($url_qr_mp, 'width:320px;max-width:100%;margin:0 auto', 'QR code del biglietto ' . $mp['codice_prenotazione'], 'border rounded p-2 bg-white'); ?>
                 <div class="font-monospace fw-bold fs-4 mt-3" style="letter-spacing:.08em;"><?php echo htmlspecialchars($mp['codice_prenotazione']); ?></div>
                 <div class="small text-muted mt-2"><i class="fa fa-sun me-1"></i>Aumenta la luminosità dello schermo e mostra il QR all'ingresso.</div>
             </div>

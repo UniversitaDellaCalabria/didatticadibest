@@ -36,7 +36,7 @@ header("Content-Security-Policy: default-src 'self'; " .
     "script-src 'self' 'unsafe-inline' cdn.jsdelivr.net cdnjs.cloudflare.com cdn.datatables.net code.jquery.com; " .
     "style-src 'self' 'unsafe-inline' cdn.jsdelivr.net cdnjs.cloudflare.com cdn.datatables.net fonts.googleapis.com; " .
     "font-src 'self' cdnjs.cloudflare.com fonts.gstatic.com data:; " .
-    "img-src 'self' data: blob: api.qrserver.com; " .
+    "img-src 'self' data: blob:; " .
     "connect-src 'self'; " .
     "frame-ancestors 'self';");
 

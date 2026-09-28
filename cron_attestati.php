@@ -1,6 +1,5 @@
 <?php
 // cron_attestati.php - Motore invio email automatiche per attestati
-if (session_status() === PHP_SESSION_NONE) { session_start(); }
 require_once 'config.php';
 require_once 'functions.php';
 consenti_esecuzione_cron([1, 2]); // anche i gestori: pulsante "Attestati" in Iscritti

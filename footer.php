@@ -65,7 +65,6 @@ if (isset($conn) && $conn instanceof mysqli) {
                 <div class="col-md-6 ps-md-4">
                     <div class="d-flex flex-wrap justify-content-center justify-content-md-start gap-3 mb-2">
                         <a href="area_personale.php" class="text-white text-decoration-none small"><i class="fa fa-user-circle me-1"></i> Area Personale</a>
-                        <a href="admin/index.php" class="text-white text-decoration-none small"><i class="fa fa-cogs me-1"></i> Pannello Gestori</a>
                         <a href="https://www.unical.it" target="_blank" class="text-white text-decoration-none small"><i class="fa fa-university me-1"></i> Portale Unical</a>
                     </div>
                     <div class="text-white small opacity-75 mt-3 pt-2 border-top" style="border-color: rgba(255,255,255,0.2) !important;">
@@ -95,7 +94,7 @@ if (isset($conn) && $conn instanceof mysqli) {
     </div>
 </footer>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap-italia@2.8.3/dist/js/bootstrap-italia.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap-italia@2.8.3/dist/js/bootstrap-italia.bundle.min.js" integrity="sha384-Uf9ZvEEEoRYjUlBeVUHMbjfQKOtjQKqCfLchDholmnW8vcgVNn8kkh6yne+cfW6v" crossorigin="anonymous"></script>
 
 <!-- Fase 4: Registrazione Service Worker PWA (Stale-While-Revalidate + Cache-First + fallback offline) -->
 <script>

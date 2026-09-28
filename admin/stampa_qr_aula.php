@@ -37,8 +37,6 @@ if (empty($turno['token_checkin'])) {
 $domain = "https://" . ($_SERVER['HTTP_HOST'] ?? 'localhost') . rtrim(dirname(dirname($_SERVER['PHP_SELF'])), '/\\');
 $checkin_url = $domain . "/self_checkin.php?t=" . $t_id . "&k=" . $turno['token_checkin'];
 
-// API funzionante presa da stampa_badge.php
-$qr_image = "https://api.qrserver.com/v1/create-qr-code/?size=400x400&margin=1&data=" . urlencode($checkin_url);
 
 // Logo
 $logo_url = "../assets/logo_dibest.png"; // Fallback
@@ -125,7 +123,7 @@ if ($res_cfg && $row_cfg = $res_cfg->fetch_assoc()) {
     </h1>
     
     <div class="bg-white p-3 rounded-4 border shadow-sm mb-4 mx-auto" style="display: inline-block;">
-        <img src="<?php echo $qr_image; ?>" alt="QR Code" style="width: 320px; height: 320px;">
+        <?php echo qr_html($checkin_url, 'width:320px', 'QR code per il check-in in aula'); ?>
     </div>
     
     <h3 class="fw-bold mt-3 mb-2" style="color: #0056b3; font-size: 1.8rem;"><i class="fa fa-camera me-2"></i> INQUADRA IL CODICE</h3>

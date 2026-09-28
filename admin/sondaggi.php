@@ -1007,7 +1007,7 @@ foreach ($curr_domande as $d) $dom_id_map[$d['id']] = $d;
 
 <!-- SortableJS -->
 <?php if (!$is_archivio && count($curr_domande) > 1): ?>
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js" integrity="sha384-BSxuMLxX+FCbTdYec3TbXlnMGEEM2QXTFdtDaveen71o+jswm2J36+xFqp8k4VHM" crossorigin="anonymous"></script>
 <script>
 (function() {
     var el = document.getElementById('domSortable');

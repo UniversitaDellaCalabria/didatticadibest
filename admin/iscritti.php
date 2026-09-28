@@ -401,7 +401,7 @@ if (!$is_archivio) {
                     $stato_man = 'in_attesa';
                 }
             }
-            $codice_p = strtoupper(substr($t_info['slug'] ?: 'EV', 0, 2)) . '-' . strtoupper(substr(md5(uniqid(rand(), true)), 0, 8));
+            $codice_p = strtoupper(substr($t_info['slug'] ?: 'EV', 0, 2)) . '-' . strtoupper(bin2hex(random_bytes(4)));
             $stmt_man = $conn->prepare("INSERT INTO prenotazioni (turno_id, codice_prenotazione, stato, num_posti, nome, cognome, email, matricola, dati_custom_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
             $stmt_man->bind_param("ississsss", $turno_id, $codice_p, $stato_man, $num_posti, $nome, $cognome, $email, $matricola, $json_custom);
             if ($stmt_man->execute()) {

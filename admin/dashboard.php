@@ -193,6 +193,42 @@ foreach ($stati_data as $sd) {
     </div>
 </div>
 
+<?php
+// ── Avviso attestati delle classi: elenchi vuoti, presenze da segnare, invii in ritardo ──
+if ($can_manage_iscritti):
+    $classi_att = db_rows($conn,
+        "SELECT pr.presente, pr.attestato_inviato,
+                CASE WHEN e.tipo = 'progetto' THEN d.data_fine ELSE t.data_turno END AS fine,
+                (SELECT COUNT(*) FROM partecipanti_prenotazione pp WHERE pp.prenotazione_id = pr.id AND pp.escluso = 0) AS n_studenti
+         FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id
+         JOIN progetti_dettagli d ON d.evento_id = e.id
+         WHERE e.pagina_id = $filtro_p AND e.archiviato = 0 $sql_filtro_eventi_rbac
+           AND d.attestati = 1 AND IFNULL(pr.stato, 'confermata') = 'confermata' AND IFNULL(pr.attestato_inviato, 0) = 0
+           AND ((e.tipo = 'progetto' AND IFNULL(d.per_scuole, 1) = 1) OR (IFNULL(e.tipo, 'evento') <> 'progetto'))");
+    $oggi = date('Y-m-d'); $tra7 = date('Y-m-d', strtotime('+7 days'));
+    $att_vuoti = $att_presenza = $att_ritardo = 0;
+    foreach ($classi_att as $ca) {
+        $fine = $ca['fine'] ?? null;
+        if (!$fine || $fine > $tra7) continue;
+        if ((int)$ca['n_studenti'] === 0) $att_vuoti++;
+        elseif ($fine < $oggi && (int)$ca['presente'] !== 1) $att_presenza++;
+        elseif ($fine < date('Y-m-d', strtotime('-1 day')) && (int)$ca['presente'] === 1) $att_ritardo++;
+    }
+    if ($att_vuoti + $att_presenza + $att_ritardo > 0): ?>
+<div class="alert alert-warning border-0 shadow-sm d-flex flex-wrap align-items-center gap-3 mb-4" style="border-left:5px solid #f59e0b !important;border-radius:12px;">
+    <i class="fa fa-graduation-cap fs-3" aria-hidden="true"></i>
+    <div class="flex-grow-1">
+        <div class="fw-bold mb-1">Attestati delle classi da controllare</div>
+        <ul class="mb-0 small ps-3">
+            <?php if ($att_vuoti): ?><li><strong><?php echo $att_vuoti; ?></strong> <?php echo $att_vuoti === 1 ? 'classe ha' : 'classi hanno'; ?> l'elenco degli studenti vuoto e l'attività finisce entro 7 giorni (o è già finita): senza nomi gli attestati non partono.</li><?php endif; ?>
+            <?php if ($att_presenza): ?><li><strong><?php echo $att_presenza; ?></strong> <?php echo $att_presenza === 1 ? 'classe è' : 'classi sono'; ?> senza presenza registrata ad attività conclusa.</li><?php endif; ?>
+            <?php if ($att_ritardo): ?><li><strong><?php echo $att_ritardo; ?></strong> <?php echo $att_ritardo === 1 ? 'invio di attestati è pronto ma non ancora partito' : 'invii di attestati sono pronti ma non ancora partiti'; ?>: controlla che il cron giornaliero sia attivo o invia a mano.</li><?php endif; ?>
+        </ul>
+    </div>
+    <a href="partecipanti.php?p_id=<?php echo $filtro_p; ?>" class="btn btn-sm btn-dark fw-bold">Studenti e attestati</a>
+</div>
+<?php endif; endif; ?>
+
 <!-- ── KPI ────────────────────────────────────────────────── -->
 <?php
 $kpi_defs = [
@@ -399,7 +435,7 @@ $kpi_defs = [
             </div>
         </div>
 
-        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous"></script>
         <script>
         (function(){
             var ctx = document.getElementById('chartStati');

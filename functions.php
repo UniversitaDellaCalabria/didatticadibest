@@ -2895,6 +2895,26 @@ if (!function_exists('dati_attestato')) {
     }
 }
 
+if (!function_exists('qr_html')) {
+    // QR disegnato nella pagina (SVG, libreria qrcode-generator): nessun servizio esterno riceve il contenuto.
+    // $stile imposta la larghezza (il QR è quadrato); lo script si aggiunge da solo una volta per pagina.
+    function qr_html(string $dati, string $stile = 'width:150px', string $alt = 'QR code', string $classi = ''): string {
+        static $script_inviato = false;
+        $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+        $out = '<div class="qr-locale ' . $h($classi) . '" data-qr="' . $h($dati) . '" role="img" aria-label="' . $h($alt) . '" style="aspect-ratio:1/1;' . $h($stile) . '"></div>';
+        if (!$script_inviato) {
+            $script_inviato = true;
+            $out .= '<style>.qr-locale svg{width:100%;height:100%;display:block}</style>'
+                  . '<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js" integrity="sha384-mZT2gIty7ZDdOGkxfP6joZcYdMW1Jvj9dRlfpTmaJAKKXTqzygtB22k7FLe+KZC1" crossorigin="anonymous"></script>'
+                  . '<script>(function(){function d(){document.querySelectorAll(".qr-locale[data-qr]").forEach(function(el){'
+                  . 'if(el.firstChild)return;if(typeof qrcode!=="function"){el.textContent="QR non disponibile";return;}'
+                  . 'var q=qrcode(0,"M");q.addData(el.dataset.qr);q.make();el.innerHTML=q.createSvgTag({cellSize:4,margin:2,scalable:true});});}'
+                  . 'if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",d);else d();})();</script>';
+        }
+        return $out;
+    }
+}
+
 if (!function_exists('slug_file')) {
     // Testo adatto a un nome di file: minuscole, senza accenti né apostrofi, parole separate da _
     function slug_file(string $s): string {
@@ -2961,6 +2981,11 @@ if (!function_exists('pagina_attestati')) {
             <button type="button" onclick="window.close()" class="btn btn-outline-secondary py-2 px-4 fw-bold fs-5">Chiudi</button>
         </div>
         <p class="text-muted mt-2 small mb-0"><i class="fa fa-info-circle me-1"></i> <strong>Stampa / PDF unico:</strong> seleziona <strong>Orizzontale</strong>, margini <strong>Nessuno</strong> e <strong>Grafica in background</strong>.<?php if ($n_att > 1): ?> <strong>Scarica ZIP:</strong> un PDF per studente (attestato_cognome_nome.pdf), comodo da inviare per email.<?php endif; ?></p>
+        <div id="attBarra" class="mx-auto mt-3" style="max-width: 520px; display: none;">
+            <div class="progress" style="height: 22px;" role="progressbar" aria-label="Preparazione dei PDF" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                <div class="progress-bar progress-bar-striped progress-bar-animated bg-success fw-bold" style="width: 0%;">0%</div>
+            </div>
+        </div>
         <p id="attAvanzamento" class="fw-semibold mt-2 mb-0" aria-live="polite"></p>
     </div>
     <?php foreach ($lista as $a): $url_ver = url_verifica_attestato($a['codice']); ?>
@@ -3012,7 +3037,7 @@ if (!function_exists('pagina_attestati')) {
     </div>
     <?php endforeach; ?>
     <!-- QR generati nella pagina: nessun servizio esterno riceve l'indirizzo di verifica -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js" integrity="sha384-mZT2gIty7ZDdOGkxfP6joZcYdMW1Jvj9dRlfpTmaJAKKXTqzygtB22k7FLe+KZC1" crossorigin="anonymous"></script>
     <script>
     document.querySelectorAll('.cert-qr').forEach(function (el) {
         if (typeof qrcode !== 'function') { el.textContent = 'QR non disponibile: usa il codice'; return; }
@@ -3025,8 +3050,24 @@ if (!function_exists('pagina_attestati')) {
     (function () {
         var btn = document.getElementById('btnScaricaAtt'), stato = document.getElementById('attAvanzamento');
         if (!btn) return;
+        var barra = document.getElementById('attBarra'), pb = barra.querySelector('.progress'), pbi = barra.querySelector('.progress-bar');
+        var percentuale = function (p, finito) {
+            barra.style.display = '';
+            pbi.style.width = p + '%'; pbi.textContent = p + '%'; pb.setAttribute('aria-valuenow', p);
+            pbi.classList.toggle('progress-bar-animated', !finito);
+        };
+        // Impronte SRI: il browser rifiuta le librerie se il CDN le servisse modificate
+        var sri = {
+            'html2canvas/1.4.1/html2canvas.min.js': 'sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H',
+            'jspdf/2.5.1/jspdf.umd.min.js': 'sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk',
+            'jszip/3.10.1/jszip.min.js': 'sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG'
+        };
         var carica = function (src) {
-            return new Promise(function (ok, ko) { var s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = ko; document.head.appendChild(s); });
+            return new Promise(function (ok, ko) {
+                var s = document.createElement('script'); s.src = src; s.crossOrigin = 'anonymous';
+                var chiave = src.split('/ajax/libs/')[1]; if (sri[chiave]) s.integrity = sri[chiave];
+                s.onload = ok; s.onerror = ko; document.head.appendChild(s);
+            });
         };
         var salva = function (blob, nome) {
             var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nome;
@@ -3037,7 +3078,7 @@ if (!function_exists('pagina_attestati')) {
             var fogli = Array.prototype.slice.call(document.querySelectorAll('.cert-container'));
             var testo = btn.innerHTML; btn.disabled = true;
             try {
-                stato.textContent = 'Preparazione in corso…';
+                stato.textContent = 'Preparazione in corso…'; percentuale(0);
                 var lib = 'https://cdnjs.cloudflare.com/ajax/libs/';
                 await carica(lib + 'html2canvas/1.4.1/html2canvas.min.js');
                 await carica(lib + 'jspdf/2.5.1/jspdf.umd.min.js');
@@ -3054,14 +3095,17 @@ if (!function_exists('pagina_attestati')) {
                     usati[base] = (usati[base] || 0) + 1;
                     var nome = base + (usati[base] > 1 ? '_' + usati[base] : '') + '.pdf';
                     if (zip) zip.file(nome, pdf.output('blob')); else salva(pdf.output('blob'), nome);
+                    percentuale(Math.round((i + 1) / fogli.length * (zip ? 90 : 100)));
                 }
                 if (zip) {
                     stato.textContent = 'Creazione dello ZIP…';
-                    salva(await zip.generateAsync({ type: 'blob' }), btn.dataset.zip + '.zip');
+                    salva(await zip.generateAsync({ type: 'blob' }, function (m) { percentuale(90 + Math.round(m.percent / 10)); }), btn.dataset.zip + '.zip');
                 }
-                stato.textContent = 'Download completato.';
+                percentuale(100, true);
+                stato.textContent = 'Download completato: trovi il file nella cartella Download.';
             } catch (e) {
                 console.error(e);
+                barra.style.display = 'none';
                 stato.textContent = 'Download non riuscito: riprova, oppure usa "Stampa / PDF unico".';
             }
             btn.disabled = false; btn.innerHTML = testo;

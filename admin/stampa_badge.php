@@ -87,7 +87,7 @@ if (isset($_POST['avvia_stampa'])) {
                 $res_u = $conn->query("SELECT nome, cognome FROM utenti WHERE id IN ($ids_str) ORDER BY cognome ASC");
                 if ($res_u) {
                     while ($u = $res_u->fetch_assoc()) {
-                        $badges_to_print[] = ['nome' => $u['nome'], 'cognome' => $u['cognome'], 'ruolo' => 'STAFF / GESTORE', 'qr' => 'STAFF-' . substr(md5(uniqid()), 0, 6)];
+                        $badges_to_print[] = ['nome' => $u['nome'], 'cognome' => $u['cognome'], 'ruolo' => 'STAFF / GESTORE', 'qr' => 'STAFF-' . bin2hex(random_bytes(3))];
                     }
                 }
             }
@@ -100,7 +100,7 @@ if (isset($_POST['avvia_stampa'])) {
                 $ccognome = trim($_POST['custom_cognome'][$i] ?? '');
                 $cruolo = trim($_POST['custom_ruolo'][$i] ?? 'EXTRA');
                 if ($cnome || $ccognome) {
-                    $badges_to_print[] = ['nome' => $cnome, 'cognome' => $ccognome, 'ruolo' => strtoupper($cruolo), 'qr' => 'EXT-' . substr(md5(uniqid()), 0, 6)];
+                    $badges_to_print[] = ['nome' => $cnome, 'cognome' => $ccognome, 'ruolo' => strtoupper($cruolo), 'qr' => 'EXT-' . bin2hex(random_bytes(3))];
                 }
             }
         }
@@ -244,8 +244,6 @@ if (isset($_POST['avvia_stampa'])) {
             echo '<div class="a4-page">';
             
             foreach ($badges_to_print as $b) {
-                // API QR Code
-                $qr_url = "https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=" . urlencode($b['qr']);
                 ?>
                 <div class="badge-card">
                     <div class="badge-sidebar-color" style="background-color: <?php echo $col_primaria; ?>;"></div>
@@ -262,7 +260,7 @@ if (isset($_POST['avvia_stampa'])) {
                         </div>
                         <div class="badge-footer">
                             <div class="badge-code">ID:<br><strong><?php echo htmlspecialchars($b['qr']); ?></strong></div>
-                            <img src="<?php echo $qr_url; ?>" class="badge-qr" alt="QR Code">
+                            <?php echo qr_html($b['qr'], '', 'QR code del badge', 'badge-qr'); ?>
                         </div>
                     </div>
                 </div>

@@ -149,7 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['invia_prenotazione'])
         }
 
         $sigla = strtoupper(substr($current_filename, 0, 2));
-        $codice_p = $sigla . '-' . strtoupper(substr(md5(uniqid(rand(), true)), 0, 8));
+        $codice_p = $sigla . '-' . strtoupper(bin2hex(random_bytes(4)));
         
         $custom_data = [];
         foreach ($_POST as $k => $v) {
@@ -1499,7 +1499,7 @@ function evSetRating(btn) {
         if (!empty($t_c['data_turno']) && !turno_concluso($t_c)) { $data_iniziale_cal = $t_c['data_turno']; break; }
     }
     ?>
-    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js" integrity="sha384-5JIwZN3kuxX2zKsavvNmbZ3zhZZMUtu/eQiK3BbXukpSXp0Cd2ZP4OAYKx7mrPgI" crossorigin="anonymous"></script>
     <script>
       document.addEventListener('DOMContentLoaded', function() {
         var calendarEl = document.getElementById('fullCalendarDiv');

@@ -1,6 +1,5 @@
 <?php
 // Script per l'invio massivo dei solleciti (Cron Job o Trigger Manuale)
-if (session_status() === PHP_SESSION_NONE) { session_start(); }
 require_once __DIR__ . '/../config.php';
 if (!function_exists('flash_set')) { require_once __DIR__ . '/../functions.php'; }
 consenti_esecuzione_cron([1]); // solo crontab, chiave CRON_KEY o admin (pulsante in Sistema)

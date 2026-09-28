@@ -11,7 +11,61 @@ if (!$can_manage_iscritti) {
 function admin_redirect($url) { echo "<script>window.location.replace(" . json_encode($url) . ");</script>"; exit; }
 
 $pr_id = (int)($_GET['pr'] ?? $_POST['pr'] ?? 0);
-if (!$pr_id || !pren_autorizzata($conn, $pr_id, $filtro_p, $sql_filtro_eventi_rbac)) nega_accesso();
+
+// Senza ?pr: elenco delle iscrizioni di classe dell'area (progetti per le scuole ed eventi con attestati per la classe)
+if (!$pr_id) {
+    $col_area = colore_valido($page_cfg['colore_primario'] ?? '', '#0056B3');
+    $res_cl = $conn->query("SELECT pr.id, pr.nome, pr.cognome, pr.email, pr.stato, pr.presente, pr.attestato_inviato, pr.dati_custom_json,
+                                   t.nome_turno, t.data_turno, e.id AS evento_id, e.titolo AS evento_titolo, e.tipo, d.data_fine, d.attestati,
+                                   (SELECT COUNT(*) FROM partecipanti_prenotazione pp WHERE pp.prenotazione_id = pr.id) AS n_studenti
+                            FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id
+                            LEFT JOIN progetti_dettagli d ON d.evento_id = e.id
+                            WHERE e.pagina_id = $filtro_p AND e.archiviato = 0 $sql_filtro_eventi_rbac
+                              AND IFNULL(pr.stato, 'confermata') IN ('confermata', 'richiesta_conferma', 'da_approvare')
+                              AND ((e.tipo = 'progetto' AND IFNULL(d.per_scuole, 1) = 1) OR (IFNULL(e.tipo, 'evento') <> 'progetto' AND d.attestati = 1))
+                            ORDER BY e.titolo ASC, t.id ASC, pr.id ASC");
+    $classi = [];
+    while ($res_cl && $c = $res_cl->fetch_assoc()) $classi[] = $c;
+    ?>
+    <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
+        <h4 class="fw-bold text-dark mb-0"><i class="fa fa-graduation-cap me-2" style="color:<?php echo h($col_area); ?>" aria-hidden="true"></i>Studenti e attestati</h4>
+    </div>
+    <p class="text-secondary small mb-3">Le classi iscritte ai progetti per le scuole e agli eventi con attestati per gli studenti. Per ognuna: l'elenco degli studenti inserito dal docente, la presenza e l'invio degli attestati.</p>
+    <?php if (!$classi): ?>
+        <div class="card border-0 shadow-sm"><div class="card-body text-center text-muted py-5"><i class="fa fa-graduation-cap fs-1 d-block mb-2" style="opacity:.3" aria-hidden="true"></i>Nessuna classe iscritta in quest'area.</div></div>
+    <?php else: ?>
+        <div class="card border-0 shadow-sm"><div class="table-responsive"><table class="table align-middle mb-0">
+            <thead class="table-light small"><tr><th>Attività</th><th>Scuola / docente</th><th>Studenti</th><th>Stato</th><th></th></tr></thead>
+            <tbody>
+            <?php foreach ($classi as $c):
+                $max_c = max_partecipanti_prenotazione($c, null);
+                $scuola_c = nome_scuola_prenotazione($c);
+                $concluso = !empty($c['data_fine']) && $c['data_fine'] < date('Y-m-d');
+            ?>
+                <tr>
+                    <td><div class="fw-semibold"><?php echo h($c['evento_titolo']); ?></div>
+                        <?php if (!empty($c['nome_turno']) && !in_array($c['nome_turno'], ['Iscrizione scuole', 'Iscrizioni'], true)): ?><div class="small text-secondary"><?php echo h($c['nome_turno']); ?></div><?php endif; ?></td>
+                    <td><?php if ($scuola_c !== ''): ?><div class="fw-semibold"><?php echo h($scuola_c); ?></div><?php endif; ?>
+                        <div class="small text-secondary"><?php echo h($c['nome'] . ' ' . $c['cognome']); ?></div></td>
+                    <td><span class="badge <?php echo (int)$c['n_studenti'] === 0 ? 'bg-warning text-dark' : 'bg-light text-dark border'; ?>"><?php echo (int)$c['n_studenti']; ?> / <?php echo $max_c; ?></span></td>
+                    <td class="small">
+                        <?php if (!empty($c['attestato_inviato'])): ?><span class="badge bg-success">Attestati inviati</span>
+                        <?php elseif ((int)($c['attestati'] ?? 0) !== 1): ?><span class="badge bg-secondary">Senza attestati</span>
+                        <?php elseif ((int)$c['presente'] !== 1): ?><span class="badge bg-light text-dark border">Presenza da segnare</span>
+                        <?php elseif ((int)$c['n_studenti'] === 0): ?><span class="badge bg-warning text-dark">Elenco vuoto</span>
+                        <?php else: ?><span class="badge bg-info text-dark"><?php echo $concluso ? 'Pronti da inviare' : 'In attesa della fine'; ?></span><?php endif; ?>
+                    </td>
+                    <td class="text-end"><a href="partecipanti.php?p_id=<?php echo $filtro_p; ?>&pr=<?php echo (int)$c['id']; ?>" class="btn btn-sm btn-outline-primary fw-bold">Apri</a></td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table></div></div>
+    <?php endif;
+    require_once 'admin_footer.php';
+    exit;
+}
+
+if (!pren_autorizzata($conn, $pr_id, $filtro_p, $sql_filtro_eventi_rbac)) nega_accesso();
 $p = prenotazione_per_attestati($conn, $pr_id);
 $is_progetto = ($p['evento_tipo'] ?? '') === 'progetto';
 if (!$p || !prenotazione_di_classe($is_progetto, $p)) {

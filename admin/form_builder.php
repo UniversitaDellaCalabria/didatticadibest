@@ -499,7 +499,7 @@ $tipi_non_input = ['separator', 'hidden'];
 <?php endif; ?>
 
 <!-- SortableJS -->
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js" integrity="sha384-BSxuMLxX+FCbTdYec3TbXlnMGEEM2QXTFdtDaveen71o+jswm2J36+xFqp8k4VHM" crossorigin="anonymous"></script>
 <script>
 // ── Tipi di campo: visibilità campi correlati ─────────────────────────────────
 var TIPI_OPZIONI  = ['select','radio','checkboxes'];

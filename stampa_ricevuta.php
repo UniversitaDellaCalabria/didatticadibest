@@ -1,5 +1,4 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) { session_start(); }
 
 require_once 'config.php';
 require_once 'functions.php'; 
@@ -36,7 +35,6 @@ $proto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https://"
 $domain = $_SERVER['HTTP_HOST'] ?? 'localhost';
 $base_dir = rtrim(dirname($_SERVER['PHP_SELF']), '/\\');
 $checkin_url = $proto . $domain . $base_dir . "/checkin.php?code=" . urlencode($p['codice_prenotazione']);
-$qr_api_url = "https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=" . urlencode($checkin_url);
 ?>
 <!DOCTYPE html>
 <html lang="it">
@@ -95,7 +93,7 @@ $qr_api_url = "https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=" .
                 </div>
                 <div class="col-sm-4 text-center mt-3 mt-sm-0">
                     <!-- IL QR CODE -->
-                    <img src="<?php echo $qr_api_url; ?>" alt="QR Code" class="img-fluid border p-1 rounded shadow-sm" style="max-width: 150px;">
+                    <?php echo qr_html($checkin_url, 'width:150px;max-width:100%;margin:0 auto;background:#fff', 'QR code per il check-in', 'border p-1 rounded shadow-sm'); ?>
                     <div class="small text-muted mt-1 fw-bold">Scansiona all'ingresso</div>
                 </div>
             </div>
