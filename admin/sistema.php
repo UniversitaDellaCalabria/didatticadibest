@@ -320,7 +320,13 @@ $cfg_bk = [
     'Copia via email (BACKUP_EMAIL)' => env_valore('BACKUP_EMAIL') ?? '— non configurata',
     'Frequenza email' => env_valore('BACKUP_EMAIL_FREQUENZA') ?? 'settimanale (il lunedì)',
     'Password della copia cifrata' => env_valore('BACKUP_PASSWORD') !== null ? (strlen(env_valore('BACKUP_PASSWORD')) >= 12 ? 'impostata' : 'troppo corta (servono 12 caratteri)') : '— non impostata',
-    'ZIP cifrato AES-256 sul server' => (extension_loaded('zip') && defined('ZipArchive::EM_AES_256')) ? 'supportato' : 'NON supportato',
+    'Cifratura della copia via email' => (function () {
+        // Prova reale su un file temporaneo: la costante AES può esserci anche con una libreria zip senza cifratura
+        $tmp = tempnam(sys_get_temp_dir(), 'bk'); file_put_contents($tmp, 'prova');
+        $zip_ok = cifra_zip_aes($tmp, $tmp . '.zip', 'prova-cifratura-123', $err_z); @unlink($tmp . '.zip');
+        $ssl_ok = !$zip_ok && cifra_openssl_aes($tmp, $tmp . '.enc', 'prova-cifratura-123', $err_s); @unlink($tmp . '.enc'); @unlink($tmp);
+        return $zip_ok ? 'ZIP AES-256 (si apre con 7-Zip)' : ($ssl_ok ? 'OpenSSL AES-256 (lo ZIP cifrato non è disponibile su questo server)' : 'NON disponibile');
+    })(),
 ];
 $icona_bk = fn($ok) => $ok === false ? '<i class="fa fa-circle-xmark text-danger me-1"></i>' : ($ok ? '<i class="fa fa-circle-check text-success me-1"></i>' : '<i class="fa fa-circle-info text-secondary me-1"></i>');
 ?>

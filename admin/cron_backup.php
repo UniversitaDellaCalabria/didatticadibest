@@ -153,38 +153,49 @@ if (!$dest_email || $freq === 'no') {
     $nota(false, $stato_email['messaggio']);
 } else {
     $pwd = env_valore('BACKUP_PASSWORD');
-    $aes = extension_loaded('zip') && method_exists('ZipArchive', 'setEncryptionName') && defined('ZipArchive::EM_AES_256');
     if ($pwd === null || strlen($pwd) < 12) {
         // Il database contiene dati personali: mai in chiaro per email
         $stato_email['ok'] = false; $stato_email['messaggio'] = "Invio via email bloccato: manca BACKUP_PASSWORD (almeno 12 caratteri) nel file .env. Il database non viene mai inviato in chiaro.";
-    } elseif (!$aes) {
-        $stato_email['ok'] = false; $stato_email['messaggio'] = "Invio via email bloccato: il PHP del server non supporta gli ZIP cifrati AES-256";
     } else {
+        // 1° tentativo: ZIP cifrato AES-256 (si apre con 7-Zip). Alcuni PHP hanno la costante ma una libreria zip
+        // compilata senza cifratura: in quel caso 2° tentativo con OpenSSL AES-256, compatibile con "openssl enc".
+        $errore_zip = '';
         $file_cif = $backup_dir . "backup_DB_{$data}_cifrato.zip";
-        $zc = new ZipArchive();
-        $nome_int = basename($file_db);
-        $cif_ok = $zc->open($file_cif, ZipArchive::CREATE | ZipArchive::OVERWRITE) === true
-               && $zc->addFile($file_db, $nome_int) && $zc->setEncryptionName($nome_int, ZipArchive::EM_AES_256, $pwd) && $zc->close();
-        $dim = $cif_ok ? filesize($file_cif) : 0;
+        $metodo = cifra_zip_aes($file_db, $file_cif, $pwd, $errore_zip) ? 'zip' : null;
+        if ($metodo === null) {
+            @unlink($file_cif);
+            $file_cif = $file_db . '.enc';
+            $errore_ssl = '';
+            $metodo = cifra_openssl_aes($file_db, $file_cif, $pwd, $errore_ssl) ? 'openssl' : null;
+        }
+        $dim = $metodo ? filesize($file_cif) : 0;
         $max = 15 * 1048576;
-        if (!$cif_ok) {
-            $stato_email['ok'] = false; $stato_email['messaggio'] = "Invio via email: creazione dello ZIP cifrato non riuscita";
+        if ($metodo === null) {
+            $stato_email['ok'] = false;
+            $stato_email['messaggio'] = "Invio via email: cifratura non riuscita (ZIP: $errore_zip; OpenSSL: $errore_ssl)";
         } else {
             $sopra = $dim > $max;
+            $nome_f = basename($file_cif);
+            $istruzioni = $metodo === 'zip'
+                ? "<p>In allegato il database compresso, dentro uno <strong>ZIP cifrato AES-256</strong> (" . $mb($dim) . "). Si apre con <strong>7-Zip</strong> o WinRAR usando la password <code>BACKUP_PASSWORD</code> del file <code>.env</code> del server (non è scritta in questa email).</p>"
+                : "<p>In allegato il database compresso e <strong>cifrato AES-256 con OpenSSL</strong> (" . $mb($dim) . ", file <code>" . htmlspecialchars($nome_f) . "</code>). Per aprirlo, da <strong>Git Bash</strong> nella cartella del file:</p>"
+                  . "<p style='font-family:monospace;background:#f1f5f9;padding:10px;border-radius:6px;'>openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 -md sha256 -in " . htmlspecialchars($nome_f) . " -out " . htmlspecialchars(preg_replace('/\.enc$/', '', $nome_f)) . "</p>"
+                  . "<p>La password richiesta è <code>BACKUP_PASSWORD</code> del file <code>.env</code> del server (non è scritta in questa email). Si ottiene il file <code>.sql.gz</code>, che si apre con 7-Zip.</p>";
             $corpo = "<p>Backup del database del portale Eventi DiBEST del <strong>" . date('d/m/Y H:i') . "</strong>.</p>"
                    . ($sopra
                        ? "<p><strong>Il file cifrato pesa " . $mb($dim) . ", troppo per un'email</strong>: non è allegato. La copia completa è sul NAS" . ($stato_nas['ok'] ? " ({$stato_nas['cartella']})" : '') . ".</p>"
-                       : "<p>In allegato il database compresso, dentro uno <strong>ZIP cifrato AES-256</strong> (" . $mb($dim) . "). Si apre con <strong>7-Zip</strong> o WinRAR usando la password <code>BACKUP_PASSWORD</code> del file <code>.env</code> del server (non è scritta in questa email).</p>")
+                       : $istruzioni)
                    . "<p style='color:#64748b;font-size:13px;'>Esito del backup di oggi:<br>" . implode('<br>', array_map(fn($x) => ($x[0] === false ? '❌ ' : ($x[0] ? '✅ ' : 'ℹ️ ')) . htmlspecialchars($x[1]), $righe)) . "</p>"
                    . "<p style='color:#64748b;font-size:13px;'>Conserva questa email in una casella sicura: contiene dati personali (cifrati).</p>";
             $inviati = 0;
             foreach ($dest_email as $em) {
-                if (inviaNotificaEmail($em, "Backup database Eventi DiBEST - " . date('d/m/Y'), $corpo, $conn, null, $sopra ? [] : [['path' => $file_cif, 'nome' => basename($file_cif)]])) $inviati++;
+                if (inviaNotificaEmail($em, "Backup database Eventi DiBEST - " . date('d/m/Y'), $corpo, $conn, null, $sopra ? [] : [['path' => $file_cif, 'nome' => $nome_f]])) $inviati++;
             }
             @unlink($file_cif);
+            $tipo_cif = $metodo === 'zip' ? 'ZIP AES-256' : "OpenSSL AES-256 (lo ZIP cifrato non è disponibile: $errore_zip)";
             $stato_email['ok'] = $inviati === count($dest_email) && !$sopra;
             $stato_email['messaggio'] = $sopra ? "Email inviata senza allegato: il database cifrato pesa " . $mb($dim) . " (limite 15 MB)"
-                : ($inviati ? "Database cifrato (" . $mb($dim) . ") inviato a " . implode(', ', $dest_email) . ($inviati < count($dest_email) ? " (alcuni invii falliti: vedi il registro email)" : '') : "Invio email non riuscito: vedi il registro in Sistema Email");
+                : ($inviati ? "Database cifrato con $tipo_cif (" . $mb($dim) . ") inviato a " . implode(', ', $dest_email) . ($inviati < count($dest_email) ? " (alcuni invii falliti: vedi il registro email)" : '') : "Invio email non riuscito: vedi il registro in Sistema Email");
         }
     }
     $stato_email['data'] = date('Y-m-d H:i:s');
