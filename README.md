@@ -26,16 +26,19 @@ Portale open-source per la gestione eventi, prenotazioni e presenze del **Dipart
 - **Gestione iscritti**: azioni di massa (presenze, approvazione, promozione dalla lista d'attesa, annullamento), prenotazione manuale
 - **Duplicazione** di eventi e progetti (con turni, campi del form e sondaggi) e di singoli turni
 - **Aree senza file da generare**: ogni area è servita da `area.php` tramite `.htaccess`, gli slug che coincidono con file del sito vengono rifiutati
-- **Attestati** PDF generati automaticamente al completamento dell'evento, con **codice e QR di verifica** (pagina pubblica `verifica_attestato.php`)
-- **Attestati per gli studenti** nei progetti per le scuole e negli eventi con l'opzione "Attestati per gli studenti della classe" (es. OpenLab): il docente inserisce l'elenco dall'Area personale (scritto, incollato da Excel o dal modello .xlsx/.csv), la segreteria può correggerlo e togliere gli assenti; a progetto concluso il docente riceve per email gli attestati di tutta la classe; promemoria automatico se l'elenco è ancora vuoto a 7 giorni dalla fine; dopo 12 mesi dalla fine del progetto i nomi vengono ridotti alle iniziali (i codici restano verificabili)
+- **Attestati** PDF generati automaticamente al completamento dell'evento, con **codice e QR di verifica** (pagina pubblica `verifica_attestato.php`); il QR è disegnato nella pagina, senza servizi esterni; la frase dell'attestato è personalizzabile per area (es. "ha partecipato al progetto di Formazione Scuola Lavoro dal titolo:")
+- **Attestati per gli studenti** nei progetti per le scuole e negli eventi con l'opzione "Attestati per gli studenti della classe" (es. OpenLab): il docente inserisce l'elenco dall'Area personale (caselle separate Cognome e Nome, incolla da Excel o modello .xlsx/.csv), la segreteria può correggerlo e togliere gli assenti; a progetto concluso il docente riceve per email il link agli attestati di tutta la classe, da stampare in un unico PDF o da **scaricare in uno ZIP con un PDF per studente** (`attestato_cognome_nome.pdf`); promemoria automatico se l'elenco è ancora vuoto a 7 giorni dalla fine; dopo 12 mesi dalla fine del progetto i nomi vengono ridotti alle iniziali (i codici restano verificabili)
+- **Pannello organizzato per aree**: pagina **Aree** con le aree visibili a ciascun utente secondo le abilitazioni; il menu mostra le voci dell'area corrente e, per gli amministratori, la sezione Portale; nome dell'area sempre visibile nella barra in alto. Le **nuove aree** si creano da una pagina dedicata e nascono **nascoste al pubblico**, con l'eventuale voce di menu anch'essa nascosta, da pubblicare quando sono pronte
+- **Abilitazioni a colpo d'occhio**: in Utenti & Abilitazioni il riepilogo degli amministratori e di chi è abilitato su ogni area (area intera o singoli eventi, con permessi e notifiche)
+- **Barra del gestore** nelle pagine pubbliche, visibile solo a chi gestisce l'area o l'evento: link diretti a modifica evento/progetto, eventi, impostazioni e pannello
 - **Prenotazioni pubbliche protette**: per chi prenota senza accesso domanda di controllo anti-robot (CAPTCHA interno, senza servizi esterni), campo trappola e limite di prenotazioni per indirizzo IP
 - **Progetti con rimando**: un progetto può comparire nell'elenco (es. Formazione Scuola Lavoro) ma rimandare a un'altra pagina del portale o a un indirizzo esterno, con il pulsante "Vai a …" (es. OpenLab)
 - **Termine per annullare** impostabile per ogni turno ("Annullabile fino a"): dopo quella data l'utente non può più annullare né cambiare turno dall'Area personale
 - **Scheda di dettaglio di ogni evento** (`<area>.php?evento=ID`), raggiungibile da tutte le card e dalla ricerca (nelle card solo la **descrizione breve**, qui la completa con la locandina): turni in sequenza con posti liberi, prenotazione e aggiunta al calendario, luogo con link a Google Maps, referenti con email, telefono e pagina personale, link da condividere
 - **Sondaggi/questionari** collegabili agli eventi: 15 tipi di campo (rating, NPS, matrice, scelta, testo, data, email…), ordinamento drag & drop, logica condizionale ("mostra se…"), anteprima interattiva, statistiche NPS ed export XLS
-- **Dashboard amministrativa** con KPI, grafici (Chart.js), messaggi non letti
+- **Dashboard amministrativa** con KPI, grafici (Chart.js), messaggi non letti, scelta dell'area per chi ne gestisce più di una e avviso sugli attestati delle classi (elenchi vuoti, presenze mancanti, invii non partiti)
 - **Statistiche & report**: presenze effettive, tasso di presenza, annullate, riempimento, trend iscrizioni 30 giorni, presenti vs assenti per evento, vista Live/Storico, export CSV/Excel e stampa PDF
-- **Menu di navigazione** a 3 livelli con ordinamento drag & drop
+- **Menu di navigazione** a 3 livelli con ordinamento drag & drop e voci nascondibili
 - **Profilo utente**: pagina dedicata con dati SSO e modifica email personale
 - **Form builder** per campi prenotazione personalizzati per area/evento
 - **Email automatiche**: conferma, cancellazione, promemoria (via SMTP configurabile), con layout nel colore dell'area, registro degli invii ed email di prova dal pannello
@@ -47,7 +50,7 @@ Portale open-source per la gestione eventi, prenotazioni e presenze del **Dipart
 - **Ricerca testuale** iscritti per nome, cognome, email, codice prenotazione
 - **Audit log** di tutte le operazioni amministrative
 - **Rate limiting** anti-flood sugli endpoint pubblici
-- **PWA-ready** (manifest + service worker + offline fallback)
+- **PWA-ready** (manifest + service worker + offline fallback): le pagine arrivano sempre dal server, in cache solo le librerie statiche
 - **Configurazione portale** da pannello admin (logo, colori, SMTP, email template)
 
 ---
@@ -136,7 +139,7 @@ Gli script `cron_background.php`, `cron_attestati.php`, `admin/cron_reminders.ph
 
 ### Aggiornamenti del database
 
-Non servono script SQL manuali dopo un aggiornamento del codice. Al primo accesso la funzione `assicura_schema()` in `functions.php` crea le tabelle e le colonne mancanti e corregge i tipi di colonna dei database più vecchi, poi scrive un marcatore (es. `cache/schema_v16.ok`) e da quel momento non interroga più lo schema. Le pagine non modificano mai la struttura del database: ogni nuova colonna va aggiunta lì, cambiando il nome del marcatore.
+Non servono script SQL manuali dopo un aggiornamento del codice. Al primo accesso la funzione `assicura_schema()` in `functions.php` crea le tabelle e le colonne mancanti e corregge i tipi di colonna dei database più vecchi, poi scrive un marcatore (es. `cache/schema_v19.ok`) e da quel momento non interroga più lo schema. Le pagine non modificano mai la struttura del database: ogni nuova colonna va aggiunta lì, cambiando il nome del marcatore.
 
 ### 6. Configura il SSO (opzionale)
 
@@ -159,11 +162,14 @@ Il tipo viene riconosciuto tramite gli attributi `matricola_studente` e `matrico
 ```
 eventidibest-cms/
 ├── admin/              # Pannello di amministrazione
-│   ├── admin_header.php        # Autenticazione, RBAC, sidebar
-│   ├── dashboard.php           # Dashboard con KPI e grafici
+│   ├── admin_header.php        # Autenticazione, RBAC, menu dell'area corrente e barra superiore
+│   ├── dashboard.php           # Dashboard con KPI e grafici, scelta dell'area
+│   ├── aree.php                # Elenco delle aree (gestisci, visibile/nascosta, elimina)
+│   ├── nuova_area.php          # Creazione di un'area (nasce nascosta, voce di menu nascosta)
+│   ├── utenti.php              # Utenti, gruppi e abilitazioni, con riepilogo per area
 │   ├── eventi.php              # CRUD eventi, turni, sezioni e referenti, duplicazione
 │   ├── progetti.php            # Progetti: scheda completa, tipo (scuole o generico), edizioni, attestati
-│   ├── partecipanti.php        # Studenti di un'iscrizione e invio degli attestati al docente
+│   ├── partecipanti.php        # Studenti e attestati: elenco delle classi dell'area e dettaglio di ciascuna (invio al docente)
 │   ├── iscritti.php            # Gestione prenotazioni (ricerca, presenza, azioni di massa)
 │   ├── scanner.php             # Scanner check-in integrato con contatore in tempo reale
 │   ├── impostazioni_area.php   # Colori, layout e regole di ogni area
@@ -241,8 +247,12 @@ Il database e` composto da **23 tabelle**:
 - Ruolo richiesto per prenotare e appartenenza del turno all'area verificati anche dal server
 - Script cron eseguibili solo da riga di comando, con `CRON_KEY` o da un utente con il ruolo adatto
 - **Content Security Policy** (CSP) configurata in `config.php`
+- **Subresource Integrity**: tutte le librerie da CDN hanno l'impronta SHA-384 (`integrity`), anche quelle caricate su richiesta
+- **QR generati nella pagina** (ricevute, badge, QR d'aula, attestati): nessun codice o token di check-in inviato a servizi esterni
+- Codici di prenotazione e di attestato generati con `random_bytes` / `random_int`
 - **HTTP Security Headers**: HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy
-- Cookie di sessione: `Secure`, `HttpOnly`, `SameSite=Lax`
+- Cookie di sessione: `Secure`, `HttpOnly`, `SameSite=Lax`, sempre aperti da `config.php`
+- Dopo "Esci" nessun accesso automatico dalla sessione SSO di Ateneo finché l'utente non rientra con "Accedi"
 - Password SMTP cifrate nel database, mai esposte nel codice sorgente
 - `uploads/` e `.env` esclusi da git e protetti da `.htaccess`
 
