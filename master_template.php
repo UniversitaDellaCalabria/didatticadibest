@@ -455,6 +455,10 @@ if ($evento_richiesto > 0 && isset($eventi_by_id[$evento_richiesto])) {
 } elseif ($evento_richiesto > 0 && $messaggio_prenotazione === '') {
     $messaggio_prenotazione = "<div class='alert alert-light border fw-semibold text-center my-4'><i class='fa fa-circle-info me-2'></i>L'evento richiesto non è più disponibile: ecco il programma aggiornato.</div>";
 }
+// Progetto che rimanda a un'altra pagina (es. OpenLab): la scheda porta direttamente lì
+if ($progetto_sel && ($dest_sel = destinazione_progetto($conn, $dettagli_progetti[(int)$progetto_sel['id']] ?? null))) {
+    header('Location: ' . $dest_sel['url']); exit;
+}
 $GLOBALS['evento_scheda_id'] = $evento_sel ? (int)$evento_sel['id'] : 0;
 // Link alla scheda dell'evento (card dei layout)
 $url_scheda_evento = fn(array $ev) => htmlspecialchars($current_filename) . '.php?' . (($ev['tipo'] ?? '') === 'progetto' ? 'progetto=' : 'evento=') . (int)$ev['id'];
@@ -469,7 +473,12 @@ $info_progetto = function (array $ev) use ($conn, $dettagli_progetti, &$mie_iscr
     $max_ed = array_filter(array_column($ie['edizioni'], 'max'));
     // Con limiti diversi tra le edizioni: dal minimo più basso al massimo più alto (senza massimo se un'edizione non ne ha)
     $max_ed = ($max_ed && count($max_ed) === count($ie['edizioni'])) ? max($max_ed) : null;
-    return ['d' => $d, 't' => $ev['turni'][0] ?? null, 'edizioni' => $ie['edizioni'], 'liberi' => $ie['liberi'],
+    // Progetto con rimando: niente iscrizioni qui, lo stato dice dove prenotare (finché il progetto non è concluso)
+    $dest = destinazione_progetto($conn, $d);
+    if ($dest && $ie['stato']['codice'] !== 'concluso') {
+        $ie['stato'] = ['codice' => 'aperte', 'etichetta' => 'Prenotazioni su ' . $dest['nome'], 'bg' => '#E0F2FE', 'fg' => '#075985', 'ordine' => 1];
+    }
+    return ['dest' => $dest, 'd' => $d, 't' => $ev['turni'][0] ?? null, 'edizioni' => $ie['edizioni'], 'liberi' => $ie['liberi'],
             'prossima_apertura' => $ie['prossima_apertura'], 'limiti' => testo_limiti_partecipanti($min_ed, $max_ed), 'max_studenti' => $max_ed,
             // Senza date, la nota sul periodo (es. "novembre-dicembre 2026") vale più di "Date da definire"
             'stato' => $ie['stato'], 'periodo' => (empty($d['data_inizio']) && empty($d['data_fine']) && !empty($d['periodo_note'])) ? $d['periodo_note'] : periodo_progetto($d), 'mio' => $ie['mio'], 'mio_ed' => $mio_ed,
@@ -481,6 +490,7 @@ $info_progetto = function (array $ev) use ($conn, $dettagli_progetti, &$mie_iscr
 $pulsante_progetto = function (array $ev, array $ip, ?array $ed = null) use ($col_primaria, $utente_logged, $current_filename): string {
     $stile = 'background-color:' . $col_primaria . ';color:' . colore_testo_su($col_primaria) . ';border:none;';
     $url_scheda = htmlspecialchars($current_filename) . '.php?progetto=' . (int)$ev['id'];
+    if (!empty($ip['dest'])) return html_pulsante_destinazione($ip['dest'], $stile);
     $mio = $ed ? $ed['mio'] : $ip['mio'];
     if ($mio === 'richiesta_conferma') return '<a href="area_personale.php" class="btn btn-warning fw-bold text-dark w-100"><i class="fa fa-bell me-1" aria-hidden="true"></i>Posto offerto: conferma</a>';
     if ($mio === 'in_attesa') return '<a href="area_personale.php" class="btn btn-outline-warning fw-bold text-dark w-100"><i class="fa fa-hourglass-half me-1" aria-hidden="true"></i>Sei in lista d\'attesa</a>';
@@ -2278,7 +2288,9 @@ function evSetRating(btn) {
             <div class="d-flex flex-column gap-3" id="pjlLista">
                 <?php foreach ($lista_pj as $pos_l => ['ev' => $ev_l, 'ip' => $ip_l]):
                     $d_l = $ip_l['d']; $st_l = $ip_l['stato'];
-                    $url_scheda = htmlspecialchars($current_filename) . '.php?progetto=' . (int)$ev_l['id'];
+                    $dest_l = $ip_l['dest'] ?? null;
+                    $url_scheda = $dest_l ? htmlspecialchars($dest_l['url']) : htmlspecialchars($current_filename) . '.php?progetto=' . (int)$ev_l['id'];
+                    $target_l = ($dest_l && $dest_l['esterno']) ? ' target="_blank" rel="noopener"' : '';
                     $cerca_l = mb_strtolower($ev_l['titolo'] . ' ' . ($d_l['struttura'] ?? '') . ' ' . ($d_l['destinatari'] ?? '') . ' ' . ($ev_l['luogo'] ?? '') . ' '
                              . implode(' ', array_map(fn($r) => ($r['nome'] ?? ''), $d_l['referenti'] ?? [])) . ' ' . strip_tags($ev_l['descrizione'] ?? ''));
                     $estratto = trim(preg_replace('/\s+/', ' ', html_entity_decode(strip_tags(str_replace('<', ' <', $ev_l['descrizione'] ?? '')), ENT_QUOTES, 'UTF-8')));
@@ -2296,7 +2308,7 @@ function evSetRating(btn) {
                                 <span class="pjl-stato" style="background: <?php echo $st_l['bg']; ?>; color: <?php echo $st_l['fg']; ?>;"><?php echo htmlspecialchars($st_l['etichetta']); ?></span>
                                 <?php if (!empty($d_l['struttura'])): ?><span class="small text-secondary fw-semibold"><i class="fa fa-building-columns me-1" aria-hidden="true"></i><?php echo htmlspecialchars($d_l['struttura']); ?></span><?php endif; ?>
                             </div>
-                            <h3><a href="<?php echo $url_scheda; ?>"><?php echo htmlspecialchars($ev_l['titolo']); ?></a></h3>
+                            <h3><a href="<?php echo $url_scheda; ?>"<?php echo $target_l; ?>><?php echo htmlspecialchars($ev_l['titolo']); ?></a></h3>
                             <div class="d-flex flex-wrap gap-2">
                                 <span class="pjl-chip"><i class="fa fa-calendar-days" aria-hidden="true"></i><?php echo htmlspecialchars($ip_l['periodo']); ?></span>
                                 <?php if (count($ip_l['edizioni']) > 1): ?><span class="pjl-chip"><i class="fa fa-clone" aria-hidden="true"></i><?php echo count($ip_l['edizioni']); ?> edizioni</span><?php endif; ?>
@@ -2307,7 +2319,9 @@ function evSetRating(btn) {
                             <?php if ($estratto !== ''): ?><p class="pjl-estratto"><?php echo htmlspecialchars(mb_strimwidth($estratto, 0, 320, '…')); ?></p><?php endif; ?>
                         </div>
                         <div class="pjl-azioni">
-                            <?php if ($ip_l['t'] && in_array($st_l['codice'], ['aperte', 'attesa', 'arrivo'], true)):
+                            <?php if ($dest_l): ?>
+                                <div class="small fw-semibold" style="color: #075985;"><i class="fa fa-up-right-from-square me-1" aria-hidden="true"></i>Prenotazioni sulla pagina <?php echo htmlspecialchars($dest_l['nome']); ?></div>
+                            <?php elseif ($ip_l['t'] && in_array($st_l['codice'], ['aperte', 'attesa', 'arrivo'], true)):
                                 $n_ed_l = count($ip_l['edizioni']);
                                 if (!$ip_l['scuole']) $txt_disp = $ip_l['liberi'] > 0 ? $ip_l['liberi'] . ($ip_l['liberi'] === 1 ? ' posto libero' : ' posti liberi') : 'Posti esauriti' . ($ip_l['attesa'] ? ' · ' . $ip_l['attesa'] . ' in attesa' : '');
                                 elseif ($ip_l['liberi'] > 0) $txt_disp = $n_ed_l > 1 ? $ip_l['liberi'] . ' ' . ($ip_l['liberi'] === 1 ? 'edizione disponibile' : 'edizioni disponibili') . ' su ' . $n_ed_l : 'Posto disponibile';
@@ -2317,7 +2331,11 @@ function evSetRating(btn) {
                                     <i class="fa <?php echo $ip_l['liberi'] > 0 ? 'fa-circle-check' : 'fa-lock'; ?> me-1" aria-hidden="true"></i><?php echo htmlspecialchars($txt_disp); ?>
                                 </div>
                             <?php endif; ?>
-                            <a href="<?php echo $url_scheda; ?>" class="btn btn-outline-secondary fw-bold w-100">Dettagli<span class="visually-hidden"> di <?php echo htmlspecialchars($ev_l['titolo']); ?></span> <i class="fa fa-arrow-right ms-1" aria-hidden="true"></i></a>
+                            <?php if ($dest_l): ?>
+                                <a href="<?php echo $url_scheda; ?>"<?php echo $target_l; ?> class="btn btn-outline-secondary fw-bold w-100">Vai a <?php echo htmlspecialchars($dest_l['nome']); ?> <i class="fa fa-arrow-right ms-1" aria-hidden="true"></i></a>
+                            <?php else: ?>
+                                <a href="<?php echo $url_scheda; ?>" class="btn btn-outline-secondary fw-bold w-100">Dettagli<span class="visually-hidden"> di <?php echo htmlspecialchars($ev_l['titolo']); ?></span> <i class="fa fa-arrow-right ms-1" aria-hidden="true"></i></a>
+                            <?php endif; ?>
                         </div>
                     </article>
                 <?php endforeach; ?>

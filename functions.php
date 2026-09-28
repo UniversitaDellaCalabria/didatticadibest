@@ -2153,6 +2153,37 @@ if (!function_exists('get_dettagli_progetti')) {
     }
 }
 
+if (!function_exists('destinazione_progetto')) {
+    // Progetto che rimanda a un'altra pagina (es. OpenLab): la card resta nell'elenco dei progetti ma "Dettagli"
+    // porta lì. progetti_dettagli.destinazione = slug di un'area del portale oppure indirizzo http(s).
+    // Ritorna null se il progetto è normale, altrimenti ['url', 'nome', 'esterno'] (url relativo alla radice del sito).
+    function destinazione_progetto($conn, ?array $d): ?array {
+        $v = trim((string)($d['destinazione'] ?? ''));
+        if ($v === '') return null;
+        static $aree = null;
+        if ($aree === null) {
+            $aree = [];
+            $r = $conn->query("SELECT slug, titolo FROM pagine_eventi");
+            while ($r && $a = $r->fetch_assoc()) $aree[strtolower((string)$a['slug'])] = (string)$a['titolo'];
+        }
+        $slug = strtolower(preg_replace('/\.php$/i', '', $v));
+        if (isset($aree[$slug])) return ['url' => $slug . '.php', 'nome' => $aree[$slug] !== '' ? $aree[$slug] : $slug, 'esterno' => false];
+        if (preg_match('#^https?://#i', $v) && filter_var($v, FILTER_VALIDATE_URL)) {
+            return ['url' => $v, 'nome' => preg_replace('/^www\./i', '', (string)parse_url($v, PHP_URL_HOST)), 'esterno' => true];
+        }
+        return null; // area eliminata o indirizzo non valido: il progetto torna a comportarsi normalmente
+    }
+}
+
+if (!function_exists('html_pulsante_destinazione')) {
+    // Pulsante "Vai a OPENLAB" dei progetti con rimando ($stile = colori del pulsante dell'area)
+    function html_pulsante_destinazione(array $dest, string $stile): string {
+        $target = $dest['esterno'] ? ' target="_blank" rel="noopener"' : '';
+        return '<a href="' . htmlspecialchars($dest['url']) . '"' . $target . ' class="btn fw-bold w-100" style="' . htmlspecialchars($stile) . '">Vai a '
+             . htmlspecialchars($dest['nome']) . ' <i class="fa fa-arrow-right ms-1" aria-hidden="true"></i></a>';
+    }
+}
+
 if (!function_exists('periodo_progetto')) {
     // "Dal 13/10/2026 al 18/12/2026", "Dal 13/10/2026", "Entro il 18/12/2026" oppure "Date da definire"
     function periodo_progetto(?array $d): string {
@@ -2970,7 +3001,7 @@ if (!function_exists('puo_vedere_prenotazione')) {
 // richiesta: quando aggiungi qualcosa qui, cambia anche il nome del marcatore.
 if (!function_exists('assicura_schema')) {
     function assicura_schema($conn) {
-        $marker = __DIR__ . '/cache/schema_v17.ok';
+        $marker = __DIR__ . '/cache/schema_v18.ok';
         if (is_file($marker)) return;
 
         // 1. Tabelle di servizio (prima create dalle singole pagine a ogni richiesta)
@@ -3071,6 +3102,8 @@ if (!function_exists('assicura_schema')) {
                 // v11: progetto dedicato alle scuole (1 scuola per edizione) e attestati per gli studenti
                 'per_scuole'  => "ADD COLUMN per_scuole TINYINT(1) NOT NULL DEFAULT 1",
                 'attestati'   => "ADD COLUMN attestati TINYINT(1) NOT NULL DEFAULT 0",
+                // v18: progetto che rimanda a un'altra pagina (slug di un'area del portale oppure indirizzo http/https)
+                'destinazione' => "ADD COLUMN destinazione VARCHAR(300) DEFAULT NULL",
             ],
             // v12: nomi degli studenti ridotti alle iniziali dopo il periodo di conservazione (i codici restano verificabili)
             'partecipanti_prenotazione' => [

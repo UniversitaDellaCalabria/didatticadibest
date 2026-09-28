@@ -85,6 +85,19 @@ if (isset($_POST['salva_progetto'])) {
     ];
     $apertura = post_data_ora('data_apertura');
     $chiusura = post_data_ora('data_chiusura');
+    // Rimando a un'altra pagina: slug di un'area del portale oppure indirizzo http(s). Con il rimando niente edizioni/iscrizioni.
+    $destinazione = null;
+    $dest_tipo = (string)($_POST['dest_tipo'] ?? '');
+    if ($dest_tipo === 'url') {
+        $u = trim((string)($_POST['dest_url'] ?? ''));
+        if ($u !== '' && !preg_match('#^https?://#i', $u)) $u = 'https://' . $u;
+        if ($u === '' || !filter_var($u, FILTER_VALIDATE_URL)) { flash_set("Progetto non salvato: l'indirizzo della pagina di destinazione non è valido.", 'danger'); admin_redirect("progetti.php?p_id=$filtro_p&" . ((int)($_POST['evento_id'] ?? 0) ? "id=" . (int)$_POST['evento_id'] : "azione=nuovo")); }
+        $destinazione = mb_substr($u, 0, 300);
+    } elseif ($dest_tipo !== '') {
+        $r_sl = $conn->prepare("SELECT slug FROM pagine_eventi WHERE slug = ? LIMIT 1");
+        $r_sl->bind_param("s", $dest_tipo); $r_sl->execute();
+        $destinazione = ($row_sl = $r_sl->get_result()->fetch_assoc()) ? $row_sl['slug'] : null;
+    }
 
     $errori = [];
     // Con più edizioni i campi generali sono nascosti: contano quelli delle edizioni, controllati più sotto
@@ -147,7 +160,7 @@ if (isset($_POST['salva_progetto'])) {
     }
     if (!$edizioni) $edizioni[] = ['id' => 0, 'nome' => '', 'posti' => $per_scuole ? 1 : 30, 'apertura' => $apertura, 'chiusura' => $chiusura, 'min' => null, 'max' => null];
     $piu_edizioni = count($edizioni) > 1;
-    if ($piu_edizioni) {
+    if ($piu_edizioni && $destinazione === null) {
         foreach ($edizioni as $k => &$ed) {
             $nome_err = $ed['nome'] !== '' ? '"' . $ed['nome'] . '"' : 'edizione ' . ($k + 1);
             $ed['apertura'] = data_ora_da($ed['post']['ap']);
@@ -216,9 +229,13 @@ if (isset($_POST['salva_progetto'])) {
         $stmt_d->bind_param("issssssiiiissssssii", $ev_id, $d['struttura'], $d['data_inizio'], $d['data_fine'], $d['periodo_note'], $d['destinatari'], $d['modalita'],
                             $d['ore_totali'], $d['incontri_previsti'], $d['min_studenti'], $d['max_studenti'], $ref_json, $info_json, $mod_json, $obiettivi, $conoscenze, $competenze, $per_scuole, $attestati);
         if (!$stmt_d->execute()) throw new RuntimeException($conn->error);
+        $stmt_dest = $conn->prepare("UPDATE progetti_dettagli SET destinazione = ? WHERE evento_id = ?");
+        $stmt_dest->bind_param("si", $destinazione, $ev_id);
+        if (!$stmt_dest->execute()) throw new RuntimeException($conn->error);
 
         // Edizioni = turni di iscrizione (posti: 1 per le scuole), lista d'attesa se attivata, niente approvazione (ordine di arrivo).
         // Ogni turno ha la sua finestra e i suoi limiti (con una sola edizione: quelli generali, limiti NULL = del progetto).
+        if ($destinazione === null) {
         $turni_esistenti = [];
         $r_t = $conn->query("SELECT id FROM turni WHERE evento_id = $ev_id ORDER BY id ASC");
         while ($r_t && $rt = $r_t->fetch_assoc()) $turni_esistenti[] = (int)$rt['id'];
@@ -250,6 +267,7 @@ if (isset($_POST['salva_progetto'])) {
             }
             elimina_turno($conn, $t_via);
         }
+        } // fine edizioni (solo progetti senza rimando)
 
         assicura_campi_progetto($conn, $filtro_p);
         $conn->commit();
@@ -367,6 +385,7 @@ if ($mostra_form):
 .pj-ed-campi label { display:flex; flex-direction:column; gap:.15rem; margin:0; }
 .pj-form-una-ed .pj-ed-campi, .pj-form-una-ed .pj-solo-piu-ed, .pj-form-piu-ed .pj-solo-una-ed { display:none !important; }
 .pj-riga-2 { display:grid; grid-template-columns: 1fr auto; gap:.75rem; align-items:center; padding-right:46px; }
+.pj-form-dest .pj-no-dest { display:none !important; }
 @media (max-width: 767.98px) { .pj-riga, .pj-riga-info, .pj-riga-2, .pj-mod-riga, .pj-mod-riga2 { grid-template-columns: 1fr; padding-right:0; } .pj-riga-info { padding-bottom:.5rem; border-bottom:1px dashed #e2e8f0; } }
 </style>
 
@@ -514,7 +533,26 @@ if ($mostra_form):
         </div>
 
         <div class="col-xl-4">
-            <section class="pj-sez" style="border-left:4px solid <?php echo h($col_area); ?>;">
+            <?php
+            $dest_val = trim((string)($dp['destinazione'] ?? ''));
+            $aree_dest = [];
+            $r_ad = $conn->query("SELECT slug, titolo FROM pagine_eventi WHERE id <> " . (int)$filtro_p . " ORDER BY ordine ASC, titolo ASC");
+            while ($r_ad && $ad = $r_ad->fetch_assoc()) $aree_dest[$ad['slug']] = $ad['titolo'];
+            $dest_sel = $dest_val === '' ? '' : (isset($aree_dest[preg_replace('/\.php$/i', '', $dest_val)]) ? preg_replace('/\.php$/i', '', $dest_val) : 'url');
+            ?>
+            <section class="pj-sez" style="border-left:4px solid #0284c7;">
+                <h2><i class="fa fa-share-from-square me-1" aria-hidden="true"></i>Rimando a un'altra pagina</h2>
+                <label for="pjDestTipo" class="form-label small fw-bold">Il pulsante del progetto porta a</label>
+                <select name="dest_tipo" id="pjDestTipo" class="form-select form-select-sm">
+                    <option value="">Nessun rimando: scheda e iscrizioni del progetto</option>
+                    <?php foreach ($aree_dest as $slug_d => $tit_d): ?><option value="<?php echo h($slug_d); ?>" <?php echo $dest_sel === $slug_d ? 'selected' : ''; ?>>Pagina dell'area: <?php echo h($tit_d); ?></option><?php endforeach; ?>
+                    <option value="url" <?php echo $dest_sel === 'url' ? 'selected' : ''; ?>>Un altro indirizzo…</option>
+                </select>
+                <input type="url" name="dest_url" id="pjDestUrl" class="form-control form-control-sm mt-2 <?php echo $dest_sel === 'url' ? '' : 'd-none'; ?>" value="<?php echo $dest_sel === 'url' ? h($dest_val) : ''; ?>" placeholder="https://..." aria-label="Indirizzo della pagina di destinazione">
+                <p class="form-text mt-2 mb-0">La card resta nell'elenco dei progetti, ma il pulsante diventa <strong>"Vai a …"</strong> e porta alla pagina scelta (anche chi apre la scheda del progetto viene portato lì). Niente edizioni né iscrizioni qui: si prenota sulla pagina di destinazione.</p>
+            </section>
+
+            <section class="pj-sez pj-no-dest" style="border-left:4px solid <?php echo h($col_area); ?>;">
                 <h2><i class="fa fa-toggle-on me-1" aria-hidden="true"></i>Tipo di progetto</h2>
                 <?php $per_scuole_v = !isset($dp['per_scuole']) || (int)$dp['per_scuole'] === 1; ?>
                 <div class="form-check form-switch mb-1">
@@ -542,7 +580,7 @@ if ($mostra_form):
                 </div>
             </section>
 
-            <section class="pj-sez">
+            <section class="pj-sez pj-no-dest">
                 <h2><i class="fa fa-clone me-1" aria-hidden="true"></i>Edizioni e iscrizione</h2>
                 <p class="form-text mt-0 mb-2">Una riga per edizione (le "repliche"). <span class="pj-solo-scuole">Nei progetti per le scuole ogni edizione accoglie <strong>una scuola</strong>.</span><span class="pj-solo-generico">Indica i <strong>posti</strong> di ogni edizione.</span> Con più edizioni si sceglie quella preferita.</p>
                 <?php $lista_v = $id_modifica ? (int)($tu['abilita_lista_attesa'] ?? 1) === 1 : true; ?>
@@ -669,6 +707,29 @@ function aggiornaEdizioni() {
     function aggiorna() { form.classList.toggle('pj-form-scuole', sw.checked); form.classList.toggle('pj-form-generico', !sw.checked); aggiornaEdizioni(); }
     sw.addEventListener('change', aggiorna); aggiorna();
 })();
+// Rimando a un'altra pagina: niente tipo di progetto né edizioni; campo indirizzo solo per "Un altro indirizzo"
+(function () {
+    var sel = document.getElementById('pjDestTipo'), url = document.getElementById('pjDestUrl');
+    if (!sel) return;
+    var form = sel.closest('form');
+    function aggiorna() {
+        form.classList.toggle('pj-form-dest', sel.value !== '');
+        url.classList.toggle('d-none', sel.value !== 'url');
+        url.required = sel.value === 'url';
+        // Campi obbligatori delle edizioni nascoste: non devono bloccare l'invio
+        form.querySelectorAll('.pj-no-dest [required]').forEach(function (i) { i.dataset.eraObbl = '1'; i.required = false; });
+        if (sel.value === '') form.querySelectorAll('.pj-no-dest [data-era-obbl]').forEach(function (i) { i.required = true; delete i.dataset.eraObbl; });
+        if (sel.value === '' && typeof aggiornaEdizioni === 'function') aggiornaEdizioni();
+    }
+    sel.addEventListener('change', aggiorna); aggiorna();
+    // Con il rimando le sezioni nascoste non contano: il browser controlla i campi obbligatori al clic su "Salva",
+    // prima dell'invio, quindi si tolgono lì
+    form.querySelectorAll('button[type=submit]').forEach(function (b) {
+        b.addEventListener('click', function () {
+            if (sel.value !== '') form.querySelectorAll('.pj-no-dest [required]').forEach(function (i) { i.required = false; });
+        });
+    });
+})();
 // Riga vuota: testi cancellati, "Riceve le iscrizioni" spento
 function svuota(riga) {
     riga.querySelectorAll('.badge').forEach(function (b) { b.remove(); });
@@ -709,6 +770,7 @@ foreach ($progetti as $id => &$p) {
     $p['stato'] = $p['ied']['stato'];
     $p['per_scuole'] = (int)($p['dett']['per_scuole'] ?? 1) === 1;
     $p['attestati']  = (int)($p['dett']['attestati'] ?? 0) === 1;
+    $p['dest']       = destinazione_progetto($conn, $p['dett']);
 }
 unset($p);
 
@@ -811,7 +873,11 @@ $n_eventi_normali = (int)($conn->query("SELECT COUNT(*) AS n FROM eventi WHERE p
             </div>
 
             <div class="mt-3 pt-2 border-top small d-flex flex-column gap-1">
-                <?php foreach ($p['ied']['edizioni'] as $ed): $as = $ed['assegnata']; ?>
+                <?php if ($p['dest']): ?>
+                    <div><span class="badge" style="background:#E0F2FE;color:#075985;"><i class="fa fa-share-from-square me-1" aria-hidden="true"></i>Rimanda a <?php echo h($p['dest']['nome']); ?></span>
+                        <a href="<?php echo $p['dest']['esterno'] ? h($p['dest']['url']) : '../' . h($p['dest']['url']); ?>" target="_blank" rel="noopener" class="ms-1">apri la pagina</a></div>
+                <?php endif; ?>
+                <?php if (!$p['dest']) foreach ($p['ied']['edizioni'] as $ed): $as = $ed['assegnata']; ?>
                     <div class="d-flex flex-wrap align-items-center gap-2">
                         <?php if (!$una_ed): ?>
                             <span class="fw-bold text-dark" style="min-width:150px;"><?php echo h($ed['etichetta']); ?></span>
