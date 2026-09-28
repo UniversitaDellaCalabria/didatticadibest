@@ -210,6 +210,24 @@ if ($filtro_p > 0) {
     // Chi riceve le email sulle prenotazioni (null = mai configurato → tutti i gestori)
     $notifiche_attive = get_notifiche_gestori_attive($conn, $filtro_p);
 }
+
+// Riepilogo in cima: amministratori del portale e abilitati di ogni area (intera area o singoli eventi)
+$utenti_per_id = [];
+foreach ($utenti as $u_r) $utenti_per_id[(int)$u_r['id']] = $u_r;
+$amministratori = array_filter($utenti, fn($x) => (int)($x['ruolo_id'] ?? 5) === 1 || in_array('1', array_map('trim', explode(',', $x['ruoli_secondari'] ?? '')), true));
+$ids_amministratori = array_map('intval', array_column($amministratori, 'id'));
+$panoramica_aree = [];
+foreach ($pagine_disponibili as $pa) {
+    $ids_intera = ids_gestori_da_campi($pa['gestore_utente_id'] ?? 0, $pa['gestori_utenti_ids'] ?? '', $pa['permessi_gestori_json'] ?? '');
+    $ids_eventi = [];
+    $r_ge = $conn->query("SELECT gestori_utenti_ids, permessi_gestori_json FROM eventi WHERE pagina_id = " . (int)$pa['id']);
+    while ($r_ge && $ge = $r_ge->fetch_assoc()) {
+        foreach (ids_gestori_da_campi(0, $ge['gestori_utenti_ids'], $ge['permessi_gestori_json']) as $id_g) if (!in_array($id_g, $ids_intera, true)) $ids_eventi[$id_g] = true;
+    }
+    $panoramica_aree[] = ['a' => $pa, 'intera' => $ids_intera, 'eventi' => array_keys($ids_eventi)];
+}
+$nome_utente = fn(int $id) => isset($utenti_per_id[$id]) ? trim(mb_strtoupper($utenti_per_id[$id]['cognome'] . ' ' . $utenti_per_id[$id]['nome'])) : "Utente #$id (non più presente)";
+$etichette_perm = ['full' => 'Admin area', 'eventi' => 'Eventi', 'iscritti' => 'Iscritti', 'sondaggi' => 'Sondaggi', 'form' => 'Form'];
 ?>
 
 <!-- ============================================================
@@ -258,6 +276,77 @@ if ($filtro_p > 0) {
     <?php endif; ?>
 </div>
 
+<!-- Riepilogo: chi amministra il portale e chi è abilitato sull'area -->
+<style>
+.riep-card { border:1px solid #e2e8f0; border-radius:12px; background:#fff; box-shadow:0 1px 5px rgba(0,0,0,.05); height:100%; }
+.riep-card h6 { font-size:.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.06em; color:#64748b; margin:0; }
+.riep-riga { display:flex; align-items:flex-start; gap:10px; padding:8px 0; border-top:1px dashed #e2e8f0; }
+.riep-riga:first-child { border-top:0; }
+.riep-nome { font-weight:700; color:#0f172a; background:none; border:0; padding:0; text-align:left; }
+.riep-nome:hover { text-decoration:underline; }
+</style>
+<div class="row g-3 mb-3">
+    <div class="col-lg-4">
+        <div class="riep-card p-3">
+            <h6 class="mb-2"><i class="fa fa-crown me-1 text-danger" aria-hidden="true"></i>Amministratori del portale (<?php echo count($amministratori); ?>)</h6>
+            <?php foreach ($amministratori as $ad): ?>
+                <div class="riep-riga">
+                    <div style="min-width:0;">
+                        <button type="button" class="riep-nome" data-apri="<?php echo (int)$ad['id']; ?>"><?php echo htmlspecialchars($nome_utente((int)$ad['id'])); ?></button>
+                        <?php if ((int)$ad['id'] === (int)$_SESSION['utente_id']): ?><span class="badge bg-secondary-subtle text-secondary-emphasis ms-1">tu</span><?php endif; ?>
+                        <?php if ((int)($ad['ruolo_id'] ?? 5) !== 1): ?><span class="badge bg-light text-dark border ms-1" title="Amministratore come gruppo secondario">secondario</span><?php endif; ?>
+                        <div class="small text-muted text-truncate"><?php echo htmlspecialchars($ad['email'] ?? ''); ?></div>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+            <div class="small text-muted mt-2">Vedono e gestiscono tutte le aree.</div>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="riep-card p-3">
+            <h6 class="mb-2"><i class="fa fa-key me-1" style="color:#5b21b6;" aria-hidden="true"></i>Abilitati su <?php echo htmlspecialchars($page_cfg['titolo'] ?? ''); ?> (<?php echo count($mappa_gestori); ?>)</h6>
+            <?php if (!$mappa_gestori): ?>
+                <div class="text-muted small py-2">Nessuno: in quest'area lavorano solo gli amministratori. Per abilitare qualcuno apri la sua scheda qui sotto, sezione "Abilitazioni Area".</div>
+            <?php endif; ?>
+            <?php foreach ($mappa_gestori as $id_g => $g): $notif = $notifiche_attive === null || in_array((int)$id_g, (array)$notifiche_attive); ?>
+                <div class="riep-riga flex-wrap">
+                    <div style="min-width:200px;flex:1;">
+                        <button type="button" class="riep-nome" data-apri="<?php echo (int)$id_g; ?>"><?php echo htmlspecialchars($nome_utente((int)$id_g)); ?></button>
+                        <div class="small text-muted">
+                            <?php if ($g['ambito'] === 'tutti'): ?><i class="fa fa-folder-open me-1" aria-hidden="true"></i>Tutta l'area
+                            <?php else: ?><i class="fa fa-calendar-check me-1" aria-hidden="true"></i><?php echo count($g['eventi']) === 1 ? 'Solo l\'evento' : 'Solo ' . count($g['eventi']) . ' eventi'; ?>: <?php echo htmlspecialchars(implode(', ', $g['eventi'])); ?><?php endif; ?>
+                        </div>
+                    </div>
+                    <div class="d-flex flex-wrap gap-1 align-items-center">
+                        <?php foreach (array_unique((array)$g['permessi']) as $pm): ?><span class="perm-chip" style="<?php echo $pm === 'full' ? 'background:#fee2e2;color:#991b1b;' : 'background:#ede9fe;color:#5b21b6;'; ?>"><?php echo htmlspecialchars($etichette_perm[$pm] ?? $pm); ?></span><?php endforeach; ?>
+                        <span class="perm-chip" style="<?php echo $notif ? 'background:#dcfce7;color:#166534;' : 'background:#f1f5f9;color:#64748b;'; ?>" title="<?php echo $notif ? 'Riceve le email delle prenotazioni' : 'Non riceve le email delle prenotazioni'; ?>"><i class="fa <?php echo $notif ? 'fa-bell' : 'fa-bell-slash'; ?>" aria-hidden="true"></i></span>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+            <?php $altre = array_filter($panoramica_aree, fn($x) => (int)$x['a']['id'] !== (int)$filtro_p); if ($altre): ?>
+                <div class="mt-3 pt-2 border-top small">
+                    <div class="fw-bold text-secondary mb-1">Nelle altre aree</div>
+                    <?php foreach ($altre as $pa): $tot = count($pa['intera']) + count($pa['eventi']); ?>
+                        <div class="mb-1">
+                            <a href="utenti.php?p_id=<?php echo (int)$pa['a']['id']; ?>" class="fw-semibold text-decoration-none"><?php echo htmlspecialchars($pa['a']['titolo']); ?></a>:
+                            <?php if ($tot === 0): ?><span class="text-muted">nessun abilitato</span>
+                            <?php else:
+                                $nomi = array_merge(array_map(fn($i) => $nome_utente($i), $pa['intera']), array_map(fn($i) => $nome_utente($i) . ' (eventi)', $pa['eventi']));
+                                echo htmlspecialchars(implode(', ', $nomi));
+                            endif; ?>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+        </div>
+    </div>
+</div>
+
+<div class="form-check form-switch mb-2">
+    <input class="form-check-input" type="checkbox" id="soloAbilitati" onchange="filtraUtenti(document.getElementById('cercaUtente').value)">
+    <label class="form-check-label small fw-bold" for="soloAbilitati">Mostra solo amministratori e abilitati su quest'area</label>
+</div>
+
 <!-- Lista utenti -->
 <div id="listaUtenti">
 <?php foreach ($utenti as $u):
@@ -271,7 +360,7 @@ if ($filtro_p > 0) {
     // Dati abilitazioni per questo utente
     $mg = $mappa_gestori[$uid] ?? null;
 ?>
-<div class="usr-card" data-search="<?php echo htmlspecialchars(strtolower(($u['nome']??'').' '.($u['cognome']??'').' '.($u['email']??'').' '.($u['matricola_studente']??'').' '.($u['matricola_dipendente']??''))); ?>">
+<div class="usr-card" id="card<?php echo $uid; ?>" data-abil="<?php echo ($mg || in_array($uid, $ids_amministratori, true)) ? '1' : '0'; ?>" data-search="<?php echo htmlspecialchars(strtolower(($u['nome']??'').' '.($u['cognome']??'').' '.($u['email']??'').' '.($u['matricola_studente']??'').' '.($u['matricola_dipendente']??''))); ?>">
 
     <!-- HEADER (click to expand) -->
     <div class="usr-header" data-bs-toggle="collapse" data-bs-target="#usr<?php echo $uid; ?>" aria-expanded="false">
@@ -593,10 +682,22 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
+// Clic su un nome del riepilogo: apre la scheda dell'utente nell'elenco
+document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-apri]'); if (!b) return;
+    var card = document.getElementById('card' + b.dataset.apri);
+    if (!card) return;
+    card.style.display = '';
+    var corpo = document.getElementById('usr' + b.dataset.apri);
+    if (corpo && window.bootstrap) bootstrap.Collapse.getOrCreateInstance(corpo, { toggle: false }).show();
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
 function filtraUtenti(q) {
     q = q.toLowerCase().trim();
     document.querySelectorAll('#listaUtenti .usr-card').forEach(function(card) {
-        card.style.display = (!q || card.dataset.search.includes(q)) ? '' : 'none';
+        var solo = document.getElementById('soloAbilitati').checked;
+        card.style.display = ((!q || card.dataset.search.includes(q)) && (!solo || card.dataset.abil === '1')) ? '' : 'none';
     });
 }
 </script>
