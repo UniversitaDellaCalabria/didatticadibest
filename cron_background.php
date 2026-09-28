@@ -157,6 +157,14 @@ $conn->query("UPDATE partecipanti_prenotazione pp
 echo "- Elenchi studenti: $cancellati_pp nomi cancellati (iscrizioni annullate), " . $conn->affected_rows . " ridotti alle iniziali dopo $mesi_cons mesi.\n";
 
 // =========================================================================
+// TASK 1d: RIEPILOGO SETTIMANALE DELLE EMAIL AGLI AMMINISTRATORI (dal lunedì, una volta a settimana)
+// =========================================================================
+if (date('N') >= 1) {
+    $esito_rep = invia_report_email_settimanale($conn);
+    echo "- Riepilogo settimanale email: " . ($esito_rep === true ? "inviato agli amministratori" : $esito_rep) . ".\n";
+}
+
+// =========================================================================
 // TASK 2: PROMEMORIA PRE-EVENTO E ALTRE AUTOMAZIONI
 // =========================================================================
 $file_reminders = __DIR__ . '/admin/cron_reminders.php';

@@ -35,6 +35,15 @@ if (isset($_POST['invia_email_test'])) {
     admin_redirect("sistema.php?p_id=$filtro_p#log-email");
 }
 
+// 1c. RIEPILOGO SETTIMANALE DELLE EMAIL: invio immediato agli amministratori
+if (isset($_POST['invia_report_email'])) {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    $esito_rep = invia_report_email_settimanale($conn, true);
+    if ($esito_rep === true) flash_set("Riepilogo inviato agli amministratori: " . htmlspecialchars(implode(', ', email_amministratori($conn))) . ".");
+    else flash_set("Riepilogo non inviato: " . htmlspecialchars($esito_rep), 'danger');
+    admin_redirect("sistema.php?p_id=$filtro_p#log-email");
+}
+
 // 2. SALVATAGGIO CONFIGURAZIONI SMTP E TEMPLATE
 if (isset($_POST['save_system_settings'])) {
     csrf_verify($_POST['csrf_token'] ?? '');
@@ -263,6 +272,10 @@ if ($res_me && $me = $res_me->fetch_assoc()) { $email_admin = $me['email'] ?? ''
             <input type="email" name="email_test" class="form-control form-control-sm" style="min-width:240px" placeholder="destinatario@unical.it" value="<?php echo htmlspecialchars($email_admin); ?>" required>
             <button type="submit" name="invia_email_test" class="btn btn-outline-primary btn-sm fw-bold text-nowrap"><i class="fa fa-paper-plane me-1"></i> Invia email di prova</button>
         </form>
+        <form method="POST" class="m-0">
+            <?php csrf_field(); ?>
+            <button type="submit" name="invia_report_email" class="btn btn-outline-secondary btn-sm fw-bold text-nowrap" title="Ogni lunedì parte in automatico agli amministratori"><i class="fa fa-chart-simple me-1"></i> Invia ora il riepilogo settimanale</button>
+        </form>
     </div>
     <p class="small text-muted mb-3">
         Ultimi 7 giorni: <span class="badge bg-success"><?php echo $stat_email['ok']; ?> accettate</span>
@@ -294,6 +307,58 @@ if ($res_me && $me = $res_me->fetch_assoc()) { $email_admin = $me['email'] ?? ''
             </table>
         </div>
     <?php endif; ?>
+</div>
+
+<?php
+// ---------------------------------------------------------------------
+// BACKUP: stato dell'ultima esecuzione e configurazione (file .env del server)
+// ---------------------------------------------------------------------
+$bk = stato_backup();
+$cfg_bk = [
+    'NAS (BACKUP_NAS_PATH)' => env_valore('BACKUP_NAS_PATH') ?? '— non configurato',
+    'Conservazione sul NAS' => (int)(env_valore('BACKUP_NAS_GIORNI') ?? 30) . ' giorni',
+    'Copia via email (BACKUP_EMAIL)' => env_valore('BACKUP_EMAIL') ?? '— non configurata',
+    'Frequenza email' => env_valore('BACKUP_EMAIL_FREQUENZA') ?? 'settimanale (il lunedì)',
+    'Password della copia cifrata' => env_valore('BACKUP_PASSWORD') !== null ? (strlen(env_valore('BACKUP_PASSWORD')) >= 12 ? 'impostata' : 'troppo corta (servono 12 caratteri)') : '— non impostata',
+    'ZIP cifrato AES-256 sul server' => (extension_loaded('zip') && defined('ZipArchive::EM_AES_256')) ? 'supportato' : 'NON supportato',
+];
+$icona_bk = fn($ok) => $ok === false ? '<i class="fa fa-circle-xmark text-danger me-1"></i>' : ($ok ? '<i class="fa fa-circle-check text-success me-1"></i>' : '<i class="fa fa-circle-info text-secondary me-1"></i>');
+?>
+<div class="card shadow-sm border-0 p-4 mt-4" id="backup">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 border-bottom pb-3 mb-3">
+        <h5 class="fw-bold text-primary m-0"><i class="fa fa-database me-1"></i> Backup</h5>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="cron_backup.php" target="_blank" class="btn btn-outline-primary btn-sm fw-bold" data-confirm="Eseguire ora il backup completo? Può richiedere qualche minuto."><i class="fa fa-play me-1"></i> Esegui backup ora</a>
+            <a href="cron_backup.php?email=1" target="_blank" class="btn btn-outline-secondary btn-sm fw-bold" data-confirm="Eseguire il backup e inviare subito la copia cifrata del database via email?"><i class="fa fa-envelope me-1"></i> Backup + invio email</a>
+        </div>
+    </div>
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <?php if (!$bk): ?>
+                <div class="alert alert-warning small mb-0"><i class="fa fa-triangle-exclamation me-1"></i> Nessun backup registrato. Pianifica <code>admin/cron_backup.php</code> ogni notte (vedi README) oppure avvialo con il pulsante.</div>
+            <?php else: ?>
+                <div class="mb-2">
+                    <span class="badge <?php echo !empty($bk['ok']) ? 'bg-success' : 'bg-warning text-dark'; ?> fs-6"><?php echo !empty($bk['ok']) ? 'Ultimo backup riuscito' : 'Ultimo backup con problemi'; ?></span>
+                    <span class="small text-muted ms-2"><?php echo date('d/m/Y H:i', strtotime($bk['data'])); ?></span>
+                    <?php if (strtotime($bk['data']) < time() - 2 * 86400): ?><span class="badge bg-danger ms-1">più di 2 giorni fa: il cron è attivo?</span><?php endif; ?>
+                </div>
+                <ul class="list-unstyled small mb-0">
+                    <?php foreach (($bk['righe'] ?? []) as [$ok_r, $msg_r]): ?>
+                        <li class="mb-1"><?php echo $icona_bk($ok_r); ?><?php echo htmlspecialchars($msg_r); ?></li>
+                    <?php endforeach; ?>
+                    <li class="mb-1"><?php echo $icona_bk(!empty($bk['ultima_email']) ? true : null); ?>Ultima copia via email: <?php echo !empty($bk['ultima_email']) ? date('d/m/Y H:i', strtotime($bk['ultima_email'])) : 'mai'; ?></li>
+                </ul>
+            <?php endif; ?>
+        </div>
+        <div class="col-lg-5">
+            <table class="table table-sm small mb-2">
+                <?php foreach ($cfg_bk as $k_bk => $v_bk): ?>
+                    <tr><th class="fw-semibold text-secondary" style="width:48%;"><?php echo htmlspecialchars($k_bk); ?></th><td><?php echo htmlspecialchars($v_bk); ?></td></tr>
+                <?php endforeach; ?>
+            </table>
+            <div class="form-text">Questi valori si impostano nel file <code>.env</code> del server (non dal pannello, per sicurezza). Il database via email parte solo cifrato.</div>
+        </div>
+    </div>
 </div>
 
 <?php require_once 'admin_footer.php'; ?>

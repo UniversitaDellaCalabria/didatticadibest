@@ -130,6 +130,8 @@ La cartella `cache/` deve essere scrivibile da PHP: oltre alla cache della confi
 
 ### Operazioni pianificate (cron)
 
+**Backup**: `admin/cron_backup.php` esporta il database (`.sql.gz`) e i file del sito (`.zip`) in `backups/` (7 giorni), li copia nella cartella del NAS indicata da `BACKUP_NAS_PATH` (conservazione `BACKUP_NAS_GIORNI`) e invia una copia del solo database, cifrata AES-256 con `BACKUP_PASSWORD`, a `BACKUP_EMAIL` (`BACKUP_EMAIL_FREQUENZA`: settimanale, giornaliera, no). Esito e configurazione nel pannello Sistema; se qualcosa non va gli amministratori ricevono un avviso. Crontab consigliato: `30 2 * * * php /percorso/eventi/admin/cron_backup.php`. Ogni lunedì `cron_background.php` manda agli amministratori il riepilogo settimanale delle email (inviate, fallite, stato del backup).
+
 Gli script `cron_background.php`, `cron_attestati.php`, `admin/cron_reminders.php` e `admin/cron_backup.php` si avviano da riga di comando (es. `php cron_background.php`) oppure via URL con la chiave `CRON_KEY` del file `.env` (almeno 16 caratteri), es. `https://tuo-dominio/eventi/cron_background.php?key=LA_TUA_CHIAVE`. Senza chiave rispondono 403.
 
 ### Aggiornamenti del database

@@ -40,7 +40,9 @@ header("Content-Security-Policy: default-src 'self'; " .
     "connect-src 'self'; " .
     "frame-ancestors 'self';");
 
-$_env = parse_ini_file(__DIR__ . '/.env');
+// Le righe che iniziano con # non sono commenti validi nei file ini (servirebbe ;): si scartano prima della lettura,
+// altrimenti un # con parentesi o altri simboli fa fallire la lettura di tutto il file e il sito resta senza database
+$_env = @parse_ini_string(preg_replace('/^\s*#.*$/m', '', (string)@file_get_contents(__DIR__ . '/.env'))) ?: [];
 $db_host = $_env['DB_HOST'] ?? 'localhost';
 $db_user = $_env['DB_USER'] ?? '';
 $db_pass = $_env['DB_PASS'] ?? '';

@@ -279,7 +279,8 @@ if (!function_exists('smtp_comando')) {
 
 if (!function_exists('inviaNotificaEmail')) {
     // $colore: colore dell'area (es. colore_area_turno()); null = rosso istituzionale
-    function inviaNotificaEmail($to, $subject, $body_html, $conn, $colore = null) {
+    // $allegati = [['path' => file sul server, 'nome' => nome del file nell'email], ...] (facoltativi)
+    function inviaNotificaEmail($to, $subject, $body_html, $conn, $colore = null, array $allegati = []) {
         $GLOBALS['ultimo_errore_email'] = '';
         $to = trim((string)$to);
         if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
@@ -308,10 +309,25 @@ if (!function_exists('inviaNotificaEmail')) {
         $dominio_from = substr(strrchr($from_e, '@') ?: '@unical.it', 1);
         $headers  = "Date: " . date('r') . "\r\n";
         $headers .= "Message-ID: <" . bin2hex(random_bytes(12)) . "@" . $dominio_from . ">\r\n";
-        $headers .= "MIME-Version: 1.0\r\nContent-Type: text/html; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n";
         $from_hdr = "From: =?UTF-8?B?" . base64_encode($from_n) . "?= <$from_e>\r\n";
         // base64 a righe da 76 caratteri: niente righe oltre il limite SMTP (998) e niente troncamenti su righe che iniziano con "."
-        $body_b64 = chunk_split(base64_encode((string)$body_html), 76, "\r\n");
+        $html_b64 = chunk_split(base64_encode((string)$body_html), 76, "\r\n");
+        $allegati = array_values(array_filter($allegati, fn($a) => !empty($a['path']) && is_readable($a['path'])));
+        if (!$allegati) {
+            $headers .= "MIME-Version: 1.0\r\nContent-Type: text/html; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n";
+            $body_b64 = $html_b64;
+        } else {
+            // Messaggio multipart: testo HTML + allegati (nomi dei file ridotti a caratteri sicuri)
+            $confine = 'b_' . bin2hex(random_bytes(12));
+            $headers .= "MIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=\"$confine\"\r\n";
+            $body_b64 = "--$confine\r\nContent-Type: text/html; charset=utf-8\r\nContent-Transfer-Encoding: base64\r\n\r\n" . $html_b64;
+            foreach ($allegati as $a) {
+                $nome_a = preg_replace('/[^A-Za-z0-9._-]/', '_', (string)($a['nome'] ?? basename($a['path'])));
+                $body_b64 .= "--$confine\r\nContent-Type: application/octet-stream; name=\"$nome_a\"\r\nContent-Transfer-Encoding: base64\r\n"
+                           . "Content-Disposition: attachment; filename=\"$nome_a\"\r\n\r\n" . chunk_split(base64_encode((string)file_get_contents($a['path'])), 76, "\r\n");
+            }
+            $body_b64 .= "--$confine--\r\n";
+        }
         $subject_enc = "=?UTF-8?B?" . base64_encode((string)$subject) . "?=";
 
         $invia_con_mail = function (string $motivo) use ($to, $subject, $subject_enc, $headers, $from_hdr, $body_b64, $conn) {
@@ -932,13 +948,101 @@ if (!function_exists('csrf_verify')) {
     }
 }
 
+if (!function_exists('env_valore')) {
+    // Valore del file .env (config.php lo legge solo per il database e poi lo scarta): null se assente o vuoto.
+    // Lettura "grezza": "no"/"yes"/"true" restano testo e le password possono contenere ! ; = senza rompere il file.
+    function env_valore(string $chiave): ?string {
+        static $env = null;
+        if ($env === null) {
+            // Righe con # scartate: nei file ini il commento è ; (vedi config.php)
+            $env = @parse_ini_string(preg_replace('/^\s*#.*$/m', '', (string)@file_get_contents(__DIR__ . '/.env')), false, INI_SCANNER_RAW) ?: [];
+        }
+        $v = trim((string)($env[$chiave] ?? ''));
+        if (strlen($v) >= 2 && ($v[0] === '"' || $v[0] === "'") && substr($v, -1) === $v[0]) $v = substr($v, 1, -1); // valore tra virgolette
+        return $v === '' ? null : $v;
+    }
+}
+
+if (!function_exists('email_amministratori')) {
+    // Email degli amministratori globali (ruolo principale o secondario 1)
+    function email_amministratori($conn): array {
+        $out = [];
+        $r = $conn->query("SELECT DISTINCT email FROM utenti WHERE (ruolo_id = 1 OR FIND_IN_SET('1', ruoli_secondari) > 0) AND email IS NOT NULL AND email <> ''");
+        while ($r && $row = $r->fetch_assoc()) if (filter_var($row['email'], FILTER_VALIDATE_EMAIL)) $out[] = strtolower($row['email']);
+        return array_values(array_unique($out));
+    }
+}
+
+if (!function_exists('stato_backup')) {
+    // Esito dell'ultimo backup (scritto da admin/cron_backup.php), [] se non è mai stato eseguito
+    function stato_backup(): array {
+        $f = __DIR__ . '/cache/backup_stato.json';
+        return is_file($f) ? (json_decode((string)file_get_contents($f), true) ?: []) : [];
+    }
+}
+
+if (!function_exists('invia_report_email_settimanale')) {
+    // Riepilogo delle email di sistema degli ultimi 7 giorni agli amministratori: inviate, fallite (raggruppate per
+    // errore), invii ripiegati su mail() e stato del backup. Una volta a settimana (primo cron del lunedì o dopo);
+    // $forza = invio immediato dal pannello Sistema. Ritorna true o il motivo per cui non è partito.
+    function invia_report_email_settimanale($conn, bool $forza = false) {
+        $cartella = __DIR__ . '/cache';
+        $marker = $cartella . '/report_email_' . date('o-W') . '.ok';
+        if (!$forza && is_file($marker)) return "già inviato questa settimana";
+        $dest = email_amministratori($conn);
+        if (!$dest) return "nessun amministratore con email";
+        $tot = ['ok' => 0, 'ko' => 0, 'mail' => 0];
+        $r = @$conn->query("SELECT SUM(esito = 1) AS ok, SUM(esito = 0) AS ko, SUM(esito = 1 AND canale = 'mail()') AS via_mail FROM log_email WHERE created_at >= NOW() - INTERVAL 7 DAY");
+        if ($r && $row = $r->fetch_assoc()) $tot = ['ok' => (int)$row['ok'], 'ko' => (int)$row['ko'], 'mail' => (int)$row['via_mail']];
+        $errori = [];
+        $r = @$conn->query("SELECT errore, COUNT(*) AS n, MAX(created_at) AS ultimo, GROUP_CONCAT(DISTINCT destinatario ORDER BY destinatario SEPARATOR ', ') AS chi
+                            FROM log_email WHERE esito = 0 AND created_at >= NOW() - INTERVAL 7 DAY GROUP BY errore ORDER BY n DESC LIMIT 15");
+        while ($r && $row = $r->fetch_assoc()) $errori[] = $row;
+        $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+        $corpo = "<p>Riepilogo delle email inviate dal portale negli ultimi 7 giorni (fino al " . date('d/m/Y H:i') . ").</p>"
+               . "<table style='border-collapse:collapse;margin:10px 0;'>"
+               . "<tr><td style='padding:4px 14px 4px 0;'>✅ Accettate dal server</td><td><strong>{$tot['ok']}</strong></td></tr>"
+               . "<tr><td style='padding:4px 14px 4px 0;'>❌ Fallite</td><td><strong style='color:" . ($tot['ko'] ? '#b91c1c' : 'inherit') . ";'>{$tot['ko']}</strong></td></tr>"
+               . ($tot['mail'] ? "<tr><td style='padding:4px 14px 4px 0;'>⚠️ Inviate con il ripiego mail() (SMTP non raggiungibile)</td><td><strong>{$tot['mail']}</strong></td></tr>" : '')
+               . "</table>";
+        if ($errori) {
+            $corpo .= "<p><strong>Errori della settimana</strong> (raggruppati):</p><ul>";
+            foreach ($errori as $e) {
+                $chi = mb_strimwidth((string)$e['chi'], 0, 200, '…');
+                $corpo .= "<li><strong>{$e['n']}×</strong> " . $h($e['errore'] ?: 'errore sconosciuto') . "<br><small style='color:#64748b;'>ultimo il " . date('d/m H:i', strtotime($e['ultimo'])) . " · " . $h($chi) . "</small></li>";
+            }
+            $corpo .= "</ul><p style='font-size:13px;color:#475569;'>\"Destinatario rifiutato\" di solito indica un indirizzo sbagliato; errori di autenticazione o di connessione riguardano la configurazione SMTP.</p>";
+        } else {
+            $corpo .= "<p>Nessun invio fallito. 👍</p>";
+        }
+        $b = stato_backup();
+        if ($b) {
+            $corpo .= "<p><strong>Backup</strong>: ultimo il " . date('d/m/Y H:i', strtotime($b['data'])) . " — " . (!empty($b['ok']) ? "✅ completato" : "⚠️ con problemi") . ". "
+                    . "NAS: " . $h($b['nas']['messaggio'] ?? '-') . ". "
+                    . (!empty($b['ultima_email']) ? "Ultima copia via email: " . date('d/m/Y', strtotime($b['ultima_email'])) . "." : "Nessuna copia via email.") . "</p>";
+            if (strtotime($b['data']) < time() - 2 * 86400) $corpo .= "<p style='color:#b91c1c;'><strong>Attenzione: l'ultimo backup ha più di 2 giorni.</strong> Controlla che il cron di admin/cron_backup.php sia attivo.</p>";
+        } else {
+            $corpo .= "<p style='color:#b91c1c;'><strong>Backup: nessuna esecuzione registrata.</strong> Controlla che il cron di admin/cron_backup.php sia attivo.</p>";
+        }
+        $corpo .= "<p><a href='" . $h(url_base_sito() . '/admin/sistema.php#log-email') . "'>Apri il registro completo nel pannello</a></p>";
+        $oggetto = ($tot['ko'] || ($b && empty($b['ok'])) || !$b ? "⚠️ " : "✅ ") . "Riepilogo settimanale email Eventi DiBEST: {$tot['ok']} inviate, {$tot['ko']} fallite";
+        $inviati = 0;
+        foreach ($dest as $em) if (inviaNotificaEmail($em, $oggetto, $corpo, $conn)) $inviati++;
+        if (!$inviati) return "invio non riuscito: " . ($GLOBALS['ultimo_errore_email'] ?? 'errore sconosciuto');
+        if (!is_dir($cartella)) @mkdir($cartella, 0755, true);
+        @file_put_contents($marker, date('c'));
+        foreach (glob($cartella . '/report_email_*.ok') ?: [] as $f) if ($f !== $marker && filemtime($f) < time() - 60 * 86400) @unlink($f);
+        return true;
+    }
+}
+
 if (!function_exists('consenti_esecuzione_cron')) {
     // Gli script cron partono SOLO: da riga di comando (crontab con "php script.php"), con la chiave
     // CRON_KEY del file .env (crontab con wget/curl: script.php?key=...), oppure da un utente loggato
     // con uno dei ruoli ammessi (pulsanti del pannello admin). In tutti gli altri casi: 403.
     function consenti_esecuzione_cron(array $ruoli_ammessi = [1]): void {
         if (PHP_SAPI === 'cli') return;
-        $chiave = (string)($GLOBALS['_env']['CRON_KEY'] ?? '');
+        $chiave = (string)(env_valore('CRON_KEY') ?? '');
         if (strlen($chiave) >= 16 && hash_equals($chiave, (string)($_GET['key'] ?? ''))) return;
         if (session_status() === PHP_SESSION_NONE) @session_start();
         if (!empty($_SESSION['utente_id'])) {
