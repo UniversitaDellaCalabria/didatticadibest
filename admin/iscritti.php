@@ -828,7 +828,7 @@ $col_area_i = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
                         <div class="d-flex gap-1 justify-content-end flex-wrap">
                             <a href="../stampa_ricevuta.php?code=<?php echo urlencode($pr['codice_prenotazione']); ?>" target="_blank" class="act-btn" title="Ricevuta PDF"><i class="fa fa-file-pdf"></i></a>
                             <?php $prog_row = ($pr['evento_tipo'] ?? '') === 'progetto'; ?>
-                            <?php if ($prog_row && (int)($pr['progetto_attestati'] ?? 0) === 1 && (int)($pr['per_scuole'] ?? 1) === 1 && $st_val === 'confermata'): ?>
+                            <?php if (attestati_di_classe(['evento_tipo' => $pr['evento_tipo'] ?? '', 'attestati' => $pr['progetto_attestati'] ?? 0, 'per_scuole' => $pr['per_scuole'] ?? 1]) && $st_val === 'confermata'): ?>
                                 <a href="partecipanti.php?p_id=<?php echo $filtro_p; ?>&pr=<?php echo (int)$pr['id']; ?>" class="act-btn green" title="Studenti e attestati (<?php echo (int)$pr['n_studenti']; ?>)" aria-label="Studenti e attestati"><i class="fa fa-graduation-cap"></i><?php if ((int)$pr['n_studenti'] > 0): ?><span class="ms-1" style="font-size:.7rem;"><?php echo (int)$pr['n_studenti']; ?></span><?php endif; ?></a>
                             <?php elseif ($ev_chk_attivo === 1 && $is_presente && $st_val === 'confermata' && (!$prog_row || (int)($pr['progetto_attestati'] ?? 0) === 1)): ?>
                                 <a href="../stampa_attestato.php?code=<?php echo urlencode($pr['codice_prenotazione']); ?>" target="_blank" class="act-btn green" title="Attestato PDF"><i class="fa fa-graduation-cap"></i></a>

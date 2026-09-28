@@ -21,27 +21,110 @@ set_exception_handler(function (Throwable $e) {
     exit;
 });
 
-// Legge i campi turno dal POST: stringhe vuote -> NULL. Ritorna null se mancano sia nome che data.
-function leggi_turno_post(): ?array {
-    $v = fn($k) => (isset($_POST[$k]) && trim($_POST[$k]) !== '') ? trim($_POST[$k]) : null;
-    $t = [
-        'nome'  => $v('nome_turno'),
-        'data'  => $v('data_turno'),
-        'in'    => $v('orario_inizio'),
-        'fi'    => $v('orario_fine'),
-        'max'   => (int)($_POST['max_posti'] ?? 30),
-        'ap'    => $v('data_apertura'),
-        'ch'    => $v('data_chiusura'),
-        'wa'    => isset($_POST['abilita_lista_attesa']) ? 1 : 0,
-        'mp'    => isset($_POST['abilita_multi_posto']) ? 1 : 0,
-        'app'   => isset($_POST['richiede_approvazione']) ? 1 : 0,
-    ];
-    return ($t['nome'] === null && $t['data'] === null) ? null : $t;
+// Data e ora da <input type="datetime-local"> (o già in formato MySQL) -> 'Y-m-d H:i:s', altrimenti null
+function data_ora_turno($v): ?string {
+    $v = trim((string)$v);
+    if ($v === '') return null;
+    $d = DateTime::createFromFormat('Y-m-d\TH:i', $v) ?: DateTime::createFromFormat('Y-m-d H:i:s', $v) ?: DateTime::createFromFormat('Y-m-d H:i', $v);
+    return $d ? $d->format('Y-m-d H:i:s') : null;
 }
 
-function inserisci_turno($conn, int $ev_id, array $t): void {
-    $stmt = $conn->prepare("INSERT INTO turni (evento_id, nome_turno, data_turno, orario_inizio, orario_fine, max_posti, data_apertura, data_chiusura, abilita_lista_attesa, abilita_multi_posto, richiede_approvazione) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    $stmt->bind_param("issssissiii", $ev_id, $t['nome'], $t['data'], $t['in'], $t['fi'], $t['max'], $t['ap'], $t['ch'], $t['wa'], $t['mp'], $t['app']);
+// Turni dalla pagina dell'evento: una riga per turno (t_id = turno esistente, 0 = nuovo).
+// Righe nuove completamente vuote ignorate; ogni turno deve avere almeno il nome oppure la data.
+// $classe = evento con attestati per la classe: si leggono anche min/max studenti.
+function leggi_turni_post(bool $classe, array &$errori): array {
+    $turni = [];
+    $txt = fn($k, $i, $max = 150) => mb_substr(trim((string)($_POST[$k][$i] ?? '')), 0, $max);
+    foreach ((array)($_POST['t_id'] ?? []) as $i => $id) {
+        $t = [
+            'id'   => (int)$id,
+            'nome' => $txt('t_nome', $i) ?: null,
+            'data' => preg_match('/^\d{4}-\d{2}-\d{2}$/', $txt('t_data', $i)) ? $txt('t_data', $i) : null,
+            'in'   => preg_match('/^\d{2}:\d{2}/', $txt('t_in', $i)) ? substr($txt('t_in', $i), 0, 5) : null,
+            'fi'   => preg_match('/^\d{2}:\d{2}/', $txt('t_fi', $i)) ? substr($txt('t_fi', $i), 0, 5) : null,
+            'max'  => max(1, min(99999, (int)($_POST['t_posti'][$i] ?? 30))),
+            'ap'   => data_ora_turno($_POST['t_ap'][$i] ?? ''),
+            'ch'   => data_ora_turno($_POST['t_ch'][$i] ?? ''),
+            'ann'  => data_ora_turno($_POST['t_ann'][$i] ?? ''),
+            'min'  => $classe && preg_match('/^\d+$/', $txt('t_min', $i)) ? (int)$txt('t_min', $i) : null,
+            'maxs' => $classe && preg_match('/^\d+$/', $txt('t_maxs', $i)) ? (int)$txt('t_maxs', $i) : null,
+            'wa'   => ($_POST['t_wa'][$i] ?? '0') === '1' ? 1 : 0,
+            'mp'   => ($_POST['t_mp'][$i] ?? '0') === '1' ? 1 : 0,
+            'app'  => ($_POST['t_app'][$i] ?? '0') === '1' ? 1 : 0,
+        ];
+        $vuota = $t['nome'] === null && $t['data'] === null;
+        if ($vuota && $t['id'] === 0) continue;
+        $nome_err = $t['nome'] ?? ($t['data'] ? date('d/m/Y', strtotime($t['data'])) : 'turno ' . ($i + 1));
+        if ($vuota) $errori[] = "turno " . ($i + 1) . ": indica almeno il nome oppure la data";
+        if ($t['ap'] && $t['ch'] && $t['ch'] <= $t['ap']) $errori[] = "$nome_err: la chiusura delle prenotazioni è precedente all'apertura";
+        if ($t['in'] && $t['fi'] && $t['fi'] <= $t['in']) $errori[] = "$nome_err: l'orario di fine è precedente all'inizio";
+        if ($t['min'] && $t['maxs'] && $t['min'] > $t['maxs']) $errori[] = "$nome_err: il minimo di studenti supera il massimo";
+        $turni[] = $t;
+        if (count($turni) >= 100) break;
+    }
+    return $turni;
+}
+
+// Posti liberati (capienza aumentata): conferma chi è in lista d'attesa, in ordine di arrivo, e lo avvisa per email
+function promuovi_attesa_turno($conn, int $t_id): int {
+    $r_t = $conn->query("SELECT max_posti FROM turni WHERE id = $t_id");
+    $max_p = $r_t ? (int)($r_t->fetch_assoc()['max_posti'] ?? 0) : 0;
+    $posti_liberi = $max_p - getPostiOccupati($conn, $t_id);
+    $promossi = 0;
+    if ($posti_liberi <= 0) return 0;
+    $res_attesa = $conn->query("SELECT p.*, e.titolo as evento_titolo FROM prenotazioni p JOIN turni t ON p.turno_id = t.id JOIN eventi e ON t.evento_id = e.id WHERE p.turno_id = $t_id AND p.stato = 'in_attesa' ORDER BY p.data_prenotazione ASC, p.id ASC");
+    while ($res_attesa && $pren = $res_attesa->fetch_assoc()) {
+        $posti_richiesti = (int)$pren['num_posti'];
+        if ($posti_liberi < $posti_richiesti) break;
+        $conn->query("UPDATE prenotazioni SET stato = 'confermata' WHERE id = " . (int)$pren['id']);
+        decadi_attese_vincolate($conn, (int)$pren['id']);
+        $posti_liberi -= $posti_richiesti; $promossi++;
+        $link = url_base_sito() . "/stampa_ricevuta.php?code=" . urlencode($pren['codice_prenotazione']);
+        $body = "<p>Gentile " . htmlspecialchars($pren['nome']) . ", la tua prenotazione in lista d'attesa è stata <strong>confermata</strong> per l'evento <strong>" . htmlspecialchars($pren['evento_titolo']) . "</strong>.</p>"
+              . "<p><a href='" . htmlspecialchars($link) . "' style='background:#B80000; color:#fff; padding:10px; border-radius:6px; text-decoration:none;'>Scarica la ricevuta</a></p>";
+        inviaNotificaEmail($pren['email'], "Posto Confermato: " . $pren['evento_titolo'], $body, $conn, colore_area_turno($conn, $t_id));
+    }
+    return $promossi;
+}
+
+// Salva i turni dell'evento: aggiorna gli esistenti, crea i nuovi, elimina quelli tolti dalla pagina
+// (solo se senza prenotazioni attive). Ritorna quante persone sono state confermate dalla lista d'attesa.
+function salva_turni_evento($conn, int $ev_id, array $turni, array &$avvisi): int {
+    $esistenti = [];
+    $r = $conn->query("SELECT id FROM turni WHERE evento_id = $ev_id");
+    while ($r && $row = $r->fetch_assoc()) $esistenti[] = (int)$row['id'];
+    $up = $conn->prepare("UPDATE turni SET nome_turno=?, data_turno=?, orario_inizio=?, orario_fine=?, max_posti=?, data_apertura=?, data_chiusura=?, annullabile_fino=?, min_partecipanti=?, max_partecipanti=?, abilita_lista_attesa=?, abilita_multi_posto=?, richiede_approvazione=? WHERE id=? AND evento_id=?");
+    $in = $conn->prepare("INSERT INTO turni (evento_id, nome_turno, data_turno, orario_inizio, orario_fine, max_posti, data_apertura, data_chiusura, annullabile_fino, min_partecipanti, max_partecipanti, abilita_lista_attesa, abilita_multi_posto, richiede_approvazione) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    $tenuti = []; $promossi = 0;
+    foreach ($turni as $t) {
+        if ($t['id'] > 0 && in_array($t['id'], $esistenti, true)) {
+            $up->bind_param("ssssisssiiiiiii", $t['nome'], $t['data'], $t['in'], $t['fi'], $t['max'], $t['ap'], $t['ch'], $t['ann'], $t['min'], $t['maxs'], $t['wa'], $t['mp'], $t['app'], $t['id'], $ev_id);
+            $up->execute();
+            $tenuti[] = $t['id'];
+            $promossi += promuovi_attesa_turno($conn, $t['id']);
+        } else {
+            $in->bind_param("issssisssiiiii", $ev_id, $t['nome'], $t['data'], $t['in'], $t['fi'], $t['max'], $t['ap'], $t['ch'], $t['ann'], $t['min'], $t['maxs'], $t['wa'], $t['mp'], $t['app']);
+            $in->execute();
+            $tenuti[] = (int)$conn->insert_id;
+        }
+    }
+    foreach (array_diff($esistenti, $tenuti) as $t_via) {
+        $r_n = $conn->query("SELECT COUNT(*) AS n FROM prenotazioni WHERE turno_id = $t_via AND IFNULL(stato, 'confermata') NOT IN ('annullata', 'rifiutata', 'scaduta')");
+        if ($r_n && (int)$r_n->fetch_assoc()['n'] > 0) {
+            $r_nome = $conn->query("SELECT nome_turno, data_turno FROM turni WHERE id = $t_via");
+            $avvisi[] = "non ho eliminato il turno \"" . etichetta_turno($r_nome ? $r_nome->fetch_assoc() : []) . "\" perché ha prenotazioni attive: annullale prima da Iscritti";
+            continue;
+        }
+        elimina_turno($conn, $t_via);
+    }
+    return $promossi;
+}
+
+// Opzione "Attestati per gli studenti della classe": progetti_dettagli.attestati dell'evento
+function salva_attestati_classe_evento($conn, int $ev_id, int $attivi): void {
+    $stmt = $conn->prepare("INSERT INTO progetti_dettagli (evento_id, attestati, per_scuole, updated_at) VALUES (?, ?, 1, NOW())
+                            ON DUPLICATE KEY UPDATE attestati = VALUES(attestati), per_scuole = 1, updated_at = NOW()");
+    $stmt->bind_param("ii", $ev_id, $attivi);
     $stmt->execute();
 }
 
@@ -56,8 +139,8 @@ if (isset($_POST['duplica_turno'])) {
     $ev_id = (int)($r_ev->fetch_assoc()['evento_id'] ?? 0);
     $nuovo = duplica_turno($conn, $t_id, $ev_id, true);
     if (function_exists('registra_log_audit')) registra_log_audit($conn, "Duplicazione Turno", ["Turno origine" => $t_id, "Nuovo turno" => $nuovo]);
-    flash_set("Turno duplicato: modifica ora data e orari della copia.");
-    admin_redirect("eventi.php?p_id=$filtro_p&f_ev=$filtro_ev&apri=modTurno$nuovo");
+    flash_set("Turno duplicato: in fondo all'elenco dei turni trovi la copia, modifica data e orari e salva.");
+    admin_redirect("eventi.php?p_id=$filtro_p&id=$ev_id#turni");
 }
 
 if (isset($_POST['duplica_evento'])) {
@@ -116,6 +199,11 @@ if (isset($_POST['add_evento'])) {
     $req_pren = isset($_POST['richiede_prenotazione']) ? 1 : 0;
     $abilita_pres = isset($_POST['abilita_presenze']) ? 1 : 0;
     $ruolo_acc = (int)($_POST['ruolo_accesso_id'] ?? 0);
+    $att_classe = isset($_POST['attestati_classe']) ? 1 : 0;
+    if ($att_classe) $abilita_pres = 1; // gli attestati della classe richiedono il check-in
+    $errori_t = [];
+    $turni_post = leggi_turni_post((bool)$att_classe, $errori_t);
+    if ($errori_t) { flash_set("Evento non creato: " . htmlspecialchars(implode('; ', $errori_t)) . ".", 'danger'); admin_redirect("eventi.php?p_id=$filtro_p&azione=nuovo"); }
 
     $upload_dir = dirname(__DIR__) . '/uploads/';
     $locandina_path = "";
@@ -148,12 +236,14 @@ if (isset($_POST['add_evento'])) {
     if ($ref_ev) salva_referenti_evento($conn, $ev_id, $ref_ev);
     if ($ref_scartate) $avviso_notif .= " Email dei referenti non valide ignorate: " . implode(", ", $ref_scartate) . ".";
 
-    $primo_turno = leggi_turno_post();
-    if ($primo_turno) inserisci_turno($conn, $ev_id, $primo_turno);
-    
+    salva_attestati_classe_evento($conn, $ev_id, $att_classe);
+    if ($att_classe) assicura_campi_progetto($conn, $filtro_p); // campo "numero di partecipanti" del modulo
+    $avvisi_t = [];
+    salva_turni_evento($conn, $ev_id, $turni_post, $avvisi_t);
+
     if (function_exists('registra_log_audit')) registra_log_audit($conn, "Creazione Evento", ["Evento ID" => $ev_id]);
-    flash_set("Evento e turni creati!" . $avviso_notif, $avviso_notif ? 'warning' : 'success');
-    admin_redirect("eventi.php?p_id=$filtro_p");
+    flash_set("Evento creato con " . count($turni_post) . " " . (count($turni_post) === 1 ? 'turno' : 'turni') . "!" . $avviso_notif, $avviso_notif ? 'warning' : 'success');
+    admin_redirect("eventi.php?p_id=$filtro_p&f_ev=$ev_id");
 }
 
 if (isset($_POST['edit_evento'])) {
@@ -172,6 +262,11 @@ if (isset($_POST['edit_evento'])) {
     $req_pren = isset($_POST['richiede_prenotazione']) ? 1 : 0;
     $abilita_pres = isset($_POST['abilita_presenze']) ? 1 : 0;
     $ruolo_acc = (int)($_POST['ruolo_accesso_id'] ?? 0);
+    $att_classe = isset($_POST['attestati_classe']) ? 1 : 0;
+    if ($att_classe) $abilita_pres = 1; // gli attestati della classe richiedono il check-in
+    $errori_t = [];
+    $turni_post = leggi_turni_post((bool)$att_classe, $errori_t);
+    if ($errori_t) { flash_set("Evento non salvato: " . htmlspecialchars(implode('; ', $errori_t)) . ".", 'danger'); admin_redirect("eventi.php?p_id=$filtro_p&id=$ev_id"); }
 
     if (isset($_POST['elimina_locandina']) && $_POST['elimina_locandina'] == '1') $conn->query("UPDATE eventi SET locandina_path = NULL WHERE id = $ev_id");
     if (isset($_POST['elimina_pdf']) && $_POST['elimina_pdf'] == '1') $conn->query("UPDATE eventi SET allegato_pdf = NULL WHERE id = $ev_id");
@@ -213,70 +308,13 @@ if (isset($_POST['edit_evento'])) {
     $ref_ev = leggi_referenti_post($ref_scartate);
     salva_referenti_evento($conn, $ev_id, $ref_ev);
     if ($ref_scartate) $avviso_notif .= " Email dei referenti non valide ignorate: " . implode(", ", $ref_scartate) . ".";
-    if (function_exists('registra_log_audit')) registra_log_audit($conn, "Modifica Evento", ["Evento ID" => $ev_id]);
-    flash_set("Evento modificato!" . $avviso_notif, $avviso_notif ? 'warning' : 'success');
-    admin_redirect("eventi.php?p_id=$filtro_p&f_ev=$filtro_ev");
-}
-
-if (isset($_POST['add_turno'])) {
-    csrf_verify($_POST['csrf_token'] ?? '');
-    $ev_id = (int)$_POST['evento_id'];
-    if (!ev_autorizzato($conn, $ev_id, $filtro_p, $sql_filtro_eventi_rbac)) nega_accesso();
-    $nt = leggi_turno_post();
-    if (!$nt) {
-        flash_set("Inserisci almeno il nome del turno oppure la data.", "danger");
-        admin_redirect("eventi.php?p_id=$filtro_p&f_ev=$filtro_ev");
-    }
-    inserisci_turno($conn, $ev_id, $nt);
-    if (function_exists('registra_log_audit')) registra_log_audit($conn, "Aggiunta Turno", ["Evento ID" => $ev_id, "Turno" => etichetta_turno(['nome_turno' => $nt['nome'], 'data_turno' => $nt['data'], 'orario_inizio' => $nt['in'], 'orario_fine' => $nt['fi']]), "Max Posti" => $nt['max']]);
-    flash_set("Turno aggiunto!");
-    admin_redirect("eventi.php?p_id=$filtro_p&f_ev=$filtro_ev");
-}
-
-if (isset($_POST['edit_turno'])) {
-    csrf_verify($_POST['csrf_token'] ?? '');
-    $t_id = (int)$_POST['turno_id'];
-    if (!turno_autorizzato($conn, $t_id, $filtro_p, $sql_filtro_eventi_rbac)) nega_accesso();
-    $et = leggi_turno_post();
-    if (!$et) {
-        flash_set("Inserisci almeno il nome del turno oppure la data.", "danger");
-        admin_redirect("eventi.php?p_id=$filtro_p&f_ev=$filtro_ev");
-    }
-    $max_p = $et['max'];
-
-    $stmt_et = $conn->prepare("UPDATE turni SET nome_turno=?, data_turno=?, orario_inizio=?, orario_fine=?, max_posti=?, data_apertura=?, data_chiusura=?, abilita_lista_attesa=?, abilita_multi_posto=?, richiede_approvazione=? WHERE id=?");
-    $stmt_et->bind_param("ssssissiiii", $et['nome'], $et['data'], $et['in'], $et['fi'], $max_p, $et['ap'], $et['ch'], $et['wa'], $et['mp'], $et['app'], $t_id);
-    $stmt_et->execute();
-    
-    // LOGICA AUTOMATICA PROMOZIONE
-    $res_occ = $conn->query("SELECT COALESCE(SUM(num_posti), 0) as tot FROM prenotazioni WHERE turno_id = $t_id AND stato = 'confermata'");
-    $occupati = ($res_occ && $row_occ = $res_occ->fetch_assoc()) ? (int)$row_occ['tot'] : 0;
-    $posti_liberi = $max_p - $occupati;
-    $promossi = 0;
-    
-    if ($posti_liberi > 0) {
-        $res_attesa = $conn->query("SELECT p.*, e.titolo as evento_titolo, e.luogo FROM prenotazioni p JOIN turni t ON p.turno_id = t.id JOIN eventi e ON t.evento_id = e.id WHERE p.turno_id = $t_id AND p.stato = 'in_attesa' ORDER BY p.data_prenotazione ASC, p.id ASC");
-        if ($res_attesa && $res_attesa->num_rows > 0) {
-            if (file_exists(dirname(__DIR__) . '/functions.php')) require_once dirname(__DIR__) . '/functions.php';
-            while ($pren = $res_attesa->fetch_assoc()) {
-                $posti_richiesti = (int)$pren['num_posti'];
-                if ($posti_liberi >= $posti_richiesti) {
-                    $conn->query("UPDATE prenotazioni SET stato = 'confermata' WHERE id = {$pren['id']}");
-                    decadi_attese_vincolate($conn, (int)$pren['id']);
-                    $posti_liberi -= $posti_richiesti; $promossi++;
-                    if (function_exists('inviaNotificaEmail')) {
-                        $proto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https://" : "http://";
-                        $link = $proto . ($_SERVER['HTTP_HOST'] ?? 'localhost') . rtrim(dirname(dirname($_SERVER['PHP_SELF'])), '/\\') . "/stampa_ricevuta.php?code=" . urlencode($pren['codice_prenotazione']);
-                        $btn = "<p><a href='$link' style='background:#B80000; color:#fff; padding:10px; border-radius:6px; text-decoration:none;'>Scarica Ricevuta</a></p>";
-                        $body = "<p>Gentile " . htmlspecialchars($pren['nome']) . ", la tua prenotazione in lista d'attesa è stata CONFERMATA per l'evento " . htmlspecialchars($pren['evento_titolo']) . ".</p>" . $btn;
-                        inviaNotificaEmail($pren['email'], "Posto Confermato: " . $pren['evento_titolo'], $body, $conn, colore_area_turno($conn, $t_id));
-                    }
-                } else break;
-            }
-        }
-    }
-    if (function_exists('registra_log_audit')) registra_log_audit($conn, "Modifica Turno", ["Turno ID" => $t_id, "Nome" => $et['nome'], "Data" => $et['data'], "Max Posti" => $max_p]);
-    flash_set("Turno aggiornato!" . ($promossi > 0 ? " (Aggiunti $promossi utenti dalla Lista d'Attesa!)" : ""));
+    salva_attestati_classe_evento($conn, $ev_id, $att_classe);
+    if ($att_classe) assicura_campi_progetto($conn, $filtro_p); // campo "numero di partecipanti" del modulo
+    $avvisi_t = [];
+    $promossi = salva_turni_evento($conn, $ev_id, $turni_post, $avvisi_t);
+    if ($avvisi_t) $avviso_notif .= " Attenzione: " . htmlspecialchars(implode('; ', $avvisi_t)) . ".";
+    if (function_exists('registra_log_audit')) registra_log_audit($conn, "Modifica Evento", ["Evento ID" => $ev_id, "Turni" => count($turni_post)]);
+    flash_set("Evento modificato!" . ($promossi > 0 ? " Confermate $promossi prenotazioni dalla lista d'attesa." : "") . $avviso_notif, $avviso_notif ? 'warning' : 'success');
     admin_redirect("eventi.php?p_id=$filtro_p&f_ev=$filtro_ev");
 }
 
@@ -336,11 +374,13 @@ if ($mostra_form):
         $r_t = $conn->query("SELECT t.*, (SELECT COUNT(*) FROM prenotazioni p WHERE p.turno_id = t.id AND IFNULL(p.stato, 'confermata') NOT IN ('annullata', 'rifiutata', 'scaduta')) AS n_iscr
                              FROM turni t WHERE t.evento_id = $id_modifica ORDER BY (t.data_turno IS NULL), t.data_turno ASC, t.orario_inizio ASC, t.id ASC");
         while ($r_t && $rt = $r_t->fetch_assoc()) $turni_ev[] = $rt;
-        $referenti = get_dettagli_progetti($conn, [$id_modifica])[$id_modifica]['referenti'] ?? [];
+        $dett_f = get_dettagli_progetti($conn, [$id_modifica])[$id_modifica] ?? [];
+        $referenti = $dett_f['referenti'] ?? [];
     } else {
         if (!$puo_creare_ev) nega_accesso();
-        $ev = []; $referenti = [];
+        $ev = []; $referenti = []; $dett_f = [];
     }
+    $att_classe_v = (int)($dett_f['attestati'] ?? 0) === 1;
     if (!$referenti) $referenti = [['ruolo' => 'Referente', 'notifiche' => 1]];
     $col_f = colore_valido($page_cfg['colore_primario'] ?? '', '#0056B3');
     $txt_f = colore_testo_su($col_f);
@@ -357,7 +397,15 @@ if ($mostra_form):
 .pj-ref { padding-bottom:.6rem; margin-bottom:.6rem; border-bottom:1px dashed #e2e8f0; }
 .pj-ref .pj-riga { margin-bottom:.4rem; }
 .pj-riga-2 { display:grid; grid-template-columns: 1fr auto; gap:.75rem; align-items:center; padding-right:46px; }
-.ev-turno-riga { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem; padding:.45rem .6rem; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; font-size:.82rem; margin-bottom:.4rem; }
+.ev-t { padding:.7rem; margin-bottom:.6rem; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; display:grid; gap:.45rem; }
+.ev-t-passato { opacity:.6; }
+.ev-t-riga1 { display:grid; grid-template-columns: 1fr 150px 105px 105px 115px 38px; gap:.45rem; }
+.ev-t-riga2 { display:grid; grid-template-columns: repeat(3, 1fr) 110px 110px; gap:.45rem; }
+.ev-t-riga2 label { display:flex; flex-direction:column; gap:.15rem; margin:0; font-size:.72rem; font-weight:700; color:#475569; }
+.ev-t-riga3 { display:flex; flex-wrap:wrap; align-items:center; gap:.4rem 1.2rem; }
+form:not(.ev-form-classe) .ev-solo-classe { display:none !important; }
+form:not(.ev-form-classe) .ev-t-riga2 { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 991.98px) { .ev-t-riga1 { grid-template-columns: 1fr 1fr; } .ev-t-riga1 .pj-rimuovi { justify-self:end; } .ev-t-riga2, form:not(.ev-form-classe) .ev-t-riga2 { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 767.98px) { .pj-riga, .pj-riga-2 { grid-template-columns: 1fr; padding-right:0; } }
 </style>
 
@@ -431,45 +479,58 @@ if ($mostra_form):
                 <button type="button" class="btn btn-sm btn-outline-secondary fw-bold mb-2" data-pj-aggiungi="evReferenti"><i class="fa fa-plus me-1" aria-hidden="true"></i>Aggiungi persona</button>
             </section>
 
-            <?php if ($nuovo): ?>
-            <section class="pj-sez">
-                <h2><i class="fa fa-clock me-1" aria-hidden="true"></i>Primo turno <span class="fw-normal text-muted text-lowercase">(facoltativo)</span></h2>
-                <p class="form-text mt-0 mb-2">Il turno viene creato se compili il nome oppure la data. Gli altri turni li aggiungi dall'elenco degli eventi.</p>
-                <div class="row g-2">
-                    <div class="col-md-4"><label for="evTNome" class="form-label small fw-bold">Nome turno</label><input type="text" name="nome_turno" id="evTNome" class="form-control form-control-sm" placeholder="es. Gruppo 1" maxlength="150"></div>
-                    <div class="col-md-3"><label for="evTData" class="form-label small fw-bold">Data</label><input type="date" name="data_turno" id="evTData" class="form-control form-control-sm"></div>
-                    <div class="col-6 col-md-2"><label for="evTIn" class="form-label small fw-bold">Inizio</label><input type="time" name="orario_inizio" id="evTIn" class="form-control form-control-sm"></div>
-                    <div class="col-6 col-md-2"><label for="evTFi" class="form-label small fw-bold">Fine</label><input type="time" name="orario_fine" id="evTFi" class="form-control form-control-sm"></div>
-                    <div class="col-md-1"><label for="evTPosti" class="form-label small fw-bold">Posti</label><input type="number" name="max_posti" id="evTPosti" class="form-control form-control-sm" value="30" min="1"></div>
-                    <div class="col-md-6"><label for="evTAp" class="form-label small fw-bold">Apertura prenotazioni</label><input type="datetime-local" name="data_apertura" id="evTAp" class="form-control form-control-sm"></div>
-                    <div class="col-md-6"><label for="evTCh" class="form-label small fw-bold">Chiusura prenotazioni</label><input type="datetime-local" name="data_chiusura" id="evTCh" class="form-control form-control-sm"></div>
-                    <div class="col-12 d-flex flex-wrap gap-4 pt-1">
-                        <div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" name="abilita_lista_attesa" id="evTWa" value="1"><label class="form-check-label small fw-bold" for="evTWa">Lista d'attesa</label></div>
-                        <div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" name="abilita_multi_posto" id="evTMp" value="1"><label class="form-check-label small fw-bold" for="evTMp">Multi-posto</label></div>
-                        <div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" name="richiede_approvazione" id="evTApp" value="1"><label class="form-check-label small fw-bold" for="evTApp">Approvazione</label></div>
+            <section class="pj-sez" id="turni">
+                <h2><i class="fa fa-clock me-1" aria-hidden="true"></i>Turni e prenotazioni</h2>
+                <p class="form-text mt-0 mb-2">Una riga per turno. Serve almeno il nome oppure la data; gli orari sono facoltativi. <strong>Annullabile fino a</strong>: dopo questa data e ora chi ha prenotato non può più annullare né cambiare turno dall'Area personale (vuoto = sempre possibile).<span class="ev-solo-classe"> Con gli attestati per la classe ogni posto è una classe: indica anche quanti studenti può avere.</span></p>
+                <div id="evTurni">
+                    <?php
+                    $turni_righe = $turni_ev ?: [['id' => 0, 'max_posti' => 30, 'n_iscr' => 0]];
+                    $dtl = fn($x) => !empty($x) ? date('Y-m-d\TH:i', strtotime($x)) : '';
+                    foreach ($turni_righe as $t):
+                        $tid = (int)($t['id'] ?? 0); $n_i = (int)($t['n_iscr'] ?? 0);
+                        $flag = fn($k) => (int)($t[$k] ?? 0) === 1;
+                    ?>
+                    <div class="ev-t <?php echo $tid && turno_concluso($t) ? 'ev-t-passato' : ''; ?>">
+                        <input type="hidden" name="t_id[]" value="<?php echo $tid; ?>">
+                        <div class="ev-t-riga1">
+                            <input type="text" name="t_nome[]" class="form-control form-control-sm" value="<?php echo h($t['nome_turno'] ?? ''); ?>" placeholder="Nome turno (facoltativo)" aria-label="Nome del turno" maxlength="150">
+                            <input type="date" name="t_data[]" class="form-control form-control-sm" value="<?php echo h($t['data_turno'] ?? ''); ?>" aria-label="Data">
+                            <input type="time" name="t_in[]" class="form-control form-control-sm" value="<?php echo h(substr((string)($t['orario_inizio'] ?? ''), 0, 5)); ?>" aria-label="Ora di inizio" title="Inizio">
+                            <input type="time" name="t_fi[]" class="form-control form-control-sm" value="<?php echo h(substr((string)($t['orario_fine'] ?? ''), 0, 5)); ?>" aria-label="Ora di fine" title="Fine">
+                            <div class="input-group input-group-sm" title="Posti">
+                                <span class="input-group-text"><i class="fa fa-users" aria-hidden="true"></i></span>
+                                <input type="number" name="t_posti[]" class="form-control" value="<?php echo (int)($t['max_posti'] ?? 30); ?>" min="1" max="99999" aria-label="Posti">
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-danger pj-rimuovi" title="Rimuovi turno" aria-label="Rimuovi turno" <?php echo $n_i > 0 ? 'data-iscritti="' . $n_i . '"' : ''; ?>><i class="fa fa-times" aria-hidden="true"></i></button>
+                        </div>
+                        <div class="ev-t-riga2">
+                            <label>Apertura prenotazioni<input type="datetime-local" name="t_ap[]" class="form-control form-control-sm" value="<?php echo $dtl($t['data_apertura'] ?? ''); ?>"></label>
+                            <label>Chiusura prenotazioni<input type="datetime-local" name="t_ch[]" class="form-control form-control-sm" value="<?php echo $dtl($t['data_chiusura'] ?? ''); ?>"></label>
+                            <label>Annullabile fino a<input type="datetime-local" name="t_ann[]" class="form-control form-control-sm" value="<?php echo $dtl($t['annullabile_fino'] ?? ''); ?>"></label>
+                            <label class="ev-solo-classe">Studenti min<input type="number" name="t_min[]" class="form-control form-control-sm" min="1" value="<?php echo (int)($t['min_partecipanti'] ?? 0) ?: ''; ?>"></label>
+                            <label class="ev-solo-classe">Studenti max<input type="number" name="t_maxs[]" class="form-control form-control-sm" min="1" value="<?php echo (int)($t['max_partecipanti'] ?? 0) ?: ''; ?>" placeholder="es. 18"></label>
+                        </div>
+                        <div class="ev-t-riga3">
+                            <?php foreach (['t_wa' => ['abilita_lista_attesa', "Lista d'attesa"], 't_mp' => ['abilita_multi_posto', 'Multi-posto'], 't_app' => ['richiede_approvazione', 'Approvazione']] as $nome_f => [$col_f_db, $lbl_f]): ?>
+                                <span class="ev-flag-box">
+                                    <input type="hidden" name="<?php echo $nome_f; ?>[]" value="<?php echo $flag($col_f_db) ? '1' : '0'; ?>">
+                                    <label class="form-check form-switch m-0 small fw-bold"><input class="form-check-input ev-flag" type="checkbox" <?php echo $flag($col_f_db) ? 'checked' : ''; ?>> <?php echo $lbl_f; ?></label>
+                                </span>
+                            <?php endforeach; ?>
+                            <?php if ($tid > 0): ?>
+                                <span class="ms-auto d-flex gap-1 flex-wrap ev-t-esistente">
+                                    <span class="badge bg-light text-dark border align-self-center" title="Prenotazioni attive (anche in attesa)"><i class="fa fa-user-check me-1" aria-hidden="true"></i><?php echo $n_i; ?></span>
+                                    <?php if ($can_manage_iscritti): ?><a href="iscritti.php?p_id=<?php echo $filtro_p; ?>&f_turno=<?php echo $tid; ?>" class="btn btn-sm btn-outline-dark py-0 fw-bold"><i class="fa fa-users me-1" aria-hidden="true"></i>Iscritti</a><?php endif; ?>
+                                    <a href="stampa_qr_aula.php?t_id=<?php echo $tid; ?>&p_id=<?php echo $filtro_p; ?>" class="btn btn-sm btn-outline-success py-0 fw-bold"><i class="fa fa-qrcode me-1" aria-hidden="true"></i>QR aula</a>
+                                </span>
+                            <?php endif; ?>
+                        </div>
                     </div>
+                    <?php endforeach; ?>
                 </div>
+                <button type="button" class="btn btn-sm btn-outline-secondary fw-bold mb-2" data-pj-aggiungi="evTurni"><i class="fa fa-plus me-1" aria-hidden="true"></i>Aggiungi turno</button>
+                <span class="form-text ms-2">Il nuovo turno parte dagli stessi orari e posti dell'ultimo: cambia la data.</span>
             </section>
-            <?php else: ?>
-            <section class="pj-sez">
-                <h2><i class="fa fa-clock me-1" aria-hidden="true"></i>Turni</h2>
-                <?php if (!$turni_ev): ?>
-                    <p class="text-muted small mb-2">Nessun turno: aggiungilo dall'elenco degli eventi.</p>
-                <?php endif; ?>
-                <?php foreach ($turni_ev as $t): ?>
-                    <div class="ev-turno-riga <?php echo turno_concluso($t) ? 'opacity-50' : ''; ?>">
-                        <?php if (!empty($t['nome_turno'])): ?><span class="fw-bold text-dark"><?php echo h($t['nome_turno']); ?></span><?php endif; ?>
-                        <?php if (!empty($t['data_turno'])): ?><span class="fw-bold" style="color:<?php echo h($col_f); ?>;"><i class="fa fa-calendar me-1" aria-hidden="true"></i><?php echo date('d/m/Y', strtotime($t['data_turno'])); ?></span><?php endif; ?>
-                        <?php if (orario_turno($t) !== ''): ?><span><i class="fa fa-clock text-secondary me-1" aria-hidden="true"></i><?php echo h(orario_turno($t)); ?></span><?php endif; ?>
-                        <span class="badge bg-light text-dark border"><i class="fa fa-users me-1" aria-hidden="true"></i><?php echo (int)$t['n_iscr']; ?> / <?php echo (int)$t['max_posti']; ?></span>
-                        <?php if ($t['abilita_lista_attesa']): ?><span class="badge" style="background:#fef3c7;color:#92400e;">L. attesa</span><?php endif; ?>
-                        <?php if ($t['richiede_approvazione']): ?><span class="badge" style="background:#fee2e2;color:#991b1b;">Approvazione</span><?php endif; ?>
-                        <?php if ($can_manage_iscritti): ?><a href="iscritti.php?p_id=<?php echo $filtro_p; ?>&f_turno=<?php echo (int)$t['id']; ?>" class="btn btn-sm btn-outline-dark py-0 ms-auto fw-bold"><i class="fa fa-users me-1" aria-hidden="true"></i>Iscritti</a><?php endif; ?>
-                    </div>
-                <?php endforeach; ?>
-                <a href="eventi.php?p_id=<?php echo $filtro_p; ?>&f_ev=<?php echo $id_modifica; ?>" class="btn btn-sm btn-outline-secondary fw-bold my-2"><i class="fa fa-pen-to-square me-1" aria-hidden="true"></i>Aggiungi o modifica i turni</a>
-            </section>
-            <?php endif; ?>
         </div>
 
         <div class="col-xl-4">
@@ -490,7 +551,12 @@ if ($mostra_form):
                     <input class="form-check-input" type="checkbox" name="abilita_presenze" id="evPres" value="1" <?php echo $sw('abilita_presenze', 1); ?>>
                     <label class="form-check-label small fw-bold" for="evPres">Check-in con QR</label>
                 </div>
-                <p class="form-text mt-0 mb-0">Registra le presenze con lo scanner o il QR d'aula: serve per rilasciare gli attestati.</p>
+                <p class="form-text mt-0 mb-3">Registra le presenze con lo scanner o il QR d'aula: serve per rilasciare gli attestati.</p>
+                <div class="form-check form-switch mb-1">
+                    <input class="form-check-input" type="checkbox" name="attestati_classe" id="evAttClasse" value="1" <?php echo $att_classe_v ? 'checked' : ''; ?>>
+                    <label class="form-check-label small fw-bold" for="evAttClasse"><i class="fa fa-graduation-cap me-1" aria-hidden="true"></i>Attestati per gli studenti della classe</label>
+                </div>
+                <p class="form-text mt-0 mb-0">Per le prenotazioni di classi (es. scuole): chi prenota indica il numero di studenti e, dalla sua Area personale, inserisce i loro nomi. Dopo l'evento, se la presenza è registrata con il check-in, riceve per email gli attestati di tutti gli studenti, con codice di verifica. Il min/max di studenti si imposta in ogni turno.</p>
             </section>
 
             <section class="pj-sez">
@@ -540,30 +606,58 @@ if ($mostra_form):
 </form>
 
 <script>
-// Referenti: aggiungi / rimuovi righe; l'interruttore aggiorna il campo nascosto (le checkbox spente non vengono inviate)
+// Referenti e turni: aggiungi / rimuovi righe. Gli interruttori aggiornano un campo nascosto della stessa riga
+// (le checkbox spente non vengono inviate, e servono valori allineati riga per riga).
 document.addEventListener('click', function (e) {
     var add = e.target.closest('[data-pj-aggiungi]');
     if (add) {
-        var box = document.getElementById(add.dataset.pjAggiungi), nuova = box.lastElementChild.cloneNode(true);
-        svuota(nuova); box.appendChild(nuova);
-        nuova.querySelector('input:not([type=hidden])').focus();
+        var box = document.getElementById(add.dataset.pjAggiungi), ultima = box.lastElementChild, nuova = ultima.cloneNode(true);
+        if (nuova.classList.contains('ev-t')) {
+            // Turno nuovo: stessi orari, posti e opzioni dell'ultimo; data, nome e scadenze da indicare
+            nuova.querySelectorAll('.ev-t-esistente').forEach(function (x) { x.remove(); });
+            nuova.classList.remove('ev-t-passato');
+            nuova.querySelector('input[name="t_id[]"]').value = '0';
+            ['t_nome[]', 't_data[]', 't_ap[]', 't_ch[]', 't_ann[]'].forEach(function (n) { nuova.querySelector('input[name="' + n + '"]').value = ''; });
+            nuova.querySelector('.pj-rimuovi').removeAttribute('data-iscritti');
+        } else {
+            svuota(nuova);
+        }
+        box.appendChild(nuova);
+        (nuova.querySelector('input[type=date]') || nuova.querySelector('input:not([type=hidden])')).focus();
         return;
     }
     var rim = e.target.closest('.pj-rimuovi');
     if (rim) {
-        var riga = rim.closest('.pj-ref');
+        var riga = rim.closest('.pj-ref, .ev-t');
+        if (rim.dataset.iscritti && !confirm('Questo turno ha ' + rim.dataset.iscritti + ' prenotazioni attive: non verrà eliminato finché non le annulli da Iscritti. Toglierlo comunque dalla pagina?')) return;
         if (riga.parentElement.children.length > 1) riga.remove(); else svuota(riga);
     }
 });
 function svuota(riga) {
+    riga.querySelectorAll('.ev-t-esistente').forEach(function (x) { x.remove(); });
     riga.querySelectorAll('input').forEach(function (i) {
         if (i.type === 'checkbox') i.checked = false; else if (i.type === 'hidden') i.value = '0'; else i.value = '';
     });
+    var posti = riga.querySelector('input[name="t_posti[]"]'); if (posti) posti.value = '30';
 }
 document.addEventListener('change', function (e) {
-    if (!e.target.classList.contains('pj-notif')) return;
-    e.target.closest('.pj-riga-2').querySelector('input[name="ref_notifiche[]"]').value = e.target.checked ? '1' : '0';
+    if (e.target.classList.contains('pj-notif')) e.target.closest('.pj-riga-2').querySelector('input[name="ref_notifiche[]"]').value = e.target.checked ? '1' : '0';
+    if (e.target.classList.contains('ev-flag')) e.target.closest('.ev-flag-box').querySelector('input[type=hidden]').value = e.target.checked ? '1' : '0';
 });
+// Attestati per la classe: mostra min/max studenti nei turni e attiva il check-in (serve per gli attestati)
+(function () {
+    var sw = document.getElementById('evAttClasse'), pres = document.getElementById('evPres');
+    if (!sw) return;
+    var form = sw.closest('form');
+    function aggiorna() {
+        form.classList.toggle('ev-form-classe', sw.checked);
+        if (sw.checked) pres.checked = true;
+        pres.disabled = sw.checked;
+    }
+    sw.addEventListener('change', aggiorna); aggiorna();
+    // Un interruttore disattivato non viene inviato: prima dell'invio lo si riattiva
+    form.addEventListener('submit', function () { pres.disabled = false; });
+})();
 </script>
 <?php
     require_once 'admin_footer.php';
@@ -754,6 +848,9 @@ $col_area = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
                         <?php $notif_extra_ev = normalizza_lista_email($ev['email_notifiche_extra'] ?? ''); if ($notif_extra_ev): ?>
                             <span class="badge" style="background:#e0e7ff;color:#3730a3;font-size:.68rem;" title="<?php echo htmlspecialchars(implode(', ', $notif_extra_ev)); ?>"><i class="fa fa-envelope me-1" aria-hidden="true"></i>Notifiche in copia: <?php echo count($notif_extra_ev); ?></span>
                         <?php endif; ?>
+                        <?php if ((int)($schede_ev[(int)$ev['id']]['attestati'] ?? 0) === 1): ?>
+                            <span class="badge" style="background:#d1fae5;color:#065f46;font-size:.68rem;"><i class="fa fa-graduation-cap me-1" aria-hidden="true"></i>Attestati per la classe</span>
+                        <?php endif; ?>
                         <?php $ref_notif_ev = array_filter($schede_ev[(int)$ev['id']]['referenti'] ?? [], fn($r) => !empty($r['notifiche']) && !empty($r['email'])); if ($ref_notif_ev): ?>
                             <span class="badge" style="background:#dcfce7;color:#166534;font-size:.68rem;" title="<?php echo htmlspecialchars(implode(', ', array_column($ref_notif_ev, 'email'))); ?>"><i class="fa fa-bell me-1" aria-hidden="true"></i>Referenti avvisati: <?php echo count($ref_notif_ev); ?></span>
                         <?php endif; ?>
@@ -786,10 +883,11 @@ $col_area = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
                                 <?php if($t['abilita_lista_attesa']): ?><span class="badge" style="background:#fef3c7;color:#92400e;font-size:.68rem;">L. Attesa</span><?php endif; ?>
                                 <?php if($t['abilita_multi_posto']): ?><span class="badge" style="background:#e0f2fe;color:#0c4a6e;font-size:.68rem;">Multi-Posto</span><?php endif; ?>
                                 <?php if($t['richiede_approvazione']): ?><span class="badge" style="background:#fee2e2;color:#991b1b;font-size:.68rem;">Approvazione</span><?php endif; ?>
+                                <?php if(!empty($t['annullabile_fino'])): ?><span class="badge" style="background:#f1f5f9;color:#334155;font-size:.68rem;" title="Dopo questa data non si può più annullare né cambiare turno"><i class="fa fa-rotate-left me-1" aria-hidden="true"></i>Annullabile fino al <?php echo date('d/m H:i', strtotime($t['annullabile_fino'])); ?></span><?php endif; ?>
                             </div>
                             <div class="d-flex align-items-center gap-1 flex-shrink-0">
                                 <a href="stampa_qr_aula.php?t_id=<?php echo $t['id']; ?>&p_id=<?php echo $filtro_p; ?>" class="btn btn-sm btn-outline-success py-0 px-2 fw-bold" style="border-radius:6px;font-size:.75rem;" title="QR Aula"><i class="fa fa-qrcode me-1"></i>QR Aula</a>
-                                <button type="button" class="btn btn-sm btn-outline-primary py-0 px-2" style="border-radius:6px;" data-bs-toggle="modal" data-bs-target="#modTurno<?php echo $t['id']; ?>" title="Modifica turno"><i class="fa fa-edit"></i></button>
+                                <a href="eventi.php?p_id=<?php echo $filtro_p; ?>&id=<?php echo (int)$ev['id']; ?>#turni" class="btn btn-sm btn-outline-primary py-0 px-2" style="border-radius:6px;" title="Modifica turno" aria-label="Modifica turno"><i class="fa fa-edit" aria-hidden="true"></i></a>
 <form method="POST" class="d-inline m-0">                                    <?php csrf_field(); ?>                                    <input type="hidden" name="duplica_turno" value="<?php echo $t['id']; ?>">                                    <input type="hidden" name="f_ev" value="<?php echo $filtro_ev; ?>">                                    <button type="submit" class="btn btn-sm btn-outline-secondary py-0 px-2" style="border-radius:6px;" title="Duplica turno" aria-label="Duplica turno"><i class="fa fa-copy" aria-hidden="true"></i></button>                                </form>
                                 <form method="POST" class="d-inline m-0">
                                     <?php csrf_field(); ?>
@@ -804,59 +902,10 @@ $col_area = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
                     </div>
                     <?php endif; ?>
 
-                    <!-- ── AGGIUNGI TURNO (collassabile) ── -->
-                    <div>
-                        <button class="add-turno-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#addTurno<?php echo $ev['id']; ?>">
-                            <i class="fa fa-plus me-1"></i> Aggiungi Turno
-                        </button>
-                        <div class="collapse mt-2" id="addTurno<?php echo $ev['id']; ?>">
-                            <form method="POST" class="p-3 rounded" style="background:#f8fafc;border:1px solid #e2e8f0;">
-                                <?php csrf_field(); ?>
-                                <input type="hidden" name="evento_id" value="<?php echo $ev['id']; ?>">
-                                <input type="hidden" name="p_id" value="<?php echo $filtro_p; ?>">
-                                <input type="hidden" name="f_ev" value="<?php echo $filtro_ev; ?>">
-                                <div class="row g-2 align-items-end mb-2">
-                                    <div class="col-12 col-md-3">
-                                        <label class="form-label small fw-bold mb-1">Nome turno</label>
-                                        <input type="text" name="nome_turno" class="form-control form-control-sm" placeholder="Es. Gruppo 1" maxlength="150">
-                                    </div>
-                                    <div class="col-6 col-md-2">
-                                        <label class="form-label small fw-bold mb-1">Data</label>
-                                        <input type="date" name="data_turno" class="form-control form-control-sm">
-                                    </div>
-                                    <div class="col-3 col-md-1">
-                                        <label class="form-label small fw-bold mb-1">Inizio</label>
-                                        <input type="time" name="orario_inizio" class="form-control form-control-sm">
-                                    </div>
-                                    <div class="col-3 col-md-1">
-                                        <label class="form-label small fw-bold mb-1">Fine</label>
-                                        <input type="time" name="orario_fine" class="form-control form-control-sm">
-                                    </div>
-                                    <div class="col-4 col-md-1">
-                                        <label class="form-label small fw-bold mb-1">Posti</label>
-                                        <input type="number" name="max_posti" class="form-control form-control-sm" value="30" required>
-                                    </div>
-                                    <div class="col-4 col-md-2">
-                                        <label class="form-label small fw-bold mb-1">Ap. Pren.</label>
-                                        <input type="datetime-local" name="data_apertura" class="form-control form-control-sm">
-                                    </div>
-                                    <div class="col-4 col-md-2">
-                                        <label class="form-label small fw-bold mb-1">Ch. Pren.</label>
-                                        <input type="datetime-local" name="data_chiusura" class="form-control form-control-sm">
-                                    </div>
-                                    <div class="col-12"><small class="text-muted">Compila almeno il nome oppure la data. Orari facoltativi.</small></div>
-                                </div>
-                                <div class="d-flex align-items-center flex-wrap gap-3 justify-content-between">
-                                    <div class="d-flex gap-3 flex-wrap">
-                                        <div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" name="abilita_lista_attesa" id="waAdd<?php echo $ev['id']; ?>" value="1"><label class="form-check-label small fw-bold text-warning" for="waAdd<?php echo $ev['id']; ?>">Lista Attesa</label></div>
-                                        <div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" name="abilita_multi_posto" id="mpAdd<?php echo $ev['id']; ?>" value="1"><label class="form-check-label small fw-bold text-info" for="mpAdd<?php echo $ev['id']; ?>">Multi-Posto</label></div>
-                                        <div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" name="richiede_approvazione" id="apprAdd<?php echo $ev['id']; ?>" value="1"><label class="form-check-label small fw-bold text-danger" for="apprAdd<?php echo $ev['id']; ?>">Approvazione</label></div>
-                                    </div>
-                                    <button type="submit" name="add_turno" class="btn btn-success btn-sm fw-bold px-4" style="border-radius:7px;"><i class="fa fa-plus me-1"></i>Salva Turno</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
+                    <!-- ── AGGIUNGI / MODIFICA TURNI: nella pagina dell'evento ── -->
+                    <a href="eventi.php?p_id=<?php echo $filtro_p; ?>&id=<?php echo (int)$ev['id']; ?>#turni" class="add-turno-toggle d-block text-center text-decoration-none">
+                        <i class="fa fa-plus me-1" aria-hidden="true"></i> Aggiungi o modifica turni
+                    </a>
 
                 </div>
             </div>
@@ -866,56 +915,4 @@ $col_area = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
     </div>
 </div>
 
-<!-- Modali EDIT TURNO (la modifica dell'evento è in una pagina: eventi.php?id=...) -->
-<?php foreach($eventi as $ev): ?>
-    <?php foreach($ev['turni'] as $t): ?>
-    <div class="modal fade" id="modTurno<?php echo $t['id']; ?>" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <form method="POST">
-                    <?php csrf_field(); ?>
-                    <div class="modal-header py-2 bg-light">
-                        <h6 class="modal-title fw-bold text-primary"><i class="fa fa-clock me-1"></i> Modifica Turno</h6>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body text-start row g-2">
-                        <input type="hidden" name="turno_id" value="<?php echo $t['id']; ?>">
-                        <input type="hidden" name="p_id" value="<?php echo $filtro_p; ?>">
-                        <input type="hidden" name="f_ev" value="<?php echo $filtro_ev; ?>">
-                        
-                        <div class="col-12"><label class="small fw-bold">Nome Turno</label><input type="text" name="nome_turno" class="form-control form-control-sm" value="<?php echo htmlspecialchars($t['nome_turno'] ?? ''); ?>" placeholder="Es. Gruppo 1" maxlength="150"></div>
-                        <div class="col-12"><label class="small fw-bold">Data Turno</label><input type="date" name="data_turno" class="form-control form-control-sm" value="<?php echo htmlspecialchars($t['data_turno'] ?? ''); ?>"></div>
-                        <div class="col-6"><label class="small fw-bold">Ora Inizio</label><input type="time" name="orario_inizio" class="form-control form-control-sm" value="<?php echo htmlspecialchars($t['orario_inizio'] ?? ''); ?>"></div>
-                        <div class="col-6"><label class="small fw-bold">Ora Fine</label><input type="time" name="orario_fine" class="form-control form-control-sm" value="<?php echo htmlspecialchars($t['orario_fine'] ?? ''); ?>"></div>
-                        <div class="col-12"><small class="text-muted">Almeno il nome oppure la data.</small></div>
-                        <div class="col-12"><label class="small fw-bold">Capienza Posti</label><input type="number" name="max_posti" class="form-control form-control-sm" value="<?php echo $t['max_posti']; ?>" required></div>
-                        
-                        <div class="col-12 mt-3"><label class="small fw-bold text-primary">Ap. Prenotazioni</label><input type="datetime-local" name="data_apertura" class="form-control form-control-sm" value="<?php echo !empty($t['data_apertura']) ? date('Y-m-d\TH:i', strtotime($t['data_apertura'])) : ''; ?>"></div>
-                        <div class="col-12"><label class="small fw-bold text-danger">Ch. Prenotazioni</label><input type="datetime-local" name="data_chiusura" class="form-control form-control-sm" value="<?php echo !empty($t['data_chiusura']) ? date('Y-m-d\TH:i', strtotime($t['data_chiusura'])) : ''; ?>"></div>
-                        
-                        <div class="col-12 mt-2">
-                            <div class="border p-2 bg-light rounded d-flex gap-3 flex-wrap">
-                                <div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="abilita_lista_attesa" id="waEdit<?php echo $t['id']; ?>" value="1" <?php echo (isset($t['abilita_lista_attesa']) && $t['abilita_lista_attesa']==1) ? 'checked' : ''; ?>><label class="form-check-label small fw-bold text-warning" for="waEdit<?php echo $t['id']; ?>">L. Attesa</label></div>
-                                <div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="abilita_multi_posto" id="mpEdit<?php echo $t['id']; ?>" value="1" <?php echo (isset($t['abilita_multi_posto']) && $t['abilita_multi_posto']==1) ? 'checked' : ''; ?>><label class="form-check-label small fw-bold text-info" for="mpEdit<?php echo $t['id']; ?>">Multi-Posto</label></div>
-                                <div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="richiede_approvazione" id="apprEdit<?php echo $t['id']; ?>" value="1" <?php echo (isset($t['richiede_approvazione']) && $t['richiede_approvazione']==1) ? 'checked' : ''; ?>><label class="form-check-label small fw-bold text-danger" for="apprEdit<?php echo $t['id']; ?>">Approvazione</label></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer py-2"><button type="submit" name="edit_turno" class="btn btn-primary btn-sm w-100 fw-bold">Salva Turno</button></div>
-                </form>
-            </div>
-        </div>
-    </div>
-    <?php endforeach; ?>
-<?php endforeach; ?>
-
-<script>
-// Dopo una duplicazione di turno apre subito la finestra di modifica della copia (?apri=modTurnoN)
-document.addEventListener("DOMContentLoaded", function () {
-    var id = new URLSearchParams(location.search).get("apri");
-    if (!id || !/^modTurno[0-9]+$/.test(id)) return;
-    var el = document.getElementById(id);
-    if (el && window.bootstrap) bootstrap.Modal.getOrCreateInstance(el).show();
-});
-</script>
 <?php require_once 'admin_footer.php'; ?>

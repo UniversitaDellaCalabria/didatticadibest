@@ -118,10 +118,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_prenotazione_ute
     }
     $json_custom_bind = !empty($custom_data) ? json_encode($custom_data, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) : null;
     // Progetti per le scuole: il numero di partecipanti modificato deve restare nei limiti del progetto
-    $r_evp = $conn->query("SELECT t.evento_id, t.min_partecipanti, t.max_partecipanti, e.tipo FROM turni t JOIN eventi e ON t.evento_id = e.id WHERE t.id = $turno_attuale_id");
+    $r_evp = $conn->query("SELECT t.evento_id, t.min_partecipanti, t.max_partecipanti, t.annullabile_fino, e.tipo FROM turni t JOIN eventi e ON t.evento_id = e.id WHERE t.id = $turno_attuale_id");
     $evp = $r_evp ? $r_evp->fetch_assoc() : null;
-    if ($evp && $evp['tipo'] === 'progetto') {
-        $err_part = valida_partecipanti_progetto($custom_data, get_dettagli_progetti($conn, [(int)$evp['evento_id']])[(int)$evp['evento_id']] ?? null, $evp);
+    $dett_evp = $evp ? (get_dettagli_progetti($conn, [(int)$evp['evento_id']])[(int)$evp['evento_id']] ?? null) : null;
+    // Cambio turno non più consentito dopo la scadenza per annullare del turno attuale
+    if ($evp && $nuovo_turno_id > 0 && $nuovo_turno_id !== $turno_attuale_id && annullamento_scaduto($evp)) {
+        $_SESSION['msg_area_pers'] = "<div class='alert alert-warning fw-bold text-center my-3 shadow-sm'><i class='fa fa-lock me-1'></i> Non è più possibile cambiare turno: il termine era il " . date('d/m/Y \a\l\l\e H:i', strtotime($evp['annullabile_fino'])) . ". Per necessità scrivi alla segreteria con il pulsante Assistenza.</div>";
+        header("Location: area_personale.php");
+        exit;
+    }
+    if ($evp && prenotazione_di_classe($evp['tipo'] === 'progetto', $dett_evp)) {
+        $err_part = valida_partecipanti_progetto($custom_data, ($dett_evp ?? []) + ['per_scuole' => 1], $evp);
         if ($err_part !== null) {
             $_SESSION['msg_area_pers'] = "<div class='alert alert-danger fw-bold text-center my-3 shadow-sm'><i class='fa fa-users me-1'></i> Modifica non salvata: " . htmlspecialchars($err_part) . "</div>";
             header("Location: area_personale.php");
@@ -227,13 +234,19 @@ if (isset($_GET['cancella_prenotazione'])) {
     csrf_verify($_GET['csrf'] ?? '');
     $pr_id = (int)$_GET['cancella_prenotazione'];
 
-    $stmt_chk = $conn->prepare("SELECT pr.*, t.id as turno_id, t.nome_turno, t.data_turno, t.orario_inizio, t.orario_fine, e.titolo as evento_titolo, e.luogo, e.pagina_id, e.id as evento_id FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id WHERE pr.id = ? AND (pr.utente_id = ? OR LOWER(pr.email) = ?)");
+    $stmt_chk = $conn->prepare("SELECT pr.*, t.id as turno_id, t.nome_turno, t.data_turno, t.orario_inizio, t.orario_fine, t.annullabile_fino, e.titolo as evento_titolo, e.luogo, e.pagina_id, e.id as evento_id FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id WHERE pr.id = ? AND (pr.utente_id = ? OR LOWER(pr.email) = ?)");
     $stmt_chk->bind_param("iis", $pr_id, $u_id, $u_email_sql);
     $stmt_chk->execute();
     $res_chk = $stmt_chk->get_result();
     
     if ($res_chk && $res_chk->num_rows > 0) {
         $p_data = $res_chk->fetch_assoc();
+        // Oltre il termine del turno non si annulla più (chi è solo in lista d'attesa può sempre uscirne)
+        if (annullamento_scaduto($p_data) && !in_array($p_data['stato'], ['in_attesa', 'annullata', 'rifiutata', 'scaduta'], true)) {
+            $_SESSION['msg_area_pers'] = "<div class='alert alert-warning fw-bold text-center my-3 shadow-sm'><i class='fa fa-lock me-1'></i> Non è più possibile annullare questa prenotazione: il termine era il " . date('d/m/Y \a\l\l\e H:i', strtotime($p_data['annullabile_fino'])) . ". Per necessità scrivi alla segreteria con il pulsante Assistenza.</div>";
+            header("Location: area_personale.php");
+            exit;
+        }
         // Anche un posto offerto e non ancora confermato va ripassato alla coda
         $was_confermata = in_array($p_data['stato'], ['confermata', 'richiesta_conferma'], true);
         $tid_promo = (int)$p_data['turno_id'];
@@ -376,18 +389,19 @@ if (isset($_GET['conferma_posto'])) {
 // =======================================================================
 
 // Pulsanti attestato / elenco studenti di una prenotazione (card dell'Area personale).
-// Eventi: attestato dopo il check-in. Progetti: solo se previsti; per le scuole elenco studenti + attestati
-// della classe (dopo l'invio), altrimenti attestato personale a progetto concluso.
+// Prenotazioni di classe (progetti per le scuole, eventi con attestati per gli studenti): elenco studenti
+// + attestati della classe (dopo l'invio). Eventi: attestato dopo il check-in. Progetti generici: a progetto concluso.
 function pulsanti_attestato_pr($conn, array $pr): string {
     $st = $pr['stato'] ?? 'confermata';
     $confermata = in_array($st, ['confermata', 'confermato', 'confirmed'], true);
     $code = urlencode($pr['codice_prenotazione']);
     $btn_att = fn($label) => '<a href="stampa_attestato.php?code=' . $code . '" target="_blank" class="btn btn-success btn-sm fw-bold" style="background:#198754;border:none;"><i class="fa fa-graduation-cap me-1"></i>' . $label . '</a>';
-    if (($pr['evento_tipo'] ?? '') !== 'progetto') {
+    $di_classe = attestati_di_classe($pr);
+    if (($pr['evento_tipo'] ?? '') !== 'progetto' && !$di_classe) {
         return ((int)$pr['presente'] === 1 && $confermata) ? $btn_att('Attestato') : '';
     }
     if ((int)($pr['attestati'] ?? 0) !== 1 || !$confermata) return '';
-    if ((int)($pr['per_scuole'] ?? 1) === 1) {
+    if ($di_classe) {
         $r_n = $conn->query("SELECT COUNT(*) AS n FROM partecipanti_prenotazione WHERE prenotazione_id = " . (int)$pr['id']);
         $n = $r_n ? (int)$r_n->fetch_assoc()['n'] : 0;
         $out = '<a href="elenco_studenti.php?code=' . $code . '" class="btn btn-outline-success btn-sm fw-bold"><i class="fa fa-list-ol me-1"></i>Elenco studenti (' . $n . ')</a>';
@@ -401,7 +415,7 @@ $prenotazioni_attive = [];
 $prenotazioni_passate = [];
 $now = date('Y-m-d H:i:s');
 
-$sql_pr = "SELECT pr.*, t.nome_turno, t.data_turno, t.orario_inizio, t.orario_fine,
+$sql_pr = "SELECT pr.*, t.nome_turno, t.data_turno, t.orario_inizio, t.orario_fine, t.annullabile_fino,
            e.titolo as evento_titolo, e.luogo as evento_luogo, e.id as evento_id, e.locandina_path, e.abilita_presenze, e.tipo AS evento_tipo,
            pd.per_scuole, pd.attestati, pd.data_fine AS progetto_fine,
            pe.titolo as pagina_titolo, pe.colore_primario, pe.id as p_id
@@ -707,6 +721,10 @@ require_once 'header.php';
                                     <?php if (!empty($pr['orario_inizio'])): ?><span><i class="fa fa-clock text-primary me-1"></i><?php echo substr($pr['orario_inizio'], 0, 5); ?></span><?php endif; ?>
                                     <?php if (!empty($pr['evento_luogo'])): ?><span><i class="fa fa-map-marker-alt text-success me-1"></i><?php echo htmlspecialchars($pr['evento_luogo']); ?></span><?php endif; ?>
                                     <span><i class="fa fa-hashtag text-secondary me-1"></i>Ticket: <strong class="text-dark font-monospace"><?php echo $pr['codice_prenotazione']; ?></strong></span>
+                                    <?php $bloccata_pr = annullamento_scaduto($pr) && $st !== 'in_attesa';
+                                          if (!empty($pr['annullabile_fino']) && !in_array($st, ['annullata', 'rifiutata'], true)): ?>
+                                        <span class="<?php echo $bloccata_pr ? 'text-danger' : ''; ?>"><i class="fa <?php echo $bloccata_pr ? 'fa-lock' : 'fa-rotate-left'; ?> me-1"></i><?php echo $bloccata_pr ? 'Non più annullabile' : 'Annullabile fino al ' . date('d/m/Y H:i', strtotime($pr['annullabile_fino'])); ?></span>
+                                    <?php endif; ?>
                                 </div>
 
                                 <!-- STATO + AZIONI -->
@@ -743,12 +761,14 @@ require_once 'header.php';
                                         <button type="button" class="btn btn-sm fw-bold text-white" style="background:<?php echo $col_p; ?>;border:none;" data-bs-toggle="modal" data-bs-target="#modEditUser<?php echo $pr['id']; ?>">
                                             <i class="fa fa-edit me-1"></i>Modifica
                                         </button>
+                                        <?php if (!$bloccata_pr): ?>
                                         <button type="button" class="btn btn-outline-danger btn-sm fw-bold"
                                             data-href="<?php echo htmlspecialchars($href_annulla); ?>"
                                             data-titolo="<?php echo htmlspecialchars($pr['evento_titolo']); ?>"
                                             onclick="apriFinestraAnnulla(this)">
                                             <i class="fa fa-times me-1"></i>Annulla
                                         </button>
+                                        <?php endif; ?>
                                         <?php endif; ?>
                                     </div>
                                 </div>
@@ -828,7 +848,8 @@ require_once 'header.php';
                                             
                                             <div class="mb-4 p-3 border rounded shadow-sm bg-light">
                                                 <label class="form-label small fw-bold text-dark"><i class="fa fa-exchange-alt me-1"></i> Modifica Orario / Turno (Opzionale)</label>
-                                                <select name="nuovo_turno_id" class="form-select border-primary fw-bold">
+                                                <?php if ($bloccata_pr): ?><div class="small text-danger fw-semibold mb-2"><i class="fa fa-lock me-1"></i>Il termine per cambiare turno è scaduto: puoi modificare solo i dati.</div><?php endif; ?>
+                                                <select name="nuovo_turno_id" class="form-select border-primary fw-bold" <?php echo $bloccata_pr ? 'disabled' : ''; ?>>
                                                     <?php
                                                     foreach ($pr['turni_alternativi'] as $ta) {
                                                         $sel = ($ta['id'] == $pr['turno_id']) ? 'selected' : '';
@@ -864,7 +885,7 @@ require_once 'header.php';
                                                     <h6 class="fw-bold text-primary mb-3"><i class="fa fa-list-check me-1"></i> Le tue risposte aggiuntive:</h6>
                                                     <div class="row g-3">
                                                     <?php while ($cf = $res_cf->fetch_assoc()):
-                                                        if (!campo_form_visibile($cf, ($pr['evento_tipo'] ?? '') === 'progetto', ['per_scuole' => $pr['per_scuole'] ?? 1])) continue;
+                                                        if (!campo_form_visibile($cf, ($pr['evento_tipo'] ?? '') === 'progetto', ['per_scuole' => $pr['per_scuole'] ?? 1, 'attestati' => $pr['attestati'] ?? 0])) continue;
                                                         if ($cf['nome_campo'] === CAMPO_PARTECIPANTI) $cf['etichetta'] = 'Numero di studenti partecipanti'; ?>
                                                         <?php 
                                                             $input_name = htmlspecialchars($cf['nome_campo']);

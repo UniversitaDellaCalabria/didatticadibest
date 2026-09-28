@@ -20,7 +20,7 @@ $sec = isset($_SESSION['utente_ruoli_secondari']) ? explode(',', $_SESSION['uten
 $is_staff = in_array($ruolo, [1, 2], true) || in_array('1', $sec, true) || in_array('2', $sec, true);
 
 $msg = null;
-if (($p['evento_tipo'] ?? '') !== 'progetto' || (int)($p['attestati'] ?? 0) !== 1 || (int)($p['per_scuole'] ?? 1) !== 1) $msg = "Questo progetto non prevede attestati per gli studenti.";
+if (!attestati_di_classe($p)) $msg = "Questa attività non prevede attestati per gli studenti.";
 elseif ((int)$p['presente'] !== 1 || ($p['stato'] ?? '') !== 'confermata') $msg = "Gli attestati sono disponibili dopo la registrazione della presenza della classe.";
 elseif (empty($p['attestato_inviato']) && !$is_staff) $msg = "Gli attestati non sono ancora stati emessi: riceverai un'email quando saranno pronti.";
 if ($msg) die("<div style='text-align:center;font-family:sans-serif;margin-top:60px;'><h2 style='color:#b45309;'>Attestati non disponibili</h2><p>" . htmlspecialchars($msg) . "</p></div>");

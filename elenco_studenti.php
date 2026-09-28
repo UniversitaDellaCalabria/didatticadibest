@@ -14,10 +14,11 @@ $r = $conn->query("SELECT id FROM prenotazioni WHERE codice_prenotazione = '" . 
 $pr_id = ($r && $row = $r->fetch_assoc()) ? (int)$row['id'] : 0;
 $p = $pr_id ? prenotazione_per_attestati($conn, $pr_id) : null;
 if (!$p || !puo_vedere_prenotazione($p)) { http_response_code(403); die("Accesso negato."); }
-if (($p['evento_tipo'] ?? '') !== 'progetto' || (int)($p['per_scuole'] ?? 1) !== 1 || (int)($p['attestati'] ?? 0) !== 1) {
-    die("Questo progetto non prevede l'elenco degli studenti.");
+if (!attestati_di_classe($p)) {
+    die("Questa attività non prevede l'elenco degli studenti.");
 }
-if (($p['stato'] ?? 'confermata') !== 'confermata') die("L'elenco degli studenti si compila quando l'iscrizione è confermata.");
+if (($p['stato'] ?? 'confermata') !== 'confermata') die("L'elenco degli studenti si compila quando la prenotazione è confermata.");
+$is_progetto = ($p['evento_tipo'] ?? '') === 'progetto';
 
 $dett = get_dettagli_progetti($conn, [(int)$p['evento_id']])[(int)$p['evento_id']] ?? null;
 $max = max_partecipanti_prenotazione($p, $dett);
@@ -72,13 +73,14 @@ require_once 'header.php';
             <h1 class="fw-bold fs-3 mb-2"><?php echo h($p['evento_titolo']); ?></h1>
             <div class="d-flex flex-wrap gap-3 small text-secondary fw-semibold">
                 <?php if (!empty($p['nome_turno']) && !in_array($p['nome_turno'], ['Iscrizione scuole', 'Iscrizioni'], true)): ?><span><i class="fa fa-clone me-1" aria-hidden="true"></i><?php echo h($p['nome_turno']); ?></span><?php endif; ?>
-                <span><i class="fa fa-calendar-days me-1" aria-hidden="true"></i><?php echo h(periodo_progetto($p)); ?></span>
+                <span><i class="fa fa-calendar-days me-1" aria-hidden="true"></i><?php echo h($is_progetto ? periodo_progetto($p) : (!empty($p['data_turno']) ? date('d/m/Y', strtotime($p['data_turno'])) . (orario_turno($p) !== '' ? ' · ' . orario_turno($p) : '') : 'Data da definire')); ?></span>
                 <span><i class="fa fa-user-tie me-1" aria-hidden="true"></i><?php echo h($p['nome'] . ' ' . $p['cognome']); ?></span>
                 <span><i class="fa fa-hashtag me-1" aria-hidden="true"></i><?php echo h($p['codice_prenotazione']); ?></span>
             </div>
             <div class="mt-3 d-flex align-items-center gap-3 flex-wrap">
                 <span class="badge fs-6 <?php echo count($studenti) === 0 ? 'bg-warning text-dark' : 'bg-success'; ?>"><?php echo count($studenti); ?> / <?php echo $max; ?> studenti</span>
-                <?php if (!empty($p['data_fine'])): ?><span class="small text-secondary">Gli attestati partono dopo la fine del progetto (<?php echo date('d/m/Y', strtotime($p['data_fine'])); ?>), per le classi di cui è stata registrata la presenza.</span><?php endif; ?>
+                <?php if ($is_progetto && !empty($p['data_fine'])): ?><span class="small text-secondary">Gli attestati partono dopo la fine del progetto (<?php echo date('d/m/Y', strtotime($p['data_fine'])); ?>), per le classi di cui è stata registrata la presenza.</span>
+                <?php elseif (!$is_progetto): ?><span class="small text-secondary">Gli attestati partono dopo l'attività, se la presenza della classe è stata registrata con il check-in.</span><?php endif; ?>
             </div>
         </div>
     </div>
@@ -140,7 +142,7 @@ require_once 'header.php';
                 </div>
                 <div class="alert alert-light border small mb-0">
                     <i class="fa fa-shield-halved me-1" aria-hidden="true"></i>
-                    I nomi degli studenti servono solo a generare gli attestati di partecipazione e sono visibili a te e alla segreteria del dipartimento. Trascorsi <?php echo (int)MESI_CONSERVAZIONE_STUDENTI; ?> mesi dalla fine del progetto vengono ridotti alle iniziali.
+                    I nomi degli studenti servono solo a generare gli attestati di partecipazione e sono visibili a te e alla segreteria del dipartimento. Trascorsi <?php echo (int)MESI_CONSERVAZIONE_STUDENTI; ?> mesi dalla fine <?php echo $is_progetto ? 'del progetto' : "dell'attività"; ?> vengono ridotti alle iniziali.
                 </div>
             </div>
         </div>

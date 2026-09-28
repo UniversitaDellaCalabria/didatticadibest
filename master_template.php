@@ -81,6 +81,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['invia_prenotazione'])
     elseif ((int)($_POST['da_scheda'] ?? 0) === (int)$ev_rit['id']) $url_ritorno = "{$current_filename}.php?evento=" . (int)$ev_rit['id'] . "&";
     else $url_ritorno = "{$current_filename}.php?";
 
+    // Prenotazione pubblica (senza accesso): trappola per i robot, domanda di controllo e limite per indirizzo IP
+    if (!$utente_logged) {
+        $err_captcha = null;
+        if (trim((string)($_POST['sito_web'] ?? '')) !== '') $err_captcha = "Prenotazione non registrata: riprova.";
+        elseif (!check_rate_limit($conn, 'prenotazione_pubblica', 20, 3600)) $err_captcha = "Troppe prenotazioni da questa connessione: riprova tra un'ora o accedi con SPID/CIE.";
+        else $err_captcha = captcha_verifica((string)($_POST['captcha_id'] ?? ''), (string)($_POST['captcha_risposta'] ?? ''));
+        if ($err_captcha !== null) {
+            $_SESSION['errore_prenotazione'] = $err_captcha;
+            header("Location: {$url_ritorno}status=captcha"); exit;
+        }
+    }
+
     if (empty($nome) || empty($cognome) || empty($email)) { header("Location: {$url_ritorno}status=error"); exit; }
 
     // CONTROLLO DUPLICATI (Email o Matricola)
@@ -144,10 +156,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['invia_prenotazione'])
             if (strpos($k, 'custom_') === 0) { $custom_data[str_replace('custom_', '', $k)] = is_array($v) ? implode(', ', $v) : trim($v); }
         }
 
-        // Progetti per le scuole: numero di partecipanti obbligatorio e dentro i limiti del progetto
-        if (($t_info['evento_tipo'] ?? '') === 'progetto') {
-            $ev_pr = (int)$t_info['evento_id'];
-            $err_studenti = valida_partecipanti_progetto($custom_data, get_dettagli_progetti($conn, [$ev_pr])[$ev_pr] ?? null, $t_info);
+        // Prenotazioni di classe (progetti per le scuole, eventi con attestati per gli studenti):
+        // numero di studenti obbligatorio e dentro i limiti del progetto o del turno
+        $ev_pr = (int)$t_info['evento_id'];
+        $dett_pr = get_dettagli_progetti($conn, [$ev_pr])[$ev_pr] ?? null;
+        $is_prog_pr = ($t_info['evento_tipo'] ?? '') === 'progetto';
+        if (prenotazione_di_classe($is_prog_pr, $dett_pr)) {
+            $err_studenti = valida_partecipanti_progetto($custom_data, ($dett_pr ?? []) + ['per_scuole' => 1], $t_info);
             if ($err_studenti !== null) {
                 $_SESSION['errore_prenotazione'] = $err_studenti;
                 if (isset($lock_iscr)) { $conn->query("SELECT RELEASE_LOCK('" . $conn->real_escape_string($lock_iscr) . "')"); }
@@ -256,6 +271,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['invia_prenotazione'])
                 $body_tpl = ($sys_email['email_conferma_corpo'] ?: "<p>Gentile <strong>{NOME} {COGNOME}</strong>,</p><p>Prenotazione confermata per <strong>{TITOLO_EVENTO}</strong>.</p><p>📅 {DATA_TURNO} | 🕒 {ORARIO_TURNO}<br>🎟️ Codice: <strong>{CODICE_PRENOTAZIONE}</strong></p>{LINK_RICEVUTA}") . $cal_html_buttons;
             }
             
+            // Attestati per la classe: chi ha prenotato inserisce l'elenco degli studenti dall'Area personale
+            if ($stato_prenotazione === 'confermata' && attestati_di_classe(['evento_tipo' => $t_info['evento_tipo'] ?? '', 'attestati' => $dett_pr['attestati'] ?? 0, 'per_scuole' => $dett_pr['per_scuole'] ?? 1])) {
+                $link_elenco = url_base_sito() . '/elenco_studenti.php?code=' . urlencode($codice_p);
+                $body_tpl .= "<p style='margin-top:18px;'>Per gli <strong>attestati di partecipazione degli studenti</strong> inserisci il loro elenco (cognome e nome) dalla tua Area personale, accedendo con SPID, CIE o credenziali Unical con questo stesso indirizzo email.</p>"
+                           . "<p><a href='" . htmlspecialchars($link_elenco) . "' style='background:#198754; color:#fff; padding:10px 18px; text-decoration:none; border-radius:6px; font-weight:bold;'>Inserisci l'elenco degli studenti</a></p>";
+            }
             inviaNotificaEmail($email, str_replace($r_find, $r_repl, $obj_tpl), str_replace($r_find, $r_repl, $body_tpl), $conn, colore_area_turno($conn, $turno_id));
 
             // Gestori dell'area/evento con notifiche attive + indirizzi aggiuntivi dell'evento:
@@ -299,6 +320,11 @@ if (isset($_GET['status'])) {
     }
     elseif ($st === 'riservato') { $messaggio_prenotazione = "<div class='alert alert-warning fw-bold text-center my-4 shadow-sm border-0 border-start border-4 border-warning'><i class='fa fa-key me-2'></i> Per iscriverti devi prima accedere (SPID, CIE o credenziali Unical).</div>"; }
     elseif ($st === 'altra_edizione') { $messaggio_prenotazione = "<div class='alert alert-warning fw-bold text-center my-4 shadow-sm border-0 border-start border-4 border-warning'><i class='fa fa-school me-2'></i> La tua scuola è già iscritta (o in lista d'attesa) a un'altra edizione di questo progetto: puoi partecipare a una sola edizione. Per cambiare, annulla prima l'iscrizione dall'Area Personale.</div>"; }
+    elseif ($st === 'captcha') {
+        $err_cp = $_SESSION['errore_prenotazione'] ?? 'Controllo anti-robot non superato.';
+        unset($_SESSION['errore_prenotazione']);
+        $messaggio_prenotazione = "<div class='alert alert-warning fw-bold text-center my-4 shadow-sm border-0 border-start border-4 border-warning'><i class='fa fa-shield-halved me-2'></i> " . htmlspecialchars($err_cp) . "</div>";
+    }
     elseif ($st === 'studenti') {
         $err_st = $_SESSION['errore_prenotazione'] ?? 'Numero di studenti non valido.';
         unset($_SESSION['errore_prenotazione']);
@@ -615,6 +641,7 @@ function printModalPrenotazione($t, $col_primaria, $utente_logged, $val_nome, $v
     $is_waitlist = ($soldout && isset($t['abilita_lista_attesa']) && $t['abilita_lista_attesa'] == 1);
     $is_progetto = ($t['evento_tipo'] ?? '') === 'progetto';
     $per_scuole_m = $is_progetto && !empty($t['per_scuole']); // progetto per le scuole: testi "scuola" e numero di partecipanti
+    $classe_m = prenotazione_di_classe($is_progetto, $t['dett_progetto'] ?? null); // numero di studenti (progetti per le scuole, eventi con attestati di classe)
     ?>
     <div class="modal fade" id="modPrenota<?php echo $t['id']; ?>" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -642,6 +669,12 @@ function printModalPrenotazione($t, $col_primaria, $utente_logged, $val_nome, $v
                             <?php endif; ?>
                         </div>
                         <?php endif; ?>
+                        <?php if (!$is_progetto && $classe_m): ?>
+                        <div class="alert alert-info border-0 small mb-3">
+                            <i class="fa fa-school me-1" aria-hidden="true"></i>
+                            Prenotazione per una <strong>classe</strong>: indica il numero di studenti. Dopo la conferma potrai inserire l'elenco degli studenti per gli <strong>attestati</strong> dalla tua Area personale (accesso con SPID, CIE o credenziali Unical, con la stessa email).
+                        </div>
+                        <?php endif; ?>
                         <div class="alert alert-light border shadow-sm mb-3" <?php echo $is_progetto ? 'hidden' : ''; ?>>
                             <div class="d-flex align-items-center gap-2 mb-1">
                                 <?php if (!empty($t['nome_turno'])): ?><span class="badge" style="background:<?php echo $col_primaria; ?>;">🏷️ <?php echo htmlspecialchars($t['nome_turno']); ?></span><?php endif; ?>
@@ -649,6 +682,7 @@ function printModalPrenotazione($t, $col_primaria, $utente_logged, $val_nome, $v
                                 <?php if (orario_turno($t) !== ''): ?><span class="badge bg-secondary">🕒 <?php echo orario_turno($t); ?></span><?php endif; ?>
                             </div>
                             <?php if(!empty($t['evento_luogo'])): ?><small class="text-muted fw-bold d-block"><i class="fa fa-map-marker-alt text-danger me-1"></i> <?php echo htmlspecialchars($t['evento_luogo']); ?></small><?php endif; ?>
+                            <?php if(!empty($t['annullabile_fino'])): ?><small class="text-muted d-block mt-1"><i class="fa fa-rotate-left me-1" aria-hidden="true"></i> Potrai annullare o cambiare turno fino al <strong><?php echo date('d/m/Y \a\l\l\e H:i', strtotime($t['annullabile_fino'])); ?></strong>.</small><?php endif; ?>
                         </div>
                         
                         <?php if (isset($t['abilita_multi_posto']) && $t['abilita_multi_posto'] == 1): ?>
@@ -781,10 +815,9 @@ function printModalPrenotazione($t, $col_primaria, $utente_logged, $val_nome, $v
                                         <?php elseif ($type === 'number'):
                                             // Progetti per le scuole: numero di partecipanti dentro i limiti del progetto (ricontrollato dal server)
                                             $lim_attr = '';
-                                            if ($per_scuole_m && $cf['nome_campo'] === CAMPO_PARTECIPANTI) {
+                                            if ($classe_m && $cf['nome_campo'] === CAMPO_PARTECIPANTI) {
                                                 $lim_attr = 'min="' . (int)($t['limite_studenti_min'] ?? 1) . '" step="1"' . (!empty($t['limite_studenti_max']) ? ' max="' . (int)$t['limite_studenti_max'] . '"' : '');
                                             }
-                                        ?>
                                         ?>
                                             <input type="number" name="<?php echo htmlspecialchars($input_name); ?>" class="form-control form-control-sm" <?php echo $lim_attr; ?> <?php echo $req_attr; ?> <?php echo $req_data; ?>>
                                             <?php if ($lim_attr !== ''): ?><div class="form-text">Tra <?php echo (int)($t['limite_studenti_min'] ?? 1); ?> e <?php echo !empty($t['limite_studenti_max']) ? (int)$t['limite_studenti_max'] : 'il massimo previsto'; ?> studenti.</div><?php endif; ?>
@@ -843,6 +876,21 @@ function printModalPrenotazione($t, $col_primaria, $utente_logged, $val_nome, $v
 
                         <?php endif; // end !empty($campi_array) ?>
                         
+                        <?php if (!$utente_logged): $cap = captcha_prenotazione(); ?>
+                        <!-- CONTROLLO ANTI-ROBOT (solo prenotazioni senza accesso) -->
+                        <div class="mt-3 p-3 rounded border bg-light">
+                            <label for="captcha_<?php echo $t['id']; ?>" class="form-label small fw-bold mb-1"><i class="fa fa-shield-halved me-1" aria-hidden="true"></i>Controllo anti-robot: <?php echo htmlspecialchars($cap['domanda']); ?> <span class="text-danger">*</span></label>
+                            <input type="text" name="captcha_risposta" id="captcha_<?php echo $t['id']; ?>" class="form-control form-control-sm" style="max-width:140px;" inputmode="numeric" pattern="[0-9]*" maxlength="3" autocomplete="off" required>
+                            <input type="hidden" name="captcha_id" value="<?php echo htmlspecialchars($cap['id']); ?>">
+                            <div class="form-text">Con l'accesso SPID, CIE o Unical questa domanda non viene chiesta.</div>
+                        </div>
+                        <!-- Campo trappola: invisibile alle persone, i robot lo compilano -->
+                        <div style="position:absolute; left:-10000px; width:1px; height:1px; overflow:hidden;" aria-hidden="true">
+                            <label for="sitoWeb_<?php echo $t['id']; ?>">Sito web (lascia vuoto)</label>
+                            <input type="text" name="sito_web" id="sitoWeb_<?php echo $t['id']; ?>" value="" tabindex="-1" autocomplete="off">
+                        </div>
+                        <?php endif; ?>
+
                         <!-- CHECKBOX PRIVACY OBBLIGATORIO -->
                         <div class="form-check mt-3 mb-1 p-3 bg-light rounded border border-secondary shadow-sm">
                             <input class="form-check-input border-secondary" type="checkbox" name="accetta_privacy" id="privacyCheck_<?php echo $t['id']; ?>" required>

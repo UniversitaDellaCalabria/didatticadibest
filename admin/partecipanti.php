@@ -1,5 +1,5 @@
 <?php
-// partecipanti.php - Studenti di un'iscrizione a un progetto per le scuole e relativi attestati:
+// partecipanti.php - Studenti di una prenotazione di classe (progetto per le scuole o evento con attestati per la classe):
 // elenco (scritto, incollato o da file), studenti senza attestato (assenti), anteprima e invio degli attestati al docente.
 require_once 'admin_header.php';
 
@@ -13,8 +13,9 @@ function admin_redirect($url) { echo "<script>window.location.replace(" . json_e
 $pr_id = (int)($_GET['pr'] ?? $_POST['pr'] ?? 0);
 if (!$pr_id || !pren_autorizzata($conn, $pr_id, $filtro_p, $sql_filtro_eventi_rbac)) nega_accesso();
 $p = prenotazione_per_attestati($conn, $pr_id);
-if (!$p || ($p['evento_tipo'] ?? '') !== 'progetto' || (int)($p['per_scuole'] ?? 1) !== 1) {
-    echo "<div class='alert alert-warning'>Questa iscrizione non riguarda un progetto per le scuole.</div>";
+$is_progetto = ($p['evento_tipo'] ?? '') === 'progetto';
+if (!$p || !prenotazione_di_classe($is_progetto, $p)) {
+    echo "<div class='alert alert-warning'>Questa prenotazione non riguarda una classe (progetto per le scuole o evento con attestati per gli studenti).</div>";
     require_once 'admin_footer.php';
     exit;
 }
@@ -62,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     if (isset($_POST['segna_presente'])) {
         $conn->query("UPDATE prenotazioni SET presente = 1, data_presenza = COALESCE(data_presenza, NOW()) WHERE id = $pr_id");
-        flash_set("Presenza della scuola registrata.");
+        flash_set("Presenza della classe registrata.");
     }
     if (isset($_POST['invia'])) {
         $esito = invia_attestati_gruppo($conn, $pr_id, true);
@@ -80,7 +81,11 @@ $col_area = colore_valido($page_cfg['colore_primario'] ?? '', '#0056B3');
 ?>
 <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
     <h4 class="fw-bold text-dark mb-0"><i class="fa fa-graduation-cap me-2" style="color:<?php echo h($col_area); ?>" aria-hidden="true"></i>Studenti e attestati</h4>
-    <a href="progetti.php?p_id=<?php echo $filtro_p; ?>" class="btn btn-outline-secondary btn-sm fw-bold"><i class="fa fa-arrow-left me-1" aria-hidden="true"></i>Progetti</a>
+    <?php if ($is_progetto): ?>
+        <a href="progetti.php?p_id=<?php echo $filtro_p; ?>" class="btn btn-outline-secondary btn-sm fw-bold"><i class="fa fa-arrow-left me-1" aria-hidden="true"></i>Progetti</a>
+    <?php else: ?>
+        <a href="iscritti.php?p_id=<?php echo $filtro_p; ?>&f_turno=<?php echo (int)$p['turno_id']; ?>" class="btn btn-outline-secondary btn-sm fw-bold"><i class="fa fa-arrow-left me-1" aria-hidden="true"></i>Iscritti del turno</a>
+    <?php endif; ?>
 </div>
 
 <div class="card border-0 shadow-sm mb-3" style="border-left:5px solid <?php echo h($col_area); ?> !important;">
@@ -89,7 +94,7 @@ $col_area = colore_valido($page_cfg['colore_primario'] ?? '', '#0056B3');
         <div class="small text-secondary d-flex flex-wrap gap-3 mt-1">
             <?php if ($scuola !== ''): ?><span><i class="fa fa-school me-1"></i><?php echo h($scuola); ?></span><?php endif; ?>
             <span><i class="fa fa-user-tie me-1"></i><?php echo h($p['nome'] . ' ' . $p['cognome']); ?> · <a href="mailto:<?php echo h($p['email']); ?>"><?php echo h($p['email']); ?></a></span>
-            <span><i class="fa fa-calendar-days me-1"></i><?php echo h(periodo_progetto($p)); ?></span>
+            <span><i class="fa fa-calendar-days me-1"></i><?php echo h($is_progetto ? periodo_progetto($p) : (!empty($p['data_turno']) ? date('d/m/Y', strtotime($p['data_turno'])) . (orario_turno($p) !== '' ? ' · ' . orario_turno($p) : '') : 'Data da definire')); ?></span>
             <span><i class="fa fa-hashtag me-1"></i><?php echo h($p['codice_prenotazione']); ?></span>
         </div>
         <div class="d-flex flex-wrap gap-2 mt-3 align-items-center">
@@ -99,7 +104,7 @@ $col_area = colore_valido($page_cfg['colore_primario'] ?? '', '#0056B3');
                 <form method="POST" class="m-0"><?php csrf_field(); ?><input type="hidden" name="pr" value="<?php echo $pr_id; ?>"><button type="submit" name="segna_presente" value="1" class="btn btn-sm btn-outline-success fw-bold" data-confirm="Registrare la presenza della scuola? Senza presenza gli attestati non partono."><i class="fa fa-user-check me-1"></i>Segna la scuola presente</button></form>
             <?php endif; ?>
             <?php if (!empty($p['attestato_inviato'])): ?><span class="badge bg-success-subtle text-success-emphasis fs-6"><i class="fa fa-envelope-circle-check me-1"></i>Attestati inviati</span><?php endif; ?>
-            <?php if ((int)($p['attestati'] ?? 0) !== 1): ?><span class="badge bg-warning text-dark">Il progetto non prevede attestati: attiva l'opzione nella scheda del progetto</span><?php endif; ?>
+            <?php if ((int)($p['attestati'] ?? 0) !== 1): ?><span class="badge bg-warning text-dark"><?php echo $is_progetto ? "Il progetto non prevede attestati: attiva l'opzione nella scheda del progetto" : "L'evento non prevede attestati per gli studenti: attiva l'opzione nella scheda dell'evento"; ?></span><?php endif; ?>
             <div class="ms-auto d-flex gap-2 flex-wrap">
                 <?php if ($n_validi > 0 && (int)$p['presente'] === 1): ?><a href="../attestati_gruppo.php?code=<?php echo urlencode($p['codice_prenotazione']); ?>" target="_blank" class="btn btn-sm btn-outline-dark fw-bold"><i class="fa fa-eye me-1"></i>Anteprima attestati (<?php echo $n_validi; ?>)</a><?php endif; ?>
                 <form method="POST" class="m-0"><?php csrf_field(); ?><input type="hidden" name="pr" value="<?php echo $pr_id; ?>">
@@ -107,7 +112,7 @@ $col_area = colore_valido($page_cfg['colore_primario'] ?? '', '#0056B3');
                 </form>
             </div>
         </div>
-        <div class="small text-muted mt-2">In automatico gli attestati partono il giorno dopo la fine del progetto, se la presenza è registrata e l'elenco non è vuoto.</div>
+        <div class="small text-muted mt-2">In automatico gli attestati partono il giorno dopo la fine <?php echo $is_progetto ? 'del progetto' : "dell'evento"; ?>, se la presenza è registrata e l'elenco non è vuoto.</div>
     </div>
 </div>
 

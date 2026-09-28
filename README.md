@@ -27,7 +27,9 @@ Portale open-source per la gestione eventi, prenotazioni e presenze del **Dipart
 - **Duplicazione** di eventi e progetti (con turni, campi del form e sondaggi) e di singoli turni
 - **Aree senza file da generare**: ogni area è servita da `area.php` tramite `.htaccess`, gli slug che coincidono con file del sito vengono rifiutati
 - **Attestati** PDF generati automaticamente al completamento dell'evento, con **codice e QR di verifica** (pagina pubblica `verifica_attestato.php`)
-- **Attestati per gli studenti** nei progetti per le scuole: il docente inserisce l'elenco dall'Area personale (scritto, incollato da Excel o dal modello .xlsx/.csv), la segreteria può correggerlo e togliere gli assenti; a progetto concluso il docente riceve per email gli attestati di tutta la classe; promemoria automatico se l'elenco è ancora vuoto a 7 giorni dalla fine; dopo 12 mesi dalla fine del progetto i nomi vengono ridotti alle iniziali (i codici restano verificabili)
+- **Attestati per gli studenti** nei progetti per le scuole e negli eventi con l'opzione "Attestati per gli studenti della classe" (es. OpenLab): il docente inserisce l'elenco dall'Area personale (scritto, incollato da Excel o dal modello .xlsx/.csv), la segreteria può correggerlo e togliere gli assenti; a progetto concluso il docente riceve per email gli attestati di tutta la classe; promemoria automatico se l'elenco è ancora vuoto a 7 giorni dalla fine; dopo 12 mesi dalla fine del progetto i nomi vengono ridotti alle iniziali (i codici restano verificabili)
+- **Prenotazioni pubbliche protette**: per chi prenota senza accesso domanda di controllo anti-robot (CAPTCHA interno, senza servizi esterni), campo trappola e limite di prenotazioni per indirizzo IP
+- **Termine per annullare** impostabile per ogni turno ("Annullabile fino a"): dopo quella data l'utente non può più annullare né cambiare turno dall'Area personale
 - **Scheda di dettaglio di ogni evento** (`<area>.php?evento=ID`), raggiungibile da tutte le card e dalla ricerca (nelle card solo la **descrizione breve**, qui la completa con la locandina): turni in sequenza con posti liberi, prenotazione e aggiunta al calendario, luogo con link a Google Maps, referenti con email, telefono e pagina personale, link da condividere
 - **Sondaggi/questionari** collegabili agli eventi: 15 tipi di campo (rating, NPS, matrice, scelta, testo, data, email…), ordinamento drag & drop, logica condizionale ("mostra se…"), anteprima interattiva, statistiche NPS ed export XLS
 - **Dashboard amministrativa** con KPI, grafici (Chart.js), messaggi non letti
@@ -58,13 +60,14 @@ Portale open-source per la gestione eventi, prenotazioni e presenze del **Dipart
 | Web server | Apache (mod_rewrite) o Nginx |
 | SimpleSAMLphp | 1.19+ (solo per SSO istituzionale) |
 
-**Librerie PHP utilizzate** (incluse via CDN, nessun Composer richiesto):
+**Librerie front-end utilizzate** (incluse via CDN, nessun Composer richiesto):
 - Bootstrap 5.3
 - Font Awesome 6.4
 - DataTables
 - Chart.js
 - SortableJS (drag & drop)
-- PHPMailer (incluso in `mailer.php`)
+
+**Invio email**: client SMTP interno in `functions.php` (`inviaNotificaEmail()`), senza librerie esterne: STARTTLS/SSL, autenticazione, verifica di ogni risposta del server, registro degli invii nella tabella `log_email`. Se l'host SMTP non è configurato o non è raggiungibile usa la funzione `mail()` di PHP.
 
 ---
 
@@ -176,7 +179,6 @@ eventidibest-cms/
 ├── assets/             # Icone PWA
 ├── config.php          # Connessione DB, session, security headers, CSP
 ├── functions.php       # Funzioni core (CSRF, rate limit, email, log, aggiornamenti dello schema)
-├── mailer.php          # Wrapper PHPMailer
 ├── install.php         # Installer guidato (da eliminare dopo l'uso)
 ├── index.php           # Homepage pubblica a widget
 ├── master_template.php # Motore dei layout delle pagine area (le pagine area lo includono)

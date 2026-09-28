@@ -2255,12 +2255,79 @@ if (!function_exists('assicura_campi_progetto')) {
     }
 }
 
+if (!function_exists('prenotazione_di_classe')) {
+    // Prenotazione fatta da un docente per una classe/gruppo: si chiede il numero di studenti (con min/max)
+    // e il docente può inserire l'elenco degli studenti.
+    // Progetti: quelli dedicati alle scuole. Eventi: quelli con "Attestati per gli studenti della classe"
+    // (progetti_dettagli.attestati = 1). $dett = riga di progetti_dettagli (null se assente).
+    function prenotazione_di_classe(bool $is_progetto, ?array $dett): bool {
+        if ($is_progetto) return (int)($dett['per_scuole'] ?? 1) === 1;
+        return (int)($dett['attestati'] ?? 0) === 1;
+    }
+}
+
+if (!function_exists('attestati_di_classe')) {
+    // Attestati per ogni studente dell'elenco inserito da chi ha prenotato.
+    // $p = riga con evento_tipo (o tipo), per_scuole e attestati (es. prenotazione_per_attestati).
+    function attestati_di_classe(array $p): bool {
+        $is_progetto = ($p['evento_tipo'] ?? $p['tipo'] ?? 'evento') === 'progetto';
+        return (int)($p['attestati'] ?? 0) === 1 && prenotazione_di_classe($is_progetto, $p);
+    }
+}
+
+if (!function_exists('attivita_conclusa_classe')) {
+    // Quando si possono emettere gli attestati della classe: progetti dopo la data di fine,
+    // eventi dopo il giorno del turno (turno senza data: subito, cioè dopo il check-in).
+    function attivita_conclusa_classe(array $p): bool {
+        if (($p['evento_tipo'] ?? 'evento') === 'progetto') return !empty($p['data_fine']) && $p['data_fine'] < date('Y-m-d');
+        return empty($p['data_turno']) || $p['data_turno'] < date('Y-m-d');
+    }
+}
+
 if (!function_exists('campo_form_visibile')) {
-    // Il campo "numero di partecipanti" vale solo per i progetti dedicati alle scuole: negli altri eventi
-    // e progetti dell'area non va mostrato né richiesto. $dett = scheda del progetto (null se evento).
+    // Il campo "numero di partecipanti" vale solo per le prenotazioni di classe (progetti per le scuole,
+    // eventi con attestati per gli studenti): altrove non va mostrato né richiesto.
+    // $dett = riga di progetti_dettagli dell'evento/progetto (null se assente).
     function campo_form_visibile(array $cf, bool $is_progetto, ?array $dett): bool {
         if (($cf['nome_campo'] ?? '') !== CAMPO_PARTECIPANTI) return true;
-        return $is_progetto && (int)($dett['per_scuole'] ?? 1) === 1;
+        return prenotazione_di_classe($is_progetto, $dett);
+    }
+}
+
+// ── CAPTCHA delle prenotazioni pubbliche (chi prenota senza accesso) ──────────
+// Domanda semplice (una somma) generata dal server: niente servizi esterni, niente cookie di terzi.
+// Una domanda per pagina (vale per tutte le finestre di prenotazione della pagina), risposta in sessione,
+// valida una sola volta; si tengono le ultime 10 pagine aperte (più schede del browser).
+if (!function_exists('captcha_prenotazione')) {
+    function captcha_prenotazione(): array {
+        static $corrente = null;
+        if ($corrente !== null) return $corrente;
+        $a = random_int(2, 9); $b = random_int(1, 9);
+        $id = bin2hex(random_bytes(8));
+        $lista = $_SESSION['captcha_pren'] ?? [];
+        $lista[$id] = ['r' => $a + $b, 't' => time()];
+        $_SESSION['captcha_pren'] = array_slice($lista, -10, null, true);
+        return $corrente = ['id' => $id, 'domanda' => "Quanto fa $a + $b?"];
+    }
+}
+
+if (!function_exists('captcha_verifica')) {
+    // Ritorna null se la risposta è giusta, altrimenti il messaggio da mostrare.
+    // Rifiuta anche i moduli inviati in meno di 3 secondi (tipico dei programmi automatici).
+    function captcha_verifica(string $id, string $risposta): ?string {
+        $c = $_SESSION['captcha_pren'][$id] ?? null;
+        if ($c !== null) unset($_SESSION['captcha_pren'][$id]);
+        if ($c === null || time() - (int)$c['t'] > 7200) return "La domanda di controllo è scaduta: ricarica la pagina e riprova.";
+        if (time() - (int)$c['t'] < 3) return "Modulo inviato troppo in fretta: attendi qualche secondo e riprova.";
+        if (!preg_match('/^\s*\d+\s*$/', $risposta) || (int)$risposta !== (int)$c['r']) return "La risposta alla domanda di controllo non è corretta: riprova.";
+        return null;
+    }
+}
+
+if (!function_exists('annullamento_scaduto')) {
+    // Il turno ha una scadenza per annullare/cambiare turno ed è passata
+    function annullamento_scaduto(?array $turno): bool {
+        return !empty($turno['annullabile_fino']) && date('Y-m-d H:i:s') > $turno['annullabile_fino'];
     }
 }
 
@@ -2313,8 +2380,8 @@ if (!function_exists('html_campi_form_admin')) {
         $ev = $r_ev ? $r_ev->fetch_assoc() : null;
         if (!$ev) return '';
         $is_progetto = $ev['tipo'] === 'progetto';
-        $dett = $is_progetto ? (get_dettagli_progetti($conn, [$evento_id])[$evento_id] ?? null) : null;
-        $r_tl = ($is_progetto && $turno_id > 0) ? $conn->query("SELECT min_partecipanti, max_partecipanti FROM turni WHERE id = $turno_id AND evento_id = $evento_id") : null;
+        $dett = get_dettagli_progetti($conn, [$evento_id])[$evento_id] ?? null;
+        $r_tl = $turno_id > 0 ? $conn->query("SELECT min_partecipanti, max_partecipanti FROM turni WHERE id = $turno_id AND evento_id = $evento_id") : null;
         $lim = limiti_partecipanti($dett, $r_tl ? $r_tl->fetch_assoc() : null);
         $pag = (int)$ev['pagina_id'];
         $res = $conn->query("SELECT * FROM campi_form WHERE (pagina_id = $pag AND (evento_id IS NULL OR evento_id = 0)) OR evento_id = $evento_id ORDER BY ordine ASC, id ASC");
@@ -2409,12 +2476,13 @@ if (!function_exists('regola_attestato_evento')) {
     // 'evento'  = evento normale (regole di sempre)
     // 'no'      = progetto senza attestati
     // 'attendi' = progetto non ancora concluso (data di fine futura)
-    // 'gruppo'  = progetto per le scuole: attestati per gli studenti dell'elenco
+    // 'gruppo'  = progetto per le scuole o evento con attestati per la classe: attestati per gli studenti dell'elenco
     // 'singolo' = progetto generico concluso: attestato alla persona iscritta
     function regola_attestato_evento($conn, int $evento_id): string {
         $r = $conn->query("SELECT e.tipo, d.per_scuole, d.attestati, d.data_fine FROM eventi e LEFT JOIN progetti_dettagli d ON d.evento_id = e.id WHERE e.id = $evento_id LIMIT 1");
         $row = $r ? $r->fetch_assoc() : null;
-        if (!$row || ($row['tipo'] ?? '') !== 'progetto') return 'evento';
+        if (!$row) return 'evento';
+        if (($row['tipo'] ?? '') !== 'progetto') return (int)($row['attestati'] ?? 0) === 1 ? 'gruppo' : 'evento';
         if ((int)($row['attestati'] ?? 0) !== 1) return 'no';
         if (!empty($row['data_fine']) && $row['data_fine'] >= date('Y-m-d')) return 'attendi';
         return (int)($row['per_scuole'] ?? 1) === 1 ? 'gruppo' : 'singolo';
@@ -2853,16 +2921,18 @@ if (!function_exists('assegna_codici_partecipanti')) {
 }
 
 if (!function_exists('invia_attestati_gruppo')) {
-    // Progetti per le scuole: genera i codici degli studenti e manda al docente il link agli attestati.
-    // Condizioni: iscrizione confermata e presente, progetto con attestati, almeno uno studente non escluso,
-    // progetto concluso (oppure $forza, dal pulsante "Invia attestati ora" dell'admin). Ritorna true o il motivo.
+    // Progetti per le scuole ed eventi con attestati per la classe: genera i codici degli studenti e manda
+    // a chi ha prenotato il link agli attestati. Condizioni: prenotazione confermata e presente, almeno uno
+    // studente non escluso, attività conclusa (progetto: data di fine; evento: giorno del turno), oppure
+    // $forza dal pulsante "Invia attestati ora" dell'admin. Ritorna true o il motivo.
     function invia_attestati_gruppo($conn, int $pr_id, bool $forza = false) {
         $p = prenotazione_per_attestati($conn, $pr_id);
-        if (!$p || ($p['evento_tipo'] ?? '') !== 'progetto' || (int)($p['attestati'] ?? 0) !== 1 || (int)($p['per_scuole'] ?? 1) !== 1) return "Il progetto non prevede attestati per gli studenti.";
-        if (($p['stato'] ?? 'confermata') !== 'confermata') return "L'iscrizione non è confermata.";
-        if ((int)$p['presente'] !== 1) return "Segna prima la presenza della scuola.";
+        if (!$p || !attestati_di_classe($p)) return "Questa attività non prevede attestati per gli studenti.";
+        $is_progetto = ($p['evento_tipo'] ?? '') === 'progetto';
+        if (($p['stato'] ?? 'confermata') !== 'confermata') return "La prenotazione non è confermata.";
+        if ((int)$p['presente'] !== 1) return "Segna prima la presenza della classe.";
         if (!$forza && !empty($p['attestato_inviato'])) return "Attestati già inviati.";
-        if (!$forza && (empty($p['data_fine']) || $p['data_fine'] >= date('Y-m-d'))) return "Il progetto non è ancora concluso.";
+        if (!$forza && !attivita_conclusa_classe($p)) return $is_progetto ? "Il progetto non è ancora concluso." : "L'evento non si è ancora svolto.";
         $r_n = $conn->query("SELECT COUNT(*) AS n FROM partecipanti_prenotazione WHERE prenotazione_id = $pr_id AND escluso = 0");
         $n = $r_n ? (int)$r_n->fetch_assoc()['n'] : 0;
         if ($n === 0) return "L'elenco degli studenti è vuoto.";
@@ -2871,7 +2941,7 @@ if (!function_exists('invia_attestati_gruppo')) {
         assegna_codici_partecipanti($conn, $pr_id);
         $link = url_base_sito() . '/attestati_gruppo.php?code=' . urlencode($p['codice_prenotazione']);
         $corpo = "<p>Gentile <strong>" . htmlspecialchars($p['nome'] . ' ' . $p['cognome']) . "</strong>,</p>"
-               . "<p>grazie per aver partecipato con la tua classe al progetto <strong>" . htmlspecialchars($p['evento_titolo']) . "</strong>.</p>"
+               . "<p>grazie per aver partecipato con la tua classe " . ($is_progetto ? "al progetto" : "all'attività") . " <strong>" . htmlspecialchars($p['evento_titolo']) . "</strong>.</p>"
                . "<p>Sono pronti gli <strong>attestati di partecipazione di $n " . ($n === 1 ? 'studente' : 'studenti') . "</strong>: li trovi tutti in un'unica pagina, uno per foglio, pronti da stampare o salvare in PDF. Ogni attestato ha un codice e un QR per verificarne l'autenticità.</p>"
                . "<p style='text-align:center; margin:30px 0;'><a href='" . htmlspecialchars($link) . "' style='background-color:#198754; color:white; padding:12px 24px; text-decoration:none; border-radius:6px; font-weight:bold; font-size:16px;'>📄 Apri gli attestati</a></p>"
                . "<p>Per aprirli accedi con le stesse credenziali usate per l'iscrizione. Li ritrovi anche nella tua <a href='" . htmlspecialchars(url_base_sito() . '/area_personale.php') . "'>Area Personale</a>.</p>";
@@ -2900,7 +2970,7 @@ if (!function_exists('puo_vedere_prenotazione')) {
 // richiesta: quando aggiungi qualcosa qui, cambia anche il nome del marcatore.
 if (!function_exists('assicura_schema')) {
     function assicura_schema($conn) {
-        $marker = __DIR__ . '/cache/schema_v16.ok';
+        $marker = __DIR__ . '/cache/schema_v17.ok';
         if (is_file($marker)) return;
 
         // 1. Tabelle di servizio (prima create dalle singole pagine a ogni richiesta)
@@ -2952,6 +3022,8 @@ if (!function_exists('assicura_schema')) {
                 // v15: partecipanti per iscrizione della singola edizione di un progetto (NULL = limiti generali del progetto)
                 'min_partecipanti' => "ADD COLUMN min_partecipanti INT DEFAULT NULL",
                 'max_partecipanti' => "ADD COLUMN max_partecipanti INT DEFAULT NULL",
+                // v17: oltre questa data/ora chi ha prenotato non può più annullare né cambiare turno (NULL = sempre)
+                'annullabile_fino' => "ADD COLUMN annullabile_fino DATETIME DEFAULT NULL",
             ],
             'sondaggi_domande' => [
                 'condizione_json' => "ADD COLUMN condizione_json TEXT NULL",
