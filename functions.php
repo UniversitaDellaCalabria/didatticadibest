@@ -3184,7 +3184,7 @@ if (!function_exists('puo_vedere_prenotazione')) {
 // richiesta: quando aggiungi qualcosa qui, cambia anche il nome del marcatore.
 if (!function_exists('assicura_schema')) {
     function assicura_schema($conn) {
-        $marker = __DIR__ . '/cache/schema_v18.ok';
+        $marker = __DIR__ . '/cache/schema_v19.ok';
         if (is_file($marker)) return;
 
         // 1. Tabelle di servizio (prima create dalle singole pagine a ogni richiesta)
@@ -3313,6 +3313,10 @@ if (!function_exists('assicura_schema')) {
                 'email_attestato_corpo'   => "ADD COLUMN email_attestato_corpo TEXT DEFAULT NULL",
                 'email_sondaggio_oggetto' => "ADD COLUMN email_sondaggio_oggetto VARCHAR(255) DEFAULT ''",
                 'email_sondaggio_corpo'   => "ADD COLUMN email_sondaggio_corpo TEXT DEFAULT NULL",
+            ],
+            // v19: voce di menu nascondibile (usata da admin/menu.php, mancava dallo schema; nuove aree: voce creata nascosta)
+            'menu_voci' => [
+                'visibile' => "ADD COLUMN visibile TINYINT(1) NOT NULL DEFAULT 1",
             ],
             'sottocategorie' => [
                 // Sezione mostrata in alto, affiancata alle altre, nel layout Griglia (prima dedotto dal nome).

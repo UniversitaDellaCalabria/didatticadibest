@@ -33,7 +33,7 @@ foreach ($pagine_disponibili as $a) {
 <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
     <h4 class="fw-bold text-dark mb-0"><i class="fa fa-layer-group me-2 text-primary" aria-hidden="true"></i>Aree</h4>
     <?php if ($is_full_admin): ?>
-        <button type="button" class="btn btn-primary btn-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modNuovaAreaTop"><i class="fa fa-plus-circle me-1" aria-hidden="true"></i>Nuova area</button>
+        <a href="nuova_area.php?p_id=<?php echo $filtro_p; ?>" class="btn btn-primary btn-sm fw-bold"><i class="fa fa-plus-circle me-1" aria-hidden="true"></i>Nuova area</a>
     <?php endif; ?>
 </div>
 <p class="text-secondary small mb-3"><?php echo $is_full_admin ? "Tutte le aree del portale." : "Le aree in cui sei abilitato."; ?> Con <strong>Gestisci</strong> entri nell'area: nel menu a sinistra trovi eventi, progetti, iscritti, scanner, sondaggi, statistiche e impostazioni di quell'area.</p>

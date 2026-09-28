@@ -63,51 +63,6 @@ if (isset($_POST['toggle_visibilita_pagina']) && $is_full_admin) {
     exit;
 }
 
-if (isset($_POST['add_nuova_pagina']) && $is_full_admin) {
-    csrf_verify($_POST['csrf_token'] ?? '');
-    $titolo_p = trim($_POST['titolo_pagina'] ?? '');
-    $slug_raw = trim($_POST['slug_pagina'] ?? '');
-    $slug = strtolower(preg_replace('/[^a-zA-Z0-9_]/', '', str_replace(' ', '_', $slug_raw)));
-    $col_p = colore_valido($_POST['colore_primario'] ?? '', '#0056B3');
-    $add_menu = isset($_POST['add_to_menu']) ? 1 : 0;
-
-    // Le pagine delle aree NON sono file: .htaccess manda /eventi/<slug>.php e /eventi/<slug>_archivio.php
-    // ad area.php, che le carica dal database. Uno slug uguale a un file o a una cartella del sito
-    // renderebbe l'area irraggiungibile (vince il file reale), quindi è rifiutato.
-    $radice_sito = dirname(__DIR__);
-    $slug_occupato = $slug !== '' && (str_ends_with($slug, '_archivio')
-        || file_exists("$radice_sito/$slug.php") || file_exists("$radice_sito/{$slug}_archivio.php") || is_dir("$radice_sito/$slug"));
-
-    if ($slug_occupato) {
-        flash_set("Lo slug '$slug' non è utilizzabile: coincide con un file o una cartella del sito. Scegline un altro.", 'danger');
-    } elseif (!empty($titolo_p) && !empty($slug)) {
-        $stmt_chk_slug = $conn->prepare("SELECT id FROM pagine_eventi WHERE slug = ?");
-        $stmt_chk_slug->bind_param("s", $slug);
-        $stmt_chk_slug->execute();
-        $check_e = $stmt_chk_slug->get_result();
-        if ($check_e && $check_e->num_rows > 0) {
-            flash_set("Errore: Un'area con slug '$slug' esiste già!", 'danger');
-        } else {
-            $desc_def = "<strong style=\"color: $col_p;\">Benvenuto/a a $titolo_p:</strong> Scopri il programma ed iscriviti.";
-            $stmt_ins_p = $conn->prepare("INSERT INTO pagine_eventi (titolo, slug, colore_primario, colore_secondario, larghezza_contenitore, layout_template, num_colonne, spazio_card, mostra_sidebar, chiedi_matricola, visibile, sidebar_titolo, hero_descrizione) VALUES (?, ?, ?, '#0056b3', '85%', 'grid', 2, 30, 1, 1, 1, ?, ?)");
-            $stmt_ins_p->bind_param("sssss", $titolo_p, $slug, $col_p, $titolo_p, $desc_def);
-            $stmt_ins_p->execute();
-            $new_id = $conn->insert_id;
-            if ($add_menu) {
-                $menu_url = $slug . '.php';
-                $stmt_menu = $conn->prepare("INSERT INTO menu_voci (genitore_id, etichetta, url, ordine, apri_nuova_scheda, ruolo_visibilita_id) VALUES (0, ?, ?, 10, 0, 0)");
-                $stmt_menu->bind_param("ss", $titolo_p, $menu_url);
-                $stmt_menu->execute();
-            }
-            
-            // Nessun file da creare: pagina e archivio sono già raggiungibili tramite area.php
-            flash_set("Area \"" . htmlspecialchars($titolo_p) . "\" creata! È già online su {$slug}.php (archivio: {$slug}_archivio.php).");
-            echo "<script>window.location.replace('impostazioni_area.php?p_id=$new_id');</script>";
-            exit;
-        }
-    }
-}
-
 if (isset($_POST['del_pagina_completa']) && $is_full_admin) {
     csrf_verify($_POST['csrf_token'] ?? '');
     $p_id_del = (int)$_POST['pagina_id_del'];
@@ -324,6 +279,17 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
         .nav-pills .nav-link.active { background-color: #990000; color: #fff; }
         .nav-pills .nav-link:hover:not(.active) { background-color: rgba(255,255,255,0.1); color: #fff; }
         #sidebar .nav > li { width: 100%; min-width: 0; }
+        .area-top { border: 2px solid; border-radius: 999px; padding: 4px 12px; background: #fff; max-width: 42vw; }
+        .area-top:hover { background: #f8fafc; }
+        .area-top-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+        .area-top-nome { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+        [data-bs-theme="dark"] .area-top { background: #2b2f33; }
+        @media (max-width: 575.98px) {
+            /* Telefono: Menu + area sulla prima riga, pulsanti sulla seconda */
+            #page-content-wrapper > .navbar { flex-wrap: wrap !important; }
+            #page-content-wrapper > .navbar .area-top { flex: 1 1 0; max-width: none; justify-content: center; }
+            .navbar-azioni { width: 100%; flex-wrap: wrap; justify-content: flex-end; }
+        }
         .side-area { background: rgba(255,255,255,0.06); overflow: hidden; }
         @media (max-width: 991.98px) {
             #sidebar { margin-left: -260px; position: fixed; height: 100%; overflow-y: auto; }
@@ -351,12 +317,14 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
                         <i class="fa fa-gauge-high me-2 text-center" style="width:20px;"></i> Dashboard
                     </a>
                 </li>
+                <?php if ($is_full_admin || count($pagine_disponibili) > 1): // un gestore con una sola area non ha nulla da scegliere ?>
                 <li class="nav-item mb-1">
-                    <a class="nav-link w-100 <?php echo ($current_page == 'aree.php') ? 'active' : ''; ?>" href="aree.php?p_id=<?php echo $filtro_p; ?>">
+                    <a class="nav-link w-100 <?php echo in_array($current_page, ['aree.php', 'nuova_area.php'], true) ? 'active' : ''; ?>" href="aree.php?p_id=<?php echo $filtro_p; ?>">
                         <i class="fa fa-layer-group me-2 text-center" style="width:20px;"></i> Aree
                         <span class="badge rounded-pill bg-secondary ms-1" style="font-size:.65rem;"><?php echo count($pagine_disponibili); ?></span>
                     </a>
                 </li>
+                <?php endif; ?>
 
                 <?php if ($filtro_p > 0 && $page_cfg): $col_side = colore_valido($page_cfg['colore_primario'] ?? '', '#0056B3'); ?>
                 <!-- ── Area corrente: tutto ciò che riguarda l'area ── -->
@@ -508,9 +476,18 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
     <div id="sidebarOverlay"></div>
 
     <div id="page-content-wrapper">
-        <nav class="navbar navbar-light bg-white border-bottom shadow-sm px-3 py-2 d-flex justify-content-between sticky-top" style="z-index: 998;">
-            <button class="btn btn-dark d-lg-none" id="sidebarToggle"><i class="fa fa-bars"></i> Menu</button>
-            <div class="ms-auto d-flex align-items-center gap-2">
+        <nav class="navbar navbar-light bg-white border-bottom shadow-sm px-3 py-2 d-flex justify-content-between flex-nowrap gap-2 sticky-top" style="z-index: 998;">
+            <button class="btn btn-dark d-lg-none flex-shrink-0" id="sidebarToggle"><i class="fa fa-bars"></i> Menu</button>
+            <?php if ($filtro_p > 0 && $page_cfg): $col_top = colore_valido($page_cfg['colore_primario'] ?? '', '#0056B3'); $link_top = count($pagine_disponibili) > 1 || $is_full_admin; ?>
+                <<?php echo $link_top ? 'a href="aree.php?p_id=' . $filtro_p . '"' : 'span'; ?> class="area-top text-decoration-none d-flex align-items-center gap-2" title="Area su cui stai lavorando<?php echo $link_top ? ' — clicca per cambiarla' : ''; ?>" style="border-color: <?php echo $col_top; ?>;">
+                    <span class="area-top-dot" style="background: <?php echo $col_top; ?>;" aria-hidden="true"></span>
+                    <span class="d-none d-sm-inline text-secondary" style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;">Area</span>
+                    <span class="area-top-nome fw-bold" style="color: <?php echo $col_top; ?>;"><?php echo htmlspecialchars($page_cfg['titolo']); ?></span>
+                    <?php if ((int)($page_cfg['visibile'] ?? 1) === 0): ?><span class="badge bg-warning text-dark" style="font-size:.62rem;" title="Nascosta al pubblico"><i class="fa fa-eye-slash"></i></span><?php endif; ?>
+                    <?php if ($link_top): ?><i class="fa fa-right-left text-secondary" style="font-size:.7rem;" aria-hidden="true"></i><?php endif; ?>
+                </<?php echo $link_top ? 'a' : 'span'; ?>>
+            <?php endif; ?>
+            <div class="ms-auto d-flex align-items-center gap-2 navbar-azioni">
                 <span class="text-muted small d-none d-md-inline-block"><i class="fa fa-user-shield text-danger me-1"></i> <strong><?php echo htmlspecialchars($utente_admin['nome'] ?? ''); ?></strong></span>
                 
                 <a href="messaggi.php?p_id=<?php echo $filtro_p; ?>" class="btn btn-outline-dark btn-sm fw-bold me-2 shadow-sm" style="background-color: #ffffff;">
@@ -532,30 +509,6 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
         <div class="container-fluid p-4" style="max-width: 1400px;">
             <?php echo flash_html(); ?>
 
-            <!-- Finestra "Nuova area" (pulsante nella pagina Aree) -->
-            <?php if ($is_full_admin): ?>
-                <div class="modal fade" id="modNuovaAreaTop" tabindex="-1">
-                    <div class="modal-dialog">
-                        <div class="modal-content">
-                            <form method="POST">
-                                <?php csrf_field(); ?>
-                                <div class="modal-header bg-primary text-white py-2">
-                                    <h6 class="modal-title fw-bold"><i class="fa fa-plus-circle me-1"></i> Crea Nuova Area di Lavoro</h6>
-                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                                </div>
-                                <div class="modal-body text-start">
-                                    <div class="mb-3"><label class="form-label small fw-bold">Nome / Titolo dell'Area</label><input type="text" name="titolo_pagina" class="form-control form-control-sm" required></div>
-                                    <div class="mb-3"><label class="form-label small fw-bold">Identificativo URL (Slug)</label><input type="text" name="slug_pagina" class="form-control form-control-sm" required></div>
-                                    <div class="mb-3"><label class="form-label small fw-bold">Colore Primario</label><input type="color" name="colore_primario" class="form-control form-control-color w-100" value="#0056b3"></div>
-                                    <div class="form-check form-switch mb-2"><input class="form-check-input" type="checkbox" name="add_to_menu" value="1" id="chkAddMenu" checked><label class="form-check-label small fw-bold" for="chkAddMenu">Aggiungi al Menu Principale</label></div>
-                                </div>
-                                <div class="modal-footer py-2"><button type="submit" name="add_nuova_pagina" class="btn btn-primary btn-sm fw-bold w-100">Crea Area</button></div>
-                            </form>
-                        </div>
-                    </div>
-                </div>
-
-            <?php endif; ?>
 
 <!-- Modal avviso scadenza sessione -->
 <div class="modal fade" id="modSessionTimeout" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">

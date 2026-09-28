@@ -22,7 +22,9 @@ if (isset($_POST['save_pagina_config'])) {
     $sottotitolo = $conn->real_escape_string($_POST['sottotitolo'] ?? '');
     $col_prim = $conn->real_escape_string($_POST['colore_primario'] ?? '#990000');
     $col_sec = $conn->real_escape_string($_POST['colore_secondario'] ?? '#0056b3');
-    $larg_cont = $conn->real_escape_string($_POST['larghezza_contenitore'] ?? '85%');
+    // Finisce nello stile della pagina: solo numero + unità (85%, 1200px, 90vw, 70rem)
+    $larg_raw = str_replace(' ', '', (string)($_POST['larghezza_contenitore'] ?? ''));
+    $larg_cont = preg_match('/^\d{1,4}(\.\d+)?(%|px|vw|rem|em)$/', $larg_raw) ? $larg_raw : '85%';
     $tmpl = $conn->real_escape_string($_POST['layout_template'] ?? 'grid');
     if (!in_array($tmpl, ['grid', 'list', 'advanced_list', 'calendar', 'timeline', 'agenda', 'gruppi', 'progetti'], true)) $tmpl = 'grid';
     $mostra_home = isset($_POST['mostra_in_home']) ? 1 : 0;

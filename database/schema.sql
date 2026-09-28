@@ -107,6 +107,7 @@ CREATE TABLE IF NOT EXISTS `menu_voci` (
     `ordine`              int(11)      DEFAULT 0,
     `apri_nuova_scheda`   tinyint(1)   DEFAULT 0,
     `ruolo_visibilita_id` int(11)      DEFAULT 0,
+    `visibile`            tinyint(1)   NOT NULL DEFAULT 1,
     PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
