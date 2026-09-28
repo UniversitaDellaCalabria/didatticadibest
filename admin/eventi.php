@@ -45,29 +45,8 @@ function inserisci_turno($conn, int $ev_id, array $t): void {
     $stmt->execute();
 }
 
-// Righe "Referenti" (nome, ruolo, email, telefono, pagina personale, riceve le prenotazioni) nei modali degli eventi
-function html_referenti_evento(array $referenti): string {
-    if (!$referenti) $referenti = [['ruolo' => 'Referente', 'notifiche' => 0]];
-    $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
-    $out = '<div class="ref-box">';
-    foreach ($referenti as $r) {
-        $n = !empty($r['notifiche']);
-        $out .= '<div class="ref-riga border rounded p-2 mb-2 bg-light">'
-              . '<div class="row g-2">'
-              . '<div class="col-md-3"><input type="text" name="ref_ruolo[]" class="form-control form-control-sm" value="' . $h($r['ruolo'] ?? '') . '" placeholder="Ruolo (es. Docente referente)" aria-label="Ruolo" list="refRuoliEv"></div>'
-              . '<div class="col-md-4"><input type="text" name="ref_nome[]" class="form-control form-control-sm" value="' . $h($r['nome'] ?? '') . '" placeholder="Nome e cognome" aria-label="Nome e cognome"></div>'
-              . '<div class="col-md-5"><input type="email" name="ref_email[]" class="form-control form-control-sm" value="' . $h($r['email'] ?? '') . '" placeholder="email@unical.it" aria-label="Email"></div>'
-              . '<div class="col-md-3"><input type="tel" name="ref_tel[]" class="form-control form-control-sm" value="' . $h($r['telefono'] ?? '') . '" placeholder="Telefono" aria-label="Telefono"></div>'
-              . '<div class="col-md-5"><input type="url" name="ref_link[]" class="form-control form-control-sm" value="' . $h($r['link'] ?? '') . '" placeholder="Link pagina personale (facoltativo)" aria-label="Link alla pagina personale"></div>'
-              . '<div class="col-md-4 d-flex align-items-center justify-content-between gap-2">'
-              . '<input type="hidden" name="ref_notifiche[]" value="' . ($n ? '1' : '0') . '">'
-              . '<label class="form-check form-switch m-0 small fw-bold"><input class="form-check-input ref-notif" type="checkbox"' . ($n ? ' checked' : '') . '> Riceve le prenotazioni</label>'
-              . '<button type="button" class="btn btn-sm btn-outline-danger ref-rimuovi" title="Rimuovi" aria-label="Rimuovi referente"><i class="fa fa-times" aria-hidden="true"></i></button>'
-              . '</div></div></div>';
-    }
-    return $out . '</div><button type="button" class="btn btn-sm btn-outline-secondary fw-bold ref-aggiungi"><i class="fa fa-plus me-1" aria-hidden="true"></i>Aggiungi referente</button>';
-}
-
+// Creazione di un nuovo evento: come il pulsante "Crea evento" (solo amministratori)
+$puo_creare_ev = $is_full_admin;
 
 if (isset($_POST['duplica_turno'])) {
     csrf_verify($_POST['csrf_token'] ?? '');
@@ -95,7 +74,7 @@ if (isset($_POST['duplica_evento'])) {
     [$nuovo_ev, $n_turni, $n_sond] = [$copia['evento'], $copia['turni'], $copia['sondaggi']];
     if (function_exists('registra_log_audit')) registra_log_audit($conn, "Duplicazione Evento", ["Evento origine" => $ev_id, "Nuovo evento" => $nuovo_ev, "Turni" => $n_turni, "Sondaggi" => $n_sond]);
     flash_set("Evento duplicato con $n_turni turni" . ($n_sond ? " e $n_sond sondaggio" . ($n_sond > 1 ? "i" : "") . " (da attivare)" : "") . ", senza iscritti: controlla titolo e date della copia.");
-    admin_redirect("eventi.php?p_id=$filtro_p&f_ev=$filtro_ev&apri=modEv$nuovo_ev");
+    admin_redirect("eventi.php?p_id=$filtro_p&id=$nuovo_ev");
 }
 
 
@@ -124,8 +103,10 @@ if (isset($_POST['add_sottocategoria'])) {
 
 if (isset($_POST['add_evento'])) {
     csrf_verify($_POST['csrf_token'] ?? '');
+    if (!$puo_creare_ev) nega_accesso();
     $sub_id = !empty($_POST['sottocategoria_id']) ? (int)$_POST['sottocategoria_id'] : null;
-    $titolo = $_POST['titolo'] ?? '';
+    $titolo = trim((string)($_POST['titolo'] ?? ''));
+    if ($titolo === '') { flash_set("Il titolo dell'evento è obbligatorio.", 'danger'); admin_redirect("eventi.php?p_id=$filtro_p&azione=nuovo"); }
     $luogo = $_POST['luogo'] ?? '';
     $desc = $_POST['descrizione'] ?? '';
     $desc_breve = pulisci_descrizione_breve((string)($_POST['descrizione_breve'] ?? ''));
@@ -180,7 +161,8 @@ if (isset($_POST['edit_evento'])) {
     $ev_id = (int)$_POST['evento_id'];
     if (!ev_autorizzato($conn, $ev_id, $filtro_p, $sql_filtro_eventi_rbac)) nega_accesso();
     $sub_id = !empty($_POST['sottocategoria_id']) ? (int)$_POST['sottocategoria_id'] : null;
-    $titolo = $_POST['titolo'] ?? '';
+    $titolo = trim((string)($_POST['titolo'] ?? ''));
+    if ($titolo === '') { flash_set("Il titolo dell'evento è obbligatorio.", 'danger'); admin_redirect("eventi.php?p_id=$filtro_p&id=$ev_id"); }
     $luogo = $_POST['luogo'] ?? '';
     $desc = $_POST['descrizione'] ?? '';
     $desc_breve = pulisci_descrizione_breve((string)($_POST['descrizione_breve'] ?? ''));
@@ -339,6 +321,255 @@ if (isset($_POST['del_turno'])) {
 $sottocategorie = get_sottocategorie($conn, $filtro_p);
 $ruoli          = get_ruoli($conn);
 
+// =====================================================================
+// SCHEDA DELL'EVENTO IN PAGINA (nuovo o modifica), stessa impostazione di progetti.php
+// =====================================================================
+$id_modifica = (int)($_GET['id'] ?? 0);
+$mostra_form = ($_GET['azione'] ?? '') === 'nuovo' || $id_modifica > 0;
+
+if ($mostra_form):
+    $turni_ev = [];
+    if ($id_modifica > 0) {
+        if (!ev_autorizzato($conn, $id_modifica, $filtro_p, $sql_filtro_eventi_rbac)) nega_accesso();
+        $ev = $conn->query("SELECT * FROM eventi WHERE id = $id_modifica")->fetch_assoc() ?: [];
+        if (($ev['tipo'] ?? '') === 'progetto') admin_redirect("progetti.php?p_id=$filtro_p&id=$id_modifica");
+        $r_t = $conn->query("SELECT t.*, (SELECT COUNT(*) FROM prenotazioni p WHERE p.turno_id = t.id AND IFNULL(p.stato, 'confermata') NOT IN ('annullata', 'rifiutata', 'scaduta')) AS n_iscr
+                             FROM turni t WHERE t.evento_id = $id_modifica ORDER BY (t.data_turno IS NULL), t.data_turno ASC, t.orario_inizio ASC, t.id ASC");
+        while ($r_t && $rt = $r_t->fetch_assoc()) $turni_ev[] = $rt;
+        $referenti = get_dettagli_progetti($conn, [$id_modifica])[$id_modifica]['referenti'] ?? [];
+    } else {
+        if (!$puo_creare_ev) nega_accesso();
+        $ev = []; $referenti = [];
+    }
+    if (!$referenti) $referenti = [['ruolo' => 'Referente', 'notifiche' => 1]];
+    $col_f = colore_valido($page_cfg['colore_primario'] ?? '', '#0056B3');
+    $txt_f = colore_testo_su($col_f);
+    $slug_f = $page_cfg['slug'] ?? '';
+    $v = fn($k) => h((string)($ev[$k] ?? ''));
+    $nuovo = $id_modifica === 0;
+    $sw = fn($k, $pred) => ($nuovo ? $pred : (int)($ev[$k] ?? $pred) === 1) ? 'checked' : '';
+?>
+<style>
+.pj-sez { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1.25rem 1.25rem .75rem; margin-bottom:1rem; box-shadow:0 1px 4px rgba(0,0,0,.04); }
+.pj-sez h2 { font-size:.8rem; text-transform:uppercase; letter-spacing:.06em; font-weight:800; color:<?php echo h($col_f); ?>; margin-bottom:1rem; }
+.pj-sez .form-text { font-size:.76rem; }
+.pj-riga { display:grid; grid-template-columns: 150px 1fr 1fr 150px 38px; gap:.5rem; margin-bottom:.5rem; }
+.pj-ref { padding-bottom:.6rem; margin-bottom:.6rem; border-bottom:1px dashed #e2e8f0; }
+.pj-ref .pj-riga { margin-bottom:.4rem; }
+.pj-riga-2 { display:grid; grid-template-columns: 1fr auto; gap:.75rem; align-items:center; padding-right:46px; }
+.ev-turno-riga { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem; padding:.45rem .6rem; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; font-size:.82rem; margin-bottom:.4rem; }
+@media (max-width: 767.98px) { .pj-riga, .pj-riga-2 { grid-template-columns: 1fr; padding-right:0; } }
+</style>
+
+<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+    <h4 class="fw-bold text-dark mb-0"><i class="fa fa-calendar-alt me-2" style="color:<?php echo h($col_f); ?>" aria-hidden="true"></i><?php echo $nuovo ? 'Nuovo evento' : 'Modifica evento'; ?></h4>
+    <a href="eventi.php?p_id=<?php echo $filtro_p; ?><?php echo $filtro_ev ? '&f_ev=' . $filtro_ev : ''; ?>" class="btn btn-outline-secondary btn-sm fw-bold"><i class="fa fa-arrow-left me-1" aria-hidden="true"></i>Torna agli eventi</a>
+</div>
+
+<form method="POST" enctype="multipart/form-data" onsubmit="if (window.tinymce) tinymce.triggerSave();">
+    <?php csrf_field(); ?>
+    <input type="hidden" name="evento_id" value="<?php echo $id_modifica; ?>">
+    <input type="hidden" name="p_id" value="<?php echo $filtro_p; ?>">
+    <input type="hidden" name="f_ev" value="<?php echo $filtro_ev; ?>">
+
+    <div class="row g-3">
+        <div class="col-xl-8">
+            <section class="pj-sez">
+                <h2><i class="fa fa-circle-info me-1" aria-hidden="true"></i>Dati generali</h2>
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label for="evTitolo" class="form-label small fw-bold">Titolo dell'evento <span class="text-danger">*</span></label>
+                        <input type="text" name="titolo" id="evTitolo" class="form-control" value="<?php echo $v('titolo'); ?>" maxlength="255" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="evSez" class="form-label small fw-bold">Sottocategoria / Sezione</label>
+                        <select name="sottocategoria_id" id="evSez" class="form-select form-select-sm" <?php echo !$can_manage_settings ? 'disabled' : ''; ?>>
+                            <option value="">-- Nessuna --</option>
+                            <?php foreach ($sottocategorie as $sub): ?><option value="<?php echo (int)$sub['id']; ?>" <?php echo (int)($ev['sottocategoria_id'] ?? 0) === (int)$sub['id'] ? 'selected' : ''; ?>><?php echo h($sub['nome'] ?? ''); ?></option><?php endforeach; ?>
+                        </select>
+                        <?php if (!$can_manage_settings && !empty($ev['sottocategoria_id'])): ?><input type="hidden" name="sottocategoria_id" value="<?php echo (int)$ev['sottocategoria_id']; ?>"><?php endif; ?>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="evLuogo" class="form-label small fw-bold">Luogo / Aula</label>
+                        <input type="text" name="luogo" id="evLuogo" class="form-control form-control-sm" value="<?php echo $v('luogo'); ?>" placeholder="es. Aula Magna, Cubo 4C, Online (Teams)" maxlength="255">
+                    </div>
+                    <div class="col-12">
+                        <label for="evDescBreve" class="form-label small fw-bold">Descrizione breve <span class="fw-normal text-muted">(compare nelle card)</span></label>
+                        <textarea name="descrizione_breve" id="evDescBreve" class="form-control form-control-sm editor-breve" rows="2" placeholder="Una o due frasi che invogliano ad aprire la scheda dell'evento"><?php echo $v('descrizione_breve'); ?></textarea>
+                        <div class="form-text"><span class="desc-breve-conta">0</span>/300 caratteri. Se è vuota, nelle card compare l'inizio della descrizione completa.</div>
+                    </div>
+                    <div class="col-12">
+                        <label for="evDesc" class="form-label small fw-bold">Descrizione completa <span class="fw-normal text-muted">(scheda dell'evento)</span></label>
+                        <textarea name="descrizione" id="evDesc" class="form-control editor-html" rows="10"><?php echo $v('descrizione'); ?></textarea>
+                    </div>
+                </div>
+            </section>
+
+            <section class="pj-sez">
+                <h2><i class="fa fa-address-book me-1" aria-hidden="true"></i>Referenti, responsabili e relatori</h2>
+                <p class="form-text mt-0 mb-2">Compaiono nella scheda dell'evento; il link alla pagina personale rende cliccabile il nome. Chi ha <strong>"Riceve le prenotazioni"</strong> attivo riceve per email il riepilogo di ogni prenotazione e disdetta (serve l'email).</p>
+                <div class="d-none d-md-grid pj-riga small fw-bold text-secondary mb-1"><span>Ruolo</span><span>Nome e cognome</span><span>Email</span><span>Telefono</span><span></span></div>
+                <div id="evReferenti">
+                    <?php foreach ($referenti as $r): $notif_r = !empty($r['notifiche']); ?>
+                        <div class="pj-ref">
+                            <div class="pj-riga">
+                                <input type="text" name="ref_ruolo[]" class="form-control form-control-sm" value="<?php echo h($r['ruolo'] ?? ''); ?>" list="evRuoli" placeholder="Ruolo" aria-label="Ruolo">
+                                <input type="text" name="ref_nome[]" class="form-control form-control-sm" value="<?php echo h($r['nome'] ?? ''); ?>" placeholder="Nome e cognome" aria-label="Nome e cognome">
+                                <input type="email" name="ref_email[]" class="form-control form-control-sm" value="<?php echo h($r['email'] ?? ''); ?>" placeholder="nome@unical.it" aria-label="Email">
+                                <input type="tel" name="ref_tel[]" class="form-control form-control-sm" value="<?php echo h($r['telefono'] ?? ''); ?>" placeholder="Telefono (facoltativo)" aria-label="Telefono">
+                                <button type="button" class="btn btn-sm btn-outline-danger pj-rimuovi" title="Rimuovi" aria-label="Rimuovi persona"><i class="fa fa-times" aria-hidden="true"></i></button>
+                            </div>
+                            <div class="pj-riga-2">
+                                <input type="url" name="ref_link[]" class="form-control form-control-sm" value="<?php echo h($r['link'] ?? ''); ?>" placeholder="Link alla pagina personale (facoltativo), es. https://www.unical.it/..." aria-label="Link alla pagina personale">
+                                <input type="hidden" name="ref_notifiche[]" value="<?php echo $notif_r ? '1' : '0'; ?>">
+                                <label class="form-check form-switch m-0 small fw-bold text-nowrap"><input class="form-check-input pj-notif" type="checkbox" <?php echo $notif_r ? 'checked' : ''; ?>> Riceve le prenotazioni</label>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+                <datalist id="evRuoli"><option value="Referente"><option value="Docente referente"><option value="Responsabile Unical"><option value="Relatore"><option value="Tutor"><option value="Segreteria"></datalist>
+                <button type="button" class="btn btn-sm btn-outline-secondary fw-bold mb-2" data-pj-aggiungi="evReferenti"><i class="fa fa-plus me-1" aria-hidden="true"></i>Aggiungi persona</button>
+            </section>
+
+            <?php if ($nuovo): ?>
+            <section class="pj-sez">
+                <h2><i class="fa fa-clock me-1" aria-hidden="true"></i>Primo turno <span class="fw-normal text-muted text-lowercase">(facoltativo)</span></h2>
+                <p class="form-text mt-0 mb-2">Il turno viene creato se compili il nome oppure la data. Gli altri turni li aggiungi dall'elenco degli eventi.</p>
+                <div class="row g-2">
+                    <div class="col-md-4"><label for="evTNome" class="form-label small fw-bold">Nome turno</label><input type="text" name="nome_turno" id="evTNome" class="form-control form-control-sm" placeholder="es. Gruppo 1" maxlength="150"></div>
+                    <div class="col-md-3"><label for="evTData" class="form-label small fw-bold">Data</label><input type="date" name="data_turno" id="evTData" class="form-control form-control-sm"></div>
+                    <div class="col-6 col-md-2"><label for="evTIn" class="form-label small fw-bold">Inizio</label><input type="time" name="orario_inizio" id="evTIn" class="form-control form-control-sm"></div>
+                    <div class="col-6 col-md-2"><label for="evTFi" class="form-label small fw-bold">Fine</label><input type="time" name="orario_fine" id="evTFi" class="form-control form-control-sm"></div>
+                    <div class="col-md-1"><label for="evTPosti" class="form-label small fw-bold">Posti</label><input type="number" name="max_posti" id="evTPosti" class="form-control form-control-sm" value="30" min="1"></div>
+                    <div class="col-md-6"><label for="evTAp" class="form-label small fw-bold">Apertura prenotazioni</label><input type="datetime-local" name="data_apertura" id="evTAp" class="form-control form-control-sm"></div>
+                    <div class="col-md-6"><label for="evTCh" class="form-label small fw-bold">Chiusura prenotazioni</label><input type="datetime-local" name="data_chiusura" id="evTCh" class="form-control form-control-sm"></div>
+                    <div class="col-12 d-flex flex-wrap gap-4 pt-1">
+                        <div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" name="abilita_lista_attesa" id="evTWa" value="1"><label class="form-check-label small fw-bold" for="evTWa">Lista d'attesa</label></div>
+                        <div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" name="abilita_multi_posto" id="evTMp" value="1"><label class="form-check-label small fw-bold" for="evTMp">Multi-posto</label></div>
+                        <div class="form-check form-switch m-0"><input class="form-check-input" type="checkbox" name="richiede_approvazione" id="evTApp" value="1"><label class="form-check-label small fw-bold" for="evTApp">Approvazione</label></div>
+                    </div>
+                </div>
+            </section>
+            <?php else: ?>
+            <section class="pj-sez">
+                <h2><i class="fa fa-clock me-1" aria-hidden="true"></i>Turni</h2>
+                <?php if (!$turni_ev): ?>
+                    <p class="text-muted small mb-2">Nessun turno: aggiungilo dall'elenco degli eventi.</p>
+                <?php endif; ?>
+                <?php foreach ($turni_ev as $t): ?>
+                    <div class="ev-turno-riga <?php echo turno_concluso($t) ? 'opacity-50' : ''; ?>">
+                        <?php if (!empty($t['nome_turno'])): ?><span class="fw-bold text-dark"><?php echo h($t['nome_turno']); ?></span><?php endif; ?>
+                        <?php if (!empty($t['data_turno'])): ?><span class="fw-bold" style="color:<?php echo h($col_f); ?>;"><i class="fa fa-calendar me-1" aria-hidden="true"></i><?php echo date('d/m/Y', strtotime($t['data_turno'])); ?></span><?php endif; ?>
+                        <?php if (orario_turno($t) !== ''): ?><span><i class="fa fa-clock text-secondary me-1" aria-hidden="true"></i><?php echo h(orario_turno($t)); ?></span><?php endif; ?>
+                        <span class="badge bg-light text-dark border"><i class="fa fa-users me-1" aria-hidden="true"></i><?php echo (int)$t['n_iscr']; ?> / <?php echo (int)$t['max_posti']; ?></span>
+                        <?php if ($t['abilita_lista_attesa']): ?><span class="badge" style="background:#fef3c7;color:#92400e;">L. attesa</span><?php endif; ?>
+                        <?php if ($t['richiede_approvazione']): ?><span class="badge" style="background:#fee2e2;color:#991b1b;">Approvazione</span><?php endif; ?>
+                        <?php if ($can_manage_iscritti): ?><a href="iscritti.php?p_id=<?php echo $filtro_p; ?>&f_turno=<?php echo (int)$t['id']; ?>" class="btn btn-sm btn-outline-dark py-0 ms-auto fw-bold"><i class="fa fa-users me-1" aria-hidden="true"></i>Iscritti</a><?php endif; ?>
+                    </div>
+                <?php endforeach; ?>
+                <a href="eventi.php?p_id=<?php echo $filtro_p; ?>&f_ev=<?php echo $id_modifica; ?>" class="btn btn-sm btn-outline-secondary fw-bold my-2"><i class="fa fa-pen-to-square me-1" aria-hidden="true"></i>Aggiungi o modifica i turni</a>
+            </section>
+            <?php endif; ?>
+        </div>
+
+        <div class="col-xl-4">
+            <section class="pj-sez" style="border-left:4px solid <?php echo h($col_f); ?>;">
+                <h2><i class="fa fa-toggle-on me-1" aria-hidden="true"></i>Accesso e prenotazione</h2>
+                <label for="evRuolo" class="form-label small fw-bold">Prenotabile da</label>
+                <select name="ruolo_accesso_id" id="evRuolo" class="form-select form-select-sm mb-3">
+                    <option value="0">🌐 Tutti (pubblico)</option>
+                    <option value="-1" <?php echo (int)($ev['ruolo_accesso_id'] ?? 0) === -1 ? 'selected' : ''; ?>>🔑 Solo utenti autenticati (SPID, CIE, Unical)</option>
+                    <?php foreach ($ruoli as $r): ?><option value="<?php echo (int)$r['id']; ?>" <?php echo (int)($ev['ruolo_accesso_id'] ?? 0) === (int)$r['id'] ? 'selected' : ''; ?>>🔒 Solo: <?php echo h($r['nome']); ?></option><?php endforeach; ?>
+                </select>
+                <div class="form-check form-switch mb-1">
+                    <input class="form-check-input" type="checkbox" name="richiede_prenotazione" id="evReqPren" value="1" <?php echo $sw('richiede_prenotazione', 1); ?>>
+                    <label class="form-check-label small fw-bold" for="evReqPren">Richiede prenotazione</label>
+                </div>
+                <p class="form-text mt-0 mb-3">Spento: evento ad accesso libero, senza modulo di prenotazione.</p>
+                <div class="form-check form-switch mb-1">
+                    <input class="form-check-input" type="checkbox" name="abilita_presenze" id="evPres" value="1" <?php echo $sw('abilita_presenze', 1); ?>>
+                    <label class="form-check-label small fw-bold" for="evPres">Check-in con QR</label>
+                </div>
+                <p class="form-text mt-0 mb-0">Registra le presenze con lo scanner o il QR d'aula: serve per rilasciare gli attestati.</p>
+            </section>
+
+            <section class="pj-sez">
+                <h2><i class="fa fa-paperclip me-1" aria-hidden="true"></i>Immagine e allegati</h2>
+                <label for="evLoc" class="form-label small fw-bold">Locandina (JPG, PNG, WEBP)</label>
+                <input type="file" name="locandina_file" id="evLoc" class="form-control form-control-sm" accept="image/png,image/jpeg,image/gif,image/webp">
+                <?php if (!empty($ev['locandina_path'])): ?>
+                    <div class="d-flex align-items-center gap-2 mt-2">
+                        <img src="../<?php echo h($ev['locandina_path']); ?>" alt="" style="height:48px;border-radius:6px;object-fit:cover;">
+                        <div class="form-check m-0"><input class="form-check-input" type="checkbox" name="elimina_locandina" id="evDelLoc" value="1"><label class="form-check-label small text-danger fw-bold" for="evDelLoc">Rimuovi</label></div>
+                    </div>
+                <?php endif; ?>
+                <label for="evPdf" class="form-label small fw-bold mt-3">Programma / allegato (PDF)</label>
+                <input type="file" name="allegato_pdf" id="evPdf" class="form-control form-control-sm" accept="application/pdf">
+                <?php if (!empty($ev['allegato_pdf'])): ?>
+                    <div class="d-flex align-items-center gap-2 mt-2 mb-2">
+                        <a href="../<?php echo h($ev['allegato_pdf']); ?>" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary py-0"><i class="fa fa-eye me-1" aria-hidden="true"></i>Vedi</a>
+                        <div class="form-check m-0"><input class="form-check-input" type="checkbox" name="elimina_pdf" id="evDelPdf" value="1"><label class="form-check-label small text-danger fw-bold" for="evDelPdf">Rimuovi</label></div>
+                    </div>
+                <?php endif; ?>
+            </section>
+
+            <section class="pj-sez">
+                <h2><i class="fa fa-sliders me-1" aria-hidden="true"></i>Pubblicazione e notifiche</h2>
+                <div class="row g-2 align-items-end">
+                    <div class="col-5"><label for="evOrd" class="form-label small fw-bold">Ordine</label><input type="number" name="ordine_evento" id="evOrd" class="form-control form-control-sm" value="<?php echo (int)($ev['ordine'] ?? 0); ?>" <?php echo !$can_manage_settings ? 'readonly' : ''; ?>></div>
+                    <div class="col-7 pb-1">
+                        <div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="is_evidenza" id="evEvid" value="1" <?php echo !empty($ev['is_evidenza']) ? 'checked' : ''; ?> <?php echo !$can_manage_settings ? 'disabled' : ''; ?>><label class="form-check-label small fw-bold" for="evEvid">⭐ In evidenza</label></div>
+                        <?php if (!$can_manage_settings && !empty($ev['is_evidenza'])): ?><input type="hidden" name="is_evidenza" value="1"><?php endif; ?>
+                    </div>
+                    <div class="col-12 mt-3">
+                        <label for="evNotif" class="form-label small fw-bold">Invia copia delle prenotazioni a</label>
+                        <input type="text" name="email_notifiche_extra" id="evNotif" class="form-control form-control-sm" value="<?php echo h(implode(', ', normalizza_lista_email($ev['email_notifiche_extra'] ?? ''))); ?>" placeholder="es. segreteria@unical.it">
+                        <div class="form-text">Oltre ai gestori e ai referenti con "Riceve le prenotazioni". Separa gli indirizzi con una virgola, massimo 10.</div>
+                    </div>
+                </div>
+            </section>
+
+            <div class="d-grid gap-2 mb-4">
+                <button type="submit" name="<?php echo $nuovo ? 'add_evento' : 'edit_evento'; ?>" value="1" class="btn fw-bold py-2" style="background:<?php echo h($col_f); ?>;color:<?php echo $txt_f; ?>;"><i class="fa fa-save me-1" aria-hidden="true"></i><?php echo $nuovo ? 'Crea evento' : 'Salva evento'; ?></button>
+                <?php if (!$nuovo && $slug_f): ?>
+                    <a href="../<?php echo h($slug_f); ?>.php?evento=<?php echo $id_modifica; ?>" target="_blank" rel="noopener" class="btn btn-outline-secondary fw-bold"><i class="fa fa-up-right-from-square me-1" aria-hidden="true"></i>Vedi la scheda pubblica</a>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</form>
+
+<script>
+// Referenti: aggiungi / rimuovi righe; l'interruttore aggiorna il campo nascosto (le checkbox spente non vengono inviate)
+document.addEventListener('click', function (e) {
+    var add = e.target.closest('[data-pj-aggiungi]');
+    if (add) {
+        var box = document.getElementById(add.dataset.pjAggiungi), nuova = box.lastElementChild.cloneNode(true);
+        svuota(nuova); box.appendChild(nuova);
+        nuova.querySelector('input:not([type=hidden])').focus();
+        return;
+    }
+    var rim = e.target.closest('.pj-rimuovi');
+    if (rim) {
+        var riga = rim.closest('.pj-ref');
+        if (riga.parentElement.children.length > 1) riga.remove(); else svuota(riga);
+    }
+});
+function svuota(riga) {
+    riga.querySelectorAll('input').forEach(function (i) {
+        if (i.type === 'checkbox') i.checked = false; else if (i.type === 'hidden') i.value = '0'; else i.value = '';
+    });
+}
+document.addEventListener('change', function (e) {
+    if (!e.target.classList.contains('pj-notif')) return;
+    e.target.closest('.pj-riga-2').querySelector('input[name="ref_notifiche[]"]').value = e.target.checked ? '1' : '0';
+});
+</script>
+<?php
+    require_once 'admin_footer.php';
+    exit;
+endif;
+
 $eventi = []; $tutti_gli_eventi = [];
 $filtro_ev = isset($_GET['f_ev']) ? (int)$_GET['f_ev'] : 0;
 
@@ -396,8 +627,8 @@ $col_area = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
                 <button type="submit" name="archivia_conclusi" class="btn btn-outline-secondary btn-sm fw-bold" data-confirm="Archiviare tutti gli eventi passati?" title="Archivia conclusi"><i class="fa fa-archive me-1"></i>Archivia vecchi</button>
             </form>
         <?php endif; ?>
-        <?php if ($can_manage_eventi && $is_full_admin): ?>
-            <button type="button" class="btn btn-sm fw-bold px-3 shadow-sm text-white" data-bs-toggle="modal" data-bs-target="#modCreaEvento" style="background:<?php echo $col_area; ?>;border:none;border-radius:8px;"><i class="fa fa-plus-circle me-1"></i>Crea Evento</button>
+        <?php if ($puo_creare_ev): ?>
+            <a href="eventi.php?p_id=<?php echo $filtro_p; ?>&azione=nuovo" class="btn btn-sm fw-bold px-3 shadow-sm text-white" style="background:<?php echo $col_area; ?>;border:none;border-radius:8px;"><i class="fa fa-plus-circle me-1"></i>Crea Evento</a>
         <?php endif; ?>
     </div>
 </div>
@@ -475,7 +706,10 @@ $col_area = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
                         </div>
                         <!-- Bottoni azione -->
                         <div class="d-flex gap-1 flex-shrink-0">
-                            <button type="button" class="btn btn-sm btn-outline-primary" style="border-radius:8px;width:34px;height:34px;padding:0;" data-bs-toggle="modal" data-bs-target="#modEv<?php echo $ev['id']; ?>" title="Modifica evento"><i class="fa fa-edit" style="font-size:.85rem;"></i></button>
+                            <a href="eventi.php?p_id=<?php echo $filtro_p; ?>&id=<?php echo (int)$ev['id']; ?><?php echo $filtro_ev ? '&f_ev=' . $filtro_ev : ''; ?>" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center justify-content-center" style="border-radius:8px;width:34px;height:34px;padding:0;" title="Modifica evento" aria-label="Modifica evento"><i class="fa fa-edit" style="font-size:.85rem;" aria-hidden="true"></i></a>
+                            <?php if (!empty($page_cfg['slug'])): ?>
+                                <a href="../<?php echo htmlspecialchars($page_cfg['slug']); ?>.php?evento=<?php echo (int)$ev['id']; ?>" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center justify-content-center" style="border-radius:8px;width:34px;height:34px;padding:0;" title="Scheda pubblica" aria-label="Scheda pubblica"><i class="fa fa-eye" style="font-size:.85rem;" aria-hidden="true"></i></a>
+                            <?php endif; ?>
                             <form method="POST" class="d-inline m-0">
                                 <?php csrf_field(); ?>
                                 <input type="hidden" name="duplica_evento" value="<?php echo $ev['id']; ?>">
@@ -519,6 +753,9 @@ $col_area = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
                         <?php endif; ?>
                         <?php $notif_extra_ev = normalizza_lista_email($ev['email_notifiche_extra'] ?? ''); if ($notif_extra_ev): ?>
                             <span class="badge" style="background:#e0e7ff;color:#3730a3;font-size:.68rem;" title="<?php echo htmlspecialchars(implode(', ', $notif_extra_ev)); ?>"><i class="fa fa-envelope me-1" aria-hidden="true"></i>Notifiche in copia: <?php echo count($notif_extra_ev); ?></span>
+                        <?php endif; ?>
+                        <?php $ref_notif_ev = array_filter($schede_ev[(int)$ev['id']]['referenti'] ?? [], fn($r) => !empty($r['notifiche']) && !empty($r['email'])); if ($ref_notif_ev): ?>
+                            <span class="badge" style="background:#dcfce7;color:#166534;font-size:.68rem;" title="<?php echo htmlspecialchars(implode(', ', array_column($ref_notif_ev, 'email'))); ?>"><i class="fa fa-bell me-1" aria-hidden="true"></i>Referenti avvisati: <?php echo count($ref_notif_ev); ?></span>
                         <?php endif; ?>
                     </div>
 
@@ -629,173 +866,8 @@ $col_area = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
     </div>
 </div>
 
-<!-- Modale CREA EVENTO -->
-<div class="modal fade" id="modCreaEvento" tabindex="-1">
-    <div class="modal-dialog modal-xl">
-        <div class="modal-content shadow-lg border-0">
-            <form method="POST" enctype="multipart/form-data">
-                <?php csrf_field(); ?>
-                <input type="hidden" name="pagina_id" value="<?php echo $filtro_p; ?>">
-                <div class="modal-header py-3 bg-danger text-white border-bottom-0">
-                    <h6 class="modal-title fw-bold fs-5"><i class="fa fa-plus-circle me-2"></i> Crea Nuovo Evento in: <?php echo htmlspecialchars($page_cfg['titolo'] ?? ''); ?></h6>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body p-4 bg-light text-start">
-                    <div class="row bg-white p-3 rounded mb-4 shadow-sm border border-secondary">
-                        <h6 class="fw-bold text-dark border-bottom pb-2 mb-3">Informazioni Generali Evento</h6>
-                        <div class="col-md-3 mb-2"><label class="form-label small fw-bold">Sottocategoria</label>
-                            <select name="sottocategoria_id" class="form-select form-select-sm border-primary">
-                                <option value="">-- Nessuna --</option>
-                                <?php foreach ($sottocategorie as $sub): ?><option value="<?php echo $sub['id']; ?>"><?php echo htmlspecialchars($sub['nome'] ?? ''); ?></option><?php endforeach; ?>
-                            </select>
-                        </div>
-                        <div class="col-md-4 mb-2"><label class="form-label small fw-bold">Titolo Evento <span class="text-danger">*</span></label><input type="text" name="titolo" class="form-control form-control-sm" required></div>
-                        <div class="col-md-3 mb-2"><label class="form-label small fw-bold">Luogo / Aula</label><input type="text" name="luogo" class="form-control form-control-sm"></div>
-                        <div class="col-md-2 mb-2"><label class="form-label small fw-bold">Ordine</label><input type="number" name="ordine_evento" class="form-control form-control-sm" value="0" required></div>
-                        
-                        <div class="col-md-4 mb-2">
-                            <label class="form-label small fw-bold text-primary">Prenotabile da:</label>
-                            <select name="ruolo_accesso_id" class="form-select form-select-sm">
-                                <option value="0">🌐 Tutti (Pubblico / Accesso Libero)</option>
-                                <option value="-1">🔑 Tutti gli Utenti Autenticati (SSO Unical)</option>
-                                <?php foreach ($ruoli as $r): ?>
-                                    <option value="<?php echo $r['id']; ?>">🔒 Solo: <?php echo htmlspecialchars($r['nome']); ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                        
-                        <div class="col-md-4 mb-2"><label class="form-label small fw-bold text-danger">Immagine Locandina</label><input type="file" name="locandina_file" class="form-control form-control-sm" accept="image/png, image/jpeg, image/jpg"></div>
-                        <div class="col-md-4 mb-2"><label class="form-label small fw-bold text-dark">Programma / Allegato (PDF)</label><input type="file" name="allegato_pdf" class="form-control form-control-sm" accept="application/pdf"></div>
-
-                        <div class="col-md-4 mb-2 pt-2 border-top"><div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="richiede_prenotazione" id="reqPren" value="1" checked><label class="form-check-label small fw-bold text-primary" for="reqPren">Richiede Prenotazione</label></div></div>
-                        <div class="col-md-4 mb-2 pt-2 border-top"><div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="is_evidenza" id="checkEvid" value="1"><label class="form-check-label small fw-bold text-danger" for="checkEvid">⭐ In EVIDENZA</label></div></div>
-                        <div class="col-md-4 mb-2 pt-2 border-top"><div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="abilita_presenze" id="checkPres" value="1" checked><label class="form-check-label small fw-bold text-success" for="checkPres">Check-in / Scanner QR</label></div></div>
-                        
-                        <div class="col-12 mt-2 mb-1">
-                            <label for="descBreveNuovo" class="form-label small fw-bold">Descrizione breve <span class="fw-normal text-muted">(compare nelle card)</span></label>
-                            <textarea name="descrizione_breve" id="descBreveNuovo" class="form-control form-control-sm editor-breve" rows="2" placeholder="Una o due frasi che invogliano ad aprire la scheda dell'evento"></textarea>
-                            <small class="text-muted"><span class="desc-breve-conta">0</span>/300 caratteri. La descrizione completa qui sotto si vede nella scheda dell'evento.</small>
-                        </div>
-                        <div class="col-12 mt-2 mb-2"><label class="form-label small fw-bold">Descrizione completa <span class="fw-normal text-muted">(scheda dell'evento)</span></label><textarea name="descrizione" class="form-control form-control-sm editor-html" rows="3"></textarea></div>
-                        <div class="col-12 mb-2">
-                            <label for="notifExtraNuovo" class="form-label small fw-bold"><i class="fa fa-envelope me-1" aria-hidden="true"></i> Invia copia delle prenotazioni a</label>
-                            <input type="text" name="email_notifiche_extra" id="notifExtraNuovo" class="form-control form-control-sm" placeholder="es. segreteria@unical.it, docente@unical.it">
-                            <small class="text-muted">Facoltativo. Oltre ai gestori, questi indirizzi ricevono il riepilogo completo di ogni prenotazione e disdetta (campi aggiuntivi compresi). Separali con una virgola, massimo 10.</small>
-                        </div>
-                        <div class="col-12 mb-2">
-                            <label class="form-label small fw-bold"><i class="fa fa-address-book me-1" aria-hidden="true"></i> Referenti dell'evento</label>
-                            <?php echo html_referenti_evento([]); ?>
-                            <small class="text-muted d-block">Facoltativi: compaiono nella scheda dell'evento con email, telefono e pagina personale. Chi ha "Riceve le prenotazioni" riceve il riepilogo di ogni prenotazione e disdetta.</small>
-                        </div>
-                    </div>
-
-                    <div class="row bg-white p-3 rounded border border-warning shadow-sm">
-                        <h6 class="fw-bold text-warning border-bottom pb-2 mb-3" style="color:#b37700!important;">Configurazione Primo Turno (Opzionale)</h6>
-                        <div class="col-md-3 mb-2"><label class="form-label small fw-bold">Nome Turno</label><input type="text" name="nome_turno" class="form-control form-control-sm" placeholder="Es. Gruppo 1" maxlength="150"></div>
-                        <div class="col-md-2 mb-2"><label class="form-label small fw-bold">Data Turno</label><input type="date" name="data_turno" class="form-control form-control-sm"></div>
-                        <div class="col-md-1 mb-2"><label class="form-label small fw-bold">Inizio</label><input type="time" name="orario_inizio" class="form-control form-control-sm"></div>
-                        <div class="col-md-1 mb-2"><label class="form-label small fw-bold">Fine</label><input type="time" name="orario_fine" class="form-control form-control-sm"></div>
-                        <div class="col-md-1 mb-2"><label class="form-label small fw-bold">Capienza</label><input type="number" name="max_posti" class="form-control form-control-sm" value="30"></div>
-                        <div class="col-md-2 mb-2"><label class="form-label small fw-bold">Ap. Prenotazioni</label><input type="datetime-local" name="data_apertura" class="form-control form-control-sm"></div>
-                        <div class="col-md-2 mb-2"><label class="form-label small fw-bold">Ch. Prenotazioni</label><input type="datetime-local" name="data_chiusura" class="form-control form-control-sm"></div>
-                        <div class="col-12"><small class="text-muted">Il turno viene creato se compili il nome oppure la data.</small></div>
-                    </div>
-                </div>
-                <div class="modal-footer py-2 bg-white">
-                    <button type="button" class="btn btn-secondary fw-bold" data-bs-dismiss="modal">Annulla</button>
-                    <button type="submit" name="add_evento" onclick="tinymce.triggerSave();" class="btn btn-danger px-4 fw-bold shadow-sm" style="background-color: #990000;">Salva e Crea Evento</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-
-<!-- Modali EDIT EVENTO e EDIT TURNO -->
+<!-- Modali EDIT TURNO (la modifica dell'evento è in una pagina: eventi.php?id=...) -->
 <?php foreach($eventi as $ev): ?>
-    <div class="modal fade" id="modEv<?php echo $ev['id']; ?>" tabindex="-1">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <form method="POST" enctype="multipart/form-data">
-                    <?php csrf_field(); ?>
-                    <input type="hidden" name="evento_id" value="<?php echo $ev['id']; ?>">
-                    <input type="hidden" name="p_id" value="<?php echo $filtro_p; ?>">
-                    <input type="hidden" name="f_ev" value="<?php echo $filtro_ev; ?>">
-
-                    <div class="modal-header py-2 bg-primary text-white">
-                        <h6 class="modal-title fw-bold"><i class="fa fa-edit me-1"></i> Modifica Evento: <?php echo htmlspecialchars($ev['titolo']); ?></h6>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-                    </div>
-                    
-                    <div class="modal-body text-start bg-light">
-                        <div class="row g-2 mb-3 bg-white p-2 rounded shadow-sm border border-secondary">
-                            <div class="col-md-4">
-                                <label class="form-label small fw-bold">Sottocategoria / Sezione</label>
-                                <select name="sottocategoria_id" class="form-select form-select-sm" <?php echo !$can_manage_settings ? 'disabled' : ''; ?>>
-                                    <option value="">-- Nessuna --</option>
-                                    <?php foreach ($sottocategorie as $sub): ?><option value="<?php echo $sub['id']; ?>" <?php echo ($ev['sottocategoria_id'] == $sub['id']) ? 'selected' : ''; ?>><?php echo htmlspecialchars($sub['nome']); ?></option><?php endforeach; ?>
-                                </select>
-                                <?php if (!$can_manage_settings && !empty($ev['sottocategoria_id'])): ?><input type="hidden" name="sottocategoria_id" value="<?php echo $ev['sottocategoria_id']; ?>"><?php endif; ?>
-                            </div>
-                            <div class="col-md-5"><label class="form-label small fw-bold">Titolo Evento</label><input type="text" name="titolo" class="form-control form-control-sm" value="<?php echo htmlspecialchars($ev['titolo'] ?? ''); ?>" required></div>
-                            <div class="col-md-3"><label class="form-label small fw-bold">Luogo / Aula</label><input type="text" name="luogo" class="form-control form-control-sm" value="<?php echo htmlspecialchars($ev['luogo'] ?? ''); ?>"></div>
-                        </div>
-
-                        <div class="row g-2 mb-3 align-items-center bg-white p-2 rounded border shadow-sm">
-                            <div class="col-md-2"><label class="form-label small fw-bold">Ordine</label><input type="number" name="ordine_evento" class="form-control form-control-sm" value="<?php echo (int)($ev['ordine'] ?? 0); ?>" required <?php echo !$can_manage_settings ? 'readonly' : ''; ?>></div>
-                            <div class="col-md-4">
-                                <label class="form-label small fw-bold text-primary">Prenotabile da:</label>
-                                <select name="ruolo_accesso_id" class="form-select form-select-sm">
-                                    <option value="0">🌐 Tutti</option>
-                                    <option value="-1" <?php echo ($ev['ruolo_accesso_id'] == -1) ? 'selected' : ''; ?>>🔑 Solo Autenticati</option>
-                                    <?php foreach ($ruoli as $r): ?><option value="<?php echo $r['id']; ?>" <?php echo ($ev['ruolo_accesso_id'] == $r['id']) ? 'selected' : ''; ?>>🔒 Solo: <?php echo htmlspecialchars($r['nome']); ?></option><?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div class="col-md-6 pt-4 d-flex justify-content-end gap-3">
-                                <div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="richiede_prenotazione" id="editReqPren<?php echo $ev['id']; ?>" value="1" <?php echo ($ev['richiede_prenotazione'] ?? 1) == 1 ? 'checked' : ''; ?>><label class="form-check-label small fw-bold text-primary" for="editReqPren<?php echo $ev['id']; ?>">Prenotazione</label></div>
-                                <div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="abilita_presenze" id="editPres<?php echo $ev['id']; ?>" value="1" <?php echo ($ev['abilita_presenze'] ?? 1) == 1 ? 'checked' : ''; ?>><label class="form-check-label small fw-bold text-success" for="editPres<?php echo $ev['id']; ?>">Scanner</label></div>
-                                <div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="is_evidenza" id="editEvid<?php echo $ev['id']; ?>" value="1" <?php echo ($ev['is_evidenza'] ?? 0) == 1 ? 'checked' : ''; ?> <?php echo !$can_manage_settings ? 'disabled' : ''; ?>><label class="form-check-label small fw-bold text-danger" for="editEvid<?php echo $ev['id']; ?>">⭐ Evidenza</label></div>
-                            </div>
-                        </div>
-
-                        <div class="row g-2 mb-3 bg-white p-2 rounded shadow-sm border border-secondary">
-                            <div class="col-md-6 border-end">
-                                <label class="form-label small fw-bold text-danger">Modifica Locandina (JPG/PNG)</label>
-                                <input type="file" name="locandina_file" class="form-control form-control-sm" accept="image/png, image/jpeg, image/jpg">
-                                <?php if(!empty($ev['locandina_path'])): ?><div class="mt-2 text-danger"><input type="checkbox" class="form-check-input" name="elimina_locandina" id="delLoc<?php echo $ev['id']; ?>" value="1"><label class="form-check-label small fw-bold" for="delLoc<?php echo $ev['id']; ?>"><i class="fa fa-trash"></i> Elimina locandina</label></div><?php endif; ?>
-                            </div>
-                            <div class="col-md-6">
-                                <label class="form-label small fw-bold text-dark">Programma / Allegato (PDF)</label>
-                                <input type="file" name="allegato_pdf" class="form-control form-control-sm" accept="application/pdf">
-                                <?php if(!empty($ev['allegato_pdf'])): ?><div class="mt-2 d-flex align-items-center gap-2"><a href="../<?php echo htmlspecialchars($ev['allegato_pdf']); ?>" target="_blank" class="btn btn-sm btn-outline-secondary py-0"><i class="fa fa-eye"></i> Vedi</a><div class="form-check m-0"><input type="checkbox" class="form-check-input" name="elimina_pdf" id="delPdf<?php echo $ev['id']; ?>" value="1"><label class="form-check-label small fw-bold text-danger" for="delPdf<?php echo $ev['id']; ?>">Elimina PDF</label></div></div><?php endif; ?>
-                            </div>
-                        </div>
-
-                        <div class="mb-2 bg-white p-2 rounded border">
-                            <label for="descBreve<?php echo $ev['id']; ?>" class="form-label small fw-bold">Descrizione breve <span class="fw-normal text-muted">(compare nelle card)</span></label>
-                            <textarea name="descrizione_breve" id="descBreve<?php echo $ev['id']; ?>" class="form-control form-control-sm editor-breve" rows="2" placeholder="Una o due frasi che invogliano ad aprire la scheda dell'evento"><?php echo htmlspecialchars($ev['descrizione_breve'] ?? ''); ?></textarea>
-                            <small class="text-muted"><span class="desc-breve-conta">0</span>/300 caratteri. Se è vuota, nelle card compare l'inizio della descrizione completa.</small>
-                        </div>
-                        <div class="mb-2 bg-white p-2 rounded border"><label class="form-label small fw-bold">Descrizione completa <span class="fw-normal text-muted">(scheda dell'evento)</span></label><textarea name="descrizione" class="form-control form-control-sm editor-html" rows="4"><?php echo htmlspecialchars($ev['descrizione'] ?? ''); ?></textarea></div>
-                        <div class="mb-2 bg-white p-2 rounded border">
-                            <label for="notifExtra<?php echo $ev['id']; ?>" class="form-label small fw-bold"><i class="fa fa-envelope me-1" aria-hidden="true"></i> Invia copia delle prenotazioni a</label>
-                            <input type="text" name="email_notifiche_extra" id="notifExtra<?php echo $ev['id']; ?>" class="form-control form-control-sm" value="<?php echo htmlspecialchars(implode(', ', normalizza_lista_email($ev['email_notifiche_extra'] ?? ''))); ?>" placeholder="es. segreteria@unical.it, docente@unical.it">
-                            <small class="text-muted">Oltre ai gestori, questi indirizzi ricevono il riepilogo completo di ogni prenotazione e disdetta. Separali con una virgola, massimo 10. Lascia vuoto per nessuno.</small>
-                        </div>
-                        <div class="mb-2 bg-white p-2 rounded border">
-                            <label class="form-label small fw-bold"><i class="fa fa-address-book me-1" aria-hidden="true"></i> Referenti dell'evento</label>
-                            <?php echo html_referenti_evento($schede_ev[(int)$ev['id']]['referenti'] ?? []); ?>
-                            <small class="text-muted d-block">Compaiono nella scheda dell'evento. Chi ha "Riceve le prenotazioni" riceve il riepilogo di ogni prenotazione e disdetta.</small>
-                        </div>
-                    </div>
-                    <div class="modal-footer py-2 bg-white border-top">
-                        <button type="button" class="btn btn-secondary btn-sm fw-bold" data-bs-dismiss="modal">Annulla</button>
-                        <button type="submit" name="edit_evento" onclick="tinymce.triggerSave();" class="btn btn-primary btn-sm fw-bold"><i class="fa fa-save"></i> Salva Modifiche Evento</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
     <?php foreach($ev['turni'] as $t): ?>
     <div class="modal fade" id="modTurno<?php echo $t['id']; ?>" tabindex="-1">
         <div class="modal-dialog">
@@ -838,32 +910,12 @@ $col_area = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
 <?php endforeach; ?>
 
 <script>
-// Dopo una duplicazione apre subito la finestra di modifica della copia (?apri=modTurnoN / modEvN)
+// Dopo una duplicazione di turno apre subito la finestra di modifica della copia (?apri=modTurnoN)
 document.addEventListener("DOMContentLoaded", function () {
     var id = new URLSearchParams(location.search).get("apri");
-    if (!id || !/^mod(Turno|Ev)[0-9]+$/.test(id)) return;
+    if (!id || !/^modTurno[0-9]+$/.test(id)) return;
     var el = document.getElementById(id);
     if (el && window.bootstrap) bootstrap.Modal.getOrCreateInstance(el).show();
 });
-// Referenti nei modali degli eventi: aggiungi, rimuovi, "riceve le prenotazioni"
-document.addEventListener('click', function (e) {
-    var add = e.target.closest('.ref-aggiungi');
-    if (add) {
-        var box = add.previousElementSibling, modello = box.lastElementChild, nuova = modello.cloneNode(true);
-        nuova.querySelectorAll('input').forEach(function (i) { if (i.type === 'checkbox') i.checked = false; else if (i.type === 'hidden') i.value = '0'; else i.value = ''; });
-        box.appendChild(nuova); nuova.querySelector('input').focus();
-        return;
-    }
-    var rim = e.target.closest('.ref-rimuovi');
-    if (rim) {
-        var riga = rim.closest('.ref-riga');
-        if (riga.parentElement.children.length > 1) riga.remove();
-        else riga.querySelectorAll('input').forEach(function (i) { if (i.type === 'checkbox') i.checked = false; else if (i.type === 'hidden') i.value = '0'; else i.value = ''; });
-    }
-});
-document.addEventListener('change', function (e) {
-    if (e.target.classList.contains('ref-notif')) e.target.closest('.ref-riga').querySelector('input[name="ref_notifiche[]"]').value = e.target.checked ? '1' : '0';
-});
 </script>
-<datalist id="refRuoliEv"><option value="Docente referente"><option value="Referente"><option value="Relatore"><option value="Tutor"><option value="Segreteria"></datalist>
 <?php require_once 'admin_footer.php'; ?>

@@ -47,7 +47,7 @@ if (isset($_POST['duplica_ev'])) {
     }
     if (function_exists('registra_log_audit')) registra_log_audit($conn, "Clonazione Evento da Archivio", ["Da ID" => $ev_azione, "Nuovo ID" => $copia['evento'], "Sondaggi" => $copia['sondaggi']]);
     flash_set("Evento duplicato! La copia è tra gli eventi attivi: aggiungi i turni con le nuove date." . ($copia['sondaggi'] ? " Il sondaggio è stato copiato non attivo." : ""));
-    admin_redirect("eventi.php?p_id=$filtro_p&apri=modEv" . $copia['evento']);
+    admin_redirect("eventi.php?p_id=$filtro_p&id=" . (int)$copia['evento']);
 }
 
 // 4. AZIONE: ESPORTA ISCRITTI

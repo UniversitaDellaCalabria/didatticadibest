@@ -2520,7 +2520,7 @@ if ($is_gestore_o_admin || $gestisce_ev):
     $ha_progetti = (bool)array_filter($eventi_by_id, fn($e) => ($e['tipo'] ?? '') === 'progetto');
     $link_admin = [];
     if ($ev_ctx && ($ev_ctx['tipo'] ?? '') === 'progetto') $link_admin[] = ['admin/progetti.php?p_id=' . $p_id . '&id=' . (int)$ev_ctx['id'], 'fa-pen', 'Modifica progetto', true];
-    elseif ($ev_ctx) $link_admin[] = ['admin/eventi.php?p_id=' . $p_id . '&f_ev=' . (int)$ev_ctx['id'] . '&apri=modEv' . (int)$ev_ctx['id'], 'fa-pen', 'Modifica evento', true];
+    elseif ($ev_ctx) $link_admin[] = ['admin/eventi.php?p_id=' . $p_id . '&id=' . (int)$ev_ctx['id'], 'fa-pen', 'Modifica evento', true];
     if ($is_gestore_o_admin) {
         $link_admin[] = ['admin/eventi.php?p_id=' . $p_id, 'fa-calendar-alt', 'Eventi', false];
         if ($ha_progetti || ($page_cfg['layout_template'] ?? '') === 'progetti') $link_admin[] = ['admin/progetti.php?p_id=' . $p_id, 'fa-diagram-project', 'Progetti', false];
