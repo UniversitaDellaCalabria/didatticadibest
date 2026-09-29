@@ -43,7 +43,7 @@ echo "Verifica di $BASE  ($(date '+%d/%m/%Y %H:%M'))"
 
 # -------------------------------------------------------------------------
 titolo "Pagine pubbliche"
-PAGINE=(index.php privacy.php verifica_attestato.php)
+PAGINE=(index.php privacy.php crediti.php verifica_attestato.php)
 for a in "${AREE[@]}"; do PAGINE+=("$a.php"); done
 i=0
 for p in "${PAGINE[@]}"; do

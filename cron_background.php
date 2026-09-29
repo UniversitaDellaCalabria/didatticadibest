@@ -202,8 +202,18 @@ if ($mesi_pren > 0) {
 
 $mesi_ut = max(0, (int)(env_valore('CONSERVAZIONE_UTENTI_MESI') ?? 0));
 if ($mesi_ut > 0) {
+    // Esclusi anche i gestori abilitati da "Utenti & Abilitazioni" su un'area o un evento,
+    // qualunque sia il loro ruolo (spesso Dipendente): perderebbero l'accesso al pannello
+    $ids_gestori = [];
+    foreach (['pagine_eventi' => 'gestore_utente_id', 'eventi' => '0'] as $tab_g => $col_singolo) {
+        $r_g = $conn->query("SELECT $col_singolo AS singolo, gestori_utenti_ids, permessi_gestori_json FROM $tab_g");
+        while ($r_g && $g = $r_g->fetch_assoc()) {
+            foreach (ids_gestori_da_campi($g['singolo'], $g['gestori_utenti_ids'], $g['permessi_gestori_json']) as $id_g) $ids_gestori[$id_g] = true;
+        }
+    }
+    $esclusi_gestori = $ids_gestori ? ' AND id NOT IN (' . implode(',', array_map('intval', array_keys($ids_gestori))) . ')' : '';
     $cond_ut = "ruolo_id NOT IN (1, 2) AND FIND_IN_SET('1', IFNULL(ruoli_secondari, '')) = 0 AND FIND_IN_SET('2', IFNULL(ruoli_secondari, '')) = 0
-                AND COALESCE(ultimo_accesso, '1970-01-01') < NOW() - INTERVAL $mesi_ut MONTH";
+                AND COALESCE(ultimo_accesso, '1970-01-01') < NOW() - INTERVAL $mesi_ut MONTH" . $esclusi_gestori;
     // Le prenotazioni restano (collegate all'email, o già anonimizzate): si toglie solo il legame con l'account
     $conn->query("UPDATE prenotazioni SET utente_id = NULL WHERE utente_id IN (SELECT id FROM (SELECT id FROM utenti WHERE $cond_ut) AS x)");
     $conn->query("DELETE FROM utenti WHERE $cond_ut");

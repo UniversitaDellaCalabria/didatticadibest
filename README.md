@@ -197,6 +197,8 @@ eventidibest-cms/
 ├── elenco_studenti.php # Elenco degli studenti inserito dal docente (progetti per le scuole)
 ├── attestati_gruppo.php # Attestati della classe, uno per pagina
 ├── verifica_attestato.php # Verifica pubblica di un attestato dal codice o dal QR
+├── privacy.php         # Informativa privacy e cookie
+├── crediti.php         # Credits: copyright, realizzazione, software open source e licenze
 ├── profilo.php         # Profilo utente: dati SSO e modifica email
 ├── sw.js               # Service Worker (PWA)
 └── manifest.json       # Web App Manifest (PWA)
@@ -249,8 +251,8 @@ Il database e` composto da **23 tabelle**:
 - **Content Security Policy** (CSP) configurata in `config.php`
 - **Subresource Integrity**: tutte le librerie da CDN hanno l'impronta SHA-384 (`integrity`), anche quelle caricate su richiesta
 - **Nessuna connessione automatica a terzi**: caratteri (Titillium Web, Lora, Dancing Script) e librerie (Bootstrap Italia, Bootstrap, Font Awesome, jQuery, DataTables, Select2, Chart.js, SortableJS, FullCalendar, TinyMCE, html2canvas, jsPDF, JSZip) sono in `assets/vendor/`, con la stessa struttura dei CDN, e si richiamano con `url_vendor()`; la CSP non ammette più Google Fonts
-- **Privacy**: pagina `privacy.php` con l'informativa (art. 13 GDPR) e l'elenco dei cookie tecnici, collegata ai moduli e al piè di pagina; nei moduli si dichiara la presa visione (base giuridica: compito di interesse pubblico, non il consenso)
-- **Conservazione dei dati** (`cron_background.php`, durate nel `.env`): registri di accessi ed email `CONSERVAZIONE_LOG_MESI` (12), azioni amministrative `CONSERVAZIONE_AUDIT_MESI` (24), prenotazioni anonimizzate dopo `CONSERVAZIONE_PRENOTAZIONI_MESI` e account inattivi eliminati dopo `CONSERVAZIONE_UTENTI_MESI` (0 = mai, da concordare con il DPO)
+- **Privacy**: pagina `privacy.php` con l'informativa (art. 13 GDPR) e l'elenco dei cookie tecnici, collegata ai moduli e al piè di pagina; nei moduli si dichiara la presa visione (base giuridica: compito di interesse pubblico, non il consenso); pagina `crediti.php` con copyright, realizzazione e licenze del software open source
+- **Conservazione dei dati** (`cron_background.php`, durate nel `.env`): registri di accessi ed email `CONSERVAZIONE_LOG_MESI` (12), azioni amministrative `CONSERVAZIONE_AUDIT_MESI` (24), prenotazioni anonimizzate dopo `CONSERVAZIONE_PRENOTAZIONI_MESI` e account inattivi eliminati dopo `CONSERVAZIONE_UTENTI_MESI` (0 = mai, da concordare con il DPO), esclusi amministratori e chiunque sia abilitato come gestore di un'area o di un evento
 - **Librerie dei QR sul server**: generazione dei QR (`qrcode-generator`) e scanner del check-in (`html5-qrcode`) sono in `assets/js/` e si caricano con `script_libreria()`; se il file locale mancasse si ripiega sul CDN, con la stessa impronta
 - **Eliminazione di un'area** solo scrivendo il nome dell'area (controllato anche dal server), con il riepilogo di eventi, prenotazioni, studenti e sondaggi che verrebbero cancellati
 - **QR generati nella pagina** (ricevute, badge, QR d'aula, attestati): nessun codice o token di check-in inviato a servizi esterni
