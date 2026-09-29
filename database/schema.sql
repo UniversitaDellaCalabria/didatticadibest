@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS `configurazione_portale` (
     `sottotitolo_portale`   varchar(255) DEFAULT 'Dipartimento di Biologia, Ecologia e Scienze della Terra',
     `descrizione_portale`   text         DEFAULT NULL,
     `logo_path`             varchar(255) DEFAULT '',
+    `logo_mobile_path`      varchar(255) DEFAULT '',
     `favicon_path`          varchar(255) DEFAULT '',
     `colore_menu_bg`        varchar(20)  DEFAULT '#1e293b',
     `colore_menu_testo`     varchar(20)  DEFAULT '#ffffff',

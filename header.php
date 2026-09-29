@@ -40,6 +40,7 @@ if (isset($conn) && $conn instanceof mysqli) {
 
 $favicon_url = !empty($cfg_portale_header['favicon_path']) ? $cfg_portale_header['favicon_path'] : 'https://www.unical.it/favicon.ico';
 $logo_url = !empty($cfg_portale_header['logo_path']) ? $cfg_portale_header['logo_path'] : '';
+$logo_mobile_url = !empty($cfg_portale_header['logo_mobile_path']) ? $cfg_portale_header['logo_mobile_path'] : '';
 $titolo_portale = !empty($cfg_portale_header['nome_portale']) ? $cfg_portale_header['nome_portale'] : 'EventiDiBEST';
 $sottotitolo_portale = !empty($cfg_portale_header['sottotitolo_portale']) ? $cfg_portale_header['sottotitolo_portale'] : 'Portale Eventi e Laboratori Dipartimentali';
 
@@ -131,6 +132,45 @@ if ($u_logged_header) {
         .it-header-center-wrapper { background-color: #B30000 !important; border-bottom: 1px solid #7a0000; padding: 15px 0; }
         .it-brand-title { color: #ffffff !important; font-size: 2.2rem !important; font-weight: 700 !important; line-height: 1.1; letter-spacing: -0.5px; }
         .it-brand-tagline { color: #ffffff !important; font-size: 1.15rem !important; font-weight: 400 !important; opacity: 0.95; margin-top: 2px; }
+
+        /* Logo nell'intestazione (caricato in Configurazione Globale → Testata).
+           Computer: logo | nome del portale con sotto il sottotitolo. Telefono: logo mobile | nome
+           (senza logo mobile: logo principale ridotto e sotto il nome). !important: Bootstrap Italia centra il link */
+        .it-brand-wrapper a.brand-logo-link { display: flex; flex-direction: row !important; align-items: center !important; gap: 22px; }
+        .brand-logo-principale { height: 84px; width: auto; max-width: 100%; object-fit: contain; display: block; }
+        .brand-logo-mobile { display: none; height: 46px; width: auto; object-fit: contain; }
+        .brand-logo-link.solo-mobile .brand-logo-mobile { display: block; height: 64px; }
+        .brand-testi { display: flex; flex-direction: column; gap: 4px; border-left: 1px solid rgba(255,255,255,.7); padding-left: 22px; }
+        .brand-nome { color: #ffffff; font-weight: 700; font-size: 2rem; line-height: 1.05; letter-spacing: -0.3px; white-space: nowrap; }
+        /* Con il logo la fascia rossa segue l'altezza del contenuto (Bootstrap Italia la fissa a 80/120 px) */
+        .it-header-center-wrapper.con-logo { height: auto !important; }
+        .brand-tagline { color: #ffffff; opacity: .95; font-size: 1.05rem; line-height: 1.25; }
+        @media (max-width: 1199.98px) {
+            /* Schermi intermedi: niente sottotitolo, altrimenti si sovrappone alla ricerca */
+            .brand-tagline { display: none; }
+            .brand-logo-principale { height: 70px; }
+            .brand-nome { font-size: 1.7rem; }
+        }
+        @media (max-width: 991.98px) {
+            .brand-logo-principale { height: 58px; }
+            .brand-nome { font-size: 1.45rem; }
+            .it-brand-wrapper a.brand-logo-link { gap: 16px; }
+            .brand-testi { padding-left: 16px; }
+            .con-logo .header-search-box input { width: 140px; }
+        }
+        @media (max-width: 767.98px) {
+            .it-brand-wrapper a.brand-logo-link { gap: 12px; }
+            .brand-tagline { display: none; }
+            .brand-testi { padding-left: 12px; }
+            .brand-nome { font-size: 1.35rem; }
+            /* Con il logo mobile: simbolo | nome, come unical.it */
+            .brand-logo-link.con-logo-mobile .brand-logo-principale { display: none; }
+            .brand-logo-link.con-logo-mobile .brand-logo-mobile { display: block; height: 46px; }
+            /* Senza logo mobile: logo principale ridotto e sotto il nome */
+            .it-brand-wrapper a.brand-logo-link:not(.con-logo-mobile) { flex-direction: column !important; align-items: flex-start !important; gap: 8px; }
+            .brand-logo-link:not(.con-logo-mobile) .brand-logo-principale { height: auto; max-height: 52px; }
+            .brand-logo-link:not(.con-logo-mobile) .brand-testi { border-left: 0; padding-left: 0; }
+        }
         
         .header-search-box { background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 4px; overflow: hidden; display: flex; align-items: center; transition: all 0.3s; }
         .header-search-box:focus-within { background: rgba(255, 255, 255, 0.25); border-color: #ffffff; box-shadow: 0 0 0 0.2rem rgba(255,255,255,0.25); }
@@ -298,18 +338,31 @@ if ($u_logged_header) {
 </div>
 
 <header class="it-header-wrapper" style="position: relative; z-index: 1050;" role="banner">
-    <div class="it-header-center-wrapper">
+    <div class="it-header-center-wrapper<?php echo ($logo_url !== '' || $logo_mobile_url !== '') ? ' con-logo' : ''; ?>">
         <div class="container">
             <div class="row">
                 <div class="col-12">
                     <div class="it-header-center-content-wrapper align-items-center">
                         <div class="it-brand-wrapper">
-                            <a href="/" class="text-decoration-none d-flex align-items-center" aria-label="Home page <?php echo htmlspecialchars($titolo_portale); ?>">
+                            <?php if ($logo_url !== '' || $logo_mobile_url !== ''): ?>
+                                <!-- Computer: logo principale e sotto il nome del portale. Telefono: logo mobile accanto al nome
+                                     (senza logo mobile, il logo principale ridotto) -->
+                                <a href="index.php" class="brand-logo-link text-decoration-none<?php echo $logo_mobile_url !== '' ? ' con-logo-mobile' : ''; ?><?php echo ($logo_url === '' && $logo_mobile_url !== '') ? ' solo-mobile' : ''; ?>" aria-label="Home page <?php echo htmlspecialchars($titolo_portale); ?>">
+                                    <?php if ($logo_url !== ''): ?><img src="<?php echo htmlspecialchars($logo_url); ?>" alt="" class="brand-logo-principale"><?php endif; ?>
+                                    <?php if ($logo_mobile_url !== ''): ?><img src="<?php echo htmlspecialchars($logo_mobile_url); ?>" alt="" class="brand-logo-mobile"><?php endif; ?>
+                                    <span class="brand-testi" aria-hidden="true">
+                                        <span class="brand-nome"><?php echo htmlspecialchars($titolo_portale); ?></span>
+                                        <?php if ($sottotitolo_portale !== ''): ?><span class="brand-tagline"><?php echo htmlspecialchars($sottotitolo_portale); ?></span><?php endif; ?>
+                                    </span>
+                                </a>
+                            <?php else: ?>
+                            <a href="index.php" class="text-decoration-none d-flex align-items-center" aria-label="Home page <?php echo htmlspecialchars($titolo_portale); ?>">
                                 <div class="it-brand-text">
                                     <div class="it-brand-title" aria-hidden="true"><?php echo htmlspecialchars($titolo_portale); ?></div>
                                     <div class="it-brand-tagline d-none d-md-block" aria-hidden="true"><?php echo htmlspecialchars($sottotitolo_portale); ?></div>
                                 </div>
                             </a>
+                            <?php endif; ?>
                         </div>
                         
                         <div class="it-right-zone">

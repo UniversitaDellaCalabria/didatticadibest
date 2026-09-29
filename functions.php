@@ -3184,7 +3184,7 @@ if (!function_exists('puo_vedere_prenotazione')) {
 // richiesta: quando aggiungi qualcosa qui, cambia anche il nome del marcatore.
 if (!function_exists('assicura_schema')) {
     function assicura_schema($conn) {
-        $marker = __DIR__ . '/cache/schema_v19.ok';
+        $marker = __DIR__ . '/cache/schema_v20.ok';
         if (is_file($marker)) return;
 
         // 1. Tabelle di servizio (prima create dalle singole pagine a ogni richiesta)
@@ -3251,6 +3251,8 @@ if (!function_exists('assicura_schema')) {
                 'widgets_home'    => "ADD COLUMN widgets_home TEXT DEFAULT NULL",
                 'annuncio_home'   => "ADD COLUMN annuncio_home TEXT DEFAULT NULL",
                 'annuncio_colore' => "ADD COLUMN annuncio_colore VARCHAR(20) DEFAULT 'info'",
+                // v20: logo per gli schermi piccoli (intestazione da telefono), accanto al nome del portale
+                'logo_mobile_path' => "ADD COLUMN logo_mobile_path VARCHAR(255) DEFAULT ''",
             ],
             'prenotazioni' => [
                 'presente'                  => "ADD COLUMN presente INT DEFAULT 0 AFTER stato",

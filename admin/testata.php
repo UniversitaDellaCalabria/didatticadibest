@@ -120,6 +120,14 @@ if (isset($_POST['save_portal_header'])) {
         if ($fn) $logo_query = ", logo_path='uploads/$fn'";
     }
 
+    if ($logo_query === "" && isset($_POST['rimuovi_logo'])) $logo_query = ", logo_path=''";
+    // Logo per il telefono (mostrato accanto al nome del portale sugli schermi piccoli)
+    if (isset($_FILES['logo_mobile_file'])) {
+        $fn = secure_upload($_FILES['logo_mobile_file'], $upload_dir, ['jpg','jpeg','png','gif','webp','svg'], ['image/jpeg','image/png','image/gif','image/webp','image/svg+xml']);
+        if ($fn) $logo_query .= ", logo_mobile_path='uploads/$fn'";
+        elseif (isset($_POST['rimuovi_logo_mobile'])) $logo_query .= ", logo_mobile_path=''";
+    }
+
     $fav_query = "";
     if (isset($_FILES['favicon_file'])) {
         $fn = secure_upload($_FILES['favicon_file'], $upload_dir, ['ico','png','svg'], ['image/x-icon','image/vnd.microsoft.icon','image/png','image/svg+xml']);
@@ -186,16 +194,29 @@ $_tmap[array_key_exists($_st, $_tmap) ? $_st : 'testata'] = 'active show';
             </div>
             
             <div class="col-md-6">
-                <label class="form-label small fw-bold">Upload Logo Principale (PNG/JPG)</label>
-                <input type="file" name="logo_file" class="form-control" accept="image/*">
+                <label class="form-label small fw-bold">Logo principale (intestazione da computer)</label>
+                <input type="file" name="logo_file" class="form-control" accept="image/png,image/svg+xml,image/webp,image/jpeg">
+                <div class="form-text">PNG o SVG <strong>bianco su sfondo trasparente</strong>, orizzontale (es. logo Unical + Dipartimento). Sotto compare il nome del portale.</div>
                 <?php if(!empty($cfg_p['logo_path'])): ?>
-                    <div class="mt-2 p-2 border rounded bg-light d-flex align-items-center gap-3">
-                        <img src="../<?php echo $cfg_p['logo_path']; ?>" alt="Logo Corrente" style="height: 40px; object-fit: contain; background: #990000; padding: 5px;">
-                        <small class="text-success fw-bold">Logo Attivo</small>
+                    <div class="mt-2 p-2 border rounded bg-light d-flex align-items-center gap-3 flex-wrap">
+                        <span style="background: #B30000; padding: 8px 12px; border-radius: 6px; display: inline-flex;"><img src="../<?php echo htmlspecialchars($cfg_p['logo_path']); ?>" alt="Logo principale attuale" style="height: 40px; max-width: 320px; object-fit: contain;"></span>
+                        <div class="form-check m-0"><input class="form-check-input" type="checkbox" name="rimuovi_logo" id="rimuoviLogo" value="1"><label class="form-check-label small text-danger fw-bold" for="rimuoviLogo">Rimuovi</label></div>
                     </div>
                 <?php endif; ?>
             </div>
-            
+
+            <div class="col-md-6">
+                <label class="form-label small fw-bold">Logo mobile (intestazione da telefono)</label>
+                <input type="file" name="logo_mobile_file" class="form-control" accept="image/png,image/svg+xml,image/webp,image/jpeg">
+                <div class="form-text">Logo compatto, quasi quadrato (es. il simbolo Unical), <strong>bianco su sfondo trasparente</strong>: da telefono compare accanto al nome del portale. Se manca si usa il logo principale ridotto.</div>
+                <?php if(!empty($cfg_p['logo_mobile_path'])): ?>
+                    <div class="mt-2 p-2 border rounded bg-light d-flex align-items-center gap-3 flex-wrap">
+                        <span style="background: #B30000; padding: 8px 12px; border-radius: 6px; display: inline-flex;"><img src="../<?php echo htmlspecialchars($cfg_p['logo_mobile_path']); ?>" alt="Logo mobile attuale" style="height: 40px; max-width: 160px; object-fit: contain;"></span>
+                        <div class="form-check m-0"><input class="form-check-input" type="checkbox" name="rimuovi_logo_mobile" id="rimuoviLogoMob" value="1"><label class="form-check-label small text-danger fw-bold" for="rimuoviLogoMob">Rimuovi</label></div>
+                    </div>
+                <?php endif; ?>
+            </div>
+
             <div class="col-md-6">
                 <label class="form-label small fw-bold">Upload Favicon (Icona browser)</label>
                 <input type="file" name="favicon_file" class="form-control" accept="image/x-icon,image/png,image/jpeg">
