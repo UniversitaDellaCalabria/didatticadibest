@@ -1,18 +1,19 @@
 // sw.js - Service Worker PWA EventiDiBEST
 // Le pagine arrivano SEMPRE dal server: contengono nome dell'utente, posti liberi e stato del login,
 // quindi una copia salvata mostrerebbe lo stato precedente (e dati personali dopo il logout).
-// In cache solo gli asset statici delle CDN (Cache-First) e la pagina offline.
+// In cache solo le librerie in assets/vendor e assets/js (percorsi con la versione: Cache-First) e la pagina offline.
 // Cambiare SW_VERSION fa cancellare ai browser tutte le cache delle versioni precedenti.
 
-const SW_VERSION = 'dibest-v5';
+const SW_VERSION = 'dibest-v6';
 
-const CACHE_STATIC  = SW_VERSION + '-static';   // CSS, JS, font, icone delle CDN
+const CACHE_STATIC  = SW_VERSION + '-static';   // CSS, JS, font e icone delle librerie
 const CACHE_OFFLINE = SW_VERSION + '-offline';  // Solo offline.html
 
 const STATIC_ASSETS = [
-    'https://cdn.jsdelivr.net/npm/bootstrap-italia@2.8.3/dist/css/bootstrap-italia.min.css',
-    'https://cdn.jsdelivr.net/npm/bootstrap-italia@2.8.3/dist/js/bootstrap-italia.bundle.min.js',
-    'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
+    './assets/vendor/jsdelivr/npm/bootstrap-italia@2.8.3/dist/css/bootstrap-italia.min.css',
+    './assets/vendor/jsdelivr/npm/bootstrap-italia@2.8.3/dist/js/bootstrap-italia.bundle.min.js',
+    './assets/vendor/cdnjs/ajax/libs/font-awesome/6.4.0/css/all.min.css',
+    './assets/vendor/fonts/titillium-lora.css',
 ];
 
 self.addEventListener('install', event => {
@@ -41,7 +42,7 @@ self.addEventListener('fetch', event => {
     const req = event.request;
     if (req.method !== 'GET') return;
 
-    // Asset statici delle CDN: Cache-First
+    // Librerie statiche (locali, o del CDN se usato come ripiego): Cache-First
     if (isStaticCDN(req.url)) {
         event.respondWith(cacheFirst(req));
         return;
@@ -76,7 +77,9 @@ async function offlineFallback() {
 }
 
 function isStaticCDN(href) {
-    return href.includes('cdn.jsdelivr.net') ||
+    return href.includes('/assets/vendor/') ||
+           href.includes('/assets/js/') ||
+           href.includes('cdn.jsdelivr.net') ||
            href.includes('cdnjs.cloudflare.com') ||
            href.includes('fonts.googleapis.com') ||
            href.includes('fonts.gstatic.com');

@@ -905,7 +905,8 @@ function printModalPrenotazione($t, $col_primaria, $utente_logged, $val_nome, $v
                         <div class="form-check mt-3 mb-1 p-3 bg-light rounded border border-secondary shadow-sm">
                             <input class="form-check-input border-secondary" type="checkbox" name="accetta_privacy" id="privacyCheck_<?php echo $t['id']; ?>" required>
                             <label class="form-check-label text-dark" for="privacyCheck_<?php echo $t['id']; ?>" style="font-size: 0.85rem; line-height: 1.4;">
-                                Ho letto e accetto l'<a href="https://www.unical.it/privacy/" target="_blank" rel="noopener" class="fw-bold" style="color: <?php echo colore_testo_su($col_primaria) === '#FFFFFF' ? $col_primaria : '#1F2937'; ?>; text-decoration: underline;">Informativa sulla Privacy</a> e acconsento al trattamento dei dati personali.
+                                <?php // Base giuridica: compito di interesse pubblico (art. 6.1.e GDPR), non il consenso: si dichiara solo la presa visione ?>
+                                Ho letto l'<a href="privacy.php" target="_blank" rel="noopener" class="fw-bold" style="color: <?php echo colore_testo_su($col_primaria) === '#FFFFFF' ? $col_primaria : '#1F2937'; ?>; text-decoration: underline;">informativa sul trattamento dei dati personali</a>.
                             </label>
                         </div>
                         
@@ -1499,7 +1500,7 @@ function evSetRating(btn) {
         if (!empty($t_c['data_turno']) && !turno_concluso($t_c)) { $data_iniziale_cal = $t_c['data_turno']; break; }
     }
     ?>
-    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js" integrity="sha384-5JIwZN3kuxX2zKsavvNmbZ3zhZZMUtu/eQiK3BbXukpSXp0Cd2ZP4OAYKx7mrPgI" crossorigin="anonymous"></script>
+    <script src="<?php echo url_vendor('jsdelivr/npm/fullcalendar@6.1.11/index.global.min.js'); ?>" integrity="sha384-5JIwZN3kuxX2zKsavvNmbZ3zhZZMUtu/eQiK3BbXukpSXp0Cd2ZP4OAYKx7mrPgI" crossorigin="anonymous"></script>
     <script>
       document.addEventListener('DOMContentLoaded', function() {
         var calendarEl = document.getElementById('fullCalendarDiv');

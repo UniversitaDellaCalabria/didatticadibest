@@ -2895,6 +2895,15 @@ if (!function_exists('dati_attestato')) {
     }
 }
 
+if (!function_exists('url_vendor')) {
+    // Librerie e caratteri salvati sul server in assets/vendor (stessa struttura dei CDN): aprendo le pagine
+    // il browser non si collega a servizi di terzi (privacy: niente IP a Google Fonts o ai CDN).
+    // Percorso dalla radice del sito, valido sia dalle pagine pubbliche sia da /admin.
+    function url_vendor(string $percorso): string {
+        return rtrim((string)parse_url(url_base_sito(), PHP_URL_PATH), '/') . '/assets/vendor/' . ltrim($percorso, '/');
+    }
+}
+
 if (!function_exists('script_libreria')) {
     // Librerie JavaScript salvate sul server (assets/js): QR e scanner funzionano anche se il CDN non risponde.
     // Se il file locale mancasse (es. non caricato sul server) si ripiega sul CDN, in modo sincrono
@@ -2957,11 +2966,9 @@ if (!function_exists('pagina_attestati')) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?php echo $h($titolo_doc); ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap" rel="stylesheet">
+    <link href="<?php echo url_vendor('jsdelivr/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css'); ?>" rel="stylesheet">
+    <link rel="stylesheet" href="<?php echo url_vendor('cdnjs/ajax/libs/font-awesome/6.4.0/css/all.min.css'); ?>">
+    <link href="<?php echo url_vendor('fonts/dancing-script.css'); ?>" rel="stylesheet">
     <style>
         body, html { margin: 0; padding: 0; background-color: #e2e8f0; font-family: 'Georgia', 'Times New Roman', serif; color: #1e293b; box-sizing: border-box; }
         @page { size: A4 landscape; margin: 0; }
@@ -3099,7 +3106,7 @@ if (!function_exists('pagina_attestati')) {
             var testo = btn.innerHTML; btn.disabled = true;
             try {
                 stato.textContent = 'Preparazione in corso…'; percentuale(0);
-                var lib = 'https://cdnjs.cloudflare.com/ajax/libs/';
+                var lib = '<?php echo url_vendor('cdnjs/ajax/libs/'); ?>';
                 await carica(lib + 'html2canvas/1.4.1/html2canvas.min.js');
                 await carica(lib + 'jspdf/2.5.1/jspdf.umd.min.js');
                 if (fogli.length > 1) await carica(lib + 'jszip/3.10.1/jszip.min.js');

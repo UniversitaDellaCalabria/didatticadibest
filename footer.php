@@ -82,8 +82,8 @@ if (isset($conn) && $conn instanceof mysqli) {
     <div class="py-3" style="background-color: #333333;">
         <div class="container d-flex flex-wrap justify-content-between align-items-center small text-white opacity-75">
             <ul class="list-inline mb-0 d-flex flex-wrap gap-4">
-                <li class="list-inline-item"><a class="text-white text-decoration-none" href="https://www.unical.it/privacy/" target="_blank">Privacy Policy</a></li>
-                <li class="list-inline-item"><a class="text-white text-decoration-none" href="https://www.unical.it/privacy/cookie/" target="_blank">Cookie Policy</a></li>
+                <li class="list-inline-item"><a class="text-white text-decoration-none" href="privacy.php">Privacy</a></li>
+                <li class="list-inline-item"><a class="text-white text-decoration-none" href="privacy.php#cookie">Cookie</a></li>
                 <li class="list-inline-item"><a class="text-white text-decoration-none" href="https://www.unical.it/note-legali/" target="_blank">Note Legali</a></li>
                 <li class="list-inline-item"><a class="text-white text-decoration-none" href="https://www.unical.it/accessibilita/" target="_blank">Accessibilità</a></li>
             </ul>
@@ -94,7 +94,7 @@ if (isset($conn) && $conn instanceof mysqli) {
     </div>
 </footer>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap-italia@2.8.3/dist/js/bootstrap-italia.bundle.min.js" integrity="sha384-Uf9ZvEEEoRYjUlBeVUHMbjfQKOtjQKqCfLchDholmnW8vcgVNn8kkh6yne+cfW6v" crossorigin="anonymous"></script>
+<script src="<?php echo url_vendor('jsdelivr/npm/bootstrap-italia@2.8.3/dist/js/bootstrap-italia.bundle.min.js'); ?>" integrity="sha384-Uf9ZvEEEoRYjUlBeVUHMbjfQKOtjQKqCfLchDholmnW8vcgVNn8kkh6yne+cfW6v" crossorigin="anonymous"></script>
 
 <!-- Fase 4: Registrazione Service Worker PWA (Stale-While-Revalidate + Cache-First + fallback offline) -->
 <script>
@@ -133,7 +133,7 @@ if ('serviceWorker' in navigator) {
     <div class="container d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
         <div class="small" style="line-height: 1.4;">
             <i class="fa fa-cookie-bite text-warning me-2 fs-4 align-middle"></i>
-            <strong>Informativa:</strong> Questo portale utilizza esclusivamente cookie tecnici necessari per il corretto funzionamento del sistema (come il mantenimento della sessione di login tramite SSO). Non utilizziamo cookie di profilazione o tracciamento a fini pubblicitari.
+            <strong>Informativa:</strong> Questo portale utilizza esclusivamente cookie tecnici necessari per il corretto funzionamento del sistema (come il mantenimento della sessione di login tramite SSO). Non utilizziamo cookie di profilazione o tracciamento a fini pubblicitari. <a href="privacy.php#cookie" class="text-white fw-bold" style="text-decoration: underline;">Dettagli</a>
         </div>
         <div class="flex-shrink-0 text-center text-md-end">
             <button id="acceptCookies" class="btn btn-light btn-sm fw-bold px-4 py-2 text-dark shadow-sm rounded-pill">Ho capito</button>

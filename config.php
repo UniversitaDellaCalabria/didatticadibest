@@ -33,9 +33,9 @@ header("X-Content-Type-Options: nosniff");
 header("Referrer-Policy: strict-origin-when-cross-origin");
 header("X-XSS-Protection: 1; mode=block");
 header("Content-Security-Policy: default-src 'self'; " .
-    "script-src 'self' 'unsafe-inline' cdn.jsdelivr.net cdnjs.cloudflare.com cdn.datatables.net code.jquery.com; " .
-    "style-src 'self' 'unsafe-inline' cdn.jsdelivr.net cdnjs.cloudflare.com cdn.datatables.net fonts.googleapis.com; " .
-    "font-src 'self' cdnjs.cloudflare.com fonts.gstatic.com data:; " .
+    "script-src 'self' 'unsafe-inline' cdn.jsdelivr.net cdnjs.cloudflare.com; " .
+    "style-src 'self' 'unsafe-inline' cdn.jsdelivr.net cdnjs.cloudflare.com; " .
+    "font-src 'self' cdnjs.cloudflare.com data:; " .
     "img-src 'self' data: blob:; " .
     "connect-src 'self'; " .
     "frame-ancestors 'self';");

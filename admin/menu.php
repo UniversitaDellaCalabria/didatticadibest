@@ -397,7 +397,7 @@ if ($res_all) while($m = $res_all->fetch_assoc()) $tutti_i_menu[] = $m;
 <?php endforeach; ?>
 
 <!-- SortableJS -->
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js" integrity="sha384-BSxuMLxX+FCbTdYec3TbXlnMGEEM2QXTFdtDaveen71o+jswm2J36+xFqp8k4VHM" crossorigin="anonymous"></script>
+<script src="<?php echo url_vendor('jsdelivr/npm/sortablejs@1.15.2/Sortable.min.js'); ?>" integrity="sha384-BSxuMLxX+FCbTdYec3TbXlnMGEEM2QXTFdtDaveen71o+jswm2J36+xFqp8k4VHM" crossorigin="anonymous"></script>
 <script>
 (function() {
     function initSortable(el) {

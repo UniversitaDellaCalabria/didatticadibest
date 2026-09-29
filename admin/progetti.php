@@ -916,7 +916,7 @@ $n_eventi_normali = (int)($conn->query("SELECT COUNT(*) AS n FROM eventi WHERE p
 </div>
 
 <?php if ($ordinabile): ?>
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js" integrity="sha384-BSxuMLxX+FCbTdYec3TbXlnMGEEM2QXTFdtDaveen71o+jswm2J36+xFqp8k4VHM" crossorigin="anonymous"></script>
+<script src="<?php echo url_vendor('jsdelivr/npm/sortablejs@1.15.2/Sortable.min.js'); ?>" integrity="sha384-BSxuMLxX+FCbTdYec3TbXlnMGEEM2QXTFdtDaveen71o+jswm2J36+xFqp8k4VHM" crossorigin="anonymous"></script>
 <script>
 (function () {
     var lista = document.getElementById('pjLista'), form = document.getElementById('pjOrdineForm');

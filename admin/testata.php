@@ -517,7 +517,7 @@ $widgets_cur = get_widgets_home($cfg_w);
     </form>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js" integrity="sha384-BSxuMLxX+FCbTdYec3TbXlnMGEEM2QXTFdtDaveen71o+jswm2J36+xFqp8k4VHM" crossorigin="anonymous"></script>
+<script src="<?php echo url_vendor('jsdelivr/npm/sortablejs@1.15.2/Sortable.min.js'); ?>" integrity="sha384-BSxuMLxX+FCbTdYec3TbXlnMGEEM2QXTFdtDaveen71o+jswm2J36+xFqp8k4VHM" crossorigin="anonymous"></script>
 <script>
 document.getElementById('w_annunci').addEventListener('change', function(){
     document.getElementById('annuncio_config').style.display = this.checked ? '' : 'none';
