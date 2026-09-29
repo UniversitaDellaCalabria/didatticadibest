@@ -248,6 +248,8 @@ Il database e` composto da **23 tabelle**:
 - Script cron eseguibili solo da riga di comando, con `CRON_KEY` o da un utente con il ruolo adatto
 - **Content Security Policy** (CSP) configurata in `config.php`
 - **Subresource Integrity**: tutte le librerie da CDN hanno l'impronta SHA-384 (`integrity`), anche quelle caricate su richiesta
+- **Librerie dei QR sul server**: generazione dei QR (`qrcode-generator`) e scanner del check-in (`html5-qrcode`) sono in `assets/js/` e si caricano con `script_libreria()`; se il file locale mancasse si ripiega sul CDN, con la stessa impronta
+- **Eliminazione di un'area** solo scrivendo il nome dell'area (controllato anche dal server), con il riepilogo di eventi, prenotazioni, studenti e sondaggi che verrebbero cancellati
 - **QR generati nella pagina** (ricevute, badge, QR d'aula, attestati): nessun codice o token di check-in inviato a servizi esterni
 - Codici di prenotazione e di attestato generati con `random_bytes` / `random_int`
 - **HTTP Security Headers**: HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy

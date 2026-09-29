@@ -19,7 +19,18 @@ foreach ($pagine_disponibili as $a) {
                   WHERE e.pagina_id = $id_a AND e.archiviato = 0 AND t.data_turno >= CURDATE()) AS prossimo");
         $num = $r_n ? $r_n->fetch_assoc() : null;
     }
-    $righe_aree[] = ['a' => $a, 'num' => $num, 'gestisce' => $gestisce_area];
+    // Per la finestra di eliminazione (solo amministratori): tutto ciò che verrebbe cancellato, archivio compreso
+    $cancella = null;
+    if ($is_full_admin) {
+        $r_c = $conn->query("SELECT
+                (SELECT COUNT(*) FROM eventi e WHERE e.pagina_id = $id_a) AS eventi,
+                (SELECT COUNT(*) FROM turni t JOIN eventi e ON t.evento_id = e.id WHERE e.pagina_id = $id_a) AS turni,
+                (SELECT COUNT(*) FROM prenotazioni p JOIN turni t ON p.turno_id = t.id JOIN eventi e ON t.evento_id = e.id WHERE e.pagina_id = $id_a) AS prenotazioni,
+                (SELECT COUNT(*) FROM partecipanti_prenotazione pp JOIN prenotazioni p ON pp.prenotazione_id = p.id JOIN turni t ON p.turno_id = t.id JOIN eventi e ON t.evento_id = e.id WHERE e.pagina_id = $id_a) AS studenti,
+                (SELECT COUNT(*) FROM sondaggi s JOIN eventi e ON s.evento_id = e.id WHERE e.pagina_id = $id_a) AS sondaggi");
+        $cancella = $r_c ? $r_c->fetch_assoc() : null;
+    }
+    $righe_aree[] = ['a' => $a, 'num' => $num, 'gestisce' => $gestisce_area, 'cancella' => $cancella];
 }
 ?>
 <style>
@@ -93,12 +104,7 @@ foreach ($pagine_disponibili as $a) {
                             <a href="<?php echo htmlspecialchars($url_pub); ?>" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary" title="Apri la pagina pubblica" aria-label="Apri la pagina pubblica di <?php echo htmlspecialchars($a['titolo']); ?>"><i class="fa fa-eye" aria-hidden="true"></i></a>
                             <?php if ($is_full_admin): ?>
                                 <a href="impostazioni_area.php?p_id=<?php echo $id_a; ?>" class="btn btn-sm btn-outline-secondary" title="Impostazioni area" aria-label="Impostazioni di <?php echo htmlspecialchars($a['titolo']); ?>"><i class="fa fa-paint-brush" aria-hidden="true"></i></a>
-                                <form method="POST" class="m-0">
-                                    <?php csrf_field(); ?>
-                                    <input type="hidden" name="pagina_id_del" value="<?php echo $id_a; ?>">
-                                    <button type="submit" name="del_pagina_completa" value="1" class="btn btn-sm btn-outline-danger" title="Elimina area" aria-label="Elimina <?php echo htmlspecialchars($a['titolo']); ?>"
-                                            data-confirm="Eliminare definitivamente l'area &quot;<?php echo htmlspecialchars($a['titolo']); ?>&quot; con tutti i suoi eventi, turni, iscrizioni e sondaggi? L'operazione non si può annullare."><i class="fa fa-trash-alt" aria-hidden="true"></i></button>
-                                </form>
+                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#elimArea<?php echo $id_a; ?>" title="Elimina area" aria-label="Elimina <?php echo htmlspecialchars($a['titolo']); ?>"><i class="fa fa-trash-alt" aria-hidden="true"></i></button>
                             <?php endif; ?>
                         </div>
                     </td>
@@ -108,6 +114,63 @@ foreach ($pagine_disponibili as $a) {
         </table>
     </div>
 </div>
+<?php endif; ?>
+
+<?php if ($is_full_admin): foreach ($righe_aree as ['a' => $a, 'cancella' => $c]):
+    $id_a = (int)$a['id'];
+    $tit_a = (string)$a['titolo'];
+    $visibile = (int)($a['visibile'] ?? 1) === 1;
+    $c = $c ?: ['eventi' => 0, 'turni' => 0, 'prenotazioni' => 0, 'studenti' => 0, 'sondaggi' => 0];
+    $vuota = (int)$c['eventi'] === 0;
+?>
+<!-- Eliminazione dell'area: si conferma scrivendo il nome (controllato anche dal server) -->
+<div class="modal fade" id="elimArea<?php echo $id_a; ?>" tabindex="-1" aria-labelledby="elimAreaTit<?php echo $id_a; ?>" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-danger">
+            <form method="POST" class="elim-area-form">
+                <?php csrf_field(); ?>
+                <input type="hidden" name="pagina_id_del" value="<?php echo $id_a; ?>">
+                <div class="modal-header bg-danger text-white py-2">
+                    <h5 class="modal-title fs-6 fw-bold" id="elimAreaTit<?php echo $id_a; ?>"><i class="fa fa-triangle-exclamation me-1" aria-hidden="true"></i>Eliminare l'area "<?php echo htmlspecialchars($tit_a); ?>"?</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+                </div>
+                <div class="modal-body">
+                    <?php if ($vuota): ?>
+                        <p class="mb-2">L'area non contiene eventi né progetti.</p>
+                    <?php else: ?>
+                        <p class="mb-2">Verranno cancellati <strong>definitivamente</strong>, archivio compreso:</p>
+                        <ul class="small mb-3">
+                            <li><strong><?php echo (int)$c['eventi']; ?></strong> eventi e progetti, con <strong><?php echo (int)$c['turni']; ?></strong> turni/edizioni</li>
+                            <li><strong><?php echo (int)$c['prenotazioni']; ?></strong> prenotazioni (con messaggi, presenze e dati dei moduli)</li>
+                            <?php if ((int)$c['studenti'] > 0): ?><li><strong><?php echo (int)$c['studenti']; ?></strong> studenti degli elenchi: i loro attestati non risulteranno più verificabili</li><?php endif; ?>
+                            <?php if ((int)$c['sondaggi'] > 0): ?><li><strong><?php echo (int)$c['sondaggi']; ?></strong> sondaggi con le risposte</li><?php endif; ?>
+                            <li>campi del modulo, sezioni e voce di menu dell'area</li>
+                        </ul>
+                    <?php endif; ?>
+                    <?php if ($visibile && !$vuota): ?>
+                        <div class="alert alert-info small py-2"><i class="fa fa-eye-slash me-1" aria-hidden="true"></i>Se vuoi solo toglierla dal sito, <strong>nascondila</strong>: i dati restano e puoi ripubblicarla quando vuoi.</div>
+                    <?php endif; ?>
+                    <label for="elimNome<?php echo $id_a; ?>" class="form-label small fw-bold">Per confermare scrivi il nome dell'area: <span class="font-monospace text-danger"><?php echo htmlspecialchars($tit_a); ?></span></label>
+                    <input type="text" name="conferma_nome" id="elimNome<?php echo $id_a; ?>" class="form-control elim-nome" data-nome="<?php echo htmlspecialchars(mb_strtolower(trim(preg_replace('/\s+/', ' ', $tit_a)))); ?>" autocomplete="off" required>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Annulla</button>
+                    <button type="submit" name="del_pagina_completa" value="1" class="btn btn-danger btn-sm fw-bold elim-invia" disabled><i class="fa fa-trash-alt me-1" aria-hidden="true"></i>Elimina definitivamente</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<?php endforeach; ?>
+<script>
+// Il pulsante si attiva solo quando il nome scritto coincide (senza distinguere maiuscole e spazi in più)
+document.querySelectorAll('.elim-area-form').forEach(function (f) {
+    var campo = f.querySelector('.elim-nome'), btn = f.querySelector('.elim-invia');
+    campo.addEventListener('input', function () {
+        btn.disabled = campo.value.trim().replace(/\s+/g, ' ').toLowerCase() !== campo.dataset.nome;
+    });
+});
+</script>
 <?php endif; ?>
 
 <?php require_once 'admin_footer.php'; ?>

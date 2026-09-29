@@ -66,12 +66,19 @@ if (isset($_POST['toggle_visibilita_pagina']) && $is_full_admin) {
 if (isset($_POST['del_pagina_completa']) && $is_full_admin) {
     csrf_verify($_POST['csrf_token'] ?? '');
     $p_id_del = (int)$_POST['pagina_id_del'];
-    $stmt_p_del = $conn->prepare("SELECT slug FROM pagine_eventi WHERE id = ? LIMIT 1");
+    $stmt_p_del = $conn->prepare("SELECT slug, titolo FROM pagine_eventi WHERE id = ? LIMIT 1");
     $stmt_p_del->bind_param("i", $p_id_del);
     $stmt_p_del->execute();
     $res_p_del = $stmt_p_del->get_result();
     $stmt_p_del->close();
     if ($res_p_del && $p_info_del = $res_p_del->fetch_assoc()) {
+        // Conferma obbligatoria: il nome dell'area scritto a mano (senza distinguere maiuscole e spazi in più)
+        $norm_nome = fn($s) => mb_strtolower(trim(preg_replace('/\s+/u', ' ', (string)$s)));
+        if ($norm_nome($_POST['conferma_nome'] ?? '') !== $norm_nome($p_info_del['titolo'])) {
+            flash_set("Area non eliminata: per confermare scrivi esattamente il nome dell'area.", 'danger');
+            echo "<script>window.location.replace('aree.php');</script>";
+            exit;
+        }
         $slug_del = $p_info_del['slug'];
         // Ogni evento con turni, prenotazioni, messaggi, campi form e sondaggi (niente dati orfani)
         $res_evs = $conn->query("SELECT id FROM eventi WHERE pagina_id = " . (int)$p_id_del);
@@ -101,7 +108,8 @@ if (isset($_POST['del_pagina_completa']) && $is_full_admin) {
             }
         }
         
-        flash_set("Area di lavoro eliminata definitivamente!", 'warning');
+        if (function_exists('registra_log_audit')) registra_log_audit($conn, "Eliminazione Area", ["Area" => $p_info_del['titolo'], "Slug" => $slug_del]);
+        flash_set("Area \"" . htmlspecialchars($p_info_del['titolo']) . "\" eliminata definitivamente.", 'warning');
         echo "<script>window.location.replace('aree.php');</script>";
         exit;
     }
