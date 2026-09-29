@@ -157,6 +157,60 @@ $conn->query("UPDATE partecipanti_prenotazione pp
 echo "- Elenchi studenti: $cancellati_pp nomi cancellati (iscrizioni annullate), " . $conn->affected_rows . " ridotti alle iniziali dopo $mesi_cons mesi.\n";
 
 // =========================================================================
+// TASK 1e: CONSERVAZIONE DEI DATI (art. 5.1.e GDPR) - durate nel file .env, descritte in privacy.php
+// - Registri tecnici (accessi con IP e browser, email inviate): CONSERVAZIONE_LOG_MESI, predefinito 12
+// - Registro delle azioni amministrative: CONSERVAZIONE_AUDIT_MESI, predefinito 24
+// - Prenotazioni: CONSERVAZIONE_PRENOTAZIONI_MESI dopo l'attività (0 = mai). Non si cancellano: nome e cognome
+//   ridotti alle iniziali, email/matricola/campi del modulo svuotati, messaggi e allegati eliminati.
+//   Restano codice, turno, stato e presenza: statistiche e codici degli attestati continuano a funzionare.
+// - Account senza accesso da CONSERVAZIONE_UTENTI_MESI (0 = mai), esclusi amministratori e gestori.
+// =========================================================================
+$mesi_log   = max(1, (int)(env_valore('CONSERVAZIONE_LOG_MESI') ?? 12));
+$mesi_audit = max(1, (int)(env_valore('CONSERVAZIONE_AUDIT_MESI') ?? 24));
+@$conn->query("DELETE FROM log_accessi WHERE created_at < NOW() - INTERVAL $mesi_log MONTH");
+$tolti_acc = max(0, $conn->affected_rows);
+@$conn->query("DELETE FROM log_email WHERE created_at < NOW() - INTERVAL $mesi_log MONTH");
+$tolti_em = max(0, $conn->affected_rows);
+@$conn->query("DELETE FROM log_attivita WHERE data_ora < NOW() - INTERVAL $mesi_audit MONTH");
+$tolti_aud = max(0, $conn->affected_rows);
+echo "- Conservazione registri: eliminati $tolti_acc accessi e $tolti_em email più vecchi di $mesi_log mesi, $tolti_aud azioni più vecchie di $mesi_audit mesi.\n";
+
+$mesi_pren = max(0, (int)(env_valore('CONSERVAZIONE_PRENOTAZIONI_MESI') ?? 0));
+if ($mesi_pren > 0) {
+    $res_an = $conn->query("SELECT pr.id, pr.dati_custom_json FROM prenotazioni pr
+                            JOIN turni t ON pr.turno_id = t.id LEFT JOIN progetti_dettagli pd ON pd.evento_id = t.evento_id
+                            WHERE IFNULL(pr.email, '') <> ''
+                              AND COALESCE(pd.data_fine, t.data_turno, DATE(pr.data_prenotazione)) < CURDATE() - INTERVAL $mesi_pren MONTH
+                            LIMIT 500");
+    $n_an = 0;
+    while ($res_an && $pa = $res_an->fetch_assoc()) {
+        $id_an = (int)$pa['id'];
+        // Allegati caricati nel modulo (solo file dentro uploads/allegati_prenotazioni)
+        foreach ((json_decode((string)$pa['dati_custom_json'], true) ?: []) as $val) {
+            if (!is_string($val)) continue;
+            foreach (array_map('trim', explode(',', $val)) as $perc) {
+                if (preg_match('#^uploads/allegati_prenotazioni/[a-f0-9]{32}\.[a-z0-9]{2,5}$#', $perc)) @unlink(__DIR__ . '/' . $perc);
+            }
+        }
+        @$conn->query("DELETE FROM messaggi_prenotazioni WHERE prenotazione_id = $id_an");
+        $conn->query("UPDATE prenotazioni SET nome = CONCAT(LEFT(nome, 1), '.'), cognome = IF(cognome = '', '', CONCAT(LEFT(cognome, 1), '.')),
+                      email = '', matricola = '', dati_custom_json = NULL, utente_id = NULL WHERE id = $id_an");
+        $n_an++;
+    }
+    echo "- Conservazione prenotazioni: $n_an anonimizzate (attività concluse da più di $mesi_pren mesi).\n";
+}
+
+$mesi_ut = max(0, (int)(env_valore('CONSERVAZIONE_UTENTI_MESI') ?? 0));
+if ($mesi_ut > 0) {
+    $cond_ut = "ruolo_id NOT IN (1, 2) AND FIND_IN_SET('1', IFNULL(ruoli_secondari, '')) = 0 AND FIND_IN_SET('2', IFNULL(ruoli_secondari, '')) = 0
+                AND COALESCE(ultimo_accesso, '1970-01-01') < NOW() - INTERVAL $mesi_ut MONTH";
+    // Le prenotazioni restano (collegate all'email, o già anonimizzate): si toglie solo il legame con l'account
+    $conn->query("UPDATE prenotazioni SET utente_id = NULL WHERE utente_id IN (SELECT id FROM (SELECT id FROM utenti WHERE $cond_ut) AS x)");
+    $conn->query("DELETE FROM utenti WHERE $cond_ut");
+    echo "- Conservazione account: " . max(0, $conn->affected_rows) . " account eliminati (nessun accesso da $mesi_ut mesi).\n";
+}
+
+// =========================================================================
 // TASK 1d: RIEPILOGO SETTIMANALE DELLE EMAIL AGLI AMMINISTRATORI (dal lunedì, una volta a settimana)
 // =========================================================================
 if (date('N') >= 1) {
