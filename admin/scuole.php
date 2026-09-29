@@ -9,6 +9,16 @@ if (!$is_full_admin) nega_accesso();
 function admin_redirect($url) { echo "<script>window.location.replace(" . json_encode($url) . ");</script>"; exit; }
 
 // Colonne del file del Ministero -> colonne della tabella (i nomi delle colonne sono confrontati in maiuscolo, senza spazi)
+// Regioni selezionabili all'importazione: nome => inizio del nome nel file del Ministero (solo lettere, maiuscolo),
+// così "EMILIA ROMAGNA", "FRIULI-VENEZIA G." e simili vengono riconosciute comunque
+const REGIONI_SCUOLE = [
+    'Abruzzo' => 'ABRUZZO', 'Basilicata' => 'BASILICATA', 'Calabria' => 'CALABRIA', 'Campania' => 'CAMPANIA',
+    'Emilia-Romagna' => 'EMILIA', 'Friuli Venezia Giulia' => 'FRIULI', 'Lazio' => 'LAZIO', 'Liguria' => 'LIGURIA',
+    'Lombardia' => 'LOMBARDIA', 'Marche' => 'MARCHE', 'Molise' => 'MOLISE', 'Piemonte' => 'PIEMONTE', 'Puglia' => 'PUGLIA',
+    'Sardegna' => 'SARDEGNA', 'Sicilia' => 'SICILIA', 'Toscana' => 'TOSCANA', 'Trentino-Alto Adige' => 'TRENTINO',
+    'Umbria' => 'UMBRIA', "Valle d'Aosta" => 'VALLE', 'Veneto' => 'VENETO',
+];
+
 const MAPPA_COLONNE_SCUOLE = [
     'codice'                 => ['CODICESCUOLA'],
     'denominazione'          => ['DENOMINAZIONESCUOLA'],
@@ -26,7 +36,7 @@ const MAPPA_COLONNE_SCUOLE = [
 ];
 
 // Legge il file caricato (CSV, o ZIP che contiene un CSV) e aggiorna la tabella. Ritorna [inserite, aggiornate] o un messaggio d'errore.
-function importa_anagrafe_scuole($conn, array $file, int $statale) {
+function importa_anagrafe_scuole($conn, array $file, int $statale, array $regioni = []) {
     $err = $file['error'] ?? UPLOAD_ERR_NO_FILE;
     if ($err === UPLOAD_ERR_INI_SIZE || $err === UPLOAD_ERR_FORM_SIZE) return "Il file supera il limite di caricamento del server (" . ini_get('upload_max_filesize') . "): caricalo compresso in ZIP.";
     if ($err !== UPLOAD_ERR_OK) return "Caricamento non riuscito (codice $err).";
@@ -69,7 +79,7 @@ function importa_anagrafe_scuole($conn, array $file, int $statale) {
     $sql = "INSERT INTO scuole (" . implode(', ', $cols) . ", statale, aggiornata_il) VALUES (" . implode(', ', array_fill(0, count($cols), '?')) . ", ?, NOW())
             ON DUPLICATE KEY UPDATE " . implode(', ', array_map(fn($c) => "$c = VALUES($c)", array_diff($cols, ['codice']))) . ", statale = VALUES(statale), aggiornata_il = NOW()";
     $st = $conn->prepare($sql);
-    $inserite = 0; $aggiornate = 0; $invariate = 0; $scartate = 0; $righe = 0;
+    $inserite = 0; $aggiornate = 0; $invariate = 0; $scartate = 0; $righe = 0; $fuori = 0;
     $conn->begin_transaction();
     while (($r = fgetcsv($fh, 0, $sep)) !== false) {
         // Codifica controllata riga per riga: le prime righe possono essere tutte in lettere semplici
@@ -78,6 +88,13 @@ function importa_anagrafe_scuole($conn, array $file, int $statale) {
         foreach ($cols as $c) $val[] = isset($indici[$c]) ? mb_substr(trim((string)($r[$indici[$c]] ?? '')), 0, 250) : '';
         $val[0] = strtoupper($val[0]);
         if (!preg_match('/^[A-Z0-9]{10}$/', $val[0]) || $val[1] === '') { if (implode('', $r) !== '') $scartate++; continue; }
+        // Solo le scuole di una regione (es. CALABRIA): le altre righe si saltano
+        if ($regioni) {
+            $reg_riga = preg_replace('/[^A-Z]/', '', strtoupper((string)$val[7]));
+            $ok_reg = false;
+            foreach ($regioni as $pref) if (str_starts_with($reg_riga, $pref)) { $ok_reg = true; break; }
+            if (!$ok_reg) { $fuori++; continue; }
+        }
         foreach ([2, 3] as $k) if ($val[$k] === '' || strtoupper($val[$k]) === 'NON DISPONIBILE') $val[$k] = null; // istituto di riferimento
         $val[] = $statale;
         $st->bind_param(str_repeat('s', count($cols)) . 'i', ...$val);
@@ -88,7 +105,7 @@ function importa_anagrafe_scuole($conn, array $file, int $statale) {
     }
     $conn->commit();
     fclose($fh); if ($temp_zip) @unlink($temp_zip);
-    return [$inserite, $aggiornate, $invariate, $scartate];
+    return [$inserite, $aggiornate, $invariate, $scartate, $fuori];
 }
 
 // Scuole scritte a mano nelle iscrizioni passate (senza codice), raggruppate per testo
@@ -123,13 +140,25 @@ function suggerisci_scuole($conn, string $testo): array {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify($_POST['csrf_token'] ?? '');
     if (isset($_POST['importa'])) {
-        $esito = importa_anagrafe_scuole($conn, $_FILES['file_scuole'] ?? [], ($_POST['tipo_file'] ?? 'statali') === 'paritarie' ? 0 : 1);
+        $esito = importa_anagrafe_scuole($conn, $_FILES['file_scuole'] ?? [], ($_POST['tipo_file'] ?? 'statali') === 'paritarie' ? 0 : 1, array_values(array_intersect(REGIONI_SCUOLE, (array)($_POST['regioni'] ?? []))));
         if (is_array($esito)) {
-            [$n_nuove, $n_agg, $n_inv, $n_scar] = $esito;
+            [$n_nuove, $n_agg, $n_inv, $n_scar, $n_fuori] = $esito;
             registra_log_audit($conn, "Aggiornamento anagrafe scuole", ["Nuove" => $n_nuove, "Aggiornate" => $n_agg, "Invariate" => $n_inv, "Scartate" => $n_scar]);
             flash_set("Anagrafe aggiornata: $n_nuove scuole nuove, $n_agg aggiornate, $n_inv già presenti e invariate."
-                      . ($n_scar ? " $n_scar righe scartate perché incomplete o non valide." : ''), $n_scar ? 'warning' : 'success');
+                      . ($n_scar ? " $n_scar righe scartate perché incomplete o non valide." : '') . ($n_fuori ? " $n_fuori scuole delle regioni non scelte saltate." : ''), $n_scar ? 'warning' : 'success');
         } else flash_set($esito, 'danger');
+    }
+    // Tiene solo le scuole della Calabria; quelle di altre regioni già scelte in un'iscrizione o in un profilo restano
+    if (isset($_POST['solo_calabria_pulisci'])) {
+        $usate = [];
+        foreach (['prenotazioni', 'utenti'] as $tab_u) {
+            $r_u = $conn->query("SELECT DISTINCT scuola_codice FROM $tab_u WHERE scuola_codice IS NOT NULL");
+            while ($r_u && $x = $r_u->fetch_assoc()) $usate[] = "'" . $conn->real_escape_string($x['scuola_codice']) . "'";
+        }
+        $conn->query("DELETE FROM scuole WHERE regione <> 'CALABRIA'" . ($usate ? " AND codice NOT IN (" . implode(',', array_unique($usate)) . ")" : ''));
+        $n_del = $conn->affected_rows;
+        registra_log_audit($conn, "Anagrafe scuole: tenute solo quelle della Calabria", ["Cancellate" => $n_del]);
+        flash_set("Tolte $n_del scuole di altre regioni. Restano le scuole della Calabria" . ($usate ? " e quelle già scelte nelle iscrizioni." : "."));
     }
     if (isset($_POST['abbina'])) {
         $s = scuola_per_codice($conn, (string)($_POST['codice'] ?? ''));
@@ -145,9 +174,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash_set("\"" . $gruppi[$chiave]['testo'] . "\" abbinata a " . etichetta_scuola($s) . " (" . $st->affected_rows . " iscrizioni).");
         }
     }
-    admin_redirect("scuole.php?p_id=$filtro_p#" . (isset($_POST['abbina']) ? 'abbina' : 'carica'));
+    admin_redirect("scuole.php?p_id=$filtro_p&r=" . time() . "#" . (isset($_POST['abbina']) ? 'abbina' : 'carica'));
 }
 
+// Scuole già in anagrafe per regione (chiave: inizio del nome, come REGIONI_SCUOLE)
+$per_regione = [];
+$r_reg = $conn->query("SELECT regione, COUNT(*) n FROM scuole GROUP BY regione");
+while ($r_reg && $x = $r_reg->fetch_assoc()) {
+    $norm = preg_replace('/[^A-Z]/', '', strtoupper((string)$x['regione']));
+    foreach (REGIONI_SCUOLE as $pref) if ($norm !== '' && str_starts_with($norm, $pref)) { $per_regione[$pref] = ($per_regione[$pref] ?? 0) + (int)$x['n']; break; }
+}
 $stato = $conn->query("SELECT COUNT(*) AS tot, SUM(statale = 1) AS statali, SUM(statale = 0) AS paritarie, SUM(regione = 'CALABRIA') AS calabria,
                               MAX(aggiornata_il) AS agg, MAX(anno_scolastico) AS anno FROM scuole")->fetch_assoc();
 $gruppi = scuole_da_abbinare($conn);
@@ -200,6 +236,12 @@ $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
             <div class="col-6 col-md-3"><div class="scu-num"><?php echo $con_codice; ?></div><div class="small text-secondary">iscrizioni collegate a una scuola</div></div>
         </div>
         <p class="small text-secondary mt-3 mb-0">Ultimo aggiornamento: <?php echo $stato['agg'] ? date('d/m/Y H:i', strtotime($stato['agg'])) : '—'; ?><?php if (!empty($stato['anno'])): ?> · dati dell'anno scolastico <?php echo $h($stato['anno']); ?><?php endif; ?></p>
+        <?php if ((int)$stato['tot'] > (int)$stato['calabria']): ?>
+            <form method="POST" class="mt-2 mb-0">
+                <?php csrf_field(); ?>
+                <button type="submit" name="solo_calabria_pulisci" value="1" class="btn btn-sm btn-outline-danger fw-bold" data-confirm="Togliere le <?php echo number_format((int)$stato['tot'] - (int)$stato['calabria'], 0, ',', '.'); ?> scuole delle altre regioni? Restano quelle della Calabria e quelle già scelte in un'iscrizione."><i class="fa fa-filter me-1" aria-hidden="true"></i>Tieni solo le scuole della Calabria</button>
+            </form>
+        <?php endif; ?>
     <?php endif; ?>
 </section>
 
@@ -218,6 +260,16 @@ $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
                     <label class="form-label small fw-bold d-block">Il file contiene</label>
                     <div class="form-check form-check-inline"><input class="form-check-input" type="radio" name="tipo_file" id="tfS" value="statali" checked><label class="form-check-label small" for="tfS">scuole statali</label></div>
                     <div class="form-check form-check-inline"><input class="form-check-input" type="radio" name="tipo_file" id="tfP" value="paritarie"><label class="form-check-label small" for="tfP">scuole paritarie</label></div>
+                    <fieldset class="mt-2">
+                        <legend class="form-label small fw-bold mb-1">Regioni da importare</legend>
+                        <div class="d-flex flex-wrap gap-1 mb-1">
+                            <?php foreach (REGIONI_SCUOLE as $reg_nome => $reg_pref): $reg_id = 'reg' . $reg_pref; ?>
+                                <input type="checkbox" class="btn-check" name="regioni[]" value="<?php echo $h($reg_pref); ?>" id="<?php echo $reg_id; ?>" <?php echo $reg_pref === 'CALABRIA' ? 'checked' : ''; ?> autocomplete="off">
+                                <label class="btn btn-sm btn-outline-secondary py-0 px-2" for="<?php echo $reg_id; ?>"><?php echo $h($reg_nome); ?><?php if (!empty($per_regione[$reg_pref])): ?> <span class="badge bg-light text-dark"><?php echo number_format($per_regione[$reg_pref], 0, ',', '.'); ?></span><?php endif; ?></label>
+                            <?php endforeach; ?>
+                        </div>
+                        <div class="form-text">Il file del Ministero è nazionale: si importano solo le regioni scelte (nessuna = tutta Italia). Puoi aggiungerne altre in seguito ricaricando lo stesso file: le scuole già presenti vengono solo aggiornate. Il numero indica le scuole già in anagrafe.</div>
+                    </fieldset>
                 </div>
                 <label for="fileScuole" class="form-label small fw-bold">File CSV (anche compresso in ZIP)</label>
                 <input type="file" name="file_scuole" id="fileScuole" class="form-control form-control-sm mb-2" accept=".csv,.zip,.txt" required>

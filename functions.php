@@ -2708,10 +2708,10 @@ if (!function_exists('sincronizza_anagrafe')) {
                 $r_prima = $conn->query("SELECT codice FROM anagrafe_strutture ORDER BY aggiunta_il, codice LIMIT 1");
                 $propri = $r_prima && ($x_prima = $r_prima->fetch_assoc()) && $x_prima['codice'] === $cod;
                 $gia = [];
-                $ins_c = $conn->prepare("INSERT INTO corsi_studio (codice, nome, tipo, tipo_descrizione, classe, anno, lingua, durata, dipartimento_cod, visibile, presente, aggiornato_il)
-                                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())
+                $ins_c = $conn->prepare("INSERT INTO corsi_studio (codice, nome, tipo, tipo_descrizione, classe, anno, lingua, durata, dipartimento_cod, visibile, regdid_id, presente, aggiornato_il)
+                                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())
                                          ON DUPLICATE KEY UPDATE nome=VALUES(nome), tipo=VALUES(tipo), tipo_descrizione=VALUES(tipo_descrizione), classe=VALUES(classe),
-                                           anno=VALUES(anno), lingua=VALUES(lingua), durata=VALUES(durata), dipartimento_cod=VALUES(dipartimento_cod), presente=1, aggiornato_il=NOW()");
+                                           anno=VALUES(anno), lingua=VALUES(lingua), durata=VALUES(durata), dipartimento_cod=VALUES(dipartimento_cod), regdid_id=VALUES(regdid_id), presente=1, aggiornato_il=NOW()");
                 $codici = [];
                 foreach ($corsi as $c) {
                     $cc = trim((string)($c['CdSCod'] ?? ''));
@@ -2724,7 +2724,8 @@ if (!function_exists('sincronizza_anagrafe')) {
                     $chiave = mb_strtolower($nome_c) . '|' . $tipo;
                     $vis = ($propri && !isset($gia[$chiave]) && ($anno ?? 0) >= $anno_max - 2) ? 1 : 0;
                     $gia[$chiave] = true;
-                    $ins_c->bind_param("sssssisisi", $cc, $nome_c, $tipo, $tipo_d, $classe, $anno, $lingua, $durata, $cod, $vis);
+                    $regdid = (int)($c['RegDidId'] ?? 0) ?: null;
+                    $ins_c->bind_param("sssssisisii", $cc, $nome_c, $tipo, $tipo_d, $classe, $anno, $lingua, $durata, $cod, $vis, $regdid);
                     $ins_c->execute();
                     $codici[] = "'" . $conn->real_escape_string($cc) . "'";
                     $n_corsi++;
@@ -3076,6 +3077,71 @@ if (!function_exists('corsi_studio_visibili')) {
     }
 }
 
+if (!function_exists('corso_studio')) {
+    function corso_studio($conn, ?string $codice): ?array {
+        static $cache = [];
+        $codice = trim((string)$codice);
+        if ($codice === '' || strlen($codice) > 20) return null;
+        if (!array_key_exists($codice, $cache)) {
+            $st = $conn->prepare("SELECT * FROM corsi_studio WHERE codice = ? LIMIT 1");
+            if (!$st) return null;
+            $st->bind_param("s", $codice); $st->execute();
+            $cache[$codice] = $st->get_result()->fetch_assoc() ?: null;
+        }
+        return $cache[$codice];
+    }
+}
+
+if (!function_exists('url_corso_studio')) {
+    // Pagina del corso sul portale di Ateneo (serve l'ID del regolamento didattico, arriva con l'aggiornamento dell'anagrafe)
+    function url_corso_studio(?array $c): string {
+        return !empty($c['regdid_id']) ? 'https://www.unical.it/storage/cds/' . (int)$c['regdid_id'] . '/' : '';
+    }
+}
+
+if (!function_exists('nome_scheda_corso')) {
+    // Nome proposto nella scheda: "Corso di laurea in Biologia", "Corso di laurea magistrale in …", altrimenti il nome del corso
+    function nome_scheda_corso(array $c): string {
+        $pref = ['L' => 'Corso di laurea in ', 'LM' => 'Corso di laurea magistrale in ', 'LM5' => 'Corso di laurea magistrale a ciclo unico in ', 'LM6' => 'Corso di laurea magistrale a ciclo unico in '][$c['tipo'] ?? ''] ?? '';
+        return $pref . $c['nome'];
+    }
+}
+
+if (!function_exists('html_scelta_corso_scheda')) {
+    // Scheda di progetti ed eventi: tendina dei corsi di studio + testo libero (name=struttura). Scegliendo un corso
+    // il testo si compila con il nome, che resta modificabile; "Altro" lascia scrivere una struttura qualsiasi.
+    function html_scelta_corso_scheda($conn, string $codice, string $testo, string $id = 'schedaCorso'): string {
+        $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+        $out = '<select name="corso_codice" id="' . $h($id) . '" class="form-select form-select-sm mb-1" onchange="var o=this.options[this.selectedIndex], t=this.nextElementSibling; if (o.dataset.nome) t.value=o.dataset.nome;">'
+              . '<option value="">Altro (scrivi sotto la struttura)</option>';
+        $trovato = $codice === '';
+        foreach (corsi_studio_visibili($conn) as $tipo => $corsi) {
+            $out .= '<optgroup label="' . $h($tipo) . '">';
+            foreach ($corsi as $c) {
+                $sel = $c['codice'] === $codice; if ($sel) $trovato = true;
+                $out .= '<option value="' . $h($c['codice']) . '" data-nome="' . $h(nome_scheda_corso($c)) . '"' . ($sel ? ' selected' : '') . '>' . $h($c['nome']) . '</option>';
+            }
+            $out .= '</optgroup>';
+        }
+        if (!$trovato && ($c = corso_studio($conn, $codice))) $out .= '<option value="' . $h($c['codice']) . '" selected>' . $h(etichetta_corso($c)) . '</option>';
+        $out .= '</select><input type="text" name="struttura" id="' . $h($id) . 'Testo" class="form-control form-control-sm" value="' . $h($testo) . '" placeholder="es. Corso di laurea in Scienze geologiche" maxlength="255" aria-label="Nome del corso o della struttura come appare nella scheda">'
+              . '<div class="form-text">Scegliendo un corso il nome nella scheda pubblica porta alla pagina del corso sul portale di Ateneo. Il testo si può modificare.</div>';
+        return $out;
+    }
+}
+
+if (!function_exists('html_corso_pubblico')) {
+    // Nome del corso/struttura nelle schede pubbliche, con il link alla pagina del corso se scelto dall'anagrafe
+    function html_corso_pubblico($conn, ?array $d, string $stile = ''): string {
+        $testo = trim((string)($d['struttura'] ?? ''));
+        $url = url_corso_studio(corso_studio($conn, $d['corso_codice'] ?? ''));
+        if ($testo === '' && $url !== '') $testo = etichetta_corso(corso_studio($conn, $d['corso_codice']));
+        if ($testo === '') return '';
+        $h = htmlspecialchars($testo, ENT_QUOTES, 'UTF-8');
+        return $url !== '' ? '<a href="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener" style="color:inherit;' . $stile . '">' . $h . ' <i class="fa fa-arrow-up-right-from-square small" aria-hidden="true"></i><span class="visually-hidden"> (pagina del corso, nuova scheda)</span></a>' : $h;
+    }
+}
+
 if (!function_exists('etichetta_corso')) {
     function etichetta_corso(array $c): string {
         return $c['nome'] . (!empty($c['tipo_descrizione']) ? ' (' . $c['tipo_descrizione'] . ')' : '');
@@ -3269,6 +3335,21 @@ if (!function_exists('salva_referenti_evento')) {
         $stmt = $conn->prepare("INSERT INTO progetti_dettagli (evento_id, referenti_json, updated_at) VALUES (?, ?, NOW())
                                 ON DUPLICATE KEY UPDATE referenti_json = VALUES(referenti_json), updated_at = NOW()");
         $stmt->bind_param("is", $ev_id, $json);
+        $stmt->execute();
+    }
+}
+
+if (!function_exists('salva_corso_evento')) {
+    // Corso di laurea / struttura di un evento normale (campi struttura e corso_codice del modulo), nella scheda progetti_dettagli
+    function salva_corso_evento($conn, int $ev_id): void {
+        if (!isset($_POST['struttura']) && !isset($_POST['corso_codice'])) return;
+        $testo = mb_substr(trim((string)($_POST['struttura'] ?? '')), 0, 255);
+        $corso = corso_studio($conn, (string)($_POST['corso_codice'] ?? ''));
+        $cod = $corso['codice'] ?? null;
+        if ($testo === '' && $cod === null && !$conn->query("SELECT 1 FROM progetti_dettagli WHERE evento_id = $ev_id")->num_rows) return;
+        $stmt = $conn->prepare("INSERT INTO progetti_dettagli (evento_id, struttura, corso_codice, updated_at) VALUES (?, ?, ?, NOW())
+                                ON DUPLICATE KEY UPDATE struttura = VALUES(struttura), corso_codice = VALUES(corso_codice), updated_at = NOW()");
+        $stmt->bind_param("iss", $ev_id, $testo, $cod);
         $stmt->execute();
     }
 }
@@ -3947,7 +4028,7 @@ if (!function_exists('puo_vedere_prenotazione')) {
 // richiesta: quando aggiungi qualcosa qui, cambia anche il nome del marcatore.
 if (!function_exists('assicura_schema')) {
     function assicura_schema($conn) {
-        $marker = __DIR__ . '/cache/schema_v23.ok';
+        $marker = __DIR__ . '/cache/schema_v24.ok';
         if (is_file($marker)) return;
 
         // 1. Tabelle di servizio (prima create dalle singole pagine a ogni richiesta)
@@ -4083,8 +4164,14 @@ if (!function_exists('assicura_schema')) {
                 // v13: testo breve mostrato nelle card (la descrizione completa sta nella scheda dell'evento)
                 'descrizione_breve'     => "ADD COLUMN descrizione_breve TEXT DEFAULT NULL AFTER descrizione",
             ],
+            'corsi_studio' => [
+                // v24: ID del regolamento didattico, per il link alla pagina del corso sul portale di Ateneo
+                'regdid_id' => "ADD COLUMN regdid_id INT DEFAULT NULL",
+            ],
             // v10: articolazione del percorso (moduli/fasi/incontri) e sezioni obiettivi/conoscenze/competenze
             'progetti_dettagli' => [
+                // v24: corso di studio dell'anagrafe collegato a progetti ed eventi (nome in struttura, link alla pagina del corso)
+                'corso_codice' => "ADD COLUMN corso_codice VARCHAR(20) DEFAULT NULL",
                 'moduli_json' => "ADD COLUMN moduli_json TEXT DEFAULT NULL",
                 'obiettivi'   => "ADD COLUMN obiettivi TEXT DEFAULT NULL",
                 'conoscenze'  => "ADD COLUMN conoscenze TEXT DEFAULT NULL",

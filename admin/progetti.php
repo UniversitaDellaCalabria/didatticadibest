@@ -229,6 +229,11 @@ if (isset($_POST['salva_progetto'])) {
         $stmt_d->bind_param("issssssiiiissssssii", $ev_id, $d['struttura'], $d['data_inizio'], $d['data_fine'], $d['periodo_note'], $d['destinatari'], $d['modalita'],
                             $d['ore_totali'], $d['incontri_previsti'], $d['min_studenti'], $d['max_studenti'], $ref_json, $info_json, $mod_json, $obiettivi, $conoscenze, $competenze, $per_scuole, $attestati);
         if (!$stmt_d->execute()) throw new RuntimeException($conn->error);
+        // Corso di studio scelto dall'anagrafe (link alla pagina del corso nella scheda pubblica)
+        $corso_sc = corso_studio($conn, (string)($_POST['corso_codice'] ?? ''));
+        $corso_cod = $corso_sc['codice'] ?? null;
+        $stmt_cs = $conn->prepare("UPDATE progetti_dettagli SET corso_codice = ? WHERE evento_id = ?");
+        $stmt_cs->bind_param("si", $corso_cod, $ev_id); $stmt_cs->execute();
         $stmt_dest = $conn->prepare("UPDATE progetti_dettagli SET destinazione = ? WHERE evento_id = ?");
         $stmt_dest->bind_param("si", $destinazione, $ev_id);
         if (!$stmt_dest->execute()) throw new RuntimeException($conn->error);
@@ -410,7 +415,7 @@ if ($mostra_form):
                     </div>
                     <div class="col-md-7">
                         <label for="pjStruttura" class="form-label small fw-bold">Corso di laurea / Struttura</label>
-                        <input type="text" name="struttura" id="pjStruttura" class="form-control form-control-sm" value="<?php echo $v($dp, 'struttura'); ?>" placeholder="es. Corso di laurea in Scienze Geologiche" maxlength="255">
+                        <?php echo html_scelta_corso_scheda($conn, (string)($dp['corso_codice'] ?? ''), (string)($dp['struttura'] ?? ''), 'pjStruttura'); ?>
                     </div>
                     <div class="col-md-5">
                         <label for="pjLuogo" class="form-label small fw-bold">Sede</label>

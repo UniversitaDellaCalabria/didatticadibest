@@ -1102,7 +1102,7 @@ function evSetRating(btn) {
         <header class="pj-hero shadow-sm mb-4">
             <div class="d-flex flex-wrap gap-2 mb-3 position-relative" style="z-index:1;">
                 <span class="pj-stato" style="background: <?php echo $st_p['bg']; ?>; color: <?php echo $st_p['fg']; ?>;"><?php echo htmlspecialchars($st_p['etichetta']); ?></span>
-                <?php if (!empty($dp['struttura'])): ?><span class="pj-stato" style="background: rgba(255,255,255,.18); color: inherit;"><i class="fa fa-building-columns" aria-hidden="true"></i><?php echo htmlspecialchars($dp['struttura']); ?></span><?php endif; ?>
+                <?php if (!empty($dp['struttura']) || !empty($dp['corso_codice'])): ?><span class="pj-stato" style="background: rgba(255,255,255,.18); color: inherit;"><i class="fa fa-building-columns" aria-hidden="true"></i><?php echo html_corso_pubblico($conn, $dp); ?></span><?php endif; ?>
             </div>
             <h1 class="mb-3 position-relative" style="z-index:1;"><?php echo htmlspecialchars($ev_p['titolo']); ?></h1>
             <div class="pj-fatti position-relative" style="z-index:1;">
@@ -1337,6 +1337,7 @@ function evSetRating(btn) {
             <div class="d-flex flex-wrap gap-3 fw-semibold">
                 <?php if ($prossima_s): ?><span><i class="fa fa-calendar-days me-1" aria-hidden="true"></i><?php echo count($turni_s) > 1 ? 'Prossimo: ' : ''; ?><?php echo date('d/m/Y', strtotime($prossima_s)); ?></span><?php endif; ?>
                 <?php if ($luogo_s !== ''): ?><span><i class="fa fa-location-dot me-1" aria-hidden="true"></i><?php echo htmlspecialchars($luogo_s); ?><?php if ($url_maps): ?> · <a href="<?php echo htmlspecialchars($url_maps); ?>" target="_blank" rel="noopener" class="text-decoration-underline">Apri in Google Maps<span class="visually-hidden"> (nuova scheda)</span></a><?php endif; ?></span><?php endif; ?>
+                <?php $corso_s = html_corso_pubblico($conn, $dett_s); if ($corso_s !== ''): ?><span><i class="fa fa-building-columns me-1" aria-hidden="true"></i><?php echo $corso_s; ?></span><?php endif; ?>
             </div>
         </header>
 

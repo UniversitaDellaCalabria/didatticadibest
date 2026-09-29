@@ -140,7 +140,7 @@ if (isset($_POST['duplica_turno'])) {
     $nuovo = duplica_turno($conn, $t_id, $ev_id, true);
     if (function_exists('registra_log_audit')) registra_log_audit($conn, "Duplicazione Turno", ["Turno origine" => $t_id, "Nuovo turno" => $nuovo]);
     flash_set("Turno duplicato: in fondo all'elenco dei turni trovi la copia, modifica data e orari e salva.");
-    admin_redirect("eventi.php?p_id=$filtro_p&id=$ev_id#turni");
+    admin_redirect("eventi.php?p_id=$filtro_p&id=$ev_id&r=" . time() . "#turni");
 }
 
 if (isset($_POST['duplica_evento'])) {
@@ -234,6 +234,7 @@ if (isset($_POST['add_evento'])) {
     $avviso_notif = $notif_scartati ? " Indirizzi non validi ignorati: " . htmlspecialchars(implode(', ', $notif_scartati)) . "." : '';
     $ref_ev = leggi_referenti_post($ref_scartate);
     if ($ref_ev) salva_referenti_evento($conn, $ev_id, $ref_ev);
+    salva_corso_evento($conn, $ev_id);
     if ($ref_scartate) $avviso_notif .= " Email dei referenti non valide ignorate: " . implode(", ", $ref_scartate) . ".";
 
     salva_attestati_classe_evento($conn, $ev_id, $att_classe);
@@ -307,6 +308,7 @@ if (isset($_POST['edit_evento'])) {
     $avviso_notif = $notif_scartati ? " Indirizzi non validi ignorati: " . htmlspecialchars(implode(', ', $notif_scartati)) . "." : '';
     $ref_ev = leggi_referenti_post($ref_scartate);
     salva_referenti_evento($conn, $ev_id, $ref_ev);
+    salva_corso_evento($conn, $ev_id);
     if ($ref_scartate) $avviso_notif .= " Email dei referenti non valide ignorate: " . implode(", ", $ref_scartate) . ".";
     salva_attestati_classe_evento($conn, $ev_id, $att_classe);
     if ($att_classe) assicura_campi_progetto($conn, $filtro_p); // campo "numero di partecipanti" del modulo
@@ -440,6 +442,10 @@ form:not(.ev-form-classe) .ev-t-riga2 { grid-template-columns: repeat(3, 1fr); }
                     <div class="col-md-6">
                         <label for="evLuogo" class="form-label small fw-bold">Luogo / Aula</label>
                         <input type="text" name="luogo" id="evLuogo" class="form-control form-control-sm" value="<?php echo $v('luogo'); ?>" placeholder="es. Aula Magna, Cubo 4C, Online (Teams)" maxlength="255">
+                    </div>
+                    <div class="col-12">
+                        <label for="evCorso" class="form-label small fw-bold">Corso di laurea / Struttura <span class="fw-normal text-muted">(facoltativo)</span></label>
+                        <?php echo html_scelta_corso_scheda($conn, (string)($dett_f['corso_codice'] ?? ''), (string)($dett_f['struttura'] ?? ''), 'evCorso'); ?>
                     </div>
                     <div class="col-12">
                         <label for="evDescBreve" class="form-label small fw-bold">Descrizione breve <span class="fw-normal text-muted">(compare nelle card)</span></label>

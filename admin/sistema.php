@@ -32,7 +32,7 @@ if (isset($_POST['invia_email_test'])) {
     $ok_test = inviaNotificaEmail($dest_test, "Email di prova - Eventi DiBEST", "<p>Questa è un'email di prova inviata dal pannello <strong>Sistema Email</strong> il " . date('d/m/Y H:i') . ".</p><p>Se la ricevi, la configurazione SMTP funziona.</p>", $conn);
     if ($ok_test) flash_set("Email di prova accettata dal server per " . $dest_test . ". Se non arriva entro qualche minuto controlla lo spam.");
     else flash_set("Invio fallito: " . ($GLOBALS['ultimo_errore_email'] ?: 'errore sconosciuto'), 'danger');
-    admin_redirect("sistema.php?p_id=$filtro_p#log-email");
+    admin_redirect("sistema.php?p_id=$filtro_p&r=" . time() . "#log-email");
 }
 
 // 1c. RIEPILOGO SETTIMANALE DELLE EMAIL: invio immediato agli amministratori
@@ -41,7 +41,7 @@ if (isset($_POST['invia_report_email'])) {
     $esito_rep = invia_report_email_settimanale($conn, true);
     if ($esito_rep === true) flash_set("Riepilogo inviato agli amministratori: " . implode(', ', email_amministratori($conn)) . ".");
     else flash_set("Riepilogo non inviato: " . $esito_rep, 'danger');
-    admin_redirect("sistema.php?p_id=$filtro_p#log-email");
+    admin_redirect("sistema.php?p_id=$filtro_p&r=" . time() . "#log-email");
 }
 
 // 2. SALVATAGGIO CONFIGURAZIONI SMTP E TEMPLATE

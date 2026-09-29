@@ -69,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif (isset($_POST['corso_visibile'])) {
         $cc = (string)$_POST['corso_visibile']; $vis = (int)($_POST['visibile'] ?? 0) ? 1 : 0;
         $st = $conn->prepare("UPDATE corsi_studio SET visibile = ? WHERE codice = ?"); $st->bind_param("is", $vis, $cc); $st->execute();
-        admin_redirect("$url_pagina&vista=corsi#c" . rawurlencode($cc));
+        admin_redirect("$url_pagina&vista=corsi&r=" . time() . "#c" . rawurlencode($cc));
     }
     admin_redirect("$url_pagina&vista=$vista");
 }
