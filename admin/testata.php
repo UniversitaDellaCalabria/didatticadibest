@@ -112,6 +112,10 @@ if (isset($_POST['save_portal_header'])) {
     $f_realizzato = $conn->real_escape_string($_POST['footer_realizzato_da'] ?? '');
     $f_assistenza = $conn->real_escape_string($_POST['footer_assistenza'] ?? '');
     $f_copyright = $conn->real_escape_string($_POST['footer_copyright'] ?? '');
+    // Dichiarazione di accessibilità: solo indirizzi http(s), altrimenti vuoto (il footer usa la pagina di Ateneo)
+    $url_acc = trim($_POST['url_accessibilita'] ?? '');
+    if ($url_acc !== '' && !preg_match('#^https?://#i', $url_acc)) $url_acc = '';
+    $url_acc = $conn->real_escape_string(mb_substr($url_acc, 0, 500));
     
     $upload_dir = dirname(__DIR__) . '/uploads/';
     $logo_query = "";
@@ -145,7 +149,8 @@ if (isset($_POST['save_portal_header'])) {
         footer_contatti='$f_contatti',
         footer_realizzato_da='$f_realizzato',
         footer_assistenza='$f_assistenza',
-        footer_copyright='$f_copyright'
+        footer_copyright='$f_copyright',
+        url_accessibilita='$url_acc'
         $logo_query $fav_query WHERE id = 1");
 
     // Fase 3: invalida subito la cache locale delle impostazioni portale, altrimenti
@@ -271,6 +276,11 @@ $_tmap[array_key_exists($_st, $_tmap) ? $_st : 'testata'] = 'active show';
                     <div class="mb-3 border-top pt-3">
                         <label class="form-label fw-bold small text-secondary">Testo Copyright (Barra grigia inferiore)</label>
                         <input type="text" name="footer_copyright" class="form-control" value="<?php echo htmlspecialchars($cfg_p['footer_copyright'] ?? ''); ?>">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-secondary" for="url_accessibilita">Link alla Dichiarazione di accessibilità</label>
+                        <input type="url" id="url_accessibilita" name="url_accessibilita" class="form-control" placeholder="https://form.agid.gov.it/view/..." value="<?php echo htmlspecialchars($cfg_p['url_accessibilita'] ?? ''); ?>">
+                        <div class="form-text">Indirizzo della dichiarazione pubblicata su form.agid.gov.it (obbligatoria per i siti delle PA, L. 4/2004). Se vuoto, il footer rimanda alla pagina Accessibilità dell'Ateneo.</div>
                     </div>
                 </div>
             </div>

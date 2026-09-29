@@ -34,7 +34,7 @@ require_once 'header.php';
             <li><a href="#finalita">Perché li trattiamo e base giuridica</a></li>
             <li><a href="#destinatari">Chi può vedere i dati</a></li>
             <li><a href="#conservazione">Per quanto tempo li conserviamo</a></li>
-            <li><a href="#diritti">I tuoi diritti</a></li>
+            <li><a href="#diritti">Esercizio dei diritti degli interessati</a></li>
             <li><a href="#cookie">Cookie e altri strumenti</a></li>
         </ol>
     </nav>
@@ -84,8 +84,9 @@ require_once 'header.php';
         <li><strong>Copie di sicurezza</strong> (backup cifrati): 7 giorni sul server e <?php echo $giorni_nas; ?> giorni sull'archivio dell'Ateneo.</li>
     </ul>
 
-    <h2 id="diritti">6. I tuoi diritti</h2>
-    <p>Puoi chiedere l'accesso ai tuoi dati, la rettifica, la cancellazione, la limitazione del trattamento e opporti al trattamento (artt. 15-22 del Regolamento) scrivendo all'RPD (<a href="mailto:rpd@unical.it">rpd@unical.it</a>). Molti dati li vedi e li correggi direttamente nella tua <a href="area_personale.php">Area personale</a>. Per i minorenni i diritti sono esercitati dai genitori o da chi ne fa le veci. Puoi inoltre presentare reclamo al <a href="https://www.garanteprivacy.it" target="_blank" rel="noopener">Garante per la protezione dei dati personali</a>.</p>
+    <h2 id="diritti">6. Esercizio dei diritti degli interessati</h2>
+    <p>Fatte salve le limitazioni all’esercizio dei diritti degli interessati di cui agli artt. 2-undecies e 2-duodecies del d.lgs. 196/2003 s.m.i. (“Codice in materia di protezione dei dati personali”), l’interessato può esercitare i propri diritti ai sensi e nei limiti degli artt. 15-21 RGPD, tra cui il diritto di chiedere al titolare l’accesso ai Suoi dati personali, la rettifica o la cancellazione degli stessi, nonché la limitazione del trattamento dei dati che La riguarda, l’opposizione al trattamento e la portabilità dei Suoi dati. L’interessato ha inoltre il diritto di revocare il proprio consenso al trattamento dei dati, in qualsiasi momento, senza pregiudicare la liceità del trattamento basata sul consenso prima della revoca. Infine, l’interessato ha il diritto di proporre reclamo a un’autorità di controllo competente, ai sensi dell’art. 77, par. 1, RGPD. Lei può esercitare i diritti sopra indicati inviando una comunicazione scritta presso la sede del Titolare o all’indirizzo di posta elettronica <a href="mailto:rpd@unical.it">rpd@unical.it</a>.</p>
+    <p>Molti dati si possono consultare e correggere direttamente nell'<a href="area_personale.php">Area personale</a>. Per i minorenni i diritti sono esercitati dai genitori o da chi ne fa le veci. L'autorità di controllo in Italia è il <a href="https://www.garanteprivacy.it" target="_blank" rel="noopener">Garante per la protezione dei dati personali</a>.</p>
     <p class="small text-secondary">Informazioni generali sulla protezione dei dati in Ateneo: <a href="https://www.unical.it/privacy/" target="_blank" rel="noopener">unical.it/privacy</a>.</p>
 
     <h2 id="cookie">7. Cookie e altri strumenti</h2>

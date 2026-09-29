@@ -2264,9 +2264,9 @@ function evSetRating(btn) {
             <div class="d-flex flex-wrap align-items-center gap-2 mb-4 p-3 bg-light border rounded-3">
                 <label for="pjlCerca" class="visually-hidden">Cerca progetto</label>
                 <input type="search" id="pjlCerca" class="form-control form-control-sm" placeholder="Cerca progetto, struttura, referente..." style="max-width: 300px;">
-                <button type="button" class="btn btn-sm btn-outline-secondary pjl-pill active" data-pjl-stato="">Tutti <span class="opacity-75">(<?php echo count($lista_pj); ?>)</span></button>
+                <button type="button" class="btn btn-sm btn-outline-secondary pjl-pill active" data-pjl-stato="">Tutti <span>(<?php echo count($lista_pj); ?>)</span></button>
                 <?php foreach ($filtri_stato as $cod => $lbl): if (empty($conta_stato[$cod])) continue; ?>
-                    <button type="button" class="btn btn-sm btn-outline-secondary pjl-pill" data-pjl-stato="<?php echo $cod; ?>"><?php echo $lbl; ?> <span class="opacity-75">(<?php echo $conta_stato[$cod]; ?>)</span></button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary pjl-pill" data-pjl-stato="<?php echo $cod; ?>"><?php echo $lbl; ?> <span>(<?php echo $conta_stato[$cod]; ?>)</span></button>
                 <?php endforeach; ?>
                 <?php if (count($strutture_pj) > 1): ?>
                     <label for="pjlStruttura" class="visually-hidden">Struttura</label>

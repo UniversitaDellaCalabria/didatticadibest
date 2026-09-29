@@ -17,6 +17,7 @@ $footer_sottotitolo = 'Portale Eventi e Laboratori Dipartimentali';
 $footer_nome_dipartimento = 'DiBEST - Dipartimento di Biologia, Ecologia e Scienze della Terra (UNICAL)';
 $footer_indirizzo = 'Via Pietro Bucci, 87036 Rende (CS)';
 $footer_contatti = 'Email: dipartimento@unical.it';
+$url_accessibilita = 'https://www.unical.it/accessibilita/';
 $footer_realizzato_da = 'Realizzato per il Dipartimento da Emanuele Dodaro';
 $footer_assistenza = 'emanuele.dodaro@unical.it';
 $footer_copyright = 'Università della Calabria - DiBEST';
@@ -27,7 +28,7 @@ if (isset($conn) && $conn instanceof mysqli) {
     if (function_exists('get_configurazione_portale')) {
         $row_foot = get_configurazione_portale($conn);
     } else {
-        $res_foot = @$conn->query("SELECT nome_portale, sottotitolo_portale, footer_nome_dipartimento, footer_indirizzo, footer_contatti, footer_realizzato_da, footer_assistenza, footer_copyright FROM configurazione_portale WHERE id = 1");
+        $res_foot = @$conn->query("SELECT nome_portale, sottotitolo_portale, footer_nome_dipartimento, footer_indirizzo, footer_contatti, footer_realizzato_da, footer_assistenza, footer_copyright, url_accessibilita FROM configurazione_portale WHERE id = 1");
         $row_foot = ($res_foot && $res_foot->num_rows > 0) ? $res_foot->fetch_assoc() : null;
     }
     if (!empty($row_foot)) {
@@ -37,6 +38,7 @@ if (isset($conn) && $conn instanceof mysqli) {
         $footer_nome_dipartimento = !empty($row_foot['footer_nome_dipartimento']) ? $row_foot['footer_nome_dipartimento'] : $footer_nome_dipartimento;
         $footer_indirizzo = !empty($row_foot['footer_indirizzo']) ? $row_foot['footer_indirizzo'] : $footer_indirizzo;
         $footer_contatti = !empty($row_foot['footer_contatti']) ? $row_foot['footer_contatti'] : $footer_contatti;
+        if (!empty($row_foot['url_accessibilita'])) $url_accessibilita = $row_foot['url_accessibilita'];
         
         $footer_realizzato_da = !empty($row_foot['footer_realizzato_da']) ? $row_foot['footer_realizzato_da'] : $footer_realizzato_da;
         $footer_assistenza = !empty($row_foot['footer_assistenza']) ? $row_foot['footer_assistenza'] : $footer_assistenza;
@@ -85,7 +87,7 @@ if (isset($conn) && $conn instanceof mysqli) {
                 <li class="list-inline-item"><a class="text-white text-decoration-none" href="privacy.php">Privacy</a></li>
                 <li class="list-inline-item"><a class="text-white text-decoration-none" href="privacy.php#cookie">Cookie</a></li>
                 <li class="list-inline-item"><a class="text-white text-decoration-none" href="https://www.unical.it/note-legali/" target="_blank">Note Legali</a></li>
-                <li class="list-inline-item"><a class="text-white text-decoration-none" href="https://www.unical.it/accessibilita/" target="_blank">Accessibilità</a></li>
+                <li class="list-inline-item"><a class="text-white text-decoration-none" href="<?php echo htmlspecialchars($url_accessibilita); ?>" target="_blank" rel="noopener">Dichiarazione di accessibilità</a></li>
             </ul>
             <div class="mt-2 mt-md-0 fw-bold">
                 © <?php echo date('Y'); ?> <?php echo htmlspecialchars($footer_copyright); ?>
