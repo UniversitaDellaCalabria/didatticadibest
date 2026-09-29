@@ -53,6 +53,9 @@ require_once 'header.php';
     <h3>Scuole (Formazione Scuola Lavoro, OpenLab e attività per le classi)</h3>
     <p>Il docente referente fornisce i propri dati, il numero di studenti e, se l'attività prevede gli attestati, <strong>cognome e nome degli studenti</strong>. Non raccogliamo altri dati degli studenti. È la scuola a informare studenti e famiglie della comunicazione dei nominativi all'Università per il rilascio degli attestati.</p>
 
+    <h3>Personale dell'Ateneo</h3>
+    <p>Per docenti e personale delle strutture che organizzano le attività il portale riprende dal portale pubblico dell'Università della Calabria nome, ruolo, struttura, settore disciplinare, recapiti di ufficio e, per chi è indicato come referente di un'attività, foto, curriculum e orari di ricevimento già pubblicati dall'Ateneo. Servono a indicare i referenti, a riconoscere al login il personale (per email) e a gestire le abilitazioni. I dati si aggiornano ogni settimana e chi non compare più nel portale di Ateneo viene cancellato dopo 12 mesi.</p>
+
     <h2 id="finalita">3. Perché li trattiamo e base giuridica</h2>
     <ul>
         <li>gestire prenotazioni, iscrizioni e liste d'attesa;</li>

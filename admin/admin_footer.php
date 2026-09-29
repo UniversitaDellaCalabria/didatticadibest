@@ -31,6 +31,8 @@
 <script src="<?php echo url_vendor('jsdelivr/npm/chart.js@4.4.0/dist/chart.umd.min.js'); ?>" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous"></script>
 <script src="<?php echo url_vendor('jsdelivr/npm/select2@4.1.0-rc.0/dist/js/select2.min.js'); ?>" integrity="sha384-d3UHjPdzJkZuk5H3qKYMLRyWLAQBJbby2yr2Q58hXXtAGF8RSNO9jpLDlKKPv5v3" crossorigin="anonymous"></script>
 <script src="<?php echo url_vendor('cdnjs/ajax/libs/tinymce/6.8.3/tinymce.min.js'); ?>" integrity="sha384-1Miaw0hyo/w0cd9ZHUnc7Z8ACgtO+lphAEziGNW4z2C1h3nJfMVVEWA5MI031P+X" crossorigin="anonymous"></script>
+<script src="../assets/js/campo-scuola.js?v=1"></script>
+<script src="../assets/js/ricerca-personale.js?v=1"></script>
 
 <script>
     tinymce.init({ selector: 'textarea.editor-html', plugins: 'table lists link code', toolbar: 'undo redo | bold italic underline | alignleft aligncenter alignright | bullist numlist | link code', menubar: false, height: 200 });

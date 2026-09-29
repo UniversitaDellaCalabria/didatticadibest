@@ -41,6 +41,12 @@ Portale open-source per la gestione eventi, prenotazioni e presenze del **Dipart
 - **Menu di navigazione** a 3 livelli con ordinamento drag & drop e voci nascondibili
 - **Profilo utente**: pagina dedicata con dati SSO e modifica email personale
 - **Form builder** per campi prenotazione personalizzati per area/evento
+- **Anagrafe delle scuole**: l'elenco ufficiale del Ministero dell'Istruzione (open data, statali e paritarie) si carica dal pannello; il campo "Scuola (anagrafe del Ministero)" dei moduli cerca mentre il docente scrive (nome, comune o codice meccanografico, prima le scuole della Calabria), salva il nome ufficiale e il codice meccanografico e la propone già compilata alle iscrizioni successive; resta possibile scrivere a mano una scuola non in elenco. Le scuole scritte a mano nelle iscrizioni passate si abbinano all'anagrafe con i suggerimenti del portale, così report e statistiche contano ogni scuola una volta sola. La pagina Anagrafe scuole elenca le scuole collegate con i docenti di riferimento, le iscrizioni e le attività (esportabile in CSV)
+- **Anagrafe del personale di Ateneo** dalle API pubbliche del portale Unical (rubrica, docenti, corsi di studio), per le strutture scelte (DiBEST di partenza, se ne aggiungono altre dalla tendina delle strutture o col codice) e aggiornata ogni settimana: elenchi Docenti, Personale tecnico amministrativo e Altro personale con filtri per ruolo e struttura. Al login la persona viene collegata per email e inserita nel gruppo Docenti / Personale tecnico amministrativo / Altro personale di Ateneo, utilizzabile per riservare gli eventi
+- **Referenti dall'anagrafe**: in eventi e progetti si cercano per gruppo, ruolo, struttura e nome e si compilano da soli nome, email, telefono e link (resta possibile l'inserimento a mano); il nome porta alla **pagina pubblica del docente** (`persona.php`) con foto (o una sagoma grigia), ruolo, settore, contatti, ricevimento, curriculum e attività sul portale. Foto e schede sono copiate dal portale di Ateneo e rinnovate ogni 7 giorni
+- **Abilitazione dei gestori dall'anagrafe**, anche prima del loro primo accesso: l'abilitazione resta in attesa e si attiva al primo login con quell'email. La dashboard avvisa se un gestore o un referente non compare più nell'anagrafe di Ateneo
+- **Campo "Corso di studio"** nel Form Builder: tendina con i corsi dei dipartimenti dell'anagrafe, raggruppati per tipo; quali proporre si sceglie in Corsi e strutture Ateneo
+- Nei moduli di prenotazione l'**email si scrive a mano** e si ripete per conferma (non viene presa dall'accesso)
 - **Email automatiche**: conferma, cancellazione, promemoria (via SMTP configurabile), con layout nel colore dell'area, registro degli invii ed email di prova dal pannello
 - **Notifiche delle prenotazioni** ai gestori, a indirizzi in copia scelti per ogni evento e ai referenti di eventi e progetti, con il riepilogo completo della prenotazione (campi aggiuntivi compresi)
 - **Badge e barre dei posti disponibili** in tempo reale sulle card eventi e in home (liberi / lista d'attesa / esauriti / concluso)
@@ -133,13 +139,13 @@ La cartella `cache/` deve essere scrivibile da PHP: oltre alla cache della confi
 
 ### Operazioni pianificate (cron)
 
-**Backup**: `admin/cron_backup.php` esporta il database (`.sql.gz`) e i file del sito (`.zip`) in `backups/` (7 giorni), li copia nella cartella del NAS indicata da `BACKUP_NAS_PATH` (conservazione `BACKUP_NAS_GIORNI`) e invia una copia del solo database, cifrata AES-256 con `BACKUP_PASSWORD`, a `BACKUP_EMAIL` (`BACKUP_EMAIL_FREQUENZA`: settimanale, giornaliera, no). Esito e configurazione nel pannello Sistema; se qualcosa non va gli amministratori ricevono un avviso. Crontab consigliato: `30 2 * * * php /percorso/eventi/admin/cron_backup.php`. Ogni lunedì `cron_background.php` manda agli amministratori il riepilogo settimanale delle email (inviate, fallite, stato del backup).
+**Backup**: `admin/cron_backup.php` esporta il database (`.sql.gz`) e i file del sito (`.zip`) in `backups/` (7 giorni), li copia nella cartella del NAS indicata da `BACKUP_NAS_PATH` (conservazione `BACKUP_NAS_GIORNI`) e invia una copia del solo database, cifrata AES-256 con `BACKUP_PASSWORD`, a `BACKUP_EMAIL` (`BACKUP_EMAIL_FREQUENZA`: settimanale, giornaliera, no). Esito e configurazione nel pannello Sistema; se qualcosa non va gli amministratori ricevono un avviso. Crontab consigliato: `30 2 * * * php /percorso/eventi/admin/cron_backup.php`. Ogni lunedì `cron_background.php` manda agli amministratori il riepilogo settimanale delle email (inviate, fallite, stato del backup). Una volta a settimana lo stesso script aggiorna l'anagrafe del personale e i corsi di studio dal portale di Ateneo.
 
 Gli script `cron_background.php`, `cron_attestati.php`, `admin/cron_reminders.php` e `admin/cron_backup.php` si avviano da riga di comando (es. `php cron_background.php`) oppure via URL con la chiave `CRON_KEY` del file `.env` (almeno 16 caratteri), es. `https://tuo-dominio/eventi/cron_background.php?key=LA_TUA_CHIAVE`. Senza chiave rispondono 403.
 
 ### Aggiornamenti del database
 
-Non servono script SQL manuali dopo un aggiornamento del codice. Al primo accesso la funzione `assicura_schema()` in `functions.php` crea le tabelle e le colonne mancanti e corregge i tipi di colonna dei database più vecchi, poi scrive un marcatore (es. `cache/schema_v19.ok`) e da quel momento non interroga più lo schema. Le pagine non modificano mai la struttura del database: ogni nuova colonna va aggiunta lì, cambiando il nome del marcatore.
+Non servono script SQL manuali dopo un aggiornamento del codice. Al primo accesso la funzione `assicura_schema()` in `functions.php` crea le tabelle e le colonne mancanti e corregge i tipi di colonna dei database più vecchi, poi scrive un marcatore (es. `cache/schema_v23.ok`) e da quel momento non interroga più lo schema. Le pagine non modificano mai la struttura del database: ogni nuova colonna va aggiunta lì, cambiando il nome del marcatore.
 
 ### 6. Configura il SSO (opzionale)
 
@@ -167,6 +173,10 @@ eventidibest-cms/
 │   ├── aree.php                # Elenco delle aree (gestisci, visibile/nascosta, elimina)
 │   ├── nuova_area.php          # Creazione di un'area (nasce nascosta, voce di menu nascosta)
 │   ├── utenti.php              # Utenti, gruppi e abilitazioni, con riepilogo per area
+│   ├── scuole.php              # Anagrafe scuole: caricamento del file del Ministero e abbinamento dello storico, scuole collegate con i docenti
+│   ├── anagrafe_personale.php  # Anagrafe del personale di Ateneo: elenchi, corsi di studio, strutture da sincronizzare
+│   ├── anagrafe_docenti.php    # Apre l'elenco dei docenti (anagrafe_pta.php: personale tecnico amministrativo)
+│   ├── cerca_personale.php     # Ricerca nell'anagrafe del personale per referenti e abilitazioni (JSON)
 │   ├── eventi.php              # CRUD eventi, turni, sezioni e referenti, duplicazione
 │   ├── progetti.php            # Progetti: scheda completa, tipo (scuole o generico), edizioni, attestati
 │   ├── partecipanti.php        # Studenti e attestati: elenco delle classi dell'area e dettaglio di ciascuna (invio al docente)
@@ -199,6 +209,8 @@ eventidibest-cms/
 ├── verifica_attestato.php # Verifica pubblica di un attestato dal codice o dal QR
 ├── privacy.php         # Informativa privacy e cookie
 ├── crediti.php         # Credits: copyright, realizzazione, software open source e licenze
+├── cerca_scuole.php    # Ricerca nell'anagrafe delle scuole per il campo "Scuola" dei moduli (JSON)
+├── persona.php         # Pagina pubblica di un referente scelto dall'anagrafe di Ateneo
 ├── profilo.php         # Profilo utente: dati SSO e modifica email
 ├── sw.js               # Service Worker (PWA)
 └── manifest.json       # Web App Manifest (PWA)
@@ -229,7 +241,12 @@ Il database e` composto da **23 tabelle**:
 | `template_email` | Template email personalizzabili |
 | `impostazioni_sistema` | Config SMTP e template email di sistema |
 | `configurazione_portale` | Impostazioni grafiche del portale |
-| `menu_voci` | Voci del menu di navigazione principale |
+| `menu_voci` | Voci del menu di navigazione principale (nascondibili) |
+| `scuole` | Anagrafe delle scuole del Ministero (codice meccanografico, istituto di riferimento, comune, tipo); le prenotazioni e gli utenti hanno il campo `scuola_codice` |
+| `personale_ateneo` | Anagrafe del personale delle strutture scelte (API del portale Unical): ruolo, struttura, gruppo, settore, recapiti, scheda con foto; gli utenti hanno il campo `persona_id` |
+| `anagrafe_strutture` | Strutture di Ateneo da sincronizzare, con l'esito dell'ultimo aggiornamento |
+| `corsi_studio` | Corsi di studio dei dipartimenti dell'anagrafe, con la scelta di quelli proposti nei moduli |
+| `abilitazioni_attesa` | Abilitazioni date a chi non ha ancora fatto accesso: si attivano al primo login con quell'email |
 | `log_attivita` | Audit trail di tutte le operazioni admin |
 | `rate_limit_attempts` | Protezione anti-flood endpoint pubblici |
 | `slide_home` | Immagini del carosello della home |

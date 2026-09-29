@@ -42,7 +42,7 @@ if (isset($_POST['duplica_ev'])) {
         $copia = duplica_evento($conn, $ev_azione, false);
     } catch (Throwable $e) {
         error_log('[archivio duplica_ev] ' . $e->getMessage());
-        flash_set("Duplicazione non riuscita: " . htmlspecialchars($e->getMessage()), 'danger');
+        flash_set("Duplicazione non riuscita: " . $e->getMessage(), 'danger');
         admin_redirect("archivio.php?p_id=$filtro_p");
     }
     if (function_exists('registra_log_audit')) registra_log_audit($conn, "Clonazione Evento da Archivio", ["Da ID" => $ev_azione, "Nuovo ID" => $copia['evento'], "Sondaggi" => $copia['sondaggi']]);

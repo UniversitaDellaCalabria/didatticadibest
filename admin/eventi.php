@@ -151,7 +151,7 @@ if (isset($_POST['duplica_evento'])) {
         $copia = duplica_evento($conn, $ev_id, true);
     } catch (Throwable $e) {
         error_log('[duplica_evento] ' . $e->getMessage());
-        flash_set("Duplicazione non riuscita: " . htmlspecialchars($e->getMessage()), 'danger');
+        flash_set("Duplicazione non riuscita: " . $e->getMessage(), 'danger');
         admin_redirect("eventi.php?p_id=$filtro_p&f_ev=$filtro_ev");
     }
     [$nuovo_ev, $n_turni, $n_sond] = [$copia['evento'], $copia['turni'], $copia['sondaggi']];
@@ -203,7 +203,7 @@ if (isset($_POST['add_evento'])) {
     if ($att_classe) $abilita_pres = 1; // gli attestati della classe richiedono il check-in
     $errori_t = [];
     $turni_post = leggi_turni_post((bool)$att_classe, $errori_t);
-    if ($errori_t) { flash_set("Evento non creato: " . htmlspecialchars(implode('; ', $errori_t)) . ".", 'danger'); admin_redirect("eventi.php?p_id=$filtro_p&azione=nuovo"); }
+    if ($errori_t) { flash_set("Evento non creato: " . implode('; ', $errori_t) . ".", 'danger'); admin_redirect("eventi.php?p_id=$filtro_p&azione=nuovo"); }
 
     $upload_dir = dirname(__DIR__) . '/uploads/';
     $locandina_path = "";
@@ -266,7 +266,7 @@ if (isset($_POST['edit_evento'])) {
     if ($att_classe) $abilita_pres = 1; // gli attestati della classe richiedono il check-in
     $errori_t = [];
     $turni_post = leggi_turni_post((bool)$att_classe, $errori_t);
-    if ($errori_t) { flash_set("Evento non salvato: " . htmlspecialchars(implode('; ', $errori_t)) . ".", 'danger'); admin_redirect("eventi.php?p_id=$filtro_p&id=$ev_id"); }
+    if ($errori_t) { flash_set("Evento non salvato: " . implode('; ', $errori_t) . ".", 'danger'); admin_redirect("eventi.php?p_id=$filtro_p&id=$ev_id"); }
 
     if (isset($_POST['elimina_locandina']) && $_POST['elimina_locandina'] == '1') $conn->query("UPDATE eventi SET locandina_path = NULL WHERE id = $ev_id");
     if (isset($_POST['elimina_pdf']) && $_POST['elimina_pdf'] == '1') $conn->query("UPDATE eventi SET allegato_pdf = NULL WHERE id = $ev_id");
@@ -396,7 +396,7 @@ if ($mostra_form):
 .pj-riga { display:grid; grid-template-columns: 150px 1fr 1fr 150px 38px; gap:.5rem; margin-bottom:.5rem; }
 .pj-ref { padding-bottom:.6rem; margin-bottom:.6rem; border-bottom:1px dashed #e2e8f0; }
 .pj-ref .pj-riga { margin-bottom:.4rem; }
-.pj-riga-2 { display:grid; grid-template-columns: 1fr auto; gap:.75rem; align-items:center; padding-right:46px; }
+.pj-riga-2 { display:grid; grid-template-columns: 1fr auto auto; gap:.75rem; align-items:center; padding-right:46px; }
 .ev-t { padding:.7rem; margin-bottom:.6rem; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; display:grid; gap:.45rem; }
 .ev-t-passato { opacity:.6; }
 .ev-t-riga1 { display:grid; grid-template-columns: 1fr 150px 105px 105px 115px 38px; gap:.45rem; }
@@ -456,6 +456,7 @@ form:not(.ev-form-classe) .ev-t-riga2 { grid-template-columns: repeat(3, 1fr); }
             <section class="pj-sez">
                 <h2><i class="fa fa-address-book me-1" aria-hidden="true"></i>Referenti, responsabili e relatori</h2>
                 <p class="form-text mt-0 mb-2">Compaiono nella scheda dell'evento; il link alla pagina personale rende cliccabile il nome. Chi ha <strong>"Riceve le prenotazioni"</strong> attivo riceve per email il riepilogo di ogni prenotazione e disdetta (serve l'email).</p>
+                <?php echo html_ricerca_personale($conn, "Aggiungi", "evReferenti"); ?>
                 <div class="d-none d-md-grid pj-riga small fw-bold text-secondary mb-1"><span>Ruolo</span><span>Nome e cognome</span><span>Email</span><span>Telefono</span><span></span></div>
                 <div id="evReferenti">
                     <?php foreach ($referenti as $r): $notif_r = !empty($r['notifiche']); ?>
@@ -469,6 +470,8 @@ form:not(.ev-form-classe) .ev-t-riga2 { grid-template-columns: repeat(3, 1fr); }
                             </div>
                             <div class="pj-riga-2">
                                 <input type="url" name="ref_link[]" class="form-control form-control-sm" value="<?php echo h($r['link'] ?? ''); ?>" placeholder="Link alla pagina personale (facoltativo), es. https://www.unical.it/..." aria-label="Link alla pagina personale">
+                                <input type="hidden" name="ref_persona[]" value="<?php echo h($r['persona_id'] ?? ''); ?>">
+                                <span class="badge ref-anag text-nowrap" style="background:#e0f2fe;color:#075985;" title="Scelto dall'anagrafe di Ateneo: il nome porta alla sua pagina nel portale" <?php echo empty($r['persona_id']) ? 'hidden' : ''; ?>><i class="fa fa-address-book me-1" aria-hidden="true"></i>Anagrafe</span>
                                 <input type="hidden" name="ref_notifiche[]" value="<?php echo $notif_r ? '1' : '0'; ?>">
                                 <label class="form-check form-switch m-0 small fw-bold text-nowrap"><input class="form-check-input pj-notif" type="checkbox" <?php echo $notif_r ? 'checked' : ''; ?>> Riceve le prenotazioni</label>
                             </div>
@@ -634,6 +637,7 @@ document.addEventListener('click', function (e) {
     }
 });
 function svuota(riga) {
+    riga.querySelectorAll('.ref-anag').forEach(function (b) { b.hidden = true; });
     riga.querySelectorAll('.ev-t-esistente').forEach(function (x) { x.remove(); });
     riga.querySelectorAll('input').forEach(function (i) {
         if (i.type === 'checkbox') i.checked = false; else if (i.type === 'hidden') i.value = '0'; else i.value = '';

@@ -293,7 +293,7 @@ if (!$is_archivio) {
                 admin_redirect("iscritti.php?p_id=$filtro_p&f_turno=$filtro_turno&f_stato=annullata$url_suffix");
             } else {
                 error_log("[iscritti] UPDATE annulla_pren fallito pr_id=$pr_id errno=" . $conn->errno . " err=" . $conn->error);
-                flash_set("⚠️ Errore DB nell'annullamento (codice: " . $conn->errno . " — " . htmlspecialchars($conn->error) . "). Segnalare all'amministratore.", 'danger');
+                flash_set("⚠️ Errore DB nell'annullamento (codice: " . $conn->errno . " — " . $conn->error . "). Segnalare all'amministratore.", 'danger');
                 admin_redirect("iscritti.php?p_id=$filtro_p&f_turno=$filtro_turno&f_stato=$filtro_stato$url_suffix");
             }
         } else {
@@ -378,6 +378,7 @@ if (!$is_archivio) {
         $custom_data = [];
         foreach ($_POST as $k => $v) { if (strpos($k, 'custom_') === 0) { $custom_data[substr($k, 7)] = is_array($v) ? implode(', ', $v) : trim($v); } }
         $custom_data = array_filter($custom_data, fn($v) => $v !== '');
+        $scuola_man = applica_scuola_scelta($conn, $custom_data, $_POST['scuola_codice'] ?? []);
         $json_custom = $custom_data ? json_encode($custom_data, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) : null;
 
         $t_info = get_turno_admin($conn, $turno_id);
@@ -405,6 +406,7 @@ if (!$is_archivio) {
             $stmt_man = $conn->prepare("INSERT INTO prenotazioni (turno_id, codice_prenotazione, stato, num_posti, nome, cognome, email, matricola, dati_custom_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
             $stmt_man->bind_param("ississsss", $turno_id, $codice_p, $stato_man, $num_posti, $nome, $cognome, $email, $matricola, $json_custom);
             if ($stmt_man->execute()) {
+                if ($scuola_man) { $id_man = (int)$stmt_man->insert_id; $st_sm = $conn->prepare("UPDATE prenotazioni SET scuola_codice = ? WHERE id = ?"); $st_sm->bind_param("si", $scuola_man, $id_man); $st_sm->execute(); }
                 if ($stato_man === 'confermata') decadi_attese_vincolate($conn, (int)$stmt_man->insert_id);
                 flash_set($stato_man === 'confermata' ? "Prenotazione manuale inserita. Codice: $codice_p" : "Edizione al completo: prenotazione inserita in lista d'attesa. Codice: $codice_p", $stato_man === 'confermata' ? 'success' : 'warning');
                 if (!empty($email)) {
@@ -433,12 +435,21 @@ if (!$is_archivio) {
         // Si parte dai dati salvati: allegati e campi non presenti nel modale restano com'erano
         $r_old = $conn->query("SELECT dati_custom_json FROM prenotazioni WHERE id = $pr_id");
         $custom_data = json_decode((string)($r_old ? ($r_old->fetch_assoc()['dati_custom_json'] ?? '') : ''), true) ?: [];
+        $custom_prima = $custom_data;
         foreach ($_POST as $k => $v) { if (strpos($k, 'custom_') === 0) { $custom_data[substr($k, 7)] = is_array($v) ? implode(', ', $v) : trim($v); } }
+        $scuola_ep = applica_scuola_scelta($conn, $custom_data, $_POST['scuola_codice'] ?? []);
+        // Il codice della scuola cambia solo se è stata scelta una scuola o se il testo del campo è stato modificato
+        $scuola_toccata = $scuola_ep !== null;
+        foreach (array_keys((array)($_POST['scuola_codice'] ?? [])) as $campo_sc) {
+            if (($custom_prima[$campo_sc] ?? '') !== ($custom_data[$campo_sc] ?? '')) $scuola_toccata = true;
+        }
         $json_custom_val = !empty($custom_data) ? json_encode($custom_data, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) : null;
 
         $stmt_ep = $conn->prepare("UPDATE prenotazioni SET turno_id=?, nome=?, cognome=?, email=?, matricola=?, dati_custom_json=? WHERE id=?");
         $stmt_ep->bind_param("isssssi", $nuovo_turno_id, $nome, $cognome, $email, $matricola, $json_custom_val, $pr_id);
         $stmt_ep->execute();
+        // Campo "Scuola" nel modale: codice dell'anagrafe o nessuno se scritta a mano
+        if ($scuola_toccata) { $st_se = $conn->prepare("UPDATE prenotazioni SET scuola_codice = ? WHERE id = ?"); $st_se->bind_param("si", $scuola_ep, $pr_id); $st_se->execute(); }
         flash_set("Dati aggiornati!");
         admin_redirect("iscritti.php?p_id=$filtro_p&f_turno=$filtro_turno&f_stato=$filtro_stato$url_suffix");
     }
@@ -964,7 +975,7 @@ $col_area_i = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
                                                     <div class="col-md-6"><label class="form-label small fw-bold">Email</label><input type="email" name="email" class="form-control form-control-sm" value="<?php echo htmlspecialchars($pr['email'] ?? ''); ?>" required></div>
                                                     <div class="col-md-6"><label class="form-label small fw-bold">Matricola</label><input type="text" name="matricola" class="form-control form-control-sm" value="<?php echo htmlspecialchars($pr['matricola'] ?? ''); ?>"></div>
                                                 </div>
-                                                <?php $campi_ed = html_campi_form_admin($conn, (int)$pr['evento_id'], json_decode($pr['dati_custom_json'] ?? '', true) ?: [], 'ed' . (int)$pr['id'], (int)($pr['turno_id'] ?? 0)); ?>
+                                                <?php $campi_ed = html_campi_form_admin($conn, (int)$pr['evento_id'], (json_decode($pr['dati_custom_json'] ?? '', true) ?: []) + ['__scuola_codice' => (string)($pr['scuola_codice'] ?? '')],'ed' . (int)$pr['id'], (int)($pr['turno_id'] ?? 0)); ?>
                                                 <?php if ($campi_ed !== ''): ?>
                                                     <div class="border-top pt-2">
                                                         <div class="fw-bold small text-primary mb-2"><i class="fa fa-list-check me-1"></i> Informazioni aggiuntive</div>

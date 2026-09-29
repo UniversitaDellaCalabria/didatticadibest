@@ -109,7 +109,7 @@ if (isset($_POST['del_pagina_completa']) && $is_full_admin) {
         }
         
         if (function_exists('registra_log_audit')) registra_log_audit($conn, "Eliminazione Area", ["Area" => $p_info_del['titolo'], "Slug" => $slug_del]);
-        flash_set("Area \"" . htmlspecialchars($p_info_del['titolo']) . "\" eliminata definitivamente.", 'warning');
+        flash_set("Area \"" . $p_info_del['titolo'] . "\" eliminata definitivamente.", 'warning');
         echo "<script>window.location.replace('aree.php');</script>";
         exit;
     }
@@ -454,6 +454,27 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
                     <li class="nav-item">
                         <a class="nav-link w-100 <?php echo ($current_page == 'menu.php') ? 'active' : ''; ?>" href="menu.php?p_id=<?php echo $filtro_p; ?>">
                             <i class="fa fa-link me-2 text-center" style="width:20px;"></i> Menu Navigazione
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link w-100 <?php echo ($current_page == 'scuole.php') ? 'active' : ''; ?>" href="scuole.php?p_id=<?php echo $filtro_p; ?>">
+                            <i class="fa fa-school me-2 text-center" style="width:20px;"></i> Anagrafe scuole
+                        </a>
+                    </li>
+                    <?php $vista_ana_menu = $current_page === 'anagrafe_personale.php' ? (string)($_GET['vista'] ?? 'docenti') : ''; ?>
+                    <li class="nav-item">
+                        <a class="nav-link w-100 <?php echo ($current_page == 'anagrafe_docenti.php' || $vista_ana_menu === 'docenti') ? 'active' : ''; ?>" href="anagrafe_docenti.php?p_id=<?php echo $filtro_p; ?>">
+                            <i class="fa fa-chalkboard-user me-2 text-center" style="width:20px;" aria-hidden="true"></i> Anagrafe docenti
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link w-100 <?php echo ($current_page == 'anagrafe_pta.php' || $vista_ana_menu === 'pta') ? 'active' : ''; ?>" href="anagrafe_pta.php?p_id=<?php echo $filtro_p; ?>">
+                            <i class="fa fa-user-tie me-2 text-center" style="width:20px;" aria-hidden="true"></i> Anagrafe PTA
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link w-100 <?php echo in_array($vista_ana_menu, ['altro', 'corsi', 'strutture'], true) ? 'active' : ''; ?>" href="anagrafe_personale.php?p_id=<?php echo $filtro_p; ?>&amp;vista=corsi">
+                            <i class="fa fa-graduation-cap me-2 text-center" style="width:20px;" aria-hidden="true"></i> Corsi e strutture Ateneo
                         </a>
                     </li>
                     <li class="nav-item">

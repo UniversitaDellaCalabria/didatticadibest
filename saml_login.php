@@ -129,6 +129,10 @@ if (file_exists($simplesaml_path)) {
             $u_info = $stmt_info->get_result()->fetch_assoc();
         }
 
+        // Anagrafe di Ateneo: persona collegata per email, gruppo Docenti/PTA/Altro e abilitazioni in attesa
+        $sec_ag = collega_utente_anagrafe($conn, (int)$u_info['id'], $email_clean);
+        if ($sec_ag !== null) $u_info['ruoli_secondari'] = $sec_ag;
+
         imposta_cookie_uscito(false); // accesso esplicito: torna attivo l'accesso automatico SSO
         $_SESSION['utente_id']       = (int)$u_info['id'];
         $_SESSION['utente_cf']       = $u_info['codice_fiscale'];

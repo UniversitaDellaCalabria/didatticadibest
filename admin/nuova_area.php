@@ -92,7 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['crea_area'])) {
             $st_m = $conn->prepare("INSERT INTO menu_voci (genitore_id, etichetta, url, ordine, apri_nuova_scheda, ruolo_visibilita_id, visibile) VALUES (?, ?, ?, ?, 0, 0, 0)");
             $st_m->bind_param("issi", $v['genitore_menu'], $etichetta, $url_menu, $ord);
             if (!$st_m->execute()) throw new RuntimeException($conn->error);
-            $msg_menu = " La voce di menu \"" . htmlspecialchars($etichetta) . "\" è stata creata nascosta: la attivi da Menu Navigazione.";
+            $msg_menu = " La voce di menu \"" . $etichetta . "\" è stata creata nascosta: la attivi da Menu Navigazione.";
         }
         $conn->commit();
         } catch (Throwable $e) {
@@ -103,7 +103,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['crea_area'])) {
     }
     if (!$errori && isset($new_id)) {
         registra_log_audit($conn, "Creazione Area", ["Area" => $v['titolo'], "Slug" => $v['slug'], "Voce di menu" => $v['crea_menu'] ? 'sì (nascosta)' : 'no']);
-        flash_set("Area \"" . htmlspecialchars($v['titolo']) . "\" creata e NASCOSTA al pubblico: la rendi visibile dalla pagina Aree quando è pronta." . $msg_menu, 'success');
+        flash_set("Area \"" . $v['titolo'] . "\" creata e NASCOSTA al pubblico: la rendi visibile dalla pagina Aree quando è pronta." . $msg_menu, 'success');
         admin_redirect("impostazioni_area.php?p_id=$new_id");
     }
 }

@@ -229,6 +229,16 @@ if (date('N') >= 1) {
 }
 
 // =========================================================================
+// TASK 1f: ANAGRAFE DEL PERSONALE E CORSI DI STUDIO (API del portale di Ateneo), una volta a settimana
+// =========================================================================
+$file_sync_anag = __DIR__ . '/cache/anagrafe_sync.txt';
+if (!is_file($file_sync_anag) || filemtime($file_sync_anag) < time() - 7 * 86400) {
+    $esiti_anag = [];
+    foreach (sincronizza_anagrafe($conn) as $cod => $es) $esiti_anag[] = "$cod: " . $es['esito'];
+    echo "- Anagrafe di Ateneo aggiornata (" . ($esiti_anag ? implode('; ', $esiti_anag) : 'nessuna struttura') . ").\n";
+}
+
+// =========================================================================
 // TASK 2: PROMEMORIA PRE-EVENTO E ALTRE AUTOMAZIONI
 // =========================================================================
 $file_reminders = __DIR__ . '/admin/cron_reminders.php';

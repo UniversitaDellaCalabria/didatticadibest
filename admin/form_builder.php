@@ -143,6 +143,8 @@ $tipo_info = [
     'checkboxes' => ['icon' => 'fa-list-check',    'col' => '#2563eb', 'label' => 'Scelta multipla'],
     'file'       => ['icon' => 'fa-file-upload',   'col' => '#f97316', 'label' => 'Upload file'],
     'rating'     => ['icon' => 'fa-star',          'col' => '#eab308', 'label' => 'Valutazione stelle'],
+    'scuola'     => ['icon' => 'fa-school',        'col' => '#0891b2', 'label' => 'Scuola (anagrafe del Ministero)'],
+    'corso_studio' => ['icon' => 'fa-graduation-cap', 'col' => '#0f766e', 'label' => 'Corso di studio (dal portale di Ateneo)'],
     'hidden'     => ['icon' => 'fa-eye-slash',     'col' => '#94a3b8', 'label' => 'Campo nascosto'],
     'separator'  => ['icon' => 'fa-grip-lines',    'col' => '#334155', 'label' => 'Separatore/Titolo'],
 ];

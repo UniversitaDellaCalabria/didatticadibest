@@ -384,7 +384,7 @@ if ($mostra_form):
 .pj-ed-campi { display:grid; grid-template-columns:1fr 1fr; gap:.4rem .5rem; margin-bottom:.6rem; }
 .pj-ed-campi label { display:flex; flex-direction:column; gap:.15rem; margin:0; }
 .pj-form-una-ed .pj-ed-campi, .pj-form-una-ed .pj-solo-piu-ed, .pj-form-piu-ed .pj-solo-una-ed { display:none !important; }
-.pj-riga-2 { display:grid; grid-template-columns: 1fr auto; gap:.75rem; align-items:center; padding-right:46px; }
+.pj-riga-2 { display:grid; grid-template-columns: 1fr auto auto; gap:.75rem; align-items:center; padding-right:46px; }
 .pj-form-dest .pj-no-dest { display:none !important; }
 @media (max-width: 767.98px) { .pj-riga, .pj-riga-info, .pj-riga-2, .pj-mod-riga, .pj-mod-riga2 { grid-template-columns: 1fr; padding-right:0; } .pj-riga-info { padding-bottom:.5rem; border-bottom:1px dashed #e2e8f0; } }
 </style>
@@ -493,6 +493,7 @@ if ($mostra_form):
             <section class="pj-sez">
                 <h2><i class="fa fa-address-book me-1" aria-hidden="true"></i>Referenti, responsabili e relatori</h2>
                 <p class="form-text mt-0 mb-2">Il link alla pagina personale rende cliccabile il nome nella scheda. Chi ha <strong>"Riceve le iscrizioni"</strong> attivo riceve per email il riepilogo di ogni iscrizione e disdetta della scuola (serve l'email).</p>
+                <?php echo html_ricerca_personale($conn, "Aggiungi", "pjReferenti"); ?>
                 <div class="d-none d-md-grid pj-riga small fw-bold text-secondary mb-1"><span>Ruolo</span><span>Nome e cognome</span><span>Email</span><span>Telefono</span><span></span></div>
                 <div id="pjReferenti">
                     <?php foreach ($referenti as $r): $notif_r = !empty($r['notifiche']); ?>
@@ -506,6 +507,8 @@ if ($mostra_form):
                             </div>
                             <div class="pj-riga-2">
                                 <input type="url" name="ref_link[]" class="form-control form-control-sm" value="<?php echo h($r['link'] ?? ''); ?>" placeholder="Link alla pagina personale (facoltativo), es. https://www.unical.it/..." aria-label="Link alla pagina personale">
+                                <input type="hidden" name="ref_persona[]" value="<?php echo h($r['persona_id'] ?? ''); ?>">
+                                <span class="badge ref-anag text-nowrap" style="background:#e0f2fe;color:#075985;" title="Scelto dall'anagrafe di Ateneo: il nome porta alla sua pagina nel portale" <?php echo empty($r['persona_id']) ? 'hidden' : ''; ?>><i class="fa fa-address-book me-1" aria-hidden="true"></i>Anagrafe</span>
                                 <input type="hidden" name="ref_notifiche[]" value="<?php echo $notif_r ? '1' : '0'; ?>">
                                 <label class="form-check form-switch m-0 small fw-bold text-nowrap"><input class="form-check-input pj-notif" type="checkbox" <?php echo $notif_r ? 'checked' : ''; ?>> Riceve le iscrizioni</label>
                             </div>
@@ -732,6 +735,7 @@ function aggiornaEdizioni() {
 })();
 // Riga vuota: testi cancellati, "Riceve le iscrizioni" spento
 function svuota(riga) {
+    riga.querySelectorAll('.ref-anag').forEach(function (b) { b.hidden = true; });
     riga.querySelectorAll('.badge').forEach(function (b) { b.remove(); });
     riga.querySelectorAll('textarea').forEach(function (t) { t.value = ''; });
     riga.querySelectorAll('input').forEach(function (i) {

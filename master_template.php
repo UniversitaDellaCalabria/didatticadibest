@@ -95,6 +95,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['invia_prenotazione'])
 
     if (empty($nome) || empty($cognome) || empty($email)) { header("Location: {$url_ritorno}status=error"); exit; }
 
+    // L'email si scrive a mano (non viene dall'accesso) e si ripete: le ricevute e gli attestati arrivano lì
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) { $_SESSION['errore_prenotazione'] = "Indirizzo email non valido."; header("Location: {$url_ritorno}status=email"); exit; }
+    if (isset($_POST['email_conferma']) && strtolower(trim((string)$_POST['email_conferma'])) !== $email) { $_SESSION['errore_prenotazione'] = "Le due email non coincidono: riscrivile con attenzione."; header("Location: {$url_ritorno}status=email"); exit; }
+
     // CONTROLLO DUPLICATI (Email o Matricola)
     $stmt_dup = $conn->prepare("SELECT id FROM prenotazioni WHERE turno_id = ? AND (email = ? OR (matricola != '' AND matricola = ?))");
     $stmt_dup->bind_param("iss", $turno_id, $email, $matricola); 
@@ -155,6 +159,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['invia_prenotazione'])
         foreach ($_POST as $k => $v) {
             if (strpos($k, 'custom_') === 0) { $custom_data[str_replace('custom_', '', $k)] = is_array($v) ? implode(', ', $v) : trim($v); }
         }
+        // Campo "Scuola": nome ufficiale e codice meccanografico se scelta dall'anagrafe
+        $scuola_codice_pr = applica_scuola_scelta($conn, $custom_data, $_POST['scuola_codice'] ?? []);
 
         // Prenotazioni di classe (progetti per le scuole, eventi con attestati per gli studenti):
         // numero di studenti obbligatorio e dentro i limiti del progetto o del turno
@@ -242,6 +248,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['invia_prenotazione'])
         // Posto confermato: le altre liste d'attesa della persona nell'ambito del limite decadono
         if ($insert_ok && $stato_prenotazione === 'confermata') { decadi_attese_vincolate($conn, (int)$stmt_ins->insert_id); }
         if (isset($lock_iscr)) { $conn->query("SELECT RELEASE_LOCK('" . $conn->real_escape_string($lock_iscr) . "')"); }
+        // Scuola dall'anagrafe: codice sulla prenotazione (report) e sul profilo del docente (proposta la prossima volta)
+        if ($insert_ok && $scuola_codice_pr) {
+            $st_sc = $conn->prepare("UPDATE prenotazioni SET scuola_codice = ? WHERE id = ?");
+            $st_sc->bind_param("si", $scuola_codice_pr, $nuovo_pr_id); $st_sc->execute();
+            if ($u_id_bind) { $st_su = $conn->prepare("UPDATE utenti SET scuola_codice = ? WHERE id = ?"); $st_su->bind_param("si", $scuola_codice_pr, $u_id_bind); $st_su->execute(); }
+        }
         // ================= FINE SEZIONE CRITICA =================
         // Da qui in poi: email/notifiche, FUORI dalla transazione (non tengono bloccata la riga).
         
@@ -324,6 +336,11 @@ if (isset($_GET['status'])) {
         $err_cp = $_SESSION['errore_prenotazione'] ?? 'Controllo anti-robot non superato.';
         unset($_SESSION['errore_prenotazione']);
         $messaggio_prenotazione = "<div class='alert alert-warning fw-bold text-center my-4 shadow-sm border-0 border-start border-4 border-warning'><i class='fa fa-shield-halved me-2'></i> " . htmlspecialchars($err_cp) . "</div>";
+    }
+    elseif ($st === 'email') {
+        $err_em = $_SESSION['errore_prenotazione'] ?? "Controlla l'indirizzo email.";
+        unset($_SESSION['errore_prenotazione']);
+        $messaggio_prenotazione = "<div class='alert alert-warning fw-bold text-center my-4 shadow-sm border-0 border-start border-4 border-warning'><i class='fa fa-envelope me-2'></i> Prenotazione non registrata: " . htmlspecialchars($err_em) . "</div>";
     }
     elseif ($st === 'studenti') {
         $err_st = $_SESSION['errore_prenotazione'] ?? 'Numero di studenti non valido.';
@@ -642,7 +659,6 @@ if (!function_exists('renderCardUniversal')) {
 function printModalPrenotazione($t, $col_primaria, $utente_logged, $val_nome, $val_cognome, $val_email, $val_matricola, $chiedi_matricola, $conn, $p_id) {
     $read_nome = ($utente_logged && !empty($val_nome)) ? 'readonly' : '';
     $read_cognome = ($utente_logged && !empty($val_cognome)) ? 'readonly' : '';
-    $read_email = ($utente_logged && !empty($val_email)) ? 'readonly' : '';
     $read_matricola = ($utente_logged && !empty($val_matricola)) ? 'readonly' : '';
 
     $occ = getPostiOccupati($conn, $t['id']);
@@ -709,9 +725,13 @@ function printModalPrenotazione($t, $col_primaria, $utente_logged, $val_nome, $v
                             
                             <?php if ($chiedi_matricola == 1): ?>
                                 <div class="col-md-6"><label class="form-label small fw-bold">Matricola <span class="text-muted fw-normal">(Opzionale)</span></label><input type="text" name="matricola" class="form-control form-control-sm" value="<?php echo htmlspecialchars($val_matricola); ?>" <?php echo $read_matricola; ?>></div>
-                                <div class="col-md-6"><label class="form-label small fw-bold">Email <span class="text-danger">*</span></label><input type="email" name="email" class="form-control form-control-sm" value="<?php echo htmlspecialchars($val_email); ?>" required <?php echo $read_email; ?>></div>
+                                <div class="col-md-6"><label class="form-label small fw-bold" for="em<?php echo $t['id']; ?>">Email <span class="text-danger">*</span></label><input type="email" name="email" id="em<?php echo $t['id']; ?>" class="form-control form-control-sm pren-email" autocomplete="email" required></div>
+                                <div class="col-md-6"><label class="form-label small fw-bold" for="emc<?php echo $t['id']; ?>">Ripeti l'email <span class="text-danger">*</span></label><input type="email" name="email_conferma" id="emc<?php echo $t['id']; ?>" class="form-control form-control-sm pren-email-conf" autocomplete="off" required></div>
+                                <div class="col-12 form-text mt-1">Scrivi l'indirizzo a cui vuoi ricevere conferma, promemoria e attestati.</div>
                             <?php else: ?>
-                                <div class="col-md-12"><label class="form-label small fw-bold">Email <span class="text-danger">*</span></label><input type="email" name="email" class="form-control form-control-sm" value="<?php echo htmlspecialchars($val_email); ?>" required <?php echo $read_email; ?>></div>
+                                <div class="col-md-6"><label class="form-label small fw-bold" for="em<?php echo $t['id']; ?>">Email <span class="text-danger">*</span></label><input type="email" name="email" id="em<?php echo $t['id']; ?>" class="form-control form-control-sm pren-email" autocomplete="email" required></div>
+                                <div class="col-md-6"><label class="form-label small fw-bold" for="emc<?php echo $t['id']; ?>">Ripeti l'email <span class="text-danger">*</span></label><input type="email" name="email_conferma" id="emc<?php echo $t['id']; ?>" class="form-control form-control-sm pren-email-conf" autocomplete="off" required></div>
+                                <div class="col-12 form-text mt-1">Scrivi l'indirizzo a cui vuoi ricevere conferma, promemoria e attestati.</div>
                             <?php endif; ?>
                         </div>
 
@@ -839,6 +859,13 @@ function printModalPrenotazione($t, $col_primaria, $utente_logged, $val_nome, $v
                                             <input type="url" name="<?php echo htmlspecialchars($input_name); ?>" class="form-control form-control-sm" placeholder="https://" <?php echo $req_attr; ?> <?php echo $req_data; ?>>
                                         <?php elseif ($type === 'time'): ?>
                                             <input type="time" name="<?php echo htmlspecialchars($input_name); ?>" class="form-control form-control-sm" <?php echo $req_attr; ?> <?php echo $req_data; ?>>
+                                        <?php elseif ($type === 'corso_studio'): ?>
+                                            <?php echo html_campo_corso($conn, $cf['nome_campo'], '', trim($req_attr . ' ' . $req_data)); ?>
+                                        <?php elseif ($type === 'scuola'):
+                                            // Scuola dall'anagrafe del Ministero: proposta quella indicata l'ultima volta dal docente
+                                            $scu_pre = scuola_per_codice($conn, $GLOBALS['logged_u_info']['scuola_codice'] ?? '');
+                                            echo html_campo_scuola($cf['nome_campo'], $scu_pre ? etichetta_scuola($scu_pre) : '', $scu_pre['codice'] ?? '', trim($req_attr . ' ' . $req_data));
+                                        ?>
                                         <?php else: ?>
                                             <input type="text" name="<?php echo htmlspecialchars($input_name); ?>" class="form-control form-control-sm" <?php echo $req_attr; ?> <?php echo $req_data; ?>>
                                         <?php endif; ?>
@@ -1218,28 +1245,7 @@ function evSetRating(btn) {
                     <?php if (!empty($dp['referenti'])): ?>
                     <section class="pj-box p-4">
                         <h2><i class="fa fa-address-book me-1" aria-hidden="true"></i>Contatti</h2>
-                        <?php foreach ($dp['referenti'] as $rf):
-                            $parole = preg_split('/\s+/', trim((string)($rf['nome'] ?? '')));
-                            $iniziali = mb_strtoupper(mb_substr($parole[0] ?? '', 0, 1) . (count($parole) > 1 ? mb_substr(end($parole), 0, 1) : ''));
-                        ?>
-                            <div class="pj-persona">
-                                <div class="pj-avatar" aria-hidden="true"><?php echo htmlspecialchars($iniziali !== '' ? $iniziali : '?'); ?></div>
-                                <div style="min-width:0;">
-                                    <?php if (!empty($rf['ruolo'])): ?><div class="small text-uppercase fw-bold text-secondary" style="letter-spacing:.05em;"><?php echo htmlspecialchars($rf['ruolo']); ?></div><?php endif; ?>
-                                    <?php if (!empty($rf['nome'])): ?>
-                                        <div class="fw-bold">
-                                            <?php if (!empty($rf['link']) && preg_match('#^https?://#i', $rf['link'])): ?>
-                                                <a href="<?php echo htmlspecialchars($rf['link']); ?>" target="_blank" rel="noopener" style="color: <?php echo $col_testo_area; ?>;"><?php echo htmlspecialchars($rf['nome']); ?> <i class="fa fa-arrow-up-right-from-square small" aria-hidden="true"></i><span class="visually-hidden"> (pagina personale, si apre in una nuova scheda)</span></a>
-                                            <?php else: ?>
-                                                <?php echo htmlspecialchars($rf['nome']); ?>
-                                            <?php endif; ?>
-                                        </div>
-                                    <?php endif; ?>
-                                    <?php if (!empty($rf['email'])): ?><div class="small"><i class="fa fa-envelope me-1 text-secondary" aria-hidden="true"></i><a href="mailto:<?php echo htmlspecialchars($rf['email']); ?>"><?php echo htmlspecialchars($rf['email']); ?></a></div><?php endif; ?>
-                                    <?php if (!empty($rf['telefono'])): ?><div class="small"><i class="fa fa-phone me-1 text-secondary" aria-hidden="true"></i><a href="tel:<?php echo htmlspecialchars(preg_replace('/[^0-9+]/', '', $rf['telefono'])); ?>"><?php echo htmlspecialchars($rf['telefono']); ?></a></div><?php endif; ?>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
+                        <?php foreach ($dp['referenti'] as $rf) echo html_referente_pubblico($conn, $rf, $col_testo_area); ?>
                     </section>
                     <?php endif; ?>
                 </div>
@@ -1411,23 +1417,7 @@ function evSetRating(btn) {
                     <?php if (!empty($dett_s['referenti'])): ?>
                     <section class="ev-box p-4">
                         <h2><i class="fa fa-address-book me-1" aria-hidden="true"></i>Contatti</h2>
-                        <?php foreach ($dett_s['referenti'] as $rf):
-                            $parole = preg_split('/\s+/', trim((string)($rf['nome'] ?? '')));
-                            $iniziali = mb_strtoupper(mb_substr($parole[0] ?? '', 0, 1) . (count($parole) > 1 ? mb_substr(end($parole), 0, 1) : ''));
-                        ?>
-                            <div class="ev-persona">
-                                <div class="ev-avatar" aria-hidden="true"><?php echo htmlspecialchars($iniziali !== '' ? $iniziali : '?'); ?></div>
-                                <div style="min-width:0;">
-                                    <?php if (!empty($rf['ruolo'])): ?><div class="small text-uppercase fw-bold text-secondary" style="letter-spacing:.05em;"><?php echo htmlspecialchars($rf['ruolo']); ?></div><?php endif; ?>
-                                    <?php if (!empty($rf['nome'])): ?><div class="fw-bold">
-                                        <?php if (!empty($rf['link']) && preg_match('#^https?://#i', $rf['link'])): ?><a href="<?php echo htmlspecialchars($rf['link']); ?>" target="_blank" rel="noopener" style="color: <?php echo $col_testo_area; ?>;"><?php echo htmlspecialchars($rf['nome']); ?> <i class="fa fa-arrow-up-right-from-square small" aria-hidden="true"></i><span class="visually-hidden"> (pagina personale, nuova scheda)</span></a>
-                                        <?php else: echo htmlspecialchars($rf['nome']); endif; ?>
-                                    </div><?php endif; ?>
-                                    <?php if (!empty($rf['email'])): ?><div class="small"><i class="fa fa-envelope me-1 text-secondary" aria-hidden="true"></i><a href="mailto:<?php echo htmlspecialchars($rf['email']); ?>"><?php echo htmlspecialchars($rf['email']); ?></a></div><?php endif; ?>
-                                    <?php if (!empty($rf['telefono'])): ?><div class="small"><i class="fa fa-phone me-1 text-secondary" aria-hidden="true"></i><a href="tel:<?php echo htmlspecialchars(preg_replace('/[^0-9+]/', '', $rf['telefono'])); ?>"><?php echo htmlspecialchars($rf['telefono']); ?></a></div><?php endif; ?>
-                                </div>
-                            </div>
-                        <?php endforeach; ?>
+                        <?php foreach ($dett_s['referenti'] as $rf) echo html_referente_pubblico($conn, $rf, $col_testo_area); ?>
                     </section>
                     <?php endif; ?>
                 </div>
@@ -2634,6 +2624,13 @@ if ($is_gestore_o_admin || $gestisce_ev):
 <?php endforeach; ?>
 
 <script>
+    // Email ripetuta: avviso subito se le due non coincidono (il server ricontrolla)
+    document.addEventListener('input', function (e) {
+        if (!e.target.matches('.pren-email, .pren-email-conf')) return;
+        var f = e.target.form, a = f.querySelector('.pren-email'), b = f.querySelector('.pren-email-conf');
+        if (!a || !b) return;
+        b.setCustomValidity(b.value && a.value.trim().toLowerCase() !== b.value.trim().toLowerCase() ? 'Le due email non coincidono' : '');
+    });
     if (window.history.replaceState) {
         const url = new URL(window.location);
         // Toglie i parametri dell'esito, lasciando quelli di navigazione (es. ?progetto=ID)

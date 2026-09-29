@@ -110,11 +110,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_prenotazione_ute
 
     // Si parte dai dati già salvati: allegati e campi non mostrati nel modulo di modifica restano com'erano
     $custom_data = json_decode((string)($old_data['dati_custom_json'] ?? ''), true) ?: [];
+    $custom_prima = $custom_data;
     foreach ($_POST as $k => $v) {
         if (strpos($k, 'custom_') === 0) {
             $field_name = str_replace('custom_', '', $k);
             $custom_data[$field_name] = is_array($v) ? implode(', ', $v) : trim($v);
         }
+    }
+    // Campo "Scuola": nome ufficiale se scelta dall'anagrafe; il codice cambia solo se la scuola è stata toccata
+    $scuola_ap = applica_scuola_scelta($conn, $custom_data, $_POST['scuola_codice'] ?? []);
+    $scuola_toccata = $scuola_ap !== null;
+    foreach (array_keys((array)($_POST['scuola_codice'] ?? [])) as $campo_sc) {
+        if (($custom_prima[$campo_sc] ?? '') !== ($custom_data[$campo_sc] ?? '')) $scuola_toccata = true;
     }
     $json_custom_bind = !empty($custom_data) ? json_encode($custom_data, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE) : null;
     // Progetti per le scuole: il numero di partecipanti modificato deve restare nei limiti del progetto
@@ -183,6 +190,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_prenotazione_ute
         $update_ok = $stmt_upd->execute();
         if (!$update_ok) {
             throw new Exception($conn->error ?: 'Errore sconosciuto in fase di aggiornamento prenotazione');
+        }
+        if ($scuola_toccata) {
+            $st_sc = $conn->prepare("UPDATE prenotazioni SET scuola_codice = ? WHERE id = ?");
+            $st_sc->bind_param("si", $scuola_ap, $pr_id); $st_sc->execute();
+            if ($scuola_ap && !empty($_SESSION['utente_id'])) { $u_sc = (int)$_SESSION['utente_id']; $st_su = $conn->prepare("UPDATE utenti SET scuola_codice = ? WHERE id = ?"); $st_su->bind_param("si", $scuola_ap, $u_sc); $st_su->execute(); }
         }
 
         $conn->commit();
@@ -587,6 +599,9 @@ require_once 'header.php';
             <?php if (!empty($user_info['matricola_studente']) || !empty($user_info['matricola_dipendente'])): ?>
                 <div class="mt-1"><span class="badge bg-light text-dark font-monospace shadow-sm">Matricola: <?php echo htmlspecialchars($user_info['matricola_studente'] ?: $user_info['matricola_dipendente']); ?></span></div>
             <?php endif; ?>
+            <?php $pers_ap = !empty($user_info['persona_id']) ? persona_ateneo($conn, $user_info['persona_id']) : null; if ($pers_ap): ?>
+                <div class="mt-1 small"><i class="fa fa-address-book me-1" aria-hidden="true"></i><?php echo htmlspecialchars(implode(' · ', array_filter([GRUPPI_PERSONALE[$pers_ap['gruppo']] ?? '', $pers_ap['ruolo'], $pers_ap['struttura']]))); ?></div>
+            <?php endif; ?>
 
             <!-- MINI KPI -->
             <div class="row g-0 mt-3 pt-3 border-top border-secondary">
@@ -873,7 +888,7 @@ require_once 'header.php';
                                                 <div class="col-md-6"><label class="form-label small fw-bold">Nome</label><input type="text" name="nome" class="form-control" value="<?php echo htmlspecialchars($pr['nome']); ?>" required></div>
                                                 <div class="col-md-6"><label class="form-label small fw-bold">Cognome</label><input type="text" name="cognome" class="form-control" value="<?php echo htmlspecialchars($pr['cognome']); ?>" required></div>
                                                 <div class="col-md-6"><label class="form-label small fw-bold">Email</label><input type="email" name="email" class="form-control" value="<?php echo htmlspecialchars($pr['email']); ?>" required></div>
-                                                <div class="col-md-6"><label class="form-label small fw-bold">Matricola</label><input type="text" name="matricola" class="form-control" value="<?php echo htmlspecialchars($pr['matricola']); ?>"></div>
+                                                <div class="col-md-6"><label class="form-label small fw-bold">Matricola</label><input type="text" name="matricola" class="form-control" value="<?php echo htmlspecialchars($pr['matricola'] ?? ''); ?>"></div>
                                             </div>
                                             
                                             <?php 
@@ -897,6 +912,10 @@ require_once 'header.php';
                                                                 <div class="p-2 border rounded bg-light text-muted small">
                                                                     <i class="fa fa-file-pdf text-danger me-1"></i> File allegato. Impossibile modificarlo da qui. Se occorre cambiarlo, contatta la segreteria.
                                                                 </div>
+                                                            <?php elseif ($cf['tipo_campo'] === 'corso_studio'): ?>
+                                                                <?php echo html_campo_corso($conn, $cf['nome_campo'], (string)$val_c, '', 'form-select'); ?>
+                                                            <?php elseif ($cf['tipo_campo'] === 'scuola'): ?>
+                                                                <?php echo html_campo_scuola($cf['nome_campo'], (string)$val_c, (string)($pr['scuola_codice'] ?? ''), '', 'form-control'); ?>
                                                             <?php else: ?>
                                                                 <input type="text" name="custom_<?php echo $input_name; ?>" class="form-control" value="<?php echo htmlspecialchars($val_c); ?>">
                                                             <?php endif; ?>

@@ -239,6 +239,28 @@ if ($can_manage_iscritti):
 </div>
 <?php endif; endif; ?>
 
+<?php
+// ── Avviso anagrafe di Ateneo: gestori e referenti che non compaiono più nel portale di Ateneo ──
+if ($is_full_admin):
+    $av_ana = avvisi_anagrafe($conn);
+    if ($av_ana['gestori'] || $av_ana['referenti']): ?>
+<div class="alert alert-warning border-0 shadow-sm d-flex flex-wrap align-items-center gap-3 mb-4" style="border-left:5px solid #f59e0b !important;border-radius:12px;">
+    <i class="fa fa-user-clock fs-3" aria-hidden="true"></i>
+    <div class="flex-grow-1">
+        <div class="fw-bold mb-1">Persone non più presenti nell'anagrafe di Ateneo</div>
+        <p class="small mb-1">Potrebbero essere cessate dal servizio o trasferite: controlla abilitazioni e contatti.</p>
+        <ul class="mb-0 small ps-3">
+            <?php foreach ($av_ana['gestori'] as $g): ?>
+                <li>Gestore <strong><?php echo htmlspecialchars(trim($g['nome'] . ' ' . $g['cognome'])); ?></strong> (dal <?php echo date('d/m/Y', strtotime($g['uscita_il'])); ?>) · <a href="utenti.php?p_id=<?php echo $filtro_p; ?>">Utenti & Abilitazioni</a></li>
+            <?php endforeach; ?>
+            <?php foreach ($av_ana['referenti'] as $rf): ?>
+                <li>Referente <strong><?php echo htmlspecialchars($rf['nome']); ?></strong> in <a href="<?php echo $rf['tipo'] === 'progetto' ? 'progetti' : 'eventi'; ?>.php?p_id=<?php echo (int)$rf['pagina_id']; ?>&amp;id=<?php echo (int)$rf['evento_id']; ?>"><?php echo htmlspecialchars($rf['titolo']); ?></a></li>
+            <?php endforeach; ?>
+        </ul>
+    </div>
+</div>
+<?php endif; endif; ?>
+
 <!-- ── KPI ────────────────────────────────────────────────── -->
 <?php
 $kpi_defs = [

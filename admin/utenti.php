@@ -68,47 +68,60 @@ if (isset($_POST['del_user'])) {
 if (isset($_POST['assegna_permessi'])) {
     csrf_verify($_POST['csrf_token'] ?? '');
     $u_id       = (int)$_POST['utente_id'];
-    $permessi   = $_POST['permessi'] ?? [];
+    $permessi   = (array)($_POST['permessi'] ?? []);
     $ambito     = $_POST['ambito_eventi'] ?? 'tutti';
-    $eventi_sel = $_POST['eventi_specifici'] ?? [];
+    $eventi_sel = array_filter(array_map('intval', (array)($_POST['eventi_specifici'] ?? [])));
 
     if ($u_id > 0 && !empty($permessi) && $filtro_p > 0) {
-        // Pulizia totale per questo utente in questa area
-        $res_p = $conn->query("SELECT permessi_gestori_json, gestori_utenti_ids FROM pagine_eventi WHERE id=$filtro_p LIMIT 1");
-        if ($res_p && $p_row = $res_p->fetch_assoc()) {
-            $p_json = json_decode($p_row['permessi_gestori_json'] ?: '{}', true) ?: [];
-            if (isset($p_json[$u_id])) unset($p_json[$u_id]);
-            $p_csv = array_diff(array_filter(array_map('trim', explode(',', $p_row['gestori_utenti_ids'] ?? ''))), [(string)$u_id]);
-            $conn->query("UPDATE pagine_eventi SET permessi_gestori_json='".$conn->real_escape_string(json_encode($p_json))."', gestori_utenti_ids='".$conn->real_escape_string(implode(',', $p_csv))."' WHERE id=$filtro_p");
-        }
-        $res_ev = $conn->query("SELECT id, permessi_gestori_json, gestori_utenti_ids FROM eventi WHERE pagina_id=$filtro_p");
-        if ($res_ev) while ($e_row = $res_ev->fetch_assoc()) {
-            $e_id   = $e_row['id'];
-            $e_json = json_decode($e_row['permessi_gestori_json'] ?: '{}', true) ?: [];
-            $e_csv  = array_filter(array_map('trim', explode(',', $e_row['gestori_utenti_ids'] ?? '')));
-            $ch = false;
-            if (isset($e_json[$u_id])) { unset($e_json[$u_id]); $ch = true; }
-            if (in_array((string)$u_id, $e_csv)) { $e_csv = array_diff($e_csv, [(string)$u_id]); $ch = true; }
-            if ($ch) $conn->query("UPDATE eventi SET permessi_gestori_json='".$conn->real_escape_string(json_encode($e_json))."', gestori_utenti_ids='".$conn->real_escape_string(implode(',', $e_csv))."' WHERE id=$e_id");
-        }
-        // Nuova assegnazione
-        if ($ambito === 'tutti') {
-            $p_json[$u_id] = $permessi;
-            $conn->query("UPDATE pagine_eventi SET permessi_gestori_json='".$conn->real_escape_string(json_encode($p_json))."' WHERE id=$filtro_p");
-        } elseif ($ambito === 'specifici' && !empty($eventi_sel)) {
-            foreach ($eventi_sel as $e_id_a) {
-                $e_id_a = (int)$e_id_a;
-                $r2 = $conn->query("SELECT permessi_gestori_json FROM eventi WHERE id=$e_id_a LIMIT 1");
-                if ($r2 && $er2 = $r2->fetch_assoc()) {
-                    $ej2 = json_decode($er2['permessi_gestori_json'] ?: '{}', true) ?: [];
-                    $ej2[$u_id] = $permessi;
-                    $conn->query("UPDATE eventi SET permessi_gestori_json='".$conn->real_escape_string(json_encode($ej2))."' WHERE id=$e_id_a");
-                }
-            }
-        }
+        // Solo eventi specifici ma nessuno scelto: restano tolte le abilitazioni dell'area
+        if ($ambito === 'specifici' && !$eventi_sel) revoca_permessi_gestore($conn, $filtro_p, $u_id);
+        else assegna_permessi_gestore($conn, $filtro_p, $u_id, $permessi, $ambito === 'specifici' ? $eventi_sel : []);
         registra_log_audit($conn, "Assegnati permessi", ["Utente" => $u_id, "Area" => $filtro_p, "Ambito" => $ambito]);
         flash_set("Abilitazioni salvate!");
     }
+    admin_redirect("utenti.php?p_id=$filtro_p");
+}
+
+// Abilitazione di una persona scelta dall'anagrafe di Ateneo (o indicata per email): se ha già fatto accesso
+// vale subito, altrimenti resta in attesa e si attiva al suo primo login con quell'email
+if (isset($_POST['abilita_da_anagrafe'])) {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    $email_ab = strtolower(trim((string)($_POST['email'] ?? '')));
+    $pid_ab   = trim((string)($_POST['persona_id'] ?? ''));
+    $pers_ab  = persona_ateneo($conn, $pid_ab);
+    $nome_ab  = $pers_ab ? nome_persona($pers_ab) : mb_substr(trim((string)($_POST['nominativo'] ?? '')), 0, 200);
+    $permessi = array_values(array_intersect((array)($_POST['permessi'] ?? []), ['eventi', 'iscritti', 'sondaggi', 'form', 'full']));
+    $eventi_sel = ($_POST['ambito_eventi'] ?? 'tutti') === 'specifici' ? array_filter(array_map('intval', (array)($_POST['eventi_specifici'] ?? []))) : [];
+    if (in_array('full', $permessi, true)) $permessi = ['full'];
+    if ($filtro_p <= 0 || !filter_var($email_ab, FILTER_VALIDATE_EMAIL) || !$permessi) {
+        flash_set("Abilitazione non salvata: servono un'email valida e almeno una sezione.", 'danger');
+        admin_redirect("utenti.php?p_id=$filtro_p");
+    }
+    $st = $conn->prepare("SELECT id FROM utenti WHERE LOWER(email) = ? OR (? <> '' AND persona_id = ?) ORDER BY ultimo_accesso DESC LIMIT 1");
+    $st->bind_param("sss", $email_ab, $pid_ab, $pid_ab); $st->execute();
+    $u_ab = $st->get_result()->fetch_assoc();
+    if ($u_ab) {
+        assegna_permessi_gestore($conn, $filtro_p, (int)$u_ab['id'], $permessi, $eventi_sel);
+        registra_log_audit($conn, "Assegnati permessi", ["Utente" => (int)$u_ab['id'], "Area" => $filtro_p, "Da anagrafe" => $nome_ab]);
+        flash_set("$nome_ab è abilitato/a su quest'area.");
+    } else {
+        $st = $conn->prepare("DELETE FROM abilitazioni_attesa WHERE email = ? AND pagina_id = ?");
+        $st->bind_param("si", $email_ab, $filtro_p); $st->execute();
+        $perm_s = implode(',', $permessi); $ev_s = implode(',', $eventi_sel); $pid_s = $pers_ab['id'] ?? null; $da = (int)$_SESSION['utente_id'];
+        $st = $conn->prepare("INSERT INTO abilitazioni_attesa (email, persona_id, nominativo, pagina_id, permessi, eventi_ids, creata_da) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $st->bind_param("sssissi", $email_ab, $pid_s, $nome_ab, $filtro_p, $perm_s, $ev_s, $da); $st->execute();
+        registra_log_audit($conn, "Abilitazione in attesa del primo accesso", ["Email" => $email_ab, "Area" => $filtro_p]);
+        flash_set(($nome_ab ?: $email_ab) . " non ha ancora fatto accesso al portale: l'abilitazione si attiverà al suo primo accesso con $email_ab.");
+    }
+    admin_redirect("utenti.php?p_id=$filtro_p");
+}
+
+if (isset($_POST['annulla_attesa'])) {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    $id_att = (int)$_POST['annulla_attesa'];
+    $conn->query("DELETE FROM abilitazioni_attesa WHERE id = $id_att AND pagina_id = " . (int)$filtro_p);
+    registra_log_audit($conn, "Annullata abilitazione in attesa", ["ID" => $id_att, "Area" => $filtro_p]);
+    flash_set("Abilitazione in attesa annullata.");
     admin_redirect("utenti.php?p_id=$filtro_p");
 }
 
@@ -129,24 +142,8 @@ if (isset($_POST['remove_user_all'])) {
     csrf_verify($_POST['csrf_token'] ?? '');
     $u_id = (int)$_POST['utente_id'];
     if ($filtro_p > 0) {
-        $res_p = $conn->query("SELECT permessi_gestori_json, gestori_utenti_ids FROM pagine_eventi WHERE id=$filtro_p LIMIT 1");
-        if ($res_p && $p_row = $res_p->fetch_assoc()) {
-            $p_json = json_decode($p_row['permessi_gestori_json'] ?: '{}', true) ?: [];
-            if (isset($p_json[$u_id])) unset($p_json[$u_id]);
-            $p_csv = array_diff(array_filter(array_map('trim', explode(',', $p_row['gestori_utenti_ids'] ?? ''))), [(string)$u_id]);
-            $conn->query("UPDATE pagine_eventi SET permessi_gestori_json='".$conn->real_escape_string(json_encode($p_json))."', gestori_utenti_ids='".$conn->real_escape_string(implode(',', $p_csv))."' WHERE id=$filtro_p");
-            $conn->query("UPDATE pagine_eventi SET gestore_utente_id=0 WHERE id=$filtro_p AND gestore_utente_id=$u_id");
-        }
-        $res_ev = $conn->query("SELECT id, permessi_gestori_json, gestori_utenti_ids FROM eventi WHERE pagina_id=$filtro_p");
-        if ($res_ev) while ($e_row = $res_ev->fetch_assoc()) {
-            $e_id   = $e_row['id'];
-            $e_json = json_decode($e_row['permessi_gestori_json'] ?: '{}', true) ?: [];
-            $e_csv  = array_filter(array_map('trim', explode(',', $e_row['gestori_utenti_ids'] ?? '')));
-            $ch = false;
-            if (isset($e_json[$u_id])) { unset($e_json[$u_id]); $ch = true; }
-            if (in_array((string)$u_id, $e_csv)) { $e_csv = array_diff($e_csv, [(string)$u_id]); $ch = true; }
-            if ($ch) $conn->query("UPDATE eventi SET permessi_gestori_json='".$conn->real_escape_string(json_encode($e_json))."', gestori_utenti_ids='".$conn->real_escape_string(implode(',', $e_csv))."' WHERE id=$e_id");
-        }
+        revoca_permessi_gestore($conn, $filtro_p, $u_id);
+        $conn->query("UPDATE pagine_eventi SET gestore_utente_id=0 WHERE id=$filtro_p AND gestore_utente_id=$u_id");
         registra_log_audit($conn, "Revoca permessi area", ["Utente" => $u_id, "Area" => $filtro_p]);
         flash_set("Abilitazioni revocate per quest'area.");
     }
@@ -157,14 +154,26 @@ if (isset($_POST['remove_user_all'])) {
 // PREPARAZIONE DATI
 // ==============================================================================
 
+$in_attesa = [];
+if ($filtro_p > 0) {
+    $r_att = $conn->query("SELECT * FROM abilitazioni_attesa WHERE pagina_id = " . (int)$filtro_p . " ORDER BY created_at DESC");
+    if ($r_att) $in_attesa = $r_att->fetch_all(MYSQLI_ASSOC);
+}
 $ruoli = get_ruoli($conn);
 $ruoli_map = [];
 foreach ($ruoli as $r) $ruoli_map[(int)$r['id']] = $r['nome'];
 
 $utenti = [];
+// Ruolo in Ateneo di chi è collegato all'anagrafe (letto a parte: le due tabelle possono avere collation diverse)
+$pers_ut = [];
+$r_pu = $conn->query("SELECT id, ruolo, struttura, gruppo, attivo FROM personale_ateneo");
+while ($r_pu && $x = $r_pu->fetch_assoc()) $pers_ut[$x['id']] = $x;
 $res_ut = $conn->query("SELECT * FROM utenti ORDER BY cognome ASC, nome ASC");
 if ($res_ut) while ($row = $res_ut->fetch_assoc()) {
     $row['ruolo_nome'] = $ruoli_map[(int)($row['ruolo_id'] ?? 5)] ?? 'Ospiti';
+    if (!empty($row['persona_id']) && ($pu = $pers_ut[$row['persona_id']] ?? null)) {
+        $row['ateneo_ruolo'] = $pu['ruolo']; $row['ateneo_struttura'] = $pu['struttura']; $row['ateneo_gruppo'] = $pu['gruppo']; $row['ateneo_attivo'] = $pu['attivo'];
+    }
     $utenti[] = $row;
 }
 
@@ -304,7 +313,10 @@ $etichette_perm = ['full' => 'Admin area', 'eventi' => 'Eventi', 'iscritti' => '
     </div>
     <div class="col-lg-8">
         <div class="riep-card p-3">
-            <h6 class="mb-2"><i class="fa fa-key me-1" style="color:#5b21b6;" aria-hidden="true"></i>Abilitati su <?php echo htmlspecialchars($page_cfg['titolo'] ?? ''); ?> (<?php echo count($mappa_gestori); ?>)</h6>
+            <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-2">
+                <h6 class="mb-0"><i class="fa fa-key me-1" style="color:#5b21b6;" aria-hidden="true"></i>Abilitati su <?php echo htmlspecialchars($page_cfg['titolo'] ?? ''); ?> (<?php echo count($mappa_gestori); ?>)</h6>
+                <?php if ($filtro_p > 0): ?><button type="button" class="btn btn-sm fw-bold" style="background:#ede9fe;color:#5b21b6;" data-bs-toggle="modal" data-bs-target="#modAbilitaAnagrafe"><i class="fa fa-user-plus me-1" aria-hidden="true"></i>Abilita una persona</button><?php endif; ?>
+            </div>
             <?php if (!$mappa_gestori): ?>
                 <div class="text-muted small py-2">Nessuno: in quest'area lavorano solo gli amministratori. Per abilitare qualcuno apri la sua scheda qui sotto, sezione "Abilitazioni Area".</div>
             <?php endif; ?>
@@ -320,6 +332,19 @@ $etichette_perm = ['full' => 'Admin area', 'eventi' => 'Eventi', 'iscritti' => '
                     <div class="d-flex flex-wrap gap-1 align-items-center">
                         <?php foreach (array_unique((array)$g['permessi']) as $pm): ?><span class="perm-chip" style="<?php echo $pm === 'full' ? 'background:#fee2e2;color:#991b1b;' : 'background:#ede9fe;color:#5b21b6;'; ?>"><?php echo htmlspecialchars($etichette_perm[$pm] ?? $pm); ?></span><?php endforeach; ?>
                         <span class="perm-chip" style="<?php echo $notif ? 'background:#dcfce7;color:#166534;' : 'background:#f1f5f9;color:#64748b;'; ?>" title="<?php echo $notif ? 'Riceve le email delle prenotazioni' : 'Non riceve le email delle prenotazioni'; ?>"><i class="fa <?php echo $notif ? 'fa-bell' : 'fa-bell-slash'; ?>" aria-hidden="true"></i></span>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+            <?php foreach ($in_attesa as $att): $perm_att = array_filter(explode(',', $att['permessi'])); ?>
+                <div class="riep-riga flex-wrap">
+                    <div style="min-width:200px;flex:1;">
+                        <span class="fw-bold"><?php echo htmlspecialchars($att['nominativo'] ?: $att['email']); ?></span>
+                        <span class="badge ms-1" style="background:#fef3c7;color:#92400e;" title="Si attiva al primo accesso con questa email"><i class="fa fa-hourglass-half me-1" aria-hidden="true"></i>in attesa del primo accesso</span>
+                        <div class="small text-muted"><?php echo htmlspecialchars($att['email']); ?> · <?php echo $att['eventi_ids'] !== '' ? 'Solo ' . count(explode(',', $att['eventi_ids'])) . ' eventi' : "Tutta l'area"; ?></div>
+                    </div>
+                    <div class="d-flex flex-wrap gap-1 align-items-center">
+                        <?php foreach ($perm_att as $pm): ?><span class="perm-chip" style="<?php echo $pm === 'full' ? 'background:#fee2e2;color:#991b1b;' : 'background:#ede9fe;color:#5b21b6;'; ?>"><?php echo htmlspecialchars($etichette_perm[$pm] ?? $pm); ?></span><?php endforeach; ?>
+                        <form method="POST" class="m-0"><?php csrf_field(); ?><button type="submit" name="annulla_attesa" value="<?php echo (int)$att['id']; ?>" class="btn btn-sm btn-link text-danger p-0 ms-1" data-confirm="Annullare l'abilitazione in attesa di <?php echo htmlspecialchars($att['nominativo'] ?: $att['email']); ?>?" title="Annulla" aria-label="Annulla l'abilitazione in attesa"><i class="fa fa-xmark" aria-hidden="true"></i></button></form>
                     </div>
                 </div>
             <?php endforeach; ?>
@@ -371,6 +396,7 @@ $etichette_perm = ['full' => 'Admin area', 'eventi' => 'Eventi', 'iscritti' => '
         <div style="flex:1;min-width:0;">
             <div class="fw-semibold text-dark" style="font-size:.88rem;"><?php echo htmlspecialchars(($u['cognome'] ?? '') . ' ' . ($u['nome'] ?? '')); ?>
                 <?php if ($is_me): ?><span class="badge bg-light text-muted border ms-1" style="font-size:.62rem;">Tu</span><?php endif; ?>
+                <?php if (!empty($u['ateneo_gruppo'])): ?><span class="badge ms-1" style="font-size:.62rem;background:#ccfbf1;color:#115e59;" title="<?php echo htmlspecialchars(($u['ateneo_ruolo'] ?? '') . ' · ' . ($u['ateneo_struttura'] ?? '')); ?>"><i class="fa fa-address-book me-1" aria-hidden="true"></i><?php echo htmlspecialchars(GRUPPI_PERSONALE[$u['ateneo_gruppo']] ?? ''); ?><?php echo empty($u['ateneo_attivo']) ? ' · non più nel portale' : ''; ?></span><?php endif; ?>
             </div>
             <div class="text-muted" style="font-size:.72rem;"><?php echo htmlspecialchars($u['email'] ?? ''); ?></div>
         </div>
@@ -632,6 +658,80 @@ $etichette_perm = ['full' => 'Admin area', 'eventi' => 'Eventi', 'iscritti' => '
 </div><!-- /usr-card -->
 <?php endforeach; ?>
 </div><!-- /listaUtenti -->
+
+<?php if ($filtro_p > 0): ?>
+<!-- MODALE ABILITA UNA PERSONA (anagrafe di Ateneo o email) -->
+<div class="modal fade" id="modAbilitaAnagrafe" tabindex="-1" aria-labelledby="titAbAn">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+            <form method="POST" id="formAbAn">
+                <?php csrf_field(); ?>
+                <div class="modal-header py-2">
+                    <h6 class="modal-title fw-bold" id="titAbAn"><i class="fa fa-user-plus me-1" aria-hidden="true"></i>Abilita una persona su <?php echo htmlspecialchars($page_cfg['titolo'] ?? ''); ?></h6>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small text-secondary">Cerca la persona nell'anagrafe di Ateneo oppure scrivi nome ed email. Se non ha ancora fatto accesso al portale, l'abilitazione si attiva al suo primo accesso con quell'email.</p>
+                    <?php echo html_ricerca_personale($conn, 'Scegli'); ?>
+                    <input type="hidden" name="persona_id" id="abAnPid">
+                    <div class="row g-2 mt-1">
+                        <div class="col-md-6"><label class="form-label small fw-bold" for="abAnNome">Nome e cognome</label><input type="text" name="nominativo" id="abAnNome" class="form-control form-control-sm" maxlength="200"></div>
+                        <div class="col-md-6"><label class="form-label small fw-bold" for="abAnEmail">Email <span class="text-danger">*</span></label><input type="email" name="email" id="abAnEmail" class="form-control form-control-sm" required placeholder="nome.cognome@unical.it"></div>
+                    </div>
+                    <div id="abAnScelta" class="small mt-1" style="color:#0f766e;" hidden><i class="fa fa-address-book me-1" aria-hidden="true"></i><span></span></div>
+                    <div class="row g-3 mt-1">
+                        <div class="col-md-5">
+                            <span class="form-label small fw-bold d-block">Sezioni abilitate</span>
+                            <div class="d-flex flex-wrap gap-2 p-2 border rounded bg-white">
+                                <?php foreach (['eventi' => 'Eventi', 'iscritti' => 'Iscritti', 'sondaggi' => 'Sondaggi', 'form' => 'Form', 'full' => 'Admin Area'] as $pk => $pl): ?>
+                                    <div class="form-check m-0"><input class="form-check-input ab-perm" type="checkbox" name="permessi[]" value="<?php echo $pk; ?>" id="abP<?php echo $pk; ?>" <?php echo in_array($pk, ['eventi', 'iscritti'], true) ? 'checked' : ''; ?>><label class="form-check-label small fw-bold" for="abP<?php echo $pk; ?>"><?php echo $pl; ?></label></div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                        <div class="col-md-7">
+                            <span class="form-label small fw-bold d-block">Ambito</span>
+                            <div class="p-2 border rounded bg-white">
+                                <div class="form-check mb-1"><input class="form-check-input" type="radio" name="ambito_eventi" id="abAmbT" value="tutti" checked onchange="document.getElementById('abAnEv').classList.add('d-none')"><label class="form-check-label small fw-bold" for="abAmbT">Intera area</label></div>
+                                <div class="form-check"><input class="form-check-input" type="radio" name="ambito_eventi" id="abAmbS" value="specifici" onchange="document.getElementById('abAnEv').classList.remove('d-none')"><label class="form-check-label small fw-bold" for="abAmbS">Solo eventi specifici</label></div>
+                                <div id="abAnEv" class="mt-2 d-none">
+                                    <label class="visually-hidden" for="abAnEvSel">Eventi</label>
+                                    <select name="eventi_specifici[]" id="abAnEvSel" class="form-select form-select-sm" multiple size="5">
+                                        <?php foreach ($eventi_area as $e_id => $e_titolo): ?><option value="<?php echo (int)$e_id; ?>"><?php echo htmlspecialchars($e_titolo); ?></option><?php endforeach; ?>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer py-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Annulla</button>
+                    <button type="submit" name="abilita_da_anagrafe" value="1" class="btn btn-sm btn-primary fw-bold"><i class="fa fa-save me-1" aria-hidden="true"></i>Abilita</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+<script>
+// Persona scelta dall'anagrafe: nome, email e collegamento. Nome o email cambiati a mano: non è più quella persona
+document.getElementById('formAbAn').addEventListener('persona-scelta', function (e) {
+    var p = e.detail;
+    document.getElementById('abAnPid').value = p.id;
+    document.getElementById('abAnNome').value = p.nome;
+    document.getElementById('abAnEmail').value = p.email || '';
+    var s = document.getElementById('abAnScelta'); s.hidden = false;
+    s.querySelector('span').textContent = 'Dall\'anagrafe: ' + [p.ruolo, p.struttura].filter(Boolean).join(' · ') + (p.email ? '' : ' — email non pubblicata: scrivila a mano');
+    (p.email ? document.querySelector('#formAbAn button[name=abilita_da_anagrafe]') : document.getElementById('abAnEmail')).focus();
+});
+['abAnNome', 'abAnEmail'].forEach(function (id) {
+    document.getElementById(id).addEventListener('input', function () { document.getElementById('abAnPid').value = ''; document.getElementById('abAnScelta').hidden = true; });
+});
+// "Admin Area" comprende tutte le sezioni
+document.getElementById('abPfull').addEventListener('change', function () {
+    var on = this.checked;
+    document.querySelectorAll('#formAbAn .ab-perm:not(#abPfull)').forEach(function (c) { c.checked = on || c.checked; c.disabled = on; });
+});
+</script>
+<?php endif; ?>
 
 <!-- MODALE CREA GRUPPO -->
 <div class="modal fade" id="modCreaGruppo" tabindex="-1">
