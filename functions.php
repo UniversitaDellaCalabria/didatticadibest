@@ -2895,6 +2895,26 @@ if (!function_exists('dati_attestato')) {
     }
 }
 
+if (!function_exists('script_libreria')) {
+    // Librerie JavaScript salvate sul server (assets/js): QR e scanner funzionano anche se il CDN non risponde.
+    // Se il file locale mancasse (es. non caricato sul server) si ripiega sul CDN, in modo sincrono
+    // (document.write subito dopo lo script locale): il codice che segue trova la libreria come prima.
+    function script_libreria(string $nome): string {
+        $librerie = [
+            'qrcode' => ['qrcode-generator-1.4.4.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js',
+                         'sha384-mZT2gIty7ZDdOGkxfP6joZcYdMW1Jvj9dRlfpTmaJAKKXTqzygtB22k7FLe+KZC1', 'typeof qrcode==="function"'],
+            'html5-qrcode' => ['html5-qrcode-2.3.8.min.js', 'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js',
+                         'sha384-c9d8RFSL+u3exBOJ4Yp3HUJXS4znl9f+z66d1y54ig+ea249SpqR+w1wyvXz/lk+', 'typeof Html5Qrcode==="function"'],
+        ];
+        if (!isset($librerie[$nome])) return '';
+        [$file, $cdn, $sri, $presente] = $librerie[$nome];
+        // Percorso dalla radice del sito (es. /eventi/assets/js/...): vale sia dalle pagine pubbliche sia da /admin
+        $locale = rtrim((string)parse_url(url_base_sito(), PHP_URL_PATH), '/') . '/assets/js/' . $file;
+        return '<script src="' . htmlspecialchars($locale) . '" integrity="' . $sri . '"></script>'
+             . '<script>' . $presente . '||document.write(\'<script src="' . $cdn . '" integrity="' . $sri . '" crossorigin="anonymous"><\/script>\');</script>';
+    }
+}
+
 if (!function_exists('qr_html')) {
     // QR disegnato nella pagina (SVG, libreria qrcode-generator): nessun servizio esterno riceve il contenuto.
     // $stile imposta la larghezza (il QR è quadrato); lo script si aggiunge da solo una volta per pagina.
@@ -2905,7 +2925,7 @@ if (!function_exists('qr_html')) {
         if (!$script_inviato) {
             $script_inviato = true;
             $out .= '<style>.qr-locale svg{width:100%;height:100%;display:block}</style>'
-                  . '<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js" integrity="sha384-mZT2gIty7ZDdOGkxfP6joZcYdMW1Jvj9dRlfpTmaJAKKXTqzygtB22k7FLe+KZC1" crossorigin="anonymous"></script>'
+                  . script_libreria('qrcode')
                   . '<script>(function(){function d(){document.querySelectorAll(".qr-locale[data-qr]").forEach(function(el){'
                   . 'if(el.firstChild)return;if(typeof qrcode!=="function"){el.textContent="QR non disponibile";return;}'
                   . 'var q=qrcode(0,"M");q.addData(el.dataset.qr);q.make();el.innerHTML=q.createSvgTag({cellSize:4,margin:2,scalable:true});});}'
@@ -3037,7 +3057,7 @@ if (!function_exists('pagina_attestati')) {
     </div>
     <?php endforeach; ?>
     <!-- QR generati nella pagina: nessun servizio esterno riceve l'indirizzo di verifica -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js" integrity="sha384-mZT2gIty7ZDdOGkxfP6joZcYdMW1Jvj9dRlfpTmaJAKKXTqzygtB22k7FLe+KZC1" crossorigin="anonymous"></script>
+    <?php echo script_libreria('qrcode'); ?>
     <script>
     document.querySelectorAll('.cert-qr').forEach(function (el) {
         if (typeof qrcode !== 'function') { el.textContent = 'QR non disponibile: usa il codice'; return; }
