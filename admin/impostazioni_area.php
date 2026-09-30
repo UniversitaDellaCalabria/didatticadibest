@@ -32,9 +32,21 @@ if (isset($_POST['save_pagina_config'])) {
     // Convenzione con le scuole: solo indirizzi http(s) e una PEC valida, altrimenti vuoto (= valori predefiniti)
     $conv_sql = function ($v, bool $email = false) use ($conn) {
         $v = trim((string)$v);
-        $ok = $email ? filter_var($v, FILTER_VALIDATE_EMAIL) : preg_match('#^https?://#i', $v);
+        $ok = $email ? filter_var($v, FILTER_VALIDATE_EMAIL) : (preg_match('#^https?://#i', $v) || preg_match('#^(uploads/modelli_convenzione|assets/modelli)/[A-Za-z0-9._-]+$#', $v));
         return ($v !== '' && $ok) ? "'" . $conn->real_escape_string(mb_substr($v, 0, 500)) . "'" : 'NULL';
     };
+    // Modelli caricati sul portale: sostituiscono il link del campo (il file precedente caricato qui si cancella)
+    $dir_mod = dirname(__DIR__) . '/uploads/modelli_convenzione/';
+    $mimes_mod = ['application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/pdf',
+                  'application/vnd.oasis.opendocument.text', 'application/zip', 'application/octet-stream', 'application/CDFV2', 'application/x-ole-storage'];
+    foreach (['conv_file_modello' => 'conv_url_modello', 'conv_file_allegato' => 'conv_url_allegato'] as $campo_f => $campo_u) {
+        if (($_FILES[$campo_f]['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) continue;
+        $fn_mod = secure_upload($_FILES[$campo_f], $dir_mod, ['doc', 'docx', 'pdf', 'odt'], $mimes_mod);
+        if (!$fn_mod) { flash_set("Modello non caricato: servono file .doc, .docx, .odt o .pdf.", 'warning'); continue; }
+        $prec = (string)($page_cfg[$campo_u] ?? '');
+        if (str_starts_with($prec, 'uploads/modelli_convenzione/')) @unlink(dirname(__DIR__) . '/' . $prec);
+        $_POST[$campo_u] = 'uploads/modelli_convenzione/' . $fn_mod;
+    }
     $conv_upd = ", conv_url_modello=" . $conv_sql($_POST['conv_url_modello'] ?? '') . ", conv_url_allegato=" . $conv_sql($_POST['conv_url_allegato'] ?? '') . ", conv_pec=" . $conv_sql($_POST['conv_pec'] ?? '', true);
     $num_col = isset($_POST['num_colonne']) ? (int)$_POST['num_colonne'] : 2;
     $spazio_c = isset($_POST['spazio_card']) ? (int)$_POST['spazio_card'] : 30;
@@ -201,10 +213,16 @@ if (isset($_POST['save_pagina_config'])) {
                 <?php $conv_d = dati_convenzione([]); ?>
                 <div class="col-12 border-top pt-3">
                     <label class="form-label small fw-bold mb-1"><i class="fa fa-file-signature me-1" aria-hidden="true"></i>Convenzione con le scuole</label>
-                    <small class="text-muted d-block mb-2">Usati quando un progetto o un evento chiede se la scuola ha la convenzione e la risposta è "No". Vuoto = valori predefiniti del DiBEST.</small>
+                    <small class="text-muted d-block mb-2">Modelli che la scuola scarica dal portale quando non ha una convenzione valida (attività di Formazione Scuola Lavoro). Carica un nuovo file per sostituirli; svuota il campo per tornare ai modelli predefiniti del Dipartimento.</small>
                     <div class="row g-2">
-                        <div class="col-md-6"><label class="form-label small mb-0" for="convMod">Link al modello di convenzione</label><input type="url" name="conv_url_modello" id="convMod" class="form-control form-control-sm" value="<?php echo htmlspecialchars($page_cfg['conv_url_modello'] ?? ''); ?>" placeholder="<?php echo htmlspecialchars($conv_d['modello']); ?>"></div>
-                        <div class="col-md-6"><label class="form-label small mb-0" for="convAll">Link all'Allegato A</label><input type="url" name="conv_url_allegato" id="convAll" class="form-control form-control-sm" value="<?php echo htmlspecialchars($page_cfg['conv_url_allegato'] ?? ''); ?>" placeholder="<?php echo htmlspecialchars($conv_d['allegato']); ?>"></div>
+                        <?php foreach (['modello' => ['conv_url_modello', 'conv_file_modello', 'Modello di convenzione'], 'allegato' => ['conv_url_allegato', 'conv_file_allegato', 'Allegato A']] as $k_m => [$c_url, $c_file, $lbl_m]): ?>
+                        <div class="col-md-6">
+                            <label class="form-label small mb-0" for="<?php echo $c_file; ?>"><?php echo $lbl_m; ?></label>
+                            <div class="small mb-1">In uso: <a href="<?php echo htmlspecialchars($conv_d[$k_m]); ?>" target="_blank" rel="noopener"><?php echo htmlspecialchars(basename((string)parse_url($conv_d[$k_m], PHP_URL_PATH)) ?: $conv_d[$k_m]); ?></a><?php echo empty($page_cfg[$c_url]) ? ' <span class="text-muted">(predefinito)</span>' : ''; ?></div>
+                            <input type="file" name="<?php echo $c_file; ?>" id="<?php echo $c_file; ?>" class="form-control form-control-sm mb-1" accept=".doc,.docx,.odt,.pdf" aria-label="Carica un nuovo file per: <?php echo $lbl_m; ?>">
+                            <input type="text" name="<?php echo $c_url; ?>" class="form-control form-control-sm" value="<?php echo htmlspecialchars($page_cfg[$c_url] ?? ''); ?>" placeholder="oppure un link https://… (vuoto = predefinito)" aria-label="Link per: <?php echo $lbl_m; ?>">
+                        </div>
+                        <?php endforeach; ?>
                         <div class="col-md-6"><label class="form-label small mb-0" for="convPec">PEC a cui inviare la convenzione firmata</label><input type="email" name="conv_pec" id="convPec" class="form-control form-control-sm" value="<?php echo htmlspecialchars($page_cfg['conv_pec'] ?? ''); ?>" placeholder="<?php echo htmlspecialchars($conv_d['pec']); ?>"></div>
                     </div>
                 </div>

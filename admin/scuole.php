@@ -291,8 +291,6 @@ if (!empty($_GET['conv_mod'])) $conv_mod = $conn->query("SELECT * FROM convenzio
 $conv_nuova_s = !$conv_mod && !empty($_GET['conv_nuova']) ? scuola_per_codice($conn, (string)$_GET['conv_nuova']) : null;
 $data_get = fn($k) => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET[$k] ?? '')) ? $_GET[$k] : null;
 [$conv_def_dal, $conv_def_al] = periodo_nuova_convenzione($data_get('dal'), $data_get('al'));
-$conv_def_al = date('Y-m-d', strtotime($conv_def_al . ' -1 day'));
-if ($data_get('al') && $conv_def_al < $data_get('al')) $conv_def_al = $data_get('al');
 $oggi_cv = date('Y-m-d'); $tra60_cv = date('Y-m-d', strtotime('+60 days'));
 $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
 ?>

@@ -3266,16 +3266,22 @@ if (!function_exists('prenotazione_di_classe')) {
     }
 }
 
-// Convenzione scuola-Dipartimento per la Formazione Scuola Lavoro: modelli e PEC predefiniti,
-// modificabili per ogni area in Impostazioni area
-if (!defined('CONV_URL_MODELLO'))  define('CONV_URL_MODELLO', 'https://drive.google.com/file/d/12FLrX8e3urB8FpxyEwcqQGGqqOovnBvC/view?usp=sharing');
-if (!defined('CONV_URL_ALLEGATO')) define('CONV_URL_ALLEGATO', 'https://docs.google.com/document/d/1u6a8bzeYP8My5_4icowbnHKJoWapxYb2/edit?usp=sharing&ouid=102914102078024712101&rtpof=true&sd=true');
+// Convenzione scuola-Dipartimento per la Formazione Scuola Lavoro: modelli (scaricati dal portale) e PEC predefiniti,
+// sostituibili per ogni area in Impostazioni area (file caricato in uploads/modelli_convenzione/ oppure link)
+if (!defined('CONV_URL_MODELLO'))  define('CONV_URL_MODELLO', 'assets/modelli/Convenzione_FSL_DiBEST.doc');
+if (!defined('CONV_URL_ALLEGATO')) define('CONV_URL_ALLEGATO', 'assets/modelli/Allegato_A_FSL_DiBEST.docx');
 if (!defined('CONV_PEC'))          define('CONV_PEC', 'dipartimento.best@pec.unical.it');
 
 if (!function_exists('dati_convenzione')) {
     // $cfg = riga di pagine_eventi dell'area: campi vuoti o non validi → valori predefiniti
+    // Indirizzi sempre completi (servono anche nelle email): i file del portale diventano https://…/eventi/…
     function dati_convenzione(array $cfg): array {
-        $url = fn($v, $def) => preg_match('#^https?://#i', trim((string)$v)) ? trim((string)$v) : $def;
+        $assoluto = fn($v) => preg_match('#^https?://#i', $v) ? $v : rtrim(url_base_sito(), '/') . '/' . ltrim($v, '/');
+        $url = function ($v, $def) use ($assoluto) {
+            $v = trim((string)$v);
+            $ok = preg_match('#^https?://#i', $v) || preg_match('#^(uploads/modelli_convenzione|assets/modelli)/[A-Za-z0-9._-]+$#', $v);
+            return $assoluto($ok ? $v : $def);
+        };
         $pec = trim((string)($cfg['conv_pec'] ?? ''));
         return [
             'modello'  => $url($cfg['conv_url_modello'] ?? '', CONV_URL_MODELLO),
@@ -3288,21 +3294,23 @@ if (!function_exists('dati_convenzione')) {
 if (!function_exists('html_istruzioni_convenzione')) {
     // Cosa fare quando la scuola non ha ancora la convenzione (pagina, email, Area personale)
     // $in_attesa = false: prenotazione già confermata a cui si chiede comunque la convenzione
+    // ($codice non è più mostrato: nella convenzione il codice della prenotazione non serve)
     function html_istruzioni_convenzione(array $cfg, bool $per_email = false, string $codice = '', bool $in_attesa = true): string {
         $c = dati_convenzione($cfg);
         $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
         $a = $per_email ? " style='color:#B30000;font-weight:bold;'" : " target='_blank' rel='noopener' class='fw-bold'";
-        $cod = $codice !== '' ? ", indicando il codice della prenotazione <strong>" . $h($codice) . "</strong>" : ", indicando il codice della prenotazione";
+        $nome_file = fn($u) => strtoupper(pathinfo((string)parse_url($u, PHP_URL_PATH), PATHINFO_EXTENSION));
+        $fmt = fn($u) => in_array($nome_file($u), ['DOC', 'DOCX', 'PDF', 'ODT'], true) ? ' <span style="font-weight:normal;">(' . $nome_file($u) . ')</span>' : '';
         $frase = $in_attesa ? "La prenotazione resta <strong>in attesa</strong> finché la scuola non stipula la convenzione con il Dipartimento."
                             : "Per partecipare la scuola deve stipulare la <strong>convenzione</strong> con il Dipartimento.";
         return "<p style='margin:0 0 6px;'>$frase Compila i modelli:</p>"
-             . "<ul style='margin:0 0 6px;'><li><a href='" . $h($c['modello']) . "'$a>Convenzione</a></li><li><a href='" . $h($c['allegato']) . "'$a>Allegato A</a></li></ul>"
-             . "<p style='margin:0;'>e inviali <strong>firmati digitalmente</strong> alla PEC <a href='mailto:" . $h($c['pec']) . "'$a>" . $h($c['pec']) . "</a>$cod. "
+             . "<ul style='margin:0 0 6px;'><li><a href='" . $h($c['modello']) . "'$a>Scarica il modello di Convenzione</a>" . $fmt($c['modello']) . "</li><li><a href='" . $h($c['allegato']) . "'$a>Scarica l'Allegato A</a>" . $fmt($c['allegato']) . "</li></ul>"
+             . "<p style='margin:0;'>e inviali <strong>firmati digitalmente</strong> alla PEC <a href='mailto:" . $h($c['pec']) . "'$a>" . $h($c['pec']) . "</a>. "
              . ($in_attesa ? "Appena riceviamo la convenzione confermiamo la prenotazione e ti avvisiamo per email.</p>" : "Se la scuola l'ha già inviata, puoi ignorare questo messaggio.</p>");
     }
 }
 
-if (!defined('CONV_DURATA_ANNI')) define('CONV_DURATA_ANNI', 3); // durata proposta per una nuova convenzione
+if (!defined('CONV_DURATA_ANNI')) define('CONV_DURATA_ANNI', 1); // durata proposta: il modello del Dipartimento vale un anno dalla stipula (art. 8)
 
 if (!function_exists('periodo_attivita')) {
     // Periodo da coprire con la convenzione: progetto dal/al, evento il giorno del turno; senza date: oggi
@@ -3506,7 +3514,7 @@ if (!function_exists('periodo_nuova_convenzione')) {
     // Validità proposta per una convenzione appena arrivata: da oggi (o dall'inizio dell'attività, se prima)
     // per la durata predefinita, allungata se l'attività finisce dopo
     function periodo_nuova_convenzione(?string $att_dal = null, ?string $att_al = null): array {
-        $dal = date('Y-m-d'); $al = date('Y-m-d', strtotime('+' . CONV_DURATA_ANNI . ' years'));
+        $dal = date('Y-m-d'); $al = date('Y-m-d', strtotime('+' . CONV_DURATA_ANNI . ' years -1 day'));
         if ($att_dal && $att_dal < $dal) $dal = $att_dal;
         if ($att_al && $att_al > $al) $al = $att_al;
         return [$dal, $al];
