@@ -461,6 +461,11 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
                             <i class="fa fa-school me-2 text-center" style="width:20px;"></i> Anagrafe scuole
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link w-100 <?php echo ($current_page == 'fsl.php') ? 'active' : ''; ?>" href="fsl.php?p_id=<?php echo $filtro_p; ?>">
+                            <i class="fa fa-briefcase me-2 text-center" style="width:20px;" aria-hidden="true"></i> Formazione Scuola Lavoro
+                        </a>
+                    </li>
                     <?php $vista_ana_menu = $current_page === 'anagrafe_personale.php' ? (string)($_GET['vista'] ?? 'docenti') : ''; ?>
                     <li class="nav-item">
                         <a class="nav-link w-100 <?php echo ($current_page == 'anagrafe_docenti.php' || $vista_ana_menu === 'docenti') ? 'active' : ''; ?>" href="anagrafe_docenti.php?p_id=<?php echo $filtro_p; ?>">

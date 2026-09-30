@@ -42,7 +42,10 @@ Portale open-source per la gestione eventi, prenotazioni e presenze del **Dipart
 - **Profilo utente**: pagina dedicata con dati SSO e modifica email personale
 - **Form builder** per campi prenotazione personalizzati per area/evento
 - **Anagrafe delle scuole**: l'elenco ufficiale del Ministero dell'Istruzione (open data, statali e paritarie) si carica dal pannello; il campo "Scuola (anagrafe del Ministero)" dei moduli cerca mentre il docente scrive (nome, comune o codice meccanografico, prima le scuole della Calabria), salva il nome ufficiale e il codice meccanografico e la propone già compilata alle iscrizioni successive; resta possibile scrivere a mano una scuola non in elenco. Le scuole scritte a mano nelle iscrizioni passate si abbinano all'anagrafe con i suggerimenti del portale, così report e statistiche contano ogni scuola una volta sola. La pagina Anagrafe scuole elenca le scuole collegate con i docenti di riferimento, le iscrizioni e le attività (esportabile in CSV)
-- **Convenzioni con le scuole**: progetti ed eventi possono chiedere nel modulo se la scuola ha già la convenzione con il Dipartimento; con "No" la prenotazione resta in attesa e la scuola scarica dal portale i modelli di Convenzione e Allegato A (assets/modelli, sostituibili per area in Impostazioni area caricando un nuovo file) e riceve la PEC a cui inviarli firmati; la durata proposta per una nuova convenzione è un anno, come nel modello del Dipartimento. Registro delle convenzioni in Anagrafe scuole, per scuola: convenzione e Allegato A firmati (PDF o .p7m, scaricabili solo dal pannello), validità dal/al, docenti di riferimento dell'Allegato A, protocollo. La convenzione deve coprire tutto il periodo dell'attività (Dal/Al del progetto, giorno del turno dell'evento): le scuole con una convenzione che lo copre sono riconosciute nel modulo, altrimenti ne va stipulata una nuova. La verifica delle iscrizioni alle attività FSL, anche già confermate, si fa da Anagrafe scuole e ogni giorno dal cron. Negli eventi gli interruttori "Dedicato alle scuole" e "Attività di Formazione Scuola Lavoro" (come nei progetti) attivano la prenotazione per classe e il processo delle convenzioni, e quando la convenzione arriva le prenotazioni in attesa si confermano con l'email alla scuola. In Iscrizioni: richiesta della convenzione per email a chi si è già iscritto, "Convenzione ricevuta" (registrata per la scuola), badge sullo stato. Dal cron: promemoria alla scuola ogni 7 giorni (massimo 3), avviso ai gestori 7 giorni prima dell'inizio se mancano convenzioni, avviso agli amministratori 60 giorni prima della scadenza. I progetti possono anche richiedere l'approvazione dei gestori per tutte le edizioni
+- **Convenzioni con le scuole**: progetti ed eventi possono chiedere nel modulo se la scuola ha già la convenzione con il Dipartimento; con "No" la prenotazione resta in attesa e la scuola scarica dal portale i modelli di Convenzione e Allegato A (assets/modelli, sostituibili per area in Impostazioni area caricando un nuovo file) e riceve la PEC a cui inviarli firmati; la durata proposta per una nuova convenzione è un anno, come nel modello del Dipartimento. Registro delle convenzioni nel pannello **Formazione Scuola Lavoro** (scheda Convenzioni), per scuola: convenzione e Allegato A firmati (PDF o .p7m, scaricabili solo dal pannello), validità dal/al, docenti di riferimento dell'Allegato A, protocollo. La convenzione deve coprire tutto il periodo dell'attività (Dal/Al del progetto, giorno del turno dell'evento): le scuole con una convenzione che lo copre sono riconosciute nel modulo, altrimenti ne va stipulata una nuova. La verifica delle iscrizioni alle attività FSL, anche già confermate, si fa dalla scheda Verifica iscrizioni dello stesso pannello e ogni giorno dal cron. Negli eventi gli interruttori "Dedicato alle scuole" e "Attività di Formazione Scuola Lavoro" (come nei progetti) attivano la prenotazione per classe e il processo delle convenzioni, e quando la convenzione arriva le prenotazioni in attesa si confermano con l'email alla scuola. In Iscrizioni: richiesta della convenzione per email a chi si è già iscritto, "Convenzione ricevuta" (registrata per la scuola), badge sullo stato. Dal cron: promemoria alla scuola ogni 7 giorni (massimo 3), avviso ai gestori 7 giorni prima dell'inizio se mancano convenzioni, avviso agli amministratori 60 giorni prima della scadenza. I progetti possono anche richiedere l'approvazione dei gestori per tutte le edizioni. Con il modello del Dipartimento la scuola scarica anche la **Convenzione già compilata** (`convenzione_precompilata.php`, .docx): istituto, codice meccanografico e sede dall'anagrafe, attività, descrizione, studenti, periodo, durata e tutor; restano evidenziati da completare codice fiscale e dati del Dirigente
+- **Scheda di valutazione della struttura ospitante** (FSL): a fine attività, con la presenza registrata, il docente riceve il link personale a `valutazione_fsl.php` (8 aspetti da 1 a 5, "riproporrebbe", commenti), con un promemoria dopo 7 giorni
+- **Pannello Formazione Scuola Lavoro** (`admin/fsl.php`), a schede: Riepilogo per anno scolastico (attività, scuole, studenti, presenze, convenzioni mancanti), Convenzioni (registro e registrazione), Verifica iscrizioni, Valutazioni; tabelle con export CSV
+- **Controllo automatico del sito** ogni notte dal cron (database, cartelle, spazio su disco, backup, email non partite, pagine pubbliche e file riservati): email agli amministratori solo se qualcosa non va, stato e "Controlla ora" in Sistema
 - **Anagrafe del personale di Ateneo** dalle API pubbliche del portale Unical (rubrica, docenti, corsi di studio), per le strutture scelte (DiBEST di partenza, se ne aggiungono altre dalla tendina delle strutture o col codice) e aggiornata ogni settimana: elenchi Docenti, Personale tecnico amministrativo e Altro personale con filtri per ruolo e struttura. Al login la persona viene collegata per email e inserita nel gruppo Docenti / Personale tecnico amministrativo / Altro personale di Ateneo, utilizzabile per riservare gli eventi
 - **Referenti dall'anagrafe**: in eventi e progetti si cercano per gruppo, ruolo, struttura e nome e si compilano da soli nome, email, telefono e link (resta possibile l'inserimento a mano); il nome porta alla **pagina pubblica del docente** (`persona.php`) con foto (o una sagoma grigia), ruolo, settore, contatti, ricevimento, curriculum e attività sul portale. Foto e schede sono copiate dal portale di Ateneo e rinnovate ogni 7 giorni
 - **Abilitazione dei gestori dall'anagrafe**, anche prima del loro primo accesso: l'abilitazione resta in attesa e si attiva al primo login con quell'email. La dashboard avvisa se un gestore o un referente non compare più nell'anagrafe di Ateneo
@@ -78,7 +81,7 @@ Portale open-source per la gestione eventi, prenotazioni e presenze del **Dipart
 - Chart.js
 - SortableJS (drag & drop)
 
-**Invio email**: client SMTP interno in `functions.php` (`inviaNotificaEmail()`), senza librerie esterne: STARTTLS/SSL, autenticazione, verifica di ogni risposta del server, registro degli invii nella tabella `log_email`. Se l'host SMTP non è configurato o non è raggiungibile usa la funzione `mail()` di PHP.
+**Invio email**: client SMTP interno in `inc/base.php` (`inviaNotificaEmail()`), senza librerie esterne: STARTTLS/SSL, autenticazione, verifica di ogni risposta del server, registro degli invii nella tabella `log_email`. Se l'host SMTP non è configurato o non è raggiungibile usa la funzione `mail()` di PHP.
 
 ---
 
@@ -144,9 +147,15 @@ La cartella `cache/` deve essere scrivibile da PHP: oltre alla cache della confi
 
 Gli script `cron_background.php`, `cron_attestati.php`, `admin/cron_reminders.php` e `admin/cron_backup.php` si avviano da riga di comando (es. `php cron_background.php`) oppure via URL con la chiave `CRON_KEY` del file `.env` (almeno 16 caratteri), es. `https://tuo-dominio/eventi/cron_background.php?key=LA_TUA_CHIAVE`. Senza chiave rispondono 403.
 
+### Ambiente locale di prova e prove automatiche
+
+Su Windows con XAMPP, da Git Bash: `bash strumenti/locale/avvia.sh` avvia MariaDB e il portale su `http://127.0.0.1:8080/eventi/` con un database separato (`eventi_locale`) e dati di esempio inventati (`--nuovo` li ricrea, `--ferma` spegne tutto). Usa il file `.env.locale` (creato da solo, mai da caricare sul server): nessuna email parte, si leggono in `/__email`; l'accesso SSO è sostituito da `/__accesso`; il cron si lancia da `/__cron`. Le poche righe del codice che lo permettono si attivano solo con il server integrato di PHP (`PHP_SAPI === 'cli-server'`), mai con Apache.
+
+Prima di ogni caricamento: `/c/xampp/php/php.exe -d extension=zip strumenti/prove/esegui.php` lancia le prove automatiche (funzioni su un database usa e getta e, se l'ambiente locale è acceso, pagine, file riservati, pannello e un'iscrizione completa). Esce con codice 1 se una prova fallisce. Dopo il caricamento, sul server: `PHP_BIN=/opt/lampp/bin/php bash strumenti/verifica_sito.sh`.
+
 ### Aggiornamenti del database
 
-Non servono script SQL manuali dopo un aggiornamento del codice. Al primo accesso la funzione `assicura_schema()` in `functions.php` crea le tabelle e le colonne mancanti e corregge i tipi di colonna dei database più vecchi, poi scrive un marcatore (es. `cache/schema_v23.ok`) e da quel momento non interroga più lo schema. Le pagine non modificano mai la struttura del database: ogni nuova colonna va aggiunta lì, cambiando il nome del marcatore.
+Non servono script SQL manuali dopo un aggiornamento del codice. Al primo accesso la funzione `assicura_schema()` in `inc/schema.php` crea le tabelle e le colonne mancanti e corregge i tipi di colonna dei database più vecchi, poi scrive un marcatore (es. `cache/schema_v23.ok`) e da quel momento non interroga più lo schema. Le pagine non modificano mai la struttura del database: ogni nuova colonna va aggiunta lì, cambiando il nome del marcatore.
 
 ### 6. Configura il SSO (opzionale)
 
@@ -174,8 +183,9 @@ eventidibest-cms/
 │   ├── aree.php                # Elenco delle aree (gestisci, visibile/nascosta, elimina)
 │   ├── nuova_area.php          # Creazione di un'area (nasce nascosta, voce di menu nascosta)
 │   ├── utenti.php              # Utenti, gruppi e abilitazioni, con riepilogo per area
-│   ├── scuole.php              # Anagrafe scuole: caricamento del file del Ministero e abbinamento dello storico, scuole collegate con i docenti, registro delle convenzioni
+│   ├── scuole.php              # Anagrafe scuole: caricamento del file del Ministero e abbinamento dello storico, scuole collegate con i docenti (le convenzioni sono in fsl.php)
 │   ├── convenzione_file.php    # Scarica la convenzione o l'Allegato A firmati (solo amministratori; i file sono bloccati al web)
+│   ├── fsl.php                 # Formazione Scuola Lavoro a schede: riepilogo per anno scolastico, convenzioni, verifica delle iscrizioni, valutazioni
 │   ├── anagrafe_personale.php  # Anagrafe del personale di Ateneo: elenchi, corsi di studio, strutture da sincronizzare
 │   ├── anagrafe_docenti.php    # Apre l'elenco dei docenti (anagrafe_pta.php: personale tecnico amministrativo)
 │   ├── cerca_personale.php     # Ricerca nell'anagrafe del personale per referenti e abilitazioni (JSON)
@@ -199,7 +209,12 @@ eventidibest-cms/
 ├── cache/              # Cache runtime (escluso da git)
 ├── assets/             # Icone PWA
 ├── config.php          # Connessione DB, session, security headers, CSP
-├── functions.php       # Funzioni core (CSRF, rate limit, email, log, aggiornamenti dello schema)
+├── functions.php       # Carica le funzioni condivise da inc/ (nell'ordine giusto)
+├── inc/                # Funzioni per argomento: base, aspetto, liste_attesa, sistema, dati, eventi_progetti, anagrafi, fsl, prenotazioni, attestati, schema (bloccata al web)
+├── modelli_documenti/  # Modelli interni per i documenti precompilati (bloccata al web)
+├── strumenti/          # verifica_sito.sh, ambiente locale (locale/) e prove automatiche (prove/); bloccata al web
+├── valutazione_fsl.php # Scheda di valutazione della struttura ospitante (link personale del docente)
+├── convenzione_precompilata.php # Convenzione FSL già compilata con i dati della prenotazione (.docx)
 ├── install.php         # Installer guidato (da eliminare dopo l'uso)
 ├── index.php           # Homepage pubblica a widget
 ├── master_template.php # Motore dei layout delle pagine area (le pagine area lo includono)

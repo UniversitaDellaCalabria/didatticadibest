@@ -583,7 +583,7 @@ form:not(.ev-form-classe) .ev-t-riga2 { grid-template-columns: repeat(3, 1fr); }
                     <input class="form-check-input" type="checkbox" name="fsl" id="evFsl" value="1" <?php echo $fsl_v ? 'checked' : ''; ?>>
                     <label class="form-check-label small fw-bold" for="evFsl"><i class="fa fa-file-signature me-1" aria-hidden="true"></i>Attività di Formazione Scuola Lavoro</label>
                 </div>
-                <p class="form-text mt-0 mb-0">Attiva il processo delle convenzioni: nel modulo la scuola dichiara se ha la convenzione con il Dipartimento, che deve coprire il giorno del turno (registro in Anagrafe scuole). Senza convenzione valida la prenotazione resta da approvare con le istruzioni per inviarla (modelli e PEC in Impostazioni area); promemoria e avvisi partono da soli. Include "Dedicato alle scuole".</p>
+                <p class="form-text mt-0 mb-0">Attiva il processo delle convenzioni: nel modulo la scuola dichiara se ha la convenzione con il Dipartimento, che deve coprire il giorno del turno (registro in Formazione Scuola Lavoro → Convenzioni). Senza convenzione valida la prenotazione resta da approvare con le istruzioni per inviarla (modelli e PEC in Impostazioni area); promemoria e avvisi partono da soli. Include "Dedicato alle scuole".</p>
             </section>
 
             <section class="pj-sez">

@@ -17,7 +17,7 @@ $conn->query("INSERT IGNORE INTO ruoli (id, nome) VALUES
     (4, 'Dipendenti'), 
     (5, 'Esterni / Ospiti')");
 
-$_saml_env = @parse_ini_string(preg_replace('/^\s*#.*$/m', '', (string)@file_get_contents(__DIR__ . '/.env'))) ?: []; // righe con # ignorate (vedi config.php)
+$_saml_env = @parse_ini_string(preg_replace('/^\s*#.*$/m', '', (string)@file_get_contents(defined('FILE_ENV') ? FILE_ENV : __DIR__ . '/.env'))) ?: []; // righe con # ignorate (vedi config.php)
 $simplesaml_path = $_saml_env['SIMPLESAML_PATH'] ?? '/opt/simplesamlphp/lib/_autoload.php';
 unset($_saml_env);
 

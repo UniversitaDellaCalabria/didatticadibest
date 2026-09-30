@@ -11,11 +11,16 @@ error_reporting(E_ALL);
 // Imposta il fuso orario di base per il server PHP
 date_default_timezone_set('Europe/Rome');
 
+// Ambiente locale di prova (strumenti/locale): solo con il server integrato di PHP e il file .env.locale.
+// Su Apache PHP_SAPI non è mai 'cli-server', quindi sul server resta tutto com'è.
+define('AMBIENTE_LOCALE', PHP_SAPI === 'cli-server' && is_file(__DIR__ . '/.env.locale'));
+define('FILE_ENV', AMBIENTE_LOCALE ? __DIR__ . '/.env.locale' : __DIR__ . '/.env');
+
 if (session_status() === PHP_SESSION_NONE) {
     session_set_cookie_params([
         'lifetime' => 0,
         'path'     => '/',
-        'secure'   => true,
+        'secure'   => !AMBIENTE_LOCALE, // in locale si lavora in http://127.0.0.1
         'httponly' => true,
         'samesite' => 'Lax',
     ]);
@@ -27,7 +32,7 @@ header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
 header("Pragma: no-cache");
 
 // HTTP Security Headers
-header("Strict-Transport-Security: max-age=31536000; includeSubDomains");
+if (!AMBIENTE_LOCALE) header("Strict-Transport-Security: max-age=31536000; includeSubDomains");
 header("X-Frame-Options: SAMEORIGIN");
 header("X-Content-Type-Options: nosniff");
 header("Referrer-Policy: strict-origin-when-cross-origin");
@@ -42,7 +47,7 @@ header("Content-Security-Policy: default-src 'self'; " .
 
 // Le righe che iniziano con # non sono commenti validi nei file ini (servirebbe ;): si scartano prima della lettura,
 // altrimenti un # con parentesi o altri simboli fa fallire la lettura di tutto il file e il sito resta senza database
-$_env = @parse_ini_string(preg_replace('/^\s*#.*$/m', '', (string)@file_get_contents(__DIR__ . '/.env'))) ?: [];
+$_env = @parse_ini_string(preg_replace('/^\s*#.*$/m', '', (string)@file_get_contents(FILE_ENV))) ?: [];
 $db_host = $_env['DB_HOST'] ?? 'localhost';
 $db_user = $_env['DB_USER'] ?? '';
 $db_pass = $_env['DB_PASS'] ?? '';

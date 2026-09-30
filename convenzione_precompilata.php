@@ -1,0 +1,32 @@
+<?php
+// convenzione_precompilata.php - Scarica la convenzione FSL (.docx) già compilata con i dati della prenotazione:
+// istituto e sede dall'anagrafe del Ministero, attività, studenti, periodo, durata e tutor. Restano da completare
+// codice fiscale e dati del Dirigente scolastico (evidenziati in giallo). Accesso con il codice della prenotazione,
+// come la ricevuta (stampa_ricevuta.php).
+require_once 'config.php';
+require_once 'functions.php';
+
+$codice = strtoupper(trim((string)($_GET['code'] ?? '')));
+$pr = null;
+if (preg_match('/^[A-Z0-9-]{4,50}$/', $codice)) {
+    $st = $conn->prepare("SELECT pr.id FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN progetti_dettagli pd ON pd.evento_id = t.evento_id
+                          WHERE pr.codice_prenotazione = ? AND pd.convenzione = 1 AND IFNULL(pr.stato, 'confermata') NOT IN ('annullata', 'rifiutata', 'scaduta') LIMIT 1");
+    $st->bind_param("s", $codice); $st->execute();
+    $pr = $st->get_result()->fetch_assoc();
+}
+if (!$pr || !check_rate_limit($conn, 'convenzione_precompilata', 30, 3600)) {
+    while (ob_get_level() > 0) ob_end_clean();
+    http_response_code(404);
+    exit('Documento non disponibile: controlla il codice della prenotazione.');
+}
+$file = genera_convenzione_precompilata($conn, (int)$pr['id']);
+if (!$file) { while (ob_get_level() > 0) ob_end_clean(); http_response_code(500); exit('Non è stato possibile preparare il documento: scarica il modello vuoto dalla pagina dell\'attività.'); }
+
+while (ob_get_level() > 0) ob_end_clean();
+header('Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+header('Content-Disposition: attachment; filename="Convenzione_FSL_' . preg_replace('/[^A-Z0-9-]/', '', $codice) . '.docx"');
+header('Content-Length: ' . filesize($file));
+header('X-Content-Type-Options: nosniff');
+readfile($file);
+@unlink($file);
+exit;

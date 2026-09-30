@@ -6,9 +6,9 @@ Options -Indexes -MultiViews
 <Files "functions.php">
     Require all denied
 </Files>
-<Files ".env">
+<FilesMatch "^\.env">
     Require all denied
-</Files>
+</FilesMatch>
 
 # Blocca l'accesso diretto a file di backup/temporanei che possono contenere
 # codice sorgente o credenziali (es. index.php.save, functions.php.save)

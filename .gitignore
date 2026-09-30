@@ -1,5 +1,9 @@
 # Credenziali e configurazioni sensibili
 .env
+.env.locale
+
+# Ambiente locale di prova (strumenti/locale)
+strumenti/locale/www/
 
 # Cache runtime (file generati automaticamente)
 # Tutto il contenuto di cache/ tranne i file che servono alla cartella stessa
@@ -32,3 +36,6 @@ php_errors.log
 /vendor/
 composer.lock
 .claude/
+
+# Pacchetti per il caricamento sul server
+*.tgz

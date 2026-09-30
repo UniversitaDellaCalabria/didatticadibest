@@ -614,7 +614,7 @@ if ($mostra_form):
                     <input class="form-check-input" type="checkbox" name="convenzione" id="pjConv" value="1" <?php echo $conv_v ? 'checked' : ''; ?>>
                     <label class="form-check-label small fw-bold" for="pjConv"><i class="fa fa-file-signature me-1" aria-hidden="true"></i>Attività di Formazione Scuola Lavoro</label>
                 </div>
-                <p class="form-text mt-0 mb-3">Attiva il processo delle convenzioni: nel modulo la scuola dichiara se ha la convenzione con il Dipartimento, che deve coprire tutto il periodo del progetto (Dal/Al, registro in Anagrafe scuole). Con una convenzione valida l'iscrizione è confermata (o da approvare, se è acceso l'interruttore sopra); senza, resta da approvare con le istruzioni per inviarla (modelli e PEC in Impostazioni area). Promemoria e avvisi partono da soli. Include "Dedicato alle scuole".</p>
+                <p class="form-text mt-0 mb-3">Attiva il processo delle convenzioni: nel modulo la scuola dichiara se ha la convenzione con il Dipartimento, che deve coprire tutto il periodo del progetto (Dal/Al, registro in Formazione Scuola Lavoro → Convenzioni). Con una convenzione valida l'iscrizione è confermata (o da approvare, se è acceso l'interruttore sopra); senza, resta da approvare con le istruzioni per inviarla (modelli e PEC in Impostazioni area). Promemoria e avvisi partono da soli. Include "Dedicato alle scuole".</p>
                 <script>
                 (function () {
                     var fsl = document.getElementById('pjConv'), scu = document.getElementById('pjScuole');

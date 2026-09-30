@@ -44,6 +44,14 @@ if (isset($_POST['invia_report_email'])) {
     admin_redirect("sistema.php?p_id=$filtro_p&r=" . time() . "#log-email");
 }
 
+// 1d. CONTROLLO DEL SITO: esecuzione immediata (senza email: i risultati si vedono qui)
+if (isset($_POST['controlla_sito'])) {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    $st_c = esegui_controllo_sito($conn, false);
+    flash_set($st_c['problemi'] ? "Controllo completato: " . $st_c['problemi'] . " problemi, vedi sotto." : "Controllo completato: tutto a posto.", $st_c['problemi'] ? 'warning' : 'success');
+    admin_redirect("sistema.php?p_id=$filtro_p&r=" . time() . "#controllo");
+}
+
 // 2. SALVATAGGIO CONFIGURAZIONI SMTP E TEMPLATE
 if (isset($_POST['save_system_settings'])) {
     csrf_verify($_POST['csrf_token'] ?? '');
@@ -365,6 +373,31 @@ $icona_bk = fn($ok) => $ok === false ? '<i class="fa fa-circle-xmark text-danger
             <div class="form-text">Questi valori si impostano nel file <code>.env</code> del server (non dal pannello, per sicurezza). Il database via email parte solo cifrato.</div>
         </div>
     </div>
+</div>
+
+<?php $ctrl = is_file(dirname(__DIR__) . '/cache/controllo_sito.json') ? (json_decode((string)file_get_contents(dirname(__DIR__) . '/cache/controllo_sito.json'), true) ?: []) : []; ?>
+<div class="card shadow-sm border-0 p-4 mt-4" id="controllo">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 border-bottom pb-3 mb-3">
+        <h5 class="fw-bold text-primary m-0"><i class="fa fa-heart-pulse me-1"></i> Controllo del sito</h5>
+        <form method="POST" class="m-0">
+            <?php csrf_field(); ?>
+            <button type="submit" name="controlla_sito" value="1" class="btn btn-outline-primary btn-sm fw-bold" data-attesa="Controllo in corso…"><i class="fa fa-stethoscope me-1"></i> Controlla ora</button>
+        </form>
+    </div>
+    <p class="small text-secondary">Ogni notte il cron controlla database, cartelle, spazio su disco, backup, email non partite, pagine pubbliche e file riservati. Se qualcosa non va gli amministratori ricevono un'email (al massimo una al giorno per gli stessi problemi) e un'altra quando torna tutto a posto.</p>
+    <?php if (!$ctrl): ?>
+        <div class="alert alert-secondary small mb-0">Nessun controllo eseguito finora: premi <strong>Controlla ora</strong>.</div>
+    <?php else: ?>
+        <div class="mb-2">
+            <span class="badge <?php echo empty($ctrl['problemi']) ? 'bg-success' : 'bg-danger'; ?> fs-6"><?php echo empty($ctrl['problemi']) ? 'Tutto a posto' : (int)$ctrl['problemi'] . ' problemi'; ?></span>
+            <span class="small text-muted ms-2">Ultimo controllo: <?php echo date('d/m/Y H:i', strtotime($ctrl['data'])); ?></span>
+        </div>
+        <ul class="list-unstyled small mb-0">
+            <?php foreach (($ctrl['esiti'] ?? []) as $e_c): ?>
+                <li class="mb-1"><?php echo $icona_bk($e_c['ok']); ?><?php echo htmlspecialchars($e_c['voce']); ?></li>
+            <?php endforeach; ?>
+        </ul>
+    <?php endif; ?>
 </div>
 
 <?php require_once 'admin_footer.php'; ?>

@@ -1,5 +1,5 @@
 <?php
-// convenzione_file.php - Scarica la convenzione firmata o l'Allegato A di una scuola (registro in Anagrafe scuole).
+// convenzione_file.php - Scarica la convenzione firmata o l'Allegato A di una scuola (pannello Formazione Scuola Lavoro).
 // I file stanno in uploads/convenzioni/, bloccata al web: si leggono solo da qui, dal pannello.
 require_once 'admin_header.php';
 

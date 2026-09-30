@@ -210,11 +210,30 @@ if ($righe_sc) {
                    . ($x['protocollo'] !== '' ? " · prot. " . $h_sc($x['protocollo']) : '') . "</li>";
     }
     $corpo_sc = "<p>Queste convenzioni con le scuole scadono nei prossimi 60 giorni:</p><ul>$lista_sc</ul>"
-              . "<p>Dopo la scadenza, alle nuove iscrizioni di queste scuole verrà chiesta di nuovo la convenzione. Il rinnovo si registra in <a href='" . $h_sc(url_base_sito() . '/admin/scuole.php#convenzioni') . "'>Anagrafe scuole → Convenzioni</a>.</p>";
+              . "<p>Dopo la scadenza, alle nuove iscrizioni di queste scuole verrà chiesta di nuovo la convenzione. Il rinnovo si registra in <a href='" . $h_sc(url_base_sito() . '/admin/fsl.php?tab=convenzioni') . "'>Formazione Scuola Lavoro → Convenzioni</a>.</p>";
     foreach (email_amministratori($conn) as $em_sc) inviaNotificaEmail($em_sc, "Convenzioni con le scuole in scadenza (" . count($righe_sc) . ")", $corpo_sc, $conn);
     $conn->query("UPDATE convenzioni_scuole SET avviso_scadenza_inviato = 1 WHERE id IN (" . implode(',', array_map(fn($x) => (int)$x['id'], $righe_sc)) . ")");
 }
 echo "- Convenzioni: " . count($righe_sc) . " in scadenza segnalate agli amministratori.\n";
+
+// =========================================================================
+// TASK 1i: SCHEDA DI VALUTAZIONE DELLA STRUTTURA OSPITANTE (FSL)
+// Attività FSL concluse da non più di 30 giorni, prenotazione confermata con la presenza registrata: il docente
+// riceve il link alla scheda; se dopo 7 giorni non l'ha compilata, un solo promemoria.
+// =========================================================================
+$res_vf = @$conn->query("SELECT pr.id FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id
+                         JOIN progetti_dettagli pd ON pd.evento_id = e.id
+                         WHERE pd.convenzione = 1 AND IFNULL(pr.stato, 'confermata') = 'confermata' AND pr.presente = 1 AND pr.valutazione_inviata IS NULL
+                           AND COALESCE(IF(e.tipo = 'progetto', pd.data_fine, t.data_turno), t.data_turno) < CURDATE()
+                           AND COALESCE(IF(e.tipo = 'progetto', pd.data_fine, t.data_turno), t.data_turno) >= CURDATE() - INTERVAL 30 DAY");
+$count_vf = 0;
+while ($res_vf && $x = $res_vf->fetch_assoc()) if (invia_invito_valutazione($conn, (int)$x['id'])) $count_vf++;
+$res_vf = @$conn->query("SELECT pr.id FROM prenotazioni pr LEFT JOIN valutazioni_fsl v ON v.prenotazione_id = pr.id
+                         WHERE pr.valutazione_inviata IS NOT NULL AND pr.valutazione_inviata <= NOW() - INTERVAL 7 DAY
+                           AND pr.valutazione_promemoria = 0 AND v.id IS NULL AND IFNULL(pr.stato, 'confermata') = 'confermata'");
+$count_vf_p = 0;
+while ($res_vf && $x = $res_vf->fetch_assoc()) if (invia_invito_valutazione($conn, (int)$x['id'], true)) $count_vf_p++;
+echo "- Schede di valutazione FSL: $count_vf inviti, $count_vf_p promemoria.\n";
 
 // =========================================================================
 // TASK 1c: CONSERVAZIONE DEI NOMI DEGLI STUDENTI (privacy)
@@ -306,6 +325,16 @@ if ($mesi_ut > 0) {
 if (date('N') >= 1) {
     $esito_rep = invia_report_email_settimanale($conn);
     echo "- Riepilogo settimanale email: " . ($esito_rep === true ? "inviato agli amministratori" : $esito_rep) . ".\n";
+}
+
+// =========================================================================
+// TASK 1h: CONTROLLO AUTOMATICO DEL PORTALE, una volta al giorno dalle 3 di notte
+// (pagine, file riservati, spazio su disco, backup, email): avviso agli amministratori solo se qualcosa non va
+// =========================================================================
+$file_ctrl = __DIR__ . '/cache/controllo_sito.json';
+if ((int)date('G') >= 3 && (!is_file($file_ctrl) || date('Y-m-d', filemtime($file_ctrl)) !== date('Y-m-d'))) {
+    $st_ctrl = esegui_controllo_sito($conn);
+    echo "- Controllo del portale: " . ($st_ctrl['problemi'] ? $st_ctrl['problemi'] . " problemi (amministratori avvisati)" : "tutto a posto") . ".\n";
 }
 
 // =========================================================================
