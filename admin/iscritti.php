@@ -119,6 +119,23 @@ $filtro_data_fine = (isset($_GET['f_data_fine']) && preg_match('/^\d{4}-\d{2}-\d
 $url_suffix = $is_archivio ? "&archivio=1" : "";
 $url_suffix .= !empty($filtro_data_da)   ? "&f_data_da="   . urlencode($filtro_data_da)   : "";
 $url_suffix .= !empty($filtro_data_fine) ? "&f_data_fine=" . urlencode($filtro_data_fine) : "";
+// Condizioni dei filtri (elenco e azioni sugli iscritti filtrati)
+$cond_turno_pr = $filtro_turno > 0 ? " AND t.id = $filtro_turno" : "";
+$cond_stato_pr = !empty($filtro_stato) ? " AND IFNULL(pr.stato, 'confermata') = '$filtro_stato'" : "";
+$cond_cerca_pr = '';
+if (!empty($filtro_cerca)) {
+    $cerca_esc = $conn->real_escape_string($filtro_cerca);
+    $cond_cerca_pr = " AND (pr.nome LIKE '%$cerca_esc%' OR pr.cognome LIKE '%$cerca_esc%' OR pr.email LIKE '%$cerca_esc%' OR pr.codice_prenotazione LIKE '%$cerca_esc%')";
+}
+$cond_data_pr = '';
+if (!empty($filtro_data_da) && !empty($filtro_data_fine)) {
+    $cond_data_pr = " AND t.data_turno BETWEEN '$filtro_data_da' AND '$filtro_data_fine'";
+} elseif (!empty($filtro_data_da)) {
+    $cond_data_pr = " AND t.data_turno >= '$filtro_data_da'";
+} elseif (!empty($filtro_data_fine)) {
+    $cond_data_pr = " AND t.data_turno <= '$filtro_data_fine'";
+}
+$where_pr = "WHERE e.pagina_id = $filtro_p AND e.archiviato = $is_archivio $cond_turno_pr $cond_stato_pr $cond_cerca_pr $cond_data_pr $sql_filtro_eventi_rbac";
 
 // ==============================================================================
 // BLOCCO AZIONI BACKEND (Eseguite solo se NON archiviato)
@@ -162,7 +179,8 @@ if (!$is_archivio) {
         $azione = (string)$_POST['bulk_azione'];
         $ids = isset($_POST['bulk_ids']) && is_array($_POST['bulk_ids']) ? array_values(array_unique(array_map('intval', $_POST['bulk_ids']))) : [];
         $etichette = ['presente' => 'segnate presenti', 'assente' => 'segnate assenti', 'approva' => 'approvate',
-                      'promuovi' => 'promosse dalla lista d\'attesa', 'annulla' => 'annullate'];
+                      'promuovi' => 'promosse dalla lista d\'attesa', 'annulla' => 'annullate',
+                      'chiedi_conv' => 'con la richiesta della convenzione inviata', 'conv_ricevuta' => 'con la convenzione segnata come ricevuta'];
         if (!isset($etichette[$azione]) || !$ids) {
             flash_set("Seleziona almeno un iscritto e un'azione.", 'warning');
             admin_redirect("iscritti.php?p_id=$filtro_p&f_turno=$filtro_turno&f_stato=$filtro_stato$url_suffix");
@@ -186,7 +204,25 @@ if (!$is_archivio) {
                     $conn->query("UPDATE prenotazioni SET presente = 0 WHERE id = $pr_id");
                     $ok = true;
                     break;
+                case 'chiedi_conv':
+                    if (in_array($st, ['confermata', 'in_attesa', 'da_approvare', 'richiesta_conferma'], true) && ($p_data['convenzione'] ?? '') !== 'ricevuta'
+                        && email_richiesta_convenzione($conn, $pr_id)) {
+                        $conn->query("UPDATE prenotazioni SET convenzione = 'no', conv_promemoria = 0, conv_promemoria_il = NOW() WHERE id = $pr_id");
+                        $ok = true;
+                    }
+                    break;
+                case 'conv_ricevuta':
+                    if (in_array($st, ['confermata', 'in_attesa', 'da_approvare', 'richiesta_conferma'], true) && ($p_data['convenzione'] ?? '') === 'no') {
+                        $ok = convenzione_ricevuta_da_gestore($conn, $pr_id, $_SESSION['utente_email'] ?? '');
+                    }
+                    break;
                 case 'approva':
+                    // In attesa della convenzione: approvare = convenzione ricevuta (registrata per la scuola)
+                    if ($st === 'da_approvare' && ($p_data['convenzione'] ?? '') === 'no') {
+                        convenzione_ricevuta_da_gestore($conn, $pr_id, $_SESSION['utente_email'] ?? '');
+                        $st = (string)($conn->query("SELECT stato FROM prenotazioni WHERE id = $pr_id")->fetch_assoc()['stato'] ?? '');
+                        if ($st === 'confermata') { $ok = true; break; }
+                    }
                 case 'promuovi':
                     $da = $azione === 'approva' ? 'da_approvare' : 'in_attesa';
                     if ($st === $da) {
@@ -236,11 +272,60 @@ if (!$is_archivio) {
         admin_redirect("iscritti.php?p_id=$filtro_p&f_turno=$filtro_turno&f_stato=$filtro_stato$url_suffix");
     }
 
+    if (isset($_POST['conv_ricevuta_pren']) || isset($_POST['chiedi_conv_pren'])) {
+        csrf_verify($_POST['csrf_token'] ?? '');
+        $pr_id = (int)($_POST['conv_ricevuta_pren'] ?? $_POST['chiedi_conv_pren']);
+        if (!pren_autorizzata($conn, $pr_id, $filtro_p, $sql_filtro_eventi_rbac)) nega_accesso_isc();
+        if (isset($_POST['conv_ricevuta_pren'])) {
+            convenzione_ricevuta_da_gestore($conn, $pr_id, $_SESSION['utente_email'] ?? '');
+            registra_log_audit($conn, "Convenzione ricevuta", ["ID Prenotazione" => $pr_id]);
+            flash_set("✅ Convenzione segnata come ricevuta (e registrata per la scuola, se è dell'anagrafe).");
+        } else {
+            $ok_cv = email_richiesta_convenzione($conn, $pr_id);
+            if ($ok_cv) $conn->query("UPDATE prenotazioni SET convenzione = 'no', conv_promemoria = 0, conv_promemoria_il = NOW() WHERE id = $pr_id AND IFNULL(convenzione, '') <> 'ricevuta'");
+            flash_set($ok_cv ? "📧 Richiesta della convenzione inviata." : "Email non inviata: controlla l'indirizzo della prenotazione.", $ok_cv ? 'success' : 'danger');
+        }
+        admin_redirect("iscritti.php?p_id=$filtro_p&f_turno=$filtro_turno&f_stato=$filtro_stato$url_suffix");
+    }
+
+    // Tutti gli iscritti filtrati senza convenzione (progetti/eventi che la chiedono, o già segnati "da stipulare"),
+    // escluse le scuole con una convenzione valida nel registro
+    if (isset($_POST['chiedi_conv_tutti'])) {
+        csrf_verify($_POST['csrf_token'] ?? '');
+        $inviate = 0; $gia = 0; $fallite = 0;
+        $res_cv = $conn->query("SELECT pr.id, pr.scuola_codice, t.data_turno, pd.data_inizio AS pd_inizio, pd.data_fine AS pd_fine FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id
+                                LEFT JOIN progetti_dettagli pd ON pd.evento_id = e.id
+                                $where_pr AND IFNULL(pr.stato, 'confermata') IN ('confermata', 'in_attesa', 'da_approvare', 'richiesta_conferma')
+                                  AND (pr.convenzione = 'no' OR (pr.convenzione IS NULL AND pd.convenzione = 1))");
+        while ($res_cv && $x = $res_cv->fetch_assoc()) {
+            [$x_dal, $x_al] = periodo_prenotazione($x);
+            if (!empty($x['scuola_codice']) && convenzione_valida($conn, $x['scuola_codice'], false, $x_dal, $x_al)) { segna_convenzione_ricevuta($conn, (int)$x['id'], false); $gia++; continue; }
+            if (email_richiesta_convenzione($conn, (int)$x['id'])) {
+                $conn->query("UPDATE prenotazioni SET convenzione = 'no', conv_promemoria = 0, conv_promemoria_il = NOW() WHERE id = " . (int)$x['id']);
+                $inviate++;
+            } else $fallite++;
+        }
+        registra_log_audit($conn, "Richiesta convenzione agli iscritti", ["Inviate" => $inviate, "Già in registro" => $gia, "Non inviate" => $fallite]);
+        flash_set("📧 Richiesta della convenzione inviata a $inviate iscrizioni." . ($gia ? " $gia avevano già la convenzione nel registro e sono state segnate come ricevute." : '')
+                  . ($fallite ? " $fallite email non inviate (indirizzo mancante o non valido)." : ''), $fallite ? 'warning' : 'success');
+        admin_redirect("iscritti.php?p_id=$filtro_p&f_turno=$filtro_turno&f_stato=$filtro_stato$url_suffix");
+    }
+
     if (isset($_POST['approva_pren'])) {
         csrf_verify($_POST['csrf_token'] ?? '');
         $pr_id = (int)$_POST['approva_pren'];
         if (!pren_autorizzata($conn, $pr_id, $filtro_p, $sql_filtro_eventi_rbac)) nega_accesso_isc();
         $p_data = get_prenotazione_con_turno_evento($conn, $pr_id);
+        // In attesa della convenzione: la si segna ricevuta (e registrata per la scuola). Se il turno non chiede
+        // anche l'approvazione la prenotazione è già confermata, con l'email alla scuola.
+        if ($p_data && ($p_data['convenzione'] ?? '') === 'no') {
+            convenzione_ricevuta_da_gestore($conn, $pr_id, $_SESSION['utente_email'] ?? '');
+            $p_data = get_prenotazione_con_turno_evento($conn, $pr_id);
+            if (($p_data['stato'] ?? '') !== 'da_approvare') {
+                flash_set("✅ Convenzione ricevuta: prenotazione confermata e scuola avvisata per email.");
+                admin_redirect("iscritti.php?p_id=$filtro_p&f_turno=$filtro_turno&f_stato=$filtro_stato$url_suffix");
+            }
+        }
         if ($p_data) {
             $conn->query("UPDATE prenotazioni SET stato = 'confermata' WHERE id = $pr_id");
             decadi_attese_vincolate($conn, $pr_id);
@@ -534,22 +619,6 @@ $tutti_gli_eventi = get_eventi_con_turni_admin($conn, $filtro_p, $is_archivio, $
 $prenotazioni = [];
 $per_page = 50;
 $page = max(1, (int)($_GET['page'] ?? 1));
-$cond_turno_pr = $filtro_turno > 0 ? " AND t.id = $filtro_turno" : "";
-$cond_stato_pr = !empty($filtro_stato) ? " AND IFNULL(pr.stato, 'confermata') = '$filtro_stato'" : "";
-$cond_cerca_pr = '';
-if (!empty($filtro_cerca)) {
-    $cerca_esc = $conn->real_escape_string($filtro_cerca);
-    $cond_cerca_pr = " AND (pr.nome LIKE '%$cerca_esc%' OR pr.cognome LIKE '%$cerca_esc%' OR pr.email LIKE '%$cerca_esc%' OR pr.codice_prenotazione LIKE '%$cerca_esc%')";
-}
-$cond_data_pr = '';
-if (!empty($filtro_data_da) && !empty($filtro_data_fine)) {
-    $cond_data_pr = " AND t.data_turno BETWEEN '$filtro_data_da' AND '$filtro_data_fine'";
-} elseif (!empty($filtro_data_da)) {
-    $cond_data_pr = " AND t.data_turno >= '$filtro_data_da'";
-} elseif (!empty($filtro_data_fine)) {
-    $cond_data_pr = " AND t.data_turno <= '$filtro_data_fine'";
-}
-$where_pr = "WHERE e.pagina_id = $filtro_p AND e.archiviato = $is_archivio $cond_turno_pr $cond_stato_pr $cond_cerca_pr $cond_data_pr $sql_filtro_eventi_rbac";
 $res_count = $conn->query("SELECT COUNT(*) as tot FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id LEFT JOIN utenti u ON pr.utente_id = u.id $where_pr");
 $total_count = ($res_count && $r_cnt = $res_count->fetch_assoc()) ? (int)$r_cnt['tot'] : 0;
 $total_pages = max(1, (int)ceil($total_count / $per_page));
@@ -557,7 +626,7 @@ $page = min($page, $total_pages);
 $offset = ($page - 1) * $per_page;
 $sql_pr = "SELECT pr.*, COALESCE(NULLIF(pr.matricola, ''), u.matricola_studente, u.matricola_dipendente, u.matricola) as matricola_effettiva,
            t.nome_turno, t.data_turno, t.orario_inizio, t.orario_fine, t.evento_id, e.titolo as evento_titolo, e.luogo as evento_luogo, e.abilita_presenze,
-           e.tipo AS evento_tipo, pd.per_scuole, pd.attestati AS progetto_attestati,
+           e.tipo AS evento_tipo, pd.per_scuole, pd.attestati AS progetto_attestati, pd.data_inizio AS pd_inizio, pd.data_fine AS pd_fine,
            (SELECT COUNT(*) FROM partecipanti_prenotazione pp WHERE pp.prenotazione_id = pr.id) AS n_studenti
            FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id LEFT JOIN utenti u ON pr.utente_id = u.id LEFT JOIN progetti_dettagli pd ON pd.evento_id = e.id
            $where_pr ORDER BY pr.data_prenotazione DESC LIMIT $per_page OFFSET $offset";
@@ -679,7 +748,21 @@ $col_area_i = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
         </form>
     </div>
 
-    <?php if (!$is_archivio): ?>
+    <?php if (!$is_archivio):
+        $r_nc = $conn->query("SELECT COUNT(*) AS n FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id
+                              LEFT JOIN progetti_dettagli pd ON pd.evento_id = e.id
+                              $where_pr AND IFNULL(pr.stato, 'confermata') IN ('confermata', 'in_attesa', 'da_approvare', 'richiesta_conferma')
+                                AND (pr.convenzione = 'no' OR (pr.convenzione IS NULL AND pd.convenzione = 1))");
+        $n_senza_conv = $r_nc ? (int)$r_nc->fetch_assoc()['n'] : 0;
+        if ($n_senza_conv > 0): ?>
+    <!-- CONVENZIONE: richiesta per email a chi si è iscritto senza convenzione -->
+    <form method="POST" class="d-flex align-items-center flex-wrap gap-2 px-3 py-2 border-bottom" style="background:#fff7ed;">
+        <?php csrf_field(); ?>
+        <span class="small"><i class="fa fa-file-signature me-1" style="color:#9a3412;" aria-hidden="true"></i><strong><?php echo $n_senza_conv; ?></strong> <?php echo $n_senza_conv === 1 ? 'iscrizione' : 'iscrizioni'; ?> senza convenzione ricevuta<?php echo $filtro_turno || $filtro_stato || $filtro_cerca || $filtro_data_da || $filtro_data_fine ? ' (con i filtri attuali)' : ''; ?>.</span>
+        <button type="submit" name="chiedi_conv_tutti" value="1" class="btn btn-sm fw-bold text-white" style="background:#c2410c;border:none;border-radius:8px;" data-confirm="Inviare a <?php echo $n_senza_conv; ?> iscrizioni l'email con i modelli della convenzione e la PEC a cui inviarla? Le scuole con una convenzione valida nel registro vengono segnate come ricevute senza email."><i class="fa fa-paper-plane me-1" aria-hidden="true"></i>Chiedi la convenzione per email</button>
+        <span class="text-muted small ms-auto">La convenzione deve coprire il periodo dell'attività. Se non arriva, la scuola riceve un promemoria ogni 7 giorni (massimo 3).</span>
+    </form>
+        <?php endif; ?>
     <!-- AZIONI DI MASSA: compare quando si seleziona almeno un iscritto -->
     <form method="POST" id="bulkForm" class="d-none align-items-center flex-wrap gap-2 px-3 py-2 border-bottom" style="background:#fffbeb;position:sticky;top:0;z-index:5;">
         <?php csrf_field(); ?>
@@ -692,6 +775,8 @@ $col_area_i = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
             <option value="approva">Approva (richieste da approvare)</option>
             <option value="promuovi">Promuovi dalla lista d'attesa</option>
             <option value="annulla">Annulla prenotazioni</option>
+            <option value="chiedi_conv">Chiedi la convenzione per email</option>
+            <option value="conv_ricevuta">Convenzione ricevuta (conferma e registra)</option>
         </select>
         <button type="submit" class="btn btn-sm fw-bold text-white" style="background:<?php echo $col_area_i; ?>;border-radius:8px;border:none;">Applica</button>
         <button type="button" id="bulkDeseleziona" class="btn btn-sm btn-outline-secondary fw-bold" style="border-radius:8px;">Deseleziona</button>
@@ -802,6 +887,14 @@ $col_area_i = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
                     <!-- Stato -->
                     <td>
                         <span class="stato-badge" style="background:<?php echo $st_bg; ?>;color:<?php echo $st_tc; ?>;"><i class="fa <?php echo $st_icon; ?>"></i><?php echo $st_lbl; ?></span>
+                        <?php $cv_pr = (string)($pr['convenzione'] ?? ''); $cv_attiva = !in_array($st_val, ['annullata', 'rifiutata', 'scaduta'], true); ?>
+                        <?php if ($cv_pr === 'no' && $cv_attiva): ?>
+                            <span class="stato-badge mt-1" style="background:#fff7ed;color:#9a3412;" title="Convenzione non ancora arrivata<?php echo (int)($pr['conv_promemoria'] ?? 0) > 0 ? ' · promemoria inviati: ' . (int)$pr['conv_promemoria'] : ''; ?>"><i class="fa fa-file-signature"></i>Convenzione da stipulare</span>
+                        <?php elseif ($cv_pr === 'ricevuta'): ?>
+                            <span class="stato-badge mt-1" style="background:#f0fdf4;color:#166534;" title="Convenzione ricevuta o valida nel registro"><i class="fa fa-file-circle-check"></i>Convenzione ricevuta</span>
+                        <?php elseif ($cv_pr === 'si' && $cv_attiva): [$cv_dal, $cv_al] = periodo_prenotazione($pr); $cv_reg = !empty($pr['scuola_codice']) && convenzione_valida($conn, $pr['scuola_codice'], false, $cv_dal, $cv_al); ?>
+                            <span class="stato-badge mt-1" style="background:<?php echo $cv_reg ? '#f0fdf4' : '#fefce8'; ?>;color:<?php echo $cv_reg ? '#166534' : '#854d0e'; ?>;" title="<?php echo $cv_reg ? 'Dichiarata dalla scuola e presente nel registro per il periodo dell\'attività' : 'Dichiarata dalla scuola ma nel registro non c\'è una convenzione che copre il periodo dell\'attività: da verificare'; ?>"><i class="fa fa-file-signature"></i><?php echo $cv_reg ? 'Convenzione in registro' : 'Convenzione dichiarata, da verificare'; ?></span>
+                        <?php endif; ?>
                     </td>
 
                     <!-- Presenza -->
@@ -845,6 +938,18 @@ $col_area_i = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
                                 <a href="../stampa_attestato.php?code=<?php echo urlencode($pr['codice_prenotazione']); ?>" target="_blank" class="act-btn green" title="Attestato PDF"><i class="fa fa-graduation-cap"></i></a>
                             <?php endif; ?>
                             <?php if (!$is_archivio): ?>
+                                <?php if (($pr['convenzione'] ?? '') === 'no' && in_array($st_val, ['confermata', 'in_attesa', 'richiesta_conferma', 'da_approvare'], true)): ?>
+                                    <?php if ($st_val !== 'da_approvare'): ?>
+                                    <form method="POST" class="d-inline">
+                                        <?php csrf_field(); ?>
+                                        <button type="submit" name="conv_ricevuta_pren" value="<?php echo (int)$pr['id']; ?>" class="act-btn green" data-confirm="La convenzione della scuola è arrivata? Viene registrata per la scuola e vale anche per le sue altre iscrizioni." title="Convenzione ricevuta" aria-label="Convenzione ricevuta"><i class="fa fa-file-circle-check"></i></button>
+                                    </form>
+                                    <?php endif; ?>
+                                    <form method="POST" class="d-inline">
+                                        <?php csrf_field(); ?>
+                                        <button type="submit" name="chiedi_conv_pren" value="<?php echo (int)$pr['id']; ?>" class="act-btn" data-confirm="Inviare di nuovo alla scuola l'email con i modelli della convenzione e la PEC?" title="Invia di nuovo la richiesta della convenzione" aria-label="Invia di nuovo la richiesta della convenzione"><i class="fa fa-envelope"></i></button>
+                                    </form>
+                                <?php endif; ?>
                                 <?php if ($st_val === 'da_approvare'): ?>
                                     <form method="POST" class="d-inline">
                                         <?php csrf_field(); ?>
@@ -852,7 +957,7 @@ $col_area_i = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
                                         <input type="hidden" name="p_id" value="<?php echo $filtro_p; ?>">
                                         <input type="hidden" name="f_turno" value="<?php echo $filtro_turno; ?>">
                                         <input type="hidden" name="f_stato" value="<?php echo htmlspecialchars($filtro_stato); ?>">
-                                        <button type="submit" class="act-btn green" data-confirm="Approvare questa prenotazione?" title="Approva"><i class="fa fa-check"></i></button>
+                                        <button type="submit" class="act-btn green" data-confirm="<?php echo ($pr['convenzione'] ?? '') === 'no' ? 'La convenzione della scuola è arrivata? Confermando, la prenotazione passa a confermata.' : 'Approvare questa prenotazione?'; ?>" title="<?php echo ($pr['convenzione'] ?? '') === 'no' ? 'Convenzione ricevuta: conferma' : 'Approva'; ?>"><i class="fa fa-check"></i></button>
                                     </form>
                                     <form method="POST" class="d-inline">
                                         <?php csrf_field(); ?>

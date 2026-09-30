@@ -29,6 +29,13 @@ if (isset($_POST['save_pagina_config'])) {
     if (!in_array($tmpl, ['grid', 'list', 'advanced_list', 'calendar', 'timeline', 'agenda', 'gruppi', 'progetti'], true)) $tmpl = 'grid';
     $mostra_home = isset($_POST['mostra_in_home']) ? 1 : 0;
     $limite_isc = in_array($_POST['limite_iscrizioni'] ?? '', ['nessuno', 'un_evento', 'un_turno'], true) ? $_POST['limite_iscrizioni'] : 'nessuno';
+    // Convenzione con le scuole: solo indirizzi http(s) e una PEC valida, altrimenti vuoto (= valori predefiniti)
+    $conv_sql = function ($v, bool $email = false) use ($conn) {
+        $v = trim((string)$v);
+        $ok = $email ? filter_var($v, FILTER_VALIDATE_EMAIL) : preg_match('#^https?://#i', $v);
+        return ($v !== '' && $ok) ? "'" . $conn->real_escape_string(mb_substr($v, 0, 500)) . "'" : 'NULL';
+    };
+    $conv_upd = ", conv_url_modello=" . $conv_sql($_POST['conv_url_modello'] ?? '') . ", conv_url_allegato=" . $conv_sql($_POST['conv_url_allegato'] ?? '') . ", conv_pec=" . $conv_sql($_POST['conv_pec'] ?? '', true);
     $num_col = isset($_POST['num_colonne']) ? (int)$_POST['num_colonne'] : 2;
     $spazio_c = isset($_POST['spazio_card']) ? (int)$_POST['spazio_card'] : 30;
     
@@ -118,7 +125,7 @@ if (isset($_POST['save_pagina_config'])) {
         if ($fn) $logo_att_query = ", logo_attestato_path='uploads/$fn'";
     }
 
-    $conn->query("UPDATE pagine_eventi SET titolo='$titolo', sottotitolo='$sottotitolo', colore_primario='$col_prim', colore_secondario='$col_sec', larghezza_contenitore='$larg_cont', layout_template='$tmpl', mostra_in_home=$mostra_home, limite_iscrizioni='$limite_isc', num_colonne=$num_col, spazio_card=$spazio_c, mostra_sidebar=$m_sidebar, chiedi_matricola=$ch_matr, sidebar_titolo='$sb_titolo', sidebar_intervallo_date='$sb_date', sidebar_testo='$sb_testo', posizione_box_info='$pos_box_info', hero_descrizione='$hero_desc', box_info_html='$box_info', allegati_box_info='$allegati_box_info_final', allegati_sidebar='$allegati_sidebar_final', firma_nome='$firma_nome', firma_titolo='$firma_titolo', testo_attestato=$testo_att_sql $logo_att_query $banner_query $copertina_query WHERE id = $p_id");
+    $conn->query("UPDATE pagine_eventi SET titolo='$titolo', sottotitolo='$sottotitolo', colore_primario='$col_prim', colore_secondario='$col_sec', larghezza_contenitore='$larg_cont', layout_template='$tmpl', mostra_in_home=$mostra_home, limite_iscrizioni='$limite_isc' $conv_upd, num_colonne=$num_col, spazio_card=$spazio_c, mostra_sidebar=$m_sidebar, chiedi_matricola=$ch_matr, sidebar_titolo='$sb_titolo', sidebar_intervallo_date='$sb_date', sidebar_testo='$sb_testo', posizione_box_info='$pos_box_info', hero_descrizione='$hero_desc', box_info_html='$box_info', allegati_box_info='$allegati_box_info_final', allegati_sidebar='$allegati_sidebar_final', firma_nome='$firma_nome', firma_titolo='$firma_titolo', testo_attestato=$testo_att_sql $logo_att_query $banner_query $copertina_query WHERE id = $p_id");
     flash_set("Impostazioni Pagina salvate con successo!");
     admin_redirect("impostazioni_area.php?p_id=$p_id");
 }
@@ -190,6 +197,16 @@ if (isset($_POST['save_pagina_config'])) {
                         <option value="un_turno" <?php echo $lim_cur === 'un_turno' ? 'selected' : ''; ?>>Un solo turno per ciascun evento</option>
                     </select>
                     <small class="text-muted d-block mt-1">La persona è riconosciuta da account, email o matricola. Le prenotazioni annullate, rifiutate o scadute non contano.</small>
+                </div>
+                <?php $conv_d = dati_convenzione([]); ?>
+                <div class="col-12 border-top pt-3">
+                    <label class="form-label small fw-bold mb-1"><i class="fa fa-file-signature me-1" aria-hidden="true"></i>Convenzione con le scuole</label>
+                    <small class="text-muted d-block mb-2">Usati quando un progetto o un evento chiede se la scuola ha la convenzione e la risposta è "No". Vuoto = valori predefiniti del DiBEST.</small>
+                    <div class="row g-2">
+                        <div class="col-md-6"><label class="form-label small mb-0" for="convMod">Link al modello di convenzione</label><input type="url" name="conv_url_modello" id="convMod" class="form-control form-control-sm" value="<?php echo htmlspecialchars($page_cfg['conv_url_modello'] ?? ''); ?>" placeholder="<?php echo htmlspecialchars($conv_d['modello']); ?>"></div>
+                        <div class="col-md-6"><label class="form-label small mb-0" for="convAll">Link all'Allegato A</label><input type="url" name="conv_url_allegato" id="convAll" class="form-control form-control-sm" value="<?php echo htmlspecialchars($page_cfg['conv_url_allegato'] ?? ''); ?>" placeholder="<?php echo htmlspecialchars($conv_d['allegato']); ?>"></div>
+                        <div class="col-md-6"><label class="form-label small mb-0" for="convPec">PEC a cui inviare la convenzione firmata</label><input type="email" name="conv_pec" id="convPec" class="form-control form-control-sm" value="<?php echo htmlspecialchars($page_cfg['conv_pec'] ?? ''); ?>" placeholder="<?php echo htmlspecialchars($conv_d['pec']); ?>"></div>
+                    </div>
                 </div>
             </div>
         </div><!-- /tab-grafica -->

@@ -121,10 +121,14 @@ function salva_turni_evento($conn, int $ev_id, array $turni, array &$avvisi): in
 }
 
 // Opzione "Attestati per gli studenti della classe": progetti_dettagli.attestati dell'evento
+// "Dedicato alle scuole" (dedicata_scuole) e "Attività di Formazione Scuola Lavoro" (convenzione: domanda sulla
+// convenzione nel modulo e tutto il processo delle convenzioni). FSL è sempre anche dedicata alle scuole.
 function salva_attestati_classe_evento($conn, int $ev_id, int $attivi): void {
-    $stmt = $conn->prepare("INSERT INTO progetti_dettagli (evento_id, attestati, per_scuole, updated_at) VALUES (?, ?, 1, NOW())
-                            ON DUPLICATE KEY UPDATE attestati = VALUES(attestati), per_scuole = 1, updated_at = NOW()");
-    $stmt->bind_param("ii", $ev_id, $attivi);
+    $conv = isset($_POST['fsl']) ? 1 : 0;
+    $scuole = ($conv || isset($_POST['dedicata_scuole'])) ? 1 : 0;
+    $stmt = $conn->prepare("INSERT INTO progetti_dettagli (evento_id, attestati, per_scuole, convenzione, dedicata_scuole, updated_at) VALUES (?, ?, 1, ?, ?, NOW())
+                            ON DUPLICATE KEY UPDATE attestati = VALUES(attestati), per_scuole = 1, convenzione = VALUES(convenzione), dedicata_scuole = VALUES(dedicata_scuole), updated_at = NOW()");
+    $stmt->bind_param("iiii", $ev_id, $attivi, $conv, $scuole);
     $stmt->execute();
 }
 
@@ -201,8 +205,9 @@ if (isset($_POST['add_evento'])) {
     $ruolo_acc = (int)($_POST['ruolo_accesso_id'] ?? 0);
     $att_classe = isset($_POST['attestati_classe']) ? 1 : 0;
     if ($att_classe) $abilita_pres = 1; // gli attestati della classe richiedono il check-in
+    $classe_ev = $att_classe || isset($_POST['dedicata_scuole']) || isset($_POST['fsl']); // prenota il docente per la classe
     $errori_t = [];
-    $turni_post = leggi_turni_post((bool)$att_classe, $errori_t);
+    $turni_post = leggi_turni_post($classe_ev, $errori_t);
     if ($errori_t) { flash_set("Evento non creato: " . implode('; ', $errori_t) . ".", 'danger'); admin_redirect("eventi.php?p_id=$filtro_p&azione=nuovo"); }
 
     $upload_dir = dirname(__DIR__) . '/uploads/';
@@ -238,7 +243,7 @@ if (isset($_POST['add_evento'])) {
     if ($ref_scartate) $avviso_notif .= " Email dei referenti non valide ignorate: " . implode(", ", $ref_scartate) . ".";
 
     salva_attestati_classe_evento($conn, $ev_id, $att_classe);
-    if ($att_classe) assicura_campi_progetto($conn, $filtro_p); // campo "numero di partecipanti" del modulo
+    if ($classe_ev) assicura_campi_progetto($conn, $filtro_p); // campo "numero di partecipanti" del modulo
     $avvisi_t = [];
     salva_turni_evento($conn, $ev_id, $turni_post, $avvisi_t);
 
@@ -265,8 +270,9 @@ if (isset($_POST['edit_evento'])) {
     $ruolo_acc = (int)($_POST['ruolo_accesso_id'] ?? 0);
     $att_classe = isset($_POST['attestati_classe']) ? 1 : 0;
     if ($att_classe) $abilita_pres = 1; // gli attestati della classe richiedono il check-in
+    $classe_ev = $att_classe || isset($_POST['dedicata_scuole']) || isset($_POST['fsl']); // prenota il docente per la classe
     $errori_t = [];
-    $turni_post = leggi_turni_post((bool)$att_classe, $errori_t);
+    $turni_post = leggi_turni_post($classe_ev, $errori_t);
     if ($errori_t) { flash_set("Evento non salvato: " . implode('; ', $errori_t) . ".", 'danger'); admin_redirect("eventi.php?p_id=$filtro_p&id=$ev_id"); }
 
     if (isset($_POST['elimina_locandina']) && $_POST['elimina_locandina'] == '1') $conn->query("UPDATE eventi SET locandina_path = NULL WHERE id = $ev_id");
@@ -311,7 +317,7 @@ if (isset($_POST['edit_evento'])) {
     salva_corso_evento($conn, $ev_id);
     if ($ref_scartate) $avviso_notif .= " Email dei referenti non valide ignorate: " . implode(", ", $ref_scartate) . ".";
     salva_attestati_classe_evento($conn, $ev_id, $att_classe);
-    if ($att_classe) assicura_campi_progetto($conn, $filtro_p); // campo "numero di partecipanti" del modulo
+    if ($classe_ev) assicura_campi_progetto($conn, $filtro_p); // campo "numero di partecipanti" del modulo
     $avvisi_t = [];
     $promossi = salva_turni_evento($conn, $ev_id, $turni_post, $avvisi_t);
     if ($avvisi_t) $avviso_notif .= " Attenzione: " . htmlspecialchars(implode('; ', $avvisi_t)) . ".";
@@ -383,6 +389,8 @@ if ($mostra_form):
         $ev = []; $referenti = []; $dett_f = [];
     }
     $att_classe_v = (int)($dett_f['attestati'] ?? 0) === 1;
+    $fsl_v = (int)($dett_f['convenzione'] ?? 0) === 1;
+    $scuole_v = $fsl_v || (int)($dett_f['dedicata_scuole'] ?? 0) === 1;
     if (!$referenti) $referenti = [['ruolo' => 'Referente', 'notifiche' => 1]];
     $col_f = colore_valido($page_cfg['colore_primario'] ?? '', '#0056B3');
     $txt_f = colore_testo_su($col_f);
@@ -565,7 +573,17 @@ form:not(.ev-form-classe) .ev-t-riga2 { grid-template-columns: repeat(3, 1fr); }
                     <input class="form-check-input" type="checkbox" name="attestati_classe" id="evAttClasse" value="1" <?php echo $att_classe_v ? 'checked' : ''; ?>>
                     <label class="form-check-label small fw-bold" for="evAttClasse"><i class="fa fa-graduation-cap me-1" aria-hidden="true"></i>Attestati per gli studenti della classe</label>
                 </div>
-                <p class="form-text mt-0 mb-0">Per le prenotazioni di classi (es. scuole): chi prenota indica il numero di studenti e, dalla sua Area personale, inserisce i loro nomi. Dopo l'evento, se la presenza è registrata con il check-in, riceve per email gli attestati di tutti gli studenti, con codice di verifica. Il min/max di studenti si imposta in ogni turno.</p>
+                <p class="form-text mt-0 mb-3">Per le prenotazioni di classi (es. scuole): chi prenota indica il numero di studenti e, dalla sua Area personale, inserisce i loro nomi. Dopo l'evento, se la presenza è registrata con il check-in, riceve per email gli attestati di tutti gli studenti, con codice di verifica. Il min/max di studenti si imposta in ogni turno.</p>
+                <div class="form-check form-switch mb-1">
+                    <input class="form-check-input" type="checkbox" name="dedicata_scuole" id="evScuole" value="1" <?php echo $scuole_v ? 'checked' : ''; ?>>
+                    <label class="form-check-label small fw-bold" for="evScuole"><i class="fa fa-school me-1" aria-hidden="true"></i>Dedicato alle scuole</label>
+                </div>
+                <p class="form-text mt-0 mb-3">Prenota il docente per la sua classe, indicando il numero di studenti (min/max in ogni turno).</p>
+                <div class="form-check form-switch mb-1">
+                    <input class="form-check-input" type="checkbox" name="fsl" id="evFsl" value="1" <?php echo $fsl_v ? 'checked' : ''; ?>>
+                    <label class="form-check-label small fw-bold" for="evFsl"><i class="fa fa-file-signature me-1" aria-hidden="true"></i>Attività di Formazione Scuola Lavoro</label>
+                </div>
+                <p class="form-text mt-0 mb-0">Attiva il processo delle convenzioni: nel modulo la scuola dichiara se ha la convenzione con il Dipartimento, che deve coprire il giorno del turno (registro in Anagrafe scuole). Senza convenzione valida la prenotazione resta da approvare con le istruzioni per inviarla (modelli e PEC in Impostazioni area); promemoria e avvisi partono da soli. Include "Dedicato alle scuole".</p>
             </section>
 
             <section class="pj-sez">
@@ -654,17 +672,22 @@ document.addEventListener('change', function (e) {
     if (e.target.classList.contains('pj-notif')) e.target.closest('.pj-riga-2').querySelector('input[name="ref_notifiche[]"]').value = e.target.checked ? '1' : '0';
     if (e.target.classList.contains('ev-flag')) e.target.closest('.ev-flag-box').querySelector('input[type=hidden]').value = e.target.checked ? '1' : '0';
 });
-// Attestati per la classe: mostra min/max studenti nei turni e attiva il check-in (serve per gli attestati)
+// Attestati per la classe: attiva il check-in (serve per gli attestati). Classe (attestati, dedicato alle scuole o FSL):
+// mostra min/max studenti nei turni. FSL accende anche "Dedicato alle scuole".
 (function () {
     var sw = document.getElementById('evAttClasse'), pres = document.getElementById('evPres');
+    var scu = document.getElementById('evScuole'), fsl = document.getElementById('evFsl');
     if (!sw) return;
     var form = sw.closest('form');
     function aggiorna() {
-        form.classList.toggle('ev-form-classe', sw.checked);
+        if (fsl && fsl.checked) scu.checked = true;
+        if (scu) scu.disabled = !!(fsl && fsl.checked);
+        form.classList.toggle('ev-form-classe', sw.checked || (scu && scu.checked));
         if (sw.checked) pres.checked = true;
         pres.disabled = sw.checked;
     }
-    sw.addEventListener('change', aggiorna); aggiorna();
+    [sw, scu, fsl].forEach(function (x) { if (x) x.addEventListener('change', aggiorna); }); aggiorna();
+    form.addEventListener('submit', function () { if (scu) scu.disabled = false; });
     // Un interruttore disattivato non viene inviato: prima dell'invio lo si riattiva
     form.addEventListener('submit', function () { pres.disabled = false; });
 })();

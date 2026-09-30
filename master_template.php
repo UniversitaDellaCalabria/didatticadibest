@@ -176,6 +176,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['invia_prenotazione'])
             }
         }
 
+        // Convenzione con la scuola: risposta obbligatoria se il progetto/evento la chiede.
+        // "No" → la prenotazione resta da approvare finché la convenzione non arriva.
+        $conv_pr = null; $conv_rinnovo = false;
+        if ((int)($dett_pr['convenzione'] ?? 0) === 1) {
+            $conv_pr = in_array($_POST['convenzione'] ?? '', ['si', 'no'], true) ? $_POST['convenzione'] : null;
+            if ($conv_pr === null) {
+                $_SESSION['errore_prenotazione'] = "Indica se la scuola ha già stipulato la convenzione con il Dipartimento.";
+                if (isset($lock_iscr)) { $conn->query("SELECT RELEASE_LOCK('" . $conn->real_escape_string($lock_iscr) . "')"); }
+                header("Location: {$url_ritorno}status=studenti"); exit;
+            }
+            // Scuola scelta dall'anagrafe: conta il registro delle convenzioni, che deve coprire tutto il periodo dell'attività.
+            // Coperto → non serve attendere. Registrata ma non copre il periodo → ne va stipulata una nuova, anche se ha risposto "Sì".
+            if ($scuola_codice_pr) {
+                [$att_dal_pr, $att_al_pr] = periodo_attivita($dett_pr['data_inizio'] ?? null, $dett_pr['data_fine'] ?? null, $t_info['data_turno'] ?? null);
+                if (convenzione_valida($conn, $scuola_codice_pr, false, $att_dal_pr, $att_al_pr)) $conv_pr = 'ricevuta';
+                elseif ($conv_pr === 'si' && convenzioni_della_scuola($conn, $scuola_codice_pr)) { $conv_pr = 'no'; $conv_rinnovo = true; }
+            }
+        }
+
         if (!empty($_FILES)) {
             $allowed_mimes = ['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
             $allowed_exts = ['pdf', 'jpg', 'jpeg', 'png', 'gif', 'doc', 'docx'];
@@ -220,7 +239,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['invia_prenotazione'])
             $occupati = getPostiOccupati($conn, $turno_id, true);
 
             // Anche 'da_approvare' occupa un posto: prima si verifica la capienza
-            $stato_prenotazione = (isset($t_info['richiede_approvazione']) && $t_info['richiede_approvazione'] == 1) ? 'da_approvare' : 'confermata';
+            $stato_prenotazione = ((isset($t_info['richiede_approvazione']) && $t_info['richiede_approvazione'] == 1) || $conv_pr === 'no') ? 'da_approvare' : 'confermata';
             if (($occupati + $num_posti) > $t_info['max_posti']) {
                 if (isset($t_info['abilita_lista_attesa']) && $t_info['abilita_lista_attesa'] == 1) {
                     $stato_prenotazione = 'in_attesa';
@@ -248,6 +267,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['invia_prenotazione'])
         // Posto confermato: le altre liste d'attesa della persona nell'ambito del limite decadono
         if ($insert_ok && $stato_prenotazione === 'confermata') { decadi_attese_vincolate($conn, (int)$stmt_ins->insert_id); }
         if (isset($lock_iscr)) { $conn->query("SELECT RELEASE_LOCK('" . $conn->real_escape_string($lock_iscr) . "')"); }
+        if ($insert_ok && $conv_pr !== null) {
+            $st_cv = $conn->prepare("UPDATE prenotazioni SET convenzione = ? WHERE id = ?");
+            $st_cv->bind_param("si", $conv_pr, $nuovo_pr_id); $st_cv->execute();
+        }
         // Scuola dall'anagrafe: codice sulla prenotazione (report) e sul profilo del docente (proposta la prossima volta)
         if ($insert_ok && $scuola_codice_pr) {
             $st_sc = $conn->prepare("UPDATE prenotazioni SET scuola_codice = ? WHERE id = ?");
@@ -272,12 +295,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['invia_prenotazione'])
             $r_repl = [$nome, $cognome, $matricola, $t_info['evento_titolo'], $data_formatted, $ora_formatted, $t_info['luogo'], $codice_p, $btn_ricevuta_html];
             $sys_email = $conn->query("SELECT * FROM impostazioni_sistema WHERE id = 1")->fetch_assoc();
 
-            if ($stato_prenotazione === 'da_approvare') {
+            if ($stato_prenotazione === 'da_approvare' && $conv_pr === 'no') {
+                $obj_tpl = "Prenotazione in attesa della convenzione: " . $t_info['evento_titolo'];
+                $body_tpl = "<p>Gentile <strong>{NOME} {COGNOME}</strong>,</p><p>abbiamo ricevuto la prenotazione per <strong>{TITOLO_EVENTO}</strong>.</p><p>📅 {DATA_TURNO} | 🕒 {ORARIO_TURNO}<br>🎟️ Codice: <strong>{CODICE_PRENOTAZIONE}</strong></p>"
+                          . ($conv_rinnovo ? "<p style='margin:0 0 8px;'><strong>La convenzione della scuola registrata al Dipartimento non copre tutto il periodo dell'attività: va stipulata una nuova convenzione.</strong></p>" : '') . html_istruzioni_convenzione($page_cfg, true, $codice_p) . "{LINK_RICEVUTA}";
+            } elseif ($stato_prenotazione === 'da_approvare') {
                 $obj_tpl = "Richiesta Ricevuta (In valutazione): " . $t_info['evento_titolo'];
                 $body_tpl = "<p>Gentile <strong>{NOME} {COGNOME}</strong>,</p><p>La tua richiesta per <strong>$num_posti posti</strong> all'evento <strong>{TITOLO_EVENTO}</strong> è in fase di valutazione.</p><p>📅 {DATA_TURNO} | 🕒 {ORARIO_TURNO}<br>🎟️ Codice: <strong>{CODICE_PRENOTAZIONE}</strong></p>{LINK_RICEVUTA}";
             } elseif ($stato_prenotazione === 'in_attesa') {
                 $obj_tpl = "Lista d'Attesa: " . $t_info['evento_titolo'];
                 $body_tpl = "<p>Gentile <strong>{NOME} {COGNOME}</strong>,</p><p>Sei stato inserito in <strong>lista d'attesa</strong> per l'evento <strong>{TITOLO_EVENTO}</strong>.</p><p>📅 {DATA_TURNO} | 🕒 {ORARIO_TURNO}<br>🎟️ Codice: <strong>{CODICE_PRENOTAZIONE}</strong></p>{LINK_RICEVUTA}" . $cal_html_buttons;
+                // Senza convenzione: meglio avviarla subito, così se il posto si libera la prenotazione è confermabile
+                if ($conv_pr === 'no') $body_tpl .= "<p style='margin-top:16px;'><strong>Convenzione:</strong> la scuola non l'ha ancora stipulata. Ti consigliamo di avviarla già ora.</p>" . html_istruzioni_convenzione($page_cfg, true, $codice_p);
             } else {
                 $obj_tpl  = $sys_email['email_conferma_oggetto'] ?: 'Conferma Prenotazione Eventi';
                 $body_tpl = ($sys_email['email_conferma_corpo'] ?: "<p>Gentile <strong>{NOME} {COGNOME}</strong>,</p><p>Prenotazione confermata per <strong>{TITOLO_EVENTO}</strong>.</p><p>📅 {DATA_TURNO} | 🕒 {ORARIO_TURNO}<br>🎟️ Codice: <strong>{CODICE_PRENOTAZIONE}</strong></p>{LINK_RICEVUTA}") . $cal_html_buttons;
@@ -302,7 +331,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['invia_prenotazione'])
                 foreach ($destinatari_notifica as $em_gest) { inviaNotificaEmail($em_gest, $obj_gest, corpo_notifica_per($em_gest, $intro_gest, $riepilogo, $gestori_ev), $conn, colore_area_turno($conn, $turno_id)); }
             }
 
-            $param_stato = ($stato_prenotazione === 'in_attesa') ? "&st_tipo=attesa" : (($stato_prenotazione === 'da_approvare') ? "&st_tipo=approvare" : "");
+            $param_stato = ($stato_prenotazione === 'in_attesa') ? "&st_tipo=attesa" : (($stato_prenotazione === 'da_approvare') ? ($conv_pr === 'no' ? "&st_tipo=convenzione" : "&st_tipo=approvare") : "");
+            if ($conv_pr === 'no' && $stato_prenotazione === 'in_attesa') $param_stato .= "&conv=no";
+            if ($conv_rinnovo) $param_stato .= "&conv_rinnovo=1";
             header("Location: {$url_ritorno}status=success&code=" . urlencode($codice_p) . $param_stato); exit;
         } else { header("Location: {$url_ritorno}status=error"); exit; }
     }
@@ -318,8 +349,10 @@ if (isset($_GET['status'])) {
         $proto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https://" : "http://";
         $link_btn = $proto . ($_SERVER['HTTP_HOST'] ?? 'localhost') . rtrim(dirname($_SERVER['PHP_SELF']), '/\\') . "/stampa_ricevuta.php?code=" . urlencode($codice_p);
         $btn_scarica_pdf = "<a href='$link_btn' target='_blank' class='btn btn-danger btn-sm fw-bold ms-3'><i class='fa fa-file-pdf me-1'></i> Stampa Ricevuta</a>";
-        if (isset($_GET['st_tipo']) && $_GET['st_tipo'] === 'approvare') { $messaggio_prenotazione = "<div class='alert alert-info fw-bold text-center my-4 shadow-sm border-0 border-start border-5 border-info'><i class='fa fa-hourglass-half me-2'></i> Richiesta in approvazione! Codice: <span class='badge bg-info text-dark ms-2'>$codice_p</span> $btn_scarica_pdf</div>"; } 
-        elseif (isset($_GET['st_tipo']) && $_GET['st_tipo'] === 'attesa') { $messaggio_prenotazione = "<div class='alert alert-warning fw-bold text-center my-4 shadow-sm border-0 border-start border-5 border-warning'><i class='fa fa-clock me-2'></i> In Lista d'Attesa! Codice: <span class='badge bg-warning text-dark ms-2'>$codice_p</span> $btn_scarica_pdf</div>"; } 
+        $box_conv = "<div class='alert alert-warning text-start my-3 shadow-sm border-0 border-start border-5 border-warning small'><div class='fw-bold mb-1'><i class='fa fa-file-signature me-1'></i> Convenzione da stipulare</div>" . (($_GET['conv_rinnovo'] ?? '') === '1' ? "<p style='margin:0 0 8px;'><strong>La convenzione della scuola registrata al Dipartimento non copre tutto il periodo dell'attività: va stipulata una nuova convenzione.</strong></p>" : '') . html_istruzioni_convenzione($page_cfg, false, $_GET['code']) . "</div>";
+        if (isset($_GET['st_tipo']) && $_GET['st_tipo'] === 'convenzione') { $messaggio_prenotazione = "<div class='alert alert-info fw-bold text-center mt-4 mb-0 shadow-sm border-0 border-start border-5 border-info'><i class='fa fa-hourglass-half me-2'></i> Prenotazione registrata, in attesa della convenzione. Codice: <span class='badge bg-info text-dark ms-2'>$codice_p</span> $btn_scarica_pdf</div>" . $box_conv; }
+        elseif (isset($_GET['st_tipo']) && $_GET['st_tipo'] === 'approvare') { $messaggio_prenotazione = "<div class='alert alert-info fw-bold text-center my-4 shadow-sm border-0 border-start border-5 border-info'><i class='fa fa-hourglass-half me-2'></i> Richiesta in approvazione! Codice: <span class='badge bg-info text-dark ms-2'>$codice_p</span> $btn_scarica_pdf</div>"; } 
+        elseif (isset($_GET['st_tipo']) && $_GET['st_tipo'] === 'attesa') { $messaggio_prenotazione = "<div class='alert alert-warning fw-bold text-center my-4 shadow-sm border-0 border-start border-5 border-warning'><i class='fa fa-clock me-2'></i> In Lista d'Attesa! Codice: <span class='badge bg-warning text-dark ms-2'>$codice_p</span> $btn_scarica_pdf</div>" . (($_GET['conv'] ?? '') === 'no' ? $box_conv : ''); } 
         else { $messaggio_prenotazione = "<div class='alert alert-success fw-bold text-center my-4 shadow-sm border-0 border-start border-5 border-success'><i class='fa fa-check-circle me-2'></i> Prenotazione confermata! Codice: <span class='badge bg-success ms-2'>$codice_p</span> $btn_scarica_pdf</div>"; }
     } elseif ($st === 'dup') { $messaggio_prenotazione = "<div class='alert alert-warning fw-bold text-center my-4 shadow-sm border-0 border-start border-4 border-warning'><i class='fa fa-exclamation-triangle me-2'></i> Prenotazione già esistente per questo turno con la stessa email.</div>"; } 
     elseif ($st === 'full') { $messaggio_prenotazione = "<div class='alert alert-danger fw-bold text-center my-4 shadow-sm border-0 border-start border-4 border-danger'><i class='fa fa-exclamation-circle me-2'></i> Posti esauriti per questo turno.</div>"; } 
@@ -913,6 +946,46 @@ function printModalPrenotazione($t, $col_primaria, $utente_logged, $val_nome, $v
 
                         <?php endif; // end !empty($campi_array) ?>
                         
+                        <?php if ((int)($t['dett_progetto']['convenzione'] ?? 0) === 1): $cid = 'conv' . (int)$t['id'];
+                            [$cv_dal, $cv_al] = periodo_attivita($t['dett_progetto']['data_inizio'] ?? null, $t['dett_progetto']['data_fine'] ?? null, $t['data_turno'] ?? null); ?>
+                        <!-- CONVENZIONE CON LA SCUOLA: "No" → prenotazione in attesa finché la convenzione non arriva.
+                             La convenzione deve coprire tutto il periodo dell'attività (data-dal / data-al) -->
+                        <fieldset class="mt-3 p-3 rounded border conv-box" data-dal="<?php echo $cv_dal; ?>" data-al="<?php echo $cv_al; ?>">
+                            <legend class="form-label small fw-bold mb-2 float-none w-auto" style="font-size:.875rem;"><i class="fa fa-file-signature me-1" aria-hidden="true"></i>La scuola ha già stipulato la convenzione con il Dipartimento per la Formazione Scuola Lavoro? <span class="text-danger">*</span></legend>
+                            <div class="form-check form-check-inline"><input class="form-check-input conv-radio" type="radio" name="convenzione" id="<?php echo $cid; ?>si" value="si" required><label class="form-check-label small" for="<?php echo $cid; ?>si">Sì, è già stipulata</label></div>
+                            <div class="form-check form-check-inline"><input class="form-check-input conv-radio" type="radio" name="convenzione" id="<?php echo $cid; ?>no" value="no" required><label class="form-check-label small" for="<?php echo $cid; ?>no">No, non ancora</label></div>
+                            <div class="conv-no alert alert-warning small mt-2 mb-0" hidden><?php echo html_istruzioni_convenzione($GLOBALS['page_cfg'] ?? []); ?></div>
+                            <div class="conv-reg alert alert-success small mt-2 mb-0" hidden><i class="fa fa-circle-check me-1" aria-hidden="true"></i>La scuola scelta ha già una convenzione con il Dipartimento valida per il periodo dell'attività (<span class="conv-reg-sc"></span>): non devi inviare nulla.</div>
+                            <div class="conv-scad alert alert-danger small mt-2 mb-0" hidden><i class="fa fa-triangle-exclamation me-1" aria-hidden="true"></i>La convenzione della scuola registrata al Dipartimento non copre tutto il periodo dell'attività (<?php echo $cv_dal === $cv_al ? date('d/m/Y', strtotime($cv_dal)) : date('d/m/Y', strtotime($cv_dal)) . ' – ' . date('d/m/Y', strtotime($cv_al)); ?>): <strong>va stipulata una nuova convenzione</strong>.</div>
+                        </fieldset>
+                        <script>
+                        if (!window.convInit) { window.convInit = true;
+                            document.addEventListener('change', function (e) {
+                                if (!e.target.classList || !e.target.classList.contains('conv-radio')) return;
+                                var box = e.target.closest('.conv-box'); box.querySelector('.conv-no').hidden = e.target.value !== 'no';
+                            });
+                            // Scuola scelta dall'anagrafe (campo-scuola.js): se nel registro c'è una convenzione che copre tutto il periodo
+                            // dell'attività si risponde "Sì" da soli; se ce n'è una che non lo copre, "No" (ne va stipulata una nuova)
+                            document.addEventListener('scuola-scelta', function (e) {
+                                var form = e.target.closest('form'), box = form && form.querySelector('.conv-box');
+                                if (!box) return;
+                                var s = e.detail, reg = box.querySelector('.conv-reg'), scad = box.querySelector('.conv-scad');
+                                reg.hidden = true; scad.hidden = true;
+                                if (!s || !Array.isArray(s.conv) || !s.conv.length) return;
+                                var dal = box.dataset.dal, al = box.dataset.al;
+                                var fmt = function (d) { return d.split('-').reverse().join('/'); };
+                                var ok = s.conv.filter(function (p) { return (!p[0] || p[0] <= dal) && (!p[1] || p[1] >= al); })[0];
+                                box.querySelector('.conv-radio[value="' + (ok ? 'si' : 'no') + '"]').checked = true;
+                                box.querySelector('.conv-no').hidden = !!ok;
+                                if (ok) {
+                                    box.querySelector('.conv-reg-sc').textContent = ok[1] ? (ok[0] ? 'dal ' + fmt(ok[0]) + ' al ' : 'fino al ') + fmt(ok[1]) : 'senza scadenza';
+                                    reg.hidden = false;
+                                } else scad.hidden = false;
+                            });
+                        }
+                        </script>
+                        <?php endif; ?>
+
                         <?php if (!$utente_logged): $cap = captcha_prenotazione(); ?>
                         <!-- CONTROLLO ANTI-ROBOT (solo prenotazioni senza accesso) -->
                         <div class="mt-3 p-3 rounded border bg-light">
@@ -1062,6 +1135,8 @@ function evSetRating(btn) {
         .pj-hero::after { content: ""; position: absolute; right: -80px; top: -80px; width: 260px; height: 260px; border-radius: 50%; background: rgba(255,255,255,.10); }
         .pj-hero h1 { color: inherit; font-weight: 800; letter-spacing: -.5px; font-size: clamp(1.4rem, 2.6vw, 2.25rem); line-height: 1.2; max-width: 900px; }
         .pj-hero .pj-fatti { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; font-weight: 600; opacity: .95; }
+        .pj-corso { font-size: 1.05rem; font-weight: 600; opacity: .95; }
+        .pj-corso a:hover, .pj-corso a:focus { opacity: .85; }
         .pj-stato { display: inline-flex; align-items: center; gap: .35rem; font-size: .78rem; font-weight: 700; padding: .3rem .75rem; border-radius: 999px; }
         .pj-box { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; box-shadow: 0 2px 10px rgba(15,23,42,.05); }
         .pj-box h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .07em; font-weight: 800; color: #475569; margin-bottom: 1rem; }
@@ -1102,9 +1177,10 @@ function evSetRating(btn) {
         <header class="pj-hero shadow-sm mb-4">
             <div class="d-flex flex-wrap gap-2 mb-3 position-relative" style="z-index:1;">
                 <span class="pj-stato" style="background: <?php echo $st_p['bg']; ?>; color: <?php echo $st_p['fg']; ?>;"><?php echo htmlspecialchars($st_p['etichetta']); ?></span>
-                <?php if (!empty($dp['struttura']) || !empty($dp['corso_codice'])): ?><span class="pj-stato" style="background: rgba(255,255,255,.18); color: inherit;"><i class="fa fa-building-columns" aria-hidden="true"></i><?php echo html_corso_pubblico($conn, $dp); ?></span><?php endif; ?>
             </div>
-            <h1 class="mb-3 position-relative" style="z-index:1;"><?php echo htmlspecialchars($ev_p['titolo']); ?></h1>
+            <h1 class="mb-2 position-relative" style="z-index:1;"><?php echo htmlspecialchars($ev_p['titolo']); ?></h1>
+            <?php $corso_p = html_corso_pubblico($conn, $dp, 'text-decoration:underline;text-underline-offset:3px;'); ?>
+            <?php if ($corso_p !== ''): ?><p class="pj-corso position-relative mb-3" style="z-index:1;"><i class="fa fa-building-columns me-2" aria-hidden="true"></i><?php echo $corso_p; ?></p><?php else: ?><div class="mb-3"></div><?php endif; ?>
             <div class="pj-fatti position-relative" style="z-index:1;">
                 <span><i class="fa fa-calendar-days me-1" aria-hidden="true"></i><?php echo htmlspecialchars($ip['periodo']); ?></span>
                 <?php if (!empty($ev_p['luogo'])): ?><span><i class="fa fa-location-dot me-1" aria-hidden="true"></i><?php echo htmlspecialchars($ev_p['luogo']); ?></span><?php endif; ?>

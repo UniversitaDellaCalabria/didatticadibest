@@ -23,6 +23,7 @@
             var ico = document.createElement('i'); ico.className = 'fa fa-circle-check text-success me-1'; ico.setAttribute('aria-hidden', 'true');
             var cd = document.createElement('span'); cd.className = 'font-monospace'; cd.textContent = s.codice;
             stato.appendChild(ico); stato.appendChild(document.createTextNode("Scuola dall'anagrafe del Ministero · ")); stato.appendChild(cd);
+            box.dispatchEvent(new CustomEvent('scuola-scelta', { bubbles: true, detail: s }));
         }
         function mostra(r) {
             voci = r; lista.innerHTML = '';
@@ -45,7 +46,7 @@
         }
 
         inp.addEventListener('input', function () {
-            if (cod.value) { cod.value = ''; stato.textContent = AIUTO; }
+            if (cod.value) { cod.value = ''; stato.textContent = AIUTO; box.dispatchEvent(new CustomEvent('scuola-scelta', { bubbles: true, detail: null })); }
             var q = inp.value.trim();
             clearTimeout(timer);
             if (q.length < 3) { chiudi(); return; }

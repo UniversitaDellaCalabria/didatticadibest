@@ -1,7 +1,8 @@
 <?php
 // scuole.php - Anagrafe delle scuole (solo amministratori): caricamento del file open data del Ministero
-// dell'Istruzione (CSV o ZIP), stato dell'anagrafe, prova della ricerca e abbinamento delle scuole scritte
-// a mano nelle iscrizioni passate (così report e statistiche contano ogni scuola una volta sola).
+// dell'Istruzione (CSV o ZIP), stato dell'anagrafe, prova della ricerca, abbinamento delle scuole scritte
+// a mano nelle iscrizioni passate (così report e statistiche contano ogni scuola una volta sola)
+// e registro delle convenzioni scuola-Dipartimento.
 require_once 'admin_header.php';
 
 if (!$is_full_admin) nega_accesso();
@@ -174,7 +175,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash_set("\"" . $gruppi[$chiave]['testo'] . "\" abbinata a " . etichetta_scuola($s) . " (" . $st->affected_rows . " iscrizioni).");
         }
     }
-    admin_redirect("scuole.php?p_id=$filtro_p&r=" . time() . "#" . (isset($_POST['abbina']) ? 'abbina' : 'carica'));
+    // Registro delle convenzioni: registrazione o modifica (con i file firmati e i docenti dell'Allegato A)
+    if (isset($_POST['conv_salva'])) {
+        $id_cv = (int)($_POST['conv_id'] ?? 0);
+        $cod_cv = strtoupper(trim((string)($_POST['scuola_codice']['conv'] ?? '')));
+        $dir_cv = dirname(__DIR__) . '/uploads/convenzioni/';
+        if (!is_dir($dir_cv)) @mkdir($dir_cv, 0755, true);
+        // Documenti firmati: mai raggiungibili dal web, si scaricano solo da convenzione_file.php (pannello)
+        if (!is_file($dir_cv . '.htaccess')) @file_put_contents($dir_cv . '.htaccess', "# Convenzioni firmate: si scaricano solo dal pannello (admin/convenzione_file.php)\nRequire all denied\n");
+        $mimes_cv = ['application/pdf', 'application/pkcs7-mime', 'application/x-pkcs7-mime', 'application/pkcs7-signature', 'application/octet-stream'];
+        $file_cv = []; $errori_file = [];
+        foreach (['file_convenzione' => 'convenzione', 'file_allegato' => 'Allegato A'] as $campo => $nome_f) {
+            if (($_FILES[$campo]['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) continue;
+            $fn = secure_upload($_FILES[$campo], $dir_cv, ['pdf', 'p7m'], $mimes_cv);
+            if ($fn) $file_cv[$campo] = 'uploads/convenzioni/' . $fn; else $errori_file[] = $nome_f;
+        }
+        $docenti_cv = [];
+        foreach ((array)($_POST['doc_nome'] ?? []) as $i => $nome_d) $docenti_cv[] = ['nome' => $nome_d, 'email' => $_POST['doc_email'][$i] ?? ''];
+        // File sostituiti: si cancellano i vecchi
+        $vecchia = $id_cv > 0 ? ($conn->query("SELECT * FROM convenzioni_scuole WHERE id = $id_cv")->fetch_assoc() ?: null) : null;
+        if ($id_cv > 0 && !$vecchia) $id_cv = -1;
+        $esito_cv = $id_cv < 0 ? null : salva_convenzione($conn, ['scuola_codice' => $cod_cv, 'data_stipula' => $_POST['data_stipula'] ?? null, 'scadenza' => $_POST['scadenza'] ?? null,
+                                                          'protocollo' => $_POST['protocollo'] ?? '', 'note' => $_POST['note'] ?? '', 'docenti' => $docenti_cv] + $file_cv,
+                                                    max(0, $id_cv), (string)($_SESSION['utente_email'] ?? ''));
+        if ($esito_cv === null) {
+            foreach ($file_cv as $f_nuovo) @unlink(dirname(__DIR__) . '/' . $f_nuovo);
+            flash_set("Convenzione non salvata: scegli la scuola dall'elenco dell'anagrafe e controlla le date (\"valida fino al\" non può precedere \"valida dal\").", 'danger');
+            admin_redirect("scuole.php?p_id=$filtro_p" . ($id_cv > 0 ? "&conv_mod=$id_cv" : '') . "#convForm");
+        }
+        [$id_cv, $n_cv] = $esito_cv;
+        if ($vecchia) foreach ($file_cv as $campo => $f_nuovo) if (!empty($vecchia[$campo])) @unlink(dirname(__DIR__) . '/' . $vecchia[$campo]);
+        $s_cv = scuola_per_codice($conn, $cod_cv);
+        registra_log_audit($conn, $vecchia ? "Convenzione modificata" : "Convenzione registrata", ["Scuola" => $cod_cv, "Valida dal" => $_POST['data_stipula'] ?? '', "Valida fino al" => $_POST['scadenza'] ?? '', "Prenotazioni aggiornate" => $n_cv]);
+        flash_set("Convenzione " . ($vecchia ? "aggiornata" : "registrata") . " per " . etichetta_scuola($s_cv) . "."
+                  . ($n_cv ? " $n_cv prenotazioni della scuola coperte dalla convenzione (chi era in attesa è stato avvisato per email)." : '')
+                  . ($errori_file ? " File non caricati (servono PDF o .p7m): " . implode(', ', $errori_file) . "." : ''), $errori_file ? 'warning' : 'success');
+    }
+    if (isset($_POST['conv_elimina'])) {
+        $id_cv = (int)$_POST['conv_elimina'];
+        $vecchia = $conn->query("SELECT * FROM convenzioni_scuole WHERE id = $id_cv")->fetch_assoc();
+        if ($vecchia) {
+            foreach (['file_convenzione', 'file_allegato'] as $campo) if (!empty($vecchia[$campo])) @unlink(dirname(__DIR__) . '/' . $vecchia[$campo]);
+            $conn->query("DELETE FROM convenzioni_scuole WHERE id = $id_cv");
+            registra_log_audit($conn, "Convenzione eliminata dal registro", ["ID" => $id_cv, "Scuola" => $vecchia['scuola_codice']]);
+            flash_set("Convenzione eliminata dal registro con i suoi file. Premi \"Verifica ora\" per aggiornare le iscrizioni della scuola.", 'warning');
+        }
+    }
+    if (isset($_POST['conv_verifica'])) {
+        $v = verifica_convenzioni_fsl($conn);
+        registra_log_audit($conn, "Verifica convenzioni FSL", $v);
+        flash_set("Verifica completata: {$v['coperte']} iscrizioni coperte da una convenzione, {$v['da_stipulare']} senza convenzione valida per il periodo"
+                  . ($v['nuove_da_stipulare'] ? " ({$v['nuove_da_stipulare']} segnate ora come \"da stipulare\")" : '')
+                  . ($v['senza_codice'] ? ", {$v['senza_codice']} con la scuola scritta a mano (abbinala all'anagrafe per verificarla)" : '') . ".",
+                  $v['da_stipulare'] || $v['senza_codice'] ? 'warning' : 'success');
+    }
+    $anc = isset($_POST['abbina']) ? 'abbina' : (isset($_POST['conv_salva']) || isset($_POST['conv_elimina']) || isset($_POST['conv_verifica']) ? 'convenzioni' : 'carica');
+    admin_redirect("scuole.php?p_id=$filtro_p&r=" . time() . "#" . $anc);
 }
 
 // Scuole già in anagrafe per regione (chiave: inizio del nome, come REGIONI_SCUOLE)
@@ -190,15 +246,15 @@ $gruppi = scuole_da_abbinare($conn);
 $con_codice = (int)($conn->query("SELECT COUNT(*) AS n FROM prenotazioni WHERE scuola_codice IS NOT NULL")->fetch_assoc()['n'] ?? 0);
 // Scuole collegate: per ogni scuola i docenti che l'hanno indicata (iscrizioni e profilo) e le attività
 $collegate = [];
-$res_c = $conn->query("SELECT pr.scuola_codice, pr.nome, pr.cognome, LOWER(pr.email) AS email, pr.created_at, e.titolo
+$res_c = $conn->query("SELECT pr.scuola_codice, pr.nome, pr.cognome, LOWER(pr.email) AS email, pr.data_prenotazione, e.titolo
                        FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id
                        WHERE pr.scuola_codice IS NOT NULL AND IFNULL(pr.stato, 'confermata') NOT IN ('annullata', 'rifiutata', 'scaduta')
-                       ORDER BY pr.created_at DESC");
+                       ORDER BY pr.data_prenotazione DESC");
 while ($res_c && $x = $res_c->fetch_assoc()) {
     $c = &$collegate[$x['scuola_codice']];
     $c['iscrizioni'] = ($c['iscrizioni'] ?? 0) + 1;
     $c['attivita'][$x['titolo']] = true;
-    $c['ultima'] = max($c['ultima'] ?? '', (string)$x['created_at']);
+    $c['ultima'] = max($c['ultima'] ?? '', (string)$x['data_prenotazione']);
     $k = $x['email'] ?: mb_strtolower($x['nome'] . ' ' . $x['cognome']);
     if (!isset($c['docenti'][$k])) $c['docenti'][$k] = ['nome' => trim($x['nome'] . ' ' . $x['cognome']), 'email' => (string)$x['email'], 'n' => 0];
     $c['docenti'][$k]['n']++;
@@ -211,6 +267,33 @@ while ($res_c && $x = $res_c->fetch_assoc()) {
     $collegate[$x['scuola_codice']]['docenti'][$k]['profilo'] = true;
 }
 uasort($collegate, fn($a, $b) => ($b['iscrizioni'] ?? 0) <=> ($a['iscrizioni'] ?? 0));
+// Registro delle convenzioni raggruppato per scuola (la più recente per prima)
+$conv_per_scuola = [];
+$r_cv = $conn->query("SELECT c.*, (SELECT COUNT(*) FROM prenotazioni p WHERE p.scuola_codice = c.scuola_codice AND IFNULL(p.stato, 'confermata') NOT IN ('annullata', 'rifiutata', 'scaduta')) AS n_iscr
+                      FROM convenzioni_scuole c ORDER BY c.scuola_codice, (c.scadenza IS NULL) DESC, c.scadenza DESC, c.id DESC");
+while ($r_cv && $x = $r_cv->fetch_assoc()) $conv_per_scuola[$x['scuola_codice']][] = $x;
+uasort($conv_per_scuola, fn($a, $b) => strcmp(etichetta_scuola(scuola_per_codice($conn, $a[0]['scuola_codice']) ?? ['denominazione' => $a[0]['scuola_codice']]),
+                                              etichetta_scuola(scuola_per_codice($conn, $b[0]['scuola_codice']) ?? ['denominazione' => $b[0]['scuola_codice']])));
+// Iscrizioni senza convenzione valida: da stipulare (attività FSL o richiesta dai gestori) e scuole scritte a mano nelle attività FSL
+$iscr_da_stipulare = [];
+$r_ds = $conn->query("SELECT pr.id, pr.scuola_codice, pr.nome, pr.cognome, pr.email, pr.codice_prenotazione, pr.stato, pr.dati_custom_json,
+                             t.data_turno, pd.data_inizio AS pd_inizio, pd.data_fine AS pd_fine, e.titolo, e.pagina_id, pe.titolo AS area
+                      FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id JOIN pagine_eventi pe ON e.pagina_id = pe.id
+                      LEFT JOIN progetti_dettagli pd ON pd.evento_id = e.id
+                      WHERE e.archiviato = 0 AND IFNULL(pr.stato, 'confermata') IN ('confermata', 'in_attesa', 'da_approvare', 'richiesta_conferma')
+                        AND COALESCE(pd.data_fine, t.data_turno, CURDATE()) >= CURDATE()
+                        AND (pr.convenzione = 'no' OR (pd.convenzione = 1 AND pr.scuola_codice IS NULL AND IFNULL(pr.convenzione, '') <> 'ricevuta'))
+                      ORDER BY COALESCE(pd.data_inizio, t.data_turno), pr.data_prenotazione");
+while ($r_ds && $x = $r_ds->fetch_assoc()) $iscr_da_stipulare[] = $x;
+// Modifica di una convenzione, oppure nuova con scuola e periodo proposti (pulsante "Registra" della verifica)
+$conv_mod = null;
+if (!empty($_GET['conv_mod'])) $conv_mod = $conn->query("SELECT * FROM convenzioni_scuole WHERE id = " . (int)$_GET['conv_mod'])->fetch_assoc() ?: null;
+$conv_nuova_s = !$conv_mod && !empty($_GET['conv_nuova']) ? scuola_per_codice($conn, (string)$_GET['conv_nuova']) : null;
+$data_get = fn($k) => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET[$k] ?? '')) ? $_GET[$k] : null;
+[$conv_def_dal, $conv_def_al] = periodo_nuova_convenzione($data_get('dal'), $data_get('al'));
+$conv_def_al = date('Y-m-d', strtotime($conv_def_al . ' -1 day'));
+if ($data_get('al') && $conv_def_al < $data_get('al')) $conv_def_al = $data_get('al');
+$oggi_cv = date('Y-m-d'); $tra60_cv = date('Y-m-d', strtotime('+60 days'));
 $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
 ?>
 <style>
@@ -341,6 +424,135 @@ $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
             });
         })();
         </script>
+    <?php endif; ?>
+</section>
+
+<section class="scu-sez" id="convenzioni">
+    <h2><i class="fa fa-file-signature me-1" aria-hidden="true"></i>Convenzioni con le scuole (<?php echo count($conv_per_scuola); ?> scuole)</h2>
+    <p class="small text-secondary">Registro delle convenzioni per la Formazione Scuola Lavoro, con i file firmati (convenzione e Allegato A), il periodo di validità e i docenti di riferimento. Nelle attività con l'interruttore <strong>Attività di Formazione Scuola Lavoro</strong> la convenzione deve coprire <strong>tutto il periodo</strong> del progetto (Dal/Al) o il giorno del turno dell'evento: se lo copre, la scuola non deve inviare nulla; se non lo copre, ne va stipulata una nuova. Registrando o modificando una convenzione, le prenotazioni della scuola in attesa si confermano da sole (se il turno non chiede anche l'approvazione) e la scuola riceve l'email. Gli amministratori ricevono un avviso 60 giorni prima della scadenza.</p>
+
+    <!-- VERIFICA SULLE ISCRIZIONI DELLE ATTIVITÀ FSL (anche già confermate) -->
+    <div class="border rounded p-3 mb-3" style="background:#f8fafc;" id="verifica">
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+            <h3 class="h6 fw-bold mb-0"><i class="fa fa-list-check me-1" aria-hidden="true"></i>Verifica delle iscrizioni alle attività FSL</h3>
+            <form method="POST" class="ms-auto m-0">
+                <?php csrf_field(); ?>
+                <button type="submit" name="conv_verifica" value="1" class="btn btn-sm btn-outline-dark fw-bold" data-attesa="Verifica in corso…"><i class="fa fa-rotate me-1" aria-hidden="true"></i>Verifica ora</button>
+            </form>
+        </div>
+        <p class="small text-secondary mb-2">Controlla tutte le iscrizioni (anche confermate) alle attività FSL non ancora concluse, per OpenLab, Formazione Scuola Lavoro e ogni altra area: dove la convenzione copre il periodo l'iscrizione risulta <strong>Convenzione ricevuta</strong>; dove non lo copre diventa <strong>Convenzione da stipulare</strong>, senza cambiare lo stato della prenotazione e senza email automatiche. La richiesta alla scuola la invii da Iscrizioni ("Chiedi la convenzione per email"); da lì partono anche i promemoria. La verifica si ripete ogni giorno da sola.</p>
+        <?php if ($iscr_da_stipulare): ?>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle small mb-0">
+                    <thead class="table-light"><tr><th>Scuola</th><th>Attività</th><th>Periodo</th><th>Convenzione in registro</th><th>Docente</th><th></th></tr></thead>
+                    <tbody>
+                    <?php foreach ($iscr_da_stipulare as $x): $s_x = !empty($x['scuola_codice']) ? scuola_per_codice($conn, $x['scuola_codice']) : null;
+                        [$pdal, $pal] = periodo_prenotazione($x); $ult = $s_x ? (convenzioni_della_scuola($conn, $x['scuola_codice'])[0] ?? null) : null; ?>
+                        <tr>
+                            <td><?php echo $h($s_x ? etichetta_scuola($s_x) : (nome_scuola_prenotazione($x) ?: '—')); ?><div class="text-secondary <?php echo $s_x ? 'font-monospace' : ''; ?>"><?php echo $s_x ? $h($x['scuola_codice']) : 'scritta a mano: abbinala all\'anagrafe'; ?></div></td>
+                            <td><?php echo $h($x['titolo']); ?><div class="text-secondary"><?php echo $h($x['area']); ?> · <span class="font-monospace"><?php echo $h($x['codice_prenotazione']); ?></span> · <?php echo $h($x['stato'] ?: 'confermata'); ?></div></td>
+                            <td class="text-nowrap"><?php echo date('d/m/Y', strtotime($pdal)) . ($pal !== $pdal ? ' – ' . date('d/m/Y', strtotime($pal)) : ''); ?></td>
+                            <td><?php if ($ult): ?><span class="badge" style="background:#fee2e2;color:#991b1b;">non copre il periodo</span><div class="text-secondary"><?php echo $h(testo_validita_convenzione($ult)); ?></div><?php elseif ($s_x): ?><span class="badge bg-light text-dark border">nessuna</span><?php else: ?>—<?php endif; ?></td>
+                            <td><?php echo $h(trim($x['nome'] . ' ' . $x['cognome'])); ?><div class="text-secondary"><?php echo $h($x['email']); ?></div></td>
+                            <td class="text-nowrap"><a href="iscritti.php?p_id=<?php echo (int)$x['pagina_id']; ?>&f_cerca=<?php echo urlencode($x['codice_prenotazione']); ?>" class="btn btn-sm btn-outline-secondary fw-bold py-0">Iscrizioni</a>
+                                <?php if ($s_x): ?><a href="scuole.php?p_id=<?php echo $filtro_p; ?>&conv_nuova=<?php echo urlencode($x['scuola_codice']); ?>&dal=<?php echo $pdal; ?>&al=<?php echo $pal; ?>#convForm" class="btn btn-sm btn-success fw-bold py-0">Registra</a><?php endif; ?></td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        <?php else: ?>
+            <p class="small text-success mb-0"><i class="fa fa-circle-check me-1" aria-hidden="true"></i>Nessuna iscrizione alle attività FSL in corso senza convenzione.</p>
+        <?php endif; ?>
+    </div>
+
+    <!-- REGISTRA / MODIFICA -->
+    <h3 class="h6 fw-bold mt-3" id="convForm"><?php echo $conv_mod ? 'Modifica la convenzione' : 'Registra una convenzione'; ?></h3>
+    <?php $cm = $conv_mod ?: []; $cm_doc = json_decode((string)($cm['docenti_json'] ?? ''), true) ?: [['nome' => '', 'email' => '']];
+          $cm_s = !empty($cm['scuola_codice']) ? scuola_per_codice($conn, $cm['scuola_codice']) : ($conv_nuova_s ?? null); ?>
+    <form method="POST" enctype="multipart/form-data" class="row g-2 align-items-end mb-3 border rounded p-2">
+        <?php csrf_field(); ?>
+        <input type="hidden" name="conv_id" value="<?php echo (int)($cm['id'] ?? 0); ?>">
+        <div class="col-lg-6"><label class="form-label small fw-bold mb-1">Scuola *</label><?php echo html_campo_scuola('conv', $cm_s ? etichetta_scuola($cm_s) : '', $cm_s['codice'] ?? '', 'required'); ?></div>
+        <div class="col-6 col-lg-3"><label class="form-label small fw-bold mb-1" for="cvStip">Valida dal *</label><input type="date" name="data_stipula" id="cvStip" class="form-control form-control-sm" required value="<?php echo $h($cm['data_stipula'] ?? $conv_def_dal); ?>" onchange="var s=document.getElementById('cvScad'); if (this.value && !s.dataset.toccata) { var d=new Date(this.value); d.setFullYear(d.getFullYear()+<?php echo CONV_DURATA_ANNI; ?>); d.setDate(d.getDate()-1); s.value=d.toISOString().slice(0,10); }"></div>
+        <div class="col-6 col-lg-3"><label class="form-label small fw-bold mb-1" for="cvScad">Valida fino al *</label><input type="date" name="scadenza" id="cvScad" class="form-control form-control-sm" required value="<?php echo $h($cm['scadenza'] ?? $conv_def_al); ?>" oninput="this.dataset.toccata='1'"></div>
+        <div class="col-md-6">
+            <label class="form-label small fw-bold mb-1" for="cvFileC">Convenzione firmata (PDF o .p7m)<?php echo empty($cm['file_convenzione']) ? '' : ' – carica solo per sostituirla'; ?></label>
+            <input type="file" name="file_convenzione" id="cvFileC" class="form-control form-control-sm" accept=".pdf,.p7m">
+            <?php if (!empty($cm['file_convenzione'])): ?><div class="form-text"><a href="convenzione_file.php?id=<?php echo (int)$cm['id']; ?>&f=conv" target="_blank"><i class="fa fa-file-pdf me-1"></i>File attuale</a></div><?php endif; ?>
+        </div>
+        <div class="col-md-6">
+            <label class="form-label small fw-bold mb-1" for="cvFileA">Allegato A firmato (PDF o .p7m)<?php echo empty($cm['file_allegato']) ? '' : ' – carica solo per sostituirlo'; ?></label>
+            <input type="file" name="file_allegato" id="cvFileA" class="form-control form-control-sm" accept=".pdf,.p7m">
+            <?php if (!empty($cm['file_allegato'])): ?><div class="form-text"><a href="convenzione_file.php?id=<?php echo (int)$cm['id']; ?>&f=all" target="_blank"><i class="fa fa-file-pdf me-1"></i>File attuale</a></div><?php endif; ?>
+        </div>
+        <div class="col-12">
+            <label class="form-label small fw-bold mb-1">Docenti di riferimento (Allegato A)</label>
+            <div id="cvDocenti">
+                <?php foreach ($cm_doc as $d): ?>
+                    <div class="d-flex gap-2 mb-1 cv-doc">
+                        <input type="text" name="doc_nome[]" class="form-control form-control-sm" placeholder="Nome e cognome" value="<?php echo $h($d['nome'] ?? ''); ?>" maxlength="150" aria-label="Nome e cognome del docente">
+                        <input type="email" name="doc_email[]" class="form-control form-control-sm" placeholder="Email" value="<?php echo $h($d['email'] ?? ''); ?>" aria-label="Email del docente">
+                        <button type="button" class="btn btn-sm btn-outline-danger" onclick="var r=this.closest('.cv-doc'); if (document.querySelectorAll('#cvDocenti .cv-doc').length > 1) r.remove(); else r.querySelectorAll('input').forEach(function(i){i.value='';});" aria-label="Togli il docente">×</button>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-secondary fw-bold py-0" onclick="var c=document.querySelector('#cvDocenti .cv-doc').cloneNode(true); c.querySelectorAll('input').forEach(function(i){i.value='';}); document.getElementById('cvDocenti').appendChild(c);"><i class="fa fa-plus me-1" aria-hidden="true"></i>Aggiungi docente</button>
+        </div>
+        <div class="col-6 col-lg-3"><label class="form-label small fw-bold mb-1" for="cvProt">Protocollo</label><input type="text" name="protocollo" id="cvProt" class="form-control form-control-sm" maxlength="100" value="<?php echo $h($cm['protocollo'] ?? ''); ?>" placeholder="es. n. 1234 del 01/10/2026"></div>
+        <div class="col-6 col-lg-6"><label class="form-label small fw-bold mb-1" for="cvNote">Note</label><input type="text" name="note" id="cvNote" class="form-control form-control-sm" maxlength="500" value="<?php echo $h($cm['note'] ?? ''); ?>"></div>
+        <div class="col-12 col-lg-3 d-flex gap-2">
+            <button type="submit" name="conv_salva" value="1" class="btn btn-sm btn-primary fw-bold flex-grow-1"><i class="fa fa-save me-1" aria-hidden="true"></i><?php echo $conv_mod ? 'Salva le modifiche' : 'Registra'; ?></button>
+            <?php if ($conv_mod || !empty($conv_nuova_s)): ?><a href="scuole.php?p_id=<?php echo $filtro_p; ?>#convenzioni" class="btn btn-sm btn-outline-secondary fw-bold">Annulla</a><?php endif; ?>
+        </div>
+    </form>
+
+    <!-- REGISTRO PER SCUOLA -->
+    <?php if ($conv_per_scuola): ?>
+        <div class="d-flex flex-wrap gap-2 mb-2">
+            <input type="search" id="cercaConv" class="form-control form-control-sm" style="max-width:320px;" placeholder="Cerca scuola, docente o protocollo" aria-label="Cerca nel registro delle convenzioni">
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle small" id="tabConv">
+                <thead class="table-light"><tr><th>Scuola</th><th>Validità</th><th>Docenti di riferimento</th><th>File</th><th>Protocollo e note</th><th></th></tr></thead>
+                <?php foreach ($conv_per_scuola as $cod => $lista): $s_c = scuola_per_codice($conn, $cod); ?>
+                    <tbody class="conv-scuola border-top">
+                    <?php foreach ($lista as $i => $c):
+                        $dal_c = $c['data_stipula']; $al_c = $c['scadenza'];
+                        [$bg_c, $fg_c, $lbl_c] = ($al_c !== null && $al_c < $oggi_cv) ? ['#fee2e2', '#991b1b', 'Scaduta']
+                            : (($dal_c !== null && $dal_c > $oggi_cv) ? ['#e0f2fe', '#0c4a6e', 'Non ancora valida']
+                            : (($al_c !== null && $al_c <= $tra60_cv) ? ['#fef3c7', '#92400e', 'In scadenza'] : ['#f0fdf4', '#166534', 'Valida']));
+                        $docs = json_decode((string)($c['docenti_json'] ?? ''), true) ?: []; ?>
+                        <tr>
+                            <?php if ($i === 0): ?><td rowspan="<?php echo count($lista); ?>" class="align-top"><div class="fw-semibold"><?php echo $h($s_c ? etichetta_scuola($s_c) : $cod); ?></div><div class="text-secondary font-monospace"><?php echo $h($cod); ?></div><div class="text-secondary"><?php echo (int)$c['n_iscr']; ?> iscrizioni</div></td><?php endif; ?>
+                            <td class="text-nowrap"><?php echo $h(testo_validita_convenzione($c)); ?> <span class="badge" style="background:<?php echo $bg_c; ?>;color:<?php echo $fg_c; ?>;"><?php echo $lbl_c; ?></span></td>
+                            <td><?php foreach ($docs as $d): ?><div><?php echo $h($d['nome']); ?><?php if (!empty($d['email'])): ?> · <a href="mailto:<?php echo $h($d['email']); ?>"><?php echo $h($d['email']); ?></a><?php endif; ?></div><?php endforeach; ?><?php if (!$docs): ?><span class="text-secondary">—</span><?php endif; ?></td>
+                            <td class="text-nowrap">
+                                <?php if (!empty($c['file_convenzione'])): ?><a href="convenzione_file.php?id=<?php echo (int)$c['id']; ?>&f=conv" target="_blank" class="me-2"><i class="fa fa-file-pdf me-1"></i>Convenzione</a><?php else: ?><span class="badge bg-light text-secondary border me-1">convenzione mancante</span><?php endif; ?>
+                                <?php if (!empty($c['file_allegato'])): ?><a href="convenzione_file.php?id=<?php echo (int)$c['id']; ?>&f=all" target="_blank"><i class="fa fa-file-pdf me-1"></i>Allegato A</a><?php else: ?><span class="badge bg-light text-secondary border">Allegato A mancante</span><?php endif; ?>
+                            </td>
+                            <td><?php echo $h($c['protocollo']); ?><?php if ($c['note'] !== ''): ?><div class="text-secondary"><?php echo $h($c['note']); ?></div><?php endif; ?></td>
+                            <td class="text-nowrap">
+                                <a href="scuole.php?p_id=<?php echo $filtro_p; ?>&conv_mod=<?php echo (int)$c['id']; ?>#convForm" class="btn btn-sm btn-outline-primary py-0" title="Modifica" aria-label="Modifica la convenzione"><i class="fa fa-pen"></i></a>
+                                <form method="POST" class="d-inline">
+                                    <?php csrf_field(); ?>
+                                    <button type="submit" name="conv_elimina" value="<?php echo (int)$c['id']; ?>" class="btn btn-sm btn-outline-danger py-0" data-confirm="Eliminare questa convenzione dal registro, con i suoi file?" title="Elimina" aria-label="Elimina la convenzione"><i class="fa fa-trash"></i></button>
+                                </form>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                <?php endforeach; ?>
+            </table>
+        </div>
+        <script>
+        document.getElementById('cercaConv').addEventListener('input', function () {
+            var q = this.value.toLowerCase().trim();
+            document.querySelectorAll('#tabConv tbody.conv-scuola').forEach(function (tb) { tb.style.display = !q || tb.textContent.toLowerCase().indexOf(q) !== -1 ? '' : 'none'; });
+        });
+        </script>
+    <?php else: ?>
+        <p class="text-muted small mb-0">Nessuna convenzione registrata.</p>
     <?php endif; ?>
 </section>
 

@@ -526,6 +526,7 @@ if (!function_exists('html_riepilogo_prenotazione')) {
             'Luogo'             => $p['luogo'] ?? '',
             'Posti'             => (string)max(1, (int)$p['num_posti']),
             'Stato'             => $stati[$p['stato'] ?? 'confermata'] ?? (string)$p['stato'],
+            'Convenzione'       => ['si' => 'Già stipulata (dichiarato dalla scuola)', 'no' => 'Da stipulare: prenotazione in attesa della convenzione'][$p['convenzione'] ?? ''] ?? '',
             'Codice'            => $p['codice_prenotazione'],
             'Registrata il'     => !empty($p['data_prenotazione']) ? date('d/m/Y H:i', strtotime($p['data_prenotazione'])) : '',
         ];
@@ -2477,6 +2478,16 @@ if (!function_exists('cerca_scuole')) {
             $out[] = ['codice' => $s['codice'], 'nome' => etichetta_scuola($s), 'tipo' => maiuscole_scuola((string)$s['tipo']),
                       'comune' => maiuscole_scuola((string)$s['comune']), 'provincia' => maiuscole_scuola((string)$s['provincia'])];
         }
+        // Convenzioni con il Dipartimento (registro): 'conv' = periodi di validità [dal, al] ('' = senza limite).
+        // Il modulo controlla se uno copre il periodo dell'attività.
+        if ($out) {
+            $in = implode(',', array_map(fn($x) => "'" . $conn->real_escape_string($x['codice']) . "'", $out));
+            $r_cv = @$conn->query("SELECT scuola_codice, data_stipula, scadenza FROM convenzioni_scuole WHERE scuola_codice IN ($in)");
+            $conv = [];
+            while ($r_cv && $x = $r_cv->fetch_assoc()) $conv[$x['scuola_codice']][] = [(string)$x['data_stipula'], (string)$x['scadenza']];
+            foreach ($out as &$o) $o['conv'] = $conv[$o['codice']] ?? [];
+            unset($o);
+        }
         return $out;
     }
 }
@@ -3130,11 +3141,38 @@ if (!function_exists('html_scelta_corso_scheda')) {
     }
 }
 
+if (!function_exists('completa_regdid_corso')) {
+    // Corsi salvati prima che l'anagrafe leggesse l'ID del regolamento (serve per il link alla pagina del corso):
+    // lo si chiede alle API del portale per il dipartimento del corso, al massimo una volta ogni 6 ore.
+    function completa_regdid_corso($conn, array $corso): array {
+        $dip = preg_replace('/[^0-9A-Za-z]/', '', (string)($corso['dipartimento_cod'] ?? ''));
+        if ($dip === '' || !function_exists('api_unical_tutte')) return $corso;
+        $segno = __DIR__ . '/cache/regdid_' . $dip . '.try';
+        if (is_file($segno) && filemtime($segno) > time() - 6 * 3600) return $corso;
+        @touch($segno);
+        $cds = api_unical_tutte('cds/', ['departmentcod' => $dip]);
+        if (!$cds) return $corso;
+        $up = $conn->prepare("UPDATE corsi_studio SET regdid_id = ? WHERE codice = ? AND (regdid_id IS NULL OR regdid_id = 0)");
+        usort($cds, fn($a, $b) => (int)($b['AcademicYear'] ?? 0) <=> (int)($a['AcademicYear'] ?? 0)); // il più recente per primo
+        $fatti = [];
+        foreach ($cds as $c) {
+            $cc = trim((string)($c['CdSCod'] ?? '')); $rd = (int)($c['RegDidId'] ?? 0);
+            if ($cc === '' || !$rd || isset($fatti[$cc])) continue;
+            $fatti[$cc] = $rd;
+            $up->bind_param("is", $rd, $cc); $up->execute();
+        }
+        if (isset($fatti[$corso['codice']])) $corso['regdid_id'] = $fatti[$corso['codice']];
+        return $corso;
+    }
+}
+
 if (!function_exists('html_corso_pubblico')) {
     // Nome del corso/struttura nelle schede pubbliche, con il link alla pagina del corso se scelto dall'anagrafe
     function html_corso_pubblico($conn, ?array $d, string $stile = ''): string {
         $testo = trim((string)($d['struttura'] ?? ''));
-        $url = url_corso_studio(corso_studio($conn, $d['corso_codice'] ?? ''));
+        $corso = corso_studio($conn, $d['corso_codice'] ?? '');
+        if ($corso && empty($corso['regdid_id'])) $corso = completa_regdid_corso($conn, $corso);
+        $url = url_corso_studio($corso);
         if ($testo === '' && $url !== '') $testo = etichetta_corso(corso_studio($conn, $d['corso_codice']));
         if ($testo === '') return '';
         $h = htmlspecialchars($testo, ENT_QUOTES, 'UTF-8');
@@ -3220,11 +3258,309 @@ if (!function_exists('assicura_campi_progetto')) {
 if (!function_exists('prenotazione_di_classe')) {
     // Prenotazione fatta da un docente per una classe/gruppo: si chiede il numero di studenti (con min/max)
     // e il docente può inserire l'elenco degli studenti.
-    // Progetti: quelli dedicati alle scuole. Eventi: quelli con "Attestati per gli studenti della classe"
-    // (progetti_dettagli.attestati = 1). $dett = riga di progetti_dettagli (null se assente).
+    // Progetti: quelli dedicati alle scuole. Eventi: "Dedicato alle scuole", "Attività di Formazione Scuola Lavoro"
+    // o "Attestati per gli studenti della classe". $dett = riga di progetti_dettagli (null se assente).
     function prenotazione_di_classe(bool $is_progetto, ?array $dett): bool {
         if ($is_progetto) return (int)($dett['per_scuole'] ?? 1) === 1;
-        return (int)($dett['attestati'] ?? 0) === 1;
+        return (int)($dett['attestati'] ?? 0) === 1 || (int)($dett['dedicata_scuole'] ?? 0) === 1 || (int)($dett['convenzione'] ?? 0) === 1;
+    }
+}
+
+// Convenzione scuola-Dipartimento per la Formazione Scuola Lavoro: modelli e PEC predefiniti,
+// modificabili per ogni area in Impostazioni area
+if (!defined('CONV_URL_MODELLO'))  define('CONV_URL_MODELLO', 'https://drive.google.com/file/d/12FLrX8e3urB8FpxyEwcqQGGqqOovnBvC/view?usp=sharing');
+if (!defined('CONV_URL_ALLEGATO')) define('CONV_URL_ALLEGATO', 'https://docs.google.com/document/d/1u6a8bzeYP8My5_4icowbnHKJoWapxYb2/edit?usp=sharing&ouid=102914102078024712101&rtpof=true&sd=true');
+if (!defined('CONV_PEC'))          define('CONV_PEC', 'dipartimento.best@pec.unical.it');
+
+if (!function_exists('dati_convenzione')) {
+    // $cfg = riga di pagine_eventi dell'area: campi vuoti o non validi → valori predefiniti
+    function dati_convenzione(array $cfg): array {
+        $url = fn($v, $def) => preg_match('#^https?://#i', trim((string)$v)) ? trim((string)$v) : $def;
+        $pec = trim((string)($cfg['conv_pec'] ?? ''));
+        return [
+            'modello'  => $url($cfg['conv_url_modello'] ?? '', CONV_URL_MODELLO),
+            'allegato' => $url($cfg['conv_url_allegato'] ?? '', CONV_URL_ALLEGATO),
+            'pec'      => filter_var($pec, FILTER_VALIDATE_EMAIL) ? $pec : CONV_PEC,
+        ];
+    }
+}
+
+if (!function_exists('html_istruzioni_convenzione')) {
+    // Cosa fare quando la scuola non ha ancora la convenzione (pagina, email, Area personale)
+    // $in_attesa = false: prenotazione già confermata a cui si chiede comunque la convenzione
+    function html_istruzioni_convenzione(array $cfg, bool $per_email = false, string $codice = '', bool $in_attesa = true): string {
+        $c = dati_convenzione($cfg);
+        $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+        $a = $per_email ? " style='color:#B30000;font-weight:bold;'" : " target='_blank' rel='noopener' class='fw-bold'";
+        $cod = $codice !== '' ? ", indicando il codice della prenotazione <strong>" . $h($codice) . "</strong>" : ", indicando il codice della prenotazione";
+        $frase = $in_attesa ? "La prenotazione resta <strong>in attesa</strong> finché la scuola non stipula la convenzione con il Dipartimento."
+                            : "Per partecipare la scuola deve stipulare la <strong>convenzione</strong> con il Dipartimento.";
+        return "<p style='margin:0 0 6px;'>$frase Compila i modelli:</p>"
+             . "<ul style='margin:0 0 6px;'><li><a href='" . $h($c['modello']) . "'$a>Convenzione</a></li><li><a href='" . $h($c['allegato']) . "'$a>Allegato A</a></li></ul>"
+             . "<p style='margin:0;'>e inviali <strong>firmati digitalmente</strong> alla PEC <a href='mailto:" . $h($c['pec']) . "'$a>" . $h($c['pec']) . "</a>$cod. "
+             . ($in_attesa ? "Appena riceviamo la convenzione confermiamo la prenotazione e ti avvisiamo per email.</p>" : "Se la scuola l'ha già inviata, puoi ignorare questo messaggio.</p>");
+    }
+}
+
+if (!defined('CONV_DURATA_ANNI')) define('CONV_DURATA_ANNI', 3); // durata proposta per una nuova convenzione
+
+if (!function_exists('periodo_attivita')) {
+    // Periodo da coprire con la convenzione: progetto dal/al, evento il giorno del turno; senza date: oggi
+    function periodo_attivita(?string $inizio, ?string $fine, ?string $data_turno = null): array {
+        $dal = $inizio ?: ($data_turno ?: ($fine ?: null));
+        $al  = $fine ?: ($data_turno ?: $dal);
+        if (!$dal) $dal = $al = date('Y-m-d');
+        if ($al < $dal) $al = $dal;
+        return [$dal, $al];
+    }
+}
+
+if (!function_exists('periodo_prenotazione')) {
+    // $p con pd_inizio, pd_fine (progetti_dettagli) e data_turno
+    function periodo_prenotazione(array $p): array {
+        return periodo_attivita($p['pd_inizio'] ?? null, $p['pd_fine'] ?? null, $p['data_turno'] ?? null);
+    }
+}
+
+if (!function_exists('convenzione_valida')) {
+    // Convenzione del registro (Anagrafe scuole) valida per TUTTO il periodo $dal-$al (default: oggi), null se non c'è.
+    // Valida dal (data_stipula) vuoto = da sempre; valida fino al (scadenza) vuoto = senza scadenza.
+    // $rileggi = true dopo averne registrata o modificata una nella stessa richiesta.
+    function convenzione_valida($conn, ?string $codice, bool $rileggi = false, ?string $dal = null, ?string $al = null): ?array {
+        static $cache = [];
+        $codice = strtoupper(trim((string)$codice));
+        if (!preg_match('/^[A-Z0-9]{10}$/', $codice)) return null;
+        $dal = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$dal) ? $dal : date('Y-m-d');
+        $al  = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$al) && $al >= $dal ? $al : $dal;
+        $k = "$codice|$dal|$al";
+        if ($rileggi) $cache = [];
+        if (!array_key_exists($k, $cache)) {
+            $st = $conn->prepare("SELECT * FROM convenzioni_scuole WHERE scuola_codice = ? AND (data_stipula IS NULL OR data_stipula <= ?) AND (scadenza IS NULL OR scadenza >= ?)
+                                  ORDER BY (scadenza IS NULL) DESC, scadenza DESC LIMIT 1");
+            if (!$st) return null;
+            $st->bind_param("sss", $codice, $dal, $al); $st->execute();
+            $cache[$k] = $st->get_result()->fetch_assoc() ?: null;
+        }
+        return $cache[$k];
+    }
+}
+
+if (!function_exists('convenzioni_della_scuola')) {
+    // Tutte le convenzioni della scuola nel registro, dalla più recente
+    function convenzioni_della_scuola($conn, ?string $codice): array {
+        $codice = strtoupper(trim((string)$codice));
+        if (!preg_match('/^[A-Z0-9]{10}$/', $codice)) return [];
+        $st = $conn->prepare("SELECT * FROM convenzioni_scuole WHERE scuola_codice = ? ORDER BY (scadenza IS NULL) DESC, scadenza DESC, id DESC");
+        if (!$st) return [];
+        $st->bind_param("s", $codice); $st->execute();
+        return $st->get_result()->fetch_all(MYSQLI_ASSOC);
+    }
+}
+
+if (!function_exists('testo_validita_convenzione')) {
+    // "dal 01/10/2026 al 30/09/2029", "fino al …", "senza scadenza"
+    function testo_validita_convenzione(array $c): string {
+        $d = fn($x) => date('d/m/Y', strtotime($x));
+        if (!empty($c['data_stipula']) && !empty($c['scadenza'])) return 'dal ' . $d($c['data_stipula']) . ' al ' . $d($c['scadenza']);
+        if (!empty($c['scadenza'])) return 'fino al ' . $d($c['scadenza']);
+        return !empty($c['data_stipula']) ? 'dal ' . $d($c['data_stipula']) . ', senza scadenza' : 'senza scadenza';
+    }
+}
+
+if (!function_exists('dati_prenotazione_convenzione')) {
+    // Prenotazione con turno, evento, periodo dell'attività e impostazioni dell'area (modelli e PEC della convenzione)
+    function dati_prenotazione_convenzione($conn, int $pr_id): ?array {
+        $r = $conn->query("SELECT pr.*, t.nome_turno, t.data_turno, t.orario_inizio, t.orario_fine, t.richiede_approvazione, t.evento_id,
+                                  e.titolo AS evento_titolo, e.pagina_id, pe.conv_url_modello, pe.conv_url_allegato, pe.conv_pec,
+                                  pd.data_inizio AS pd_inizio, pd.data_fine AS pd_fine, IFNULL(pd.convenzione, 0) AS fsl
+                           FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id
+                           JOIN pagine_eventi pe ON e.pagina_id = pe.id LEFT JOIN progetti_dettagli pd ON pd.evento_id = e.id
+                           WHERE pr.id = " . (int)$pr_id . " LIMIT 1");
+        return $r ? ($r->fetch_assoc() ?: null) : null;
+    }
+}
+
+if (!function_exists('email_richiesta_convenzione')) {
+    // Email alla scuola con modelli e PEC. $tipo: 'richiesta' (pulsante in Iscrizioni) | 'promemoria' (cron)
+    function email_richiesta_convenzione($conn, int $pr_id, string $tipo = 'richiesta'): bool {
+        $p = dati_prenotazione_convenzione($conn, $pr_id);
+        if (!$p || empty($p['email']) || !filter_var($p['email'], FILTER_VALIDATE_EMAIL)) return false;
+        $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+        $in_attesa = in_array($p['stato'], ['da_approvare', 'in_attesa', 'richiesta_conferma'], true);
+        $att = $h($p['evento_titolo']) . (etichetta_turno($p) !== '' ? ' (' . $h(etichetta_turno($p)) . ')' : '');
+        [$dal, $al] = periodo_prenotazione($p);
+        $periodo = $dal === $al ? 'il ' . date('d/m/Y', strtotime($dal)) : 'dal ' . date('d/m/Y', strtotime($dal)) . ' al ' . date('d/m/Y', strtotime($al));
+        // Convenzione già registrata ma che non copre il periodo: va stipulata una nuova
+        $ultima = !empty($p['scuola_codice']) ? (convenzioni_della_scuola($conn, $p['scuola_codice'])[0] ?? null) : null;
+        $nota = $ultima ? "<p>La convenzione della scuola che risulta al Dipartimento (valida " . $h(testo_validita_convenzione($ultima)) . ") <strong>non copre il periodo dell'attività</strong> ($periodo): va stipulata una <strong>nuova convenzione</strong>.</p>" : '';
+        $intro = $tipo === 'promemoria'
+            ? "<p>ti ricordiamo che per la prenotazione di <strong>$att</strong> non abbiamo ancora ricevuto la convenzione della scuola con il Dipartimento.</p>"
+            : "<p>per la prenotazione di <strong>$att</strong> ($periodo) la scuola deve avere una convenzione con il Dipartimento per la Formazione Scuola Lavoro valida per tutto il periodo dell'attività.</p>";
+        $corpo = "<p>Gentile <strong>" . $h(trim($p['nome'] . ' ' . $p['cognome'])) . "</strong>,</p>" . $intro . $nota
+               . "<p>🎟️ Codice della prenotazione: <strong>" . $h($p['codice_prenotazione']) . "</strong></p>"
+               . html_istruzioni_convenzione($p, true, (string)$p['codice_prenotazione'], $in_attesa);
+        $oggetto = ($tipo === 'promemoria' ? "Promemoria: convenzione da inviare - " : "Convenzione con il Dipartimento - ") . $p['evento_titolo'];
+        return (bool)inviaNotificaEmail($p['email'], $oggetto, $corpo, $conn, colore_area_turno($conn, (int)$p['turno_id']));
+    }
+}
+
+if (!function_exists('segna_convenzione_ricevuta')) {
+    // La convenzione della scuola è arrivata (o è nel registro): la prenotazione passa a "ricevuta" e, se era
+    // da approvare solo per la convenzione (turno senza approvazione), diventa confermata con l'email alla scuola.
+    function segna_convenzione_ricevuta($conn, int $pr_id, bool $email = true): bool {
+        $p = dati_prenotazione_convenzione($conn, $pr_id);
+        if (!$p || ($p['convenzione'] ?? '') === 'ricevuta') return false;
+        $conn->query("UPDATE prenotazioni SET convenzione = 'ricevuta' WHERE id = " . (int)$pr_id);
+        $confermata = false;
+        if ($p['stato'] === 'da_approvare' && (int)$p['richiede_approvazione'] === 0) {
+            $conn->query("UPDATE prenotazioni SET stato = 'confermata' WHERE id = " . (int)$pr_id . " AND stato = 'da_approvare'");
+            if ($conn->affected_rows > 0) { $confermata = true; decadi_attese_vincolate($conn, $pr_id); }
+        }
+        // Email solo a chi aspettava la convenzione ('no'); chi l'aveva dichiarata non ha nulla da fare
+        if ($email && ($p['convenzione'] ?? '') === 'no' && !empty($p['email']) && in_array($p['stato'], ['da_approvare', 'confermata', 'in_attesa', 'richiesta_conferma'], true)) {
+            $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+            $att = $h($p['evento_titolo']) . (etichetta_turno($p) !== '' ? ' (' . $h(etichetta_turno($p)) . ')' : '');
+            $link = url_base_sito() . "/stampa_ricevuta.php?code=" . urlencode($p['codice_prenotazione']);
+            $stato_txt = $confermata || $p['stato'] === 'confermata' ? "La prenotazione per <strong>$att</strong> è <strong>CONFERMATA</strong>."
+                       : ($p['stato'] === 'da_approvare' ? "La richiesta per <strong>$att</strong> resta in valutazione degli organizzatori: riceverai l'esito per email."
+                       : "La prenotazione per <strong>$att</strong> resta in lista d'attesa: se si libera un posto ti avvisiamo per email.");
+            $corpo = "<p>Gentile <strong>" . $h(trim($p['nome'] . ' ' . $p['cognome'])) . "</strong>,</p>"
+                   . "<p>abbiamo ricevuto la <strong>convenzione</strong> della scuola con il Dipartimento. $stato_txt</p>"
+                   . "<p style='margin-top:15px;'><a href='" . $h($link) . "' target='_blank' style='background:#B80000; color:#ffffff; padding:10px 18px; text-decoration:none; border-radius:6px; font-weight:bold;'>📄 Scarica Ricevuta PDF</a></p>";
+            inviaNotificaEmail($p['email'], "Convenzione ricevuta: " . $p['evento_titolo'], $corpo, $conn, colore_area_turno($conn, (int)$p['turno_id']));
+        }
+        return true;
+    }
+}
+
+if (!function_exists('applica_convenzioni_scuola')) {
+    // Dopo una registrazione o modifica nel registro: le prenotazioni della scuola in attesa (o dichiarate) il cui
+    // periodo è coperto da una convenzione diventano "ricevuta". Ritorna quante sono state aggiornate.
+    function applica_convenzioni_scuola($conn, string $codice): int {
+        $n = 0;
+        $st_p = $conn->prepare("SELECT pr.id, t.data_turno, pd.data_inizio AS pd_inizio, pd.data_fine AS pd_fine
+                                FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id LEFT JOIN progetti_dettagli pd ON pd.evento_id = t.evento_id
+                                WHERE pr.scuola_codice = ? AND pr.convenzione IN ('no', 'si')
+                                  AND IFNULL(pr.stato, 'confermata') IN ('da_approvare', 'confermata', 'in_attesa', 'richiesta_conferma')");
+        if (!$st_p) return 0;
+        $st_p->bind_param("s", $codice); $st_p->execute();
+        $r = $st_p->get_result();
+        while ($r && $x = $r->fetch_assoc()) {
+            [$dal, $al] = periodo_prenotazione($x);
+            if (convenzione_valida($conn, $codice, true, $dal, $al) && segna_convenzione_ricevuta($conn, (int)$x['id'])) $n++;
+        }
+        return $n;
+    }
+}
+
+if (!function_exists('salva_convenzione')) {
+    // Registra (id = 0) o modifica una convenzione. $d: scuola_codice, data_stipula (valida dal), scadenza (valida fino al),
+    // protocollo, note, docenti (array di ['nome' =>, 'email' =>]), file_convenzione, file_allegato (percorsi già salvati; null = invariati).
+    // Ritorna [id, prenotazioni aggiornate] oppure null (dati non validi).
+    function salva_convenzione($conn, array $d, int $id = 0, string $autore = ''): ?array {
+        $codice = strtoupper(trim((string)($d['scuola_codice'] ?? '')));
+        if (!scuola_per_codice($conn, $codice)) return null;
+        $data_ok = fn($x) => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$x) ? $x : null;
+        $dal = $data_ok($d['data_stipula'] ?? null); $al = $data_ok($d['scadenza'] ?? null);
+        if ($dal && $al && $al < $dal) return null;
+        $prot = mb_substr(trim((string)($d['protocollo'] ?? '')), 0, 100); $note = mb_substr(trim((string)($d['note'] ?? '')), 0, 500);
+        $docenti = [];
+        foreach ((array)($d['docenti'] ?? []) as $doc) {
+            $nome = mb_substr(trim((string)($doc['nome'] ?? '')), 0, 150); $email = strtolower(trim((string)($doc['email'] ?? '')));
+            if ($nome === '' && $email === '') continue;
+            $docenti[] = ['nome' => $nome, 'email' => filter_var($email, FILTER_VALIDATE_EMAIL) ? $email : ''];
+        }
+        $doc_json = $docenti ? json_encode($docenti, JSON_UNESCAPED_UNICODE) : null;
+        $autore = mb_substr($autore, 0, 255);
+        if ($id > 0) {
+            $st = $conn->prepare("UPDATE convenzioni_scuole SET scuola_codice = ?, data_stipula = ?, scadenza = ?, protocollo = ?, note = ?, docenti_json = ?, avviso_scadenza_inviato = 0 WHERE id = ?");
+            if (!$st) return null;
+            $st->bind_param("ssssssi", $codice, $dal, $al, $prot, $note, $doc_json, $id);
+            if (!$st->execute()) return null;
+        } else {
+            $st = $conn->prepare("INSERT INTO convenzioni_scuole (scuola_codice, data_stipula, scadenza, protocollo, note, docenti_json, registrata_da) VALUES (?, ?, ?, ?, ?, ?, ?)");
+            if (!$st) return null;
+            $st->bind_param("sssssss", $codice, $dal, $al, $prot, $note, $doc_json, $autore);
+            if (!$st->execute()) return null;
+            $id = (int)$conn->insert_id;
+        }
+        foreach (['file_convenzione', 'file_allegato'] as $col) {
+            if (!empty($d[$col])) {
+                $st_f = $conn->prepare("UPDATE convenzioni_scuole SET $col = ? WHERE id = ?");
+                $st_f->bind_param("si", $d[$col], $id); $st_f->execute();
+            }
+        }
+        convenzione_valida($conn, $codice, true);
+        return [$id, applica_convenzioni_scuola($conn, $codice)];
+    }
+}
+
+if (!function_exists('registra_convenzione')) {
+    // Scorciatoia per una convenzione senza file (conferma da Iscrizioni, pulsante "Ricevuta")
+    function registra_convenzione($conn, string $codice, ?string $dal, ?string $al, string $protocollo = '', string $note = '', string $autore = ''): ?array {
+        return salva_convenzione($conn, ['scuola_codice' => $codice, 'data_stipula' => $dal, 'scadenza' => $al, 'protocollo' => $protocollo, 'note' => $note], 0, $autore);
+    }
+}
+
+if (!function_exists('periodo_nuova_convenzione')) {
+    // Validità proposta per una convenzione appena arrivata: da oggi (o dall'inizio dell'attività, se prima)
+    // per la durata predefinita, allungata se l'attività finisce dopo
+    function periodo_nuova_convenzione(?string $att_dal = null, ?string $att_al = null): array {
+        $dal = date('Y-m-d'); $al = date('Y-m-d', strtotime('+' . CONV_DURATA_ANNI . ' years'));
+        if ($att_dal && $att_dal < $dal) $dal = $att_dal;
+        if ($att_al && $att_al > $al) $al = $att_al;
+        return [$dal, $al];
+    }
+}
+
+if (!function_exists('convenzione_ricevuta_da_gestore')) {
+    // Un gestore conferma che la convenzione è arrivata: se la scuola è dell'anagrafe e nel registro non c'è una convenzione
+    // che copre il periodo dell'attività, la si registra, così vale anche per le altre prenotazioni e le prossime iscrizioni.
+    function convenzione_ricevuta_da_gestore($conn, int $pr_id, string $autore = ''): bool {
+        $p = dati_prenotazione_convenzione($conn, $pr_id);
+        if (!$p) return false;
+        $cod = (string)($p['scuola_codice'] ?? '');
+        [$att_dal, $att_al] = periodo_prenotazione($p);
+        if ($cod !== '' && !convenzione_valida($conn, $cod, false, $att_dal, $att_al)) {
+            [$dal, $al] = periodo_nuova_convenzione($att_dal, $att_al);
+            registra_convenzione($conn, $cod, $dal, $al, '', 'Registrata alla conferma della prenotazione ' . $p['codice_prenotazione'] . ': completa con i file e i docenti dell\'Allegato A', $autore);
+        }
+        // Se la registrazione ha già aggiornato la prenotazione, segna_... non ha altro da fare: conta lo stato finale
+        return segna_convenzione_ricevuta($conn, $pr_id) || ((dati_prenotazione_convenzione($conn, $pr_id)['convenzione'] ?? '') === 'ricevuta');
+    }
+}
+
+if (!function_exists('verifica_convenzioni_fsl')) {
+    // Controllo delle iscrizioni delle attività di Formazione Scuola Lavoro non ancora concluse, anche già confermate:
+    // - scuola dell'anagrafe con una convenzione che copre il periodo → "ricevuta" (chi era in attesa viene confermato e avvisato);
+    // - nessuna convenzione valida per il periodo → "da stipulare" (lo stato della prenotazione non cambia e non parte
+    //   nessuna email: la richiesta la invia il gestore da Iscrizioni, poi seguono i promemoria);
+    // - scuola scritta a mano → non verificabile (va abbinata all'anagrafe).
+    // Ritorna ['coperte' => n, 'da_stipulare' => n, 'nuove_da_stipulare' => n, 'senza_codice' => n].
+    function verifica_convenzioni_fsl($conn): array {
+        $out = ['coperte' => 0, 'da_stipulare' => 0, 'nuove_da_stipulare' => 0, 'senza_codice' => 0];
+        $r = @$conn->query("SELECT pr.id, pr.scuola_codice, pr.convenzione, t.data_turno, pd.data_inizio AS pd_inizio, pd.data_fine AS pd_fine
+                            FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id
+                            JOIN progetti_dettagli pd ON pd.evento_id = e.id
+                            WHERE pd.convenzione = 1 AND e.archiviato = 0
+                              AND IFNULL(pr.stato, 'confermata') IN ('confermata', 'da_approvare', 'in_attesa', 'richiesta_conferma')
+                              AND COALESCE(pd.data_fine, t.data_turno, CURDATE()) >= CURDATE()");
+        while ($r && $x = $r->fetch_assoc()) {
+            if (empty($x['scuola_codice'])) { if (($x['convenzione'] ?? '') !== 'ricevuta') $out['senza_codice']++; continue; }
+            [$dal, $al] = periodo_prenotazione($x);
+            if (convenzione_valida($conn, $x['scuola_codice'], false, $dal, $al)) {
+                if (($x['convenzione'] ?? '') !== 'ricevuta') segna_convenzione_ricevuta($conn, (int)$x['id']);
+                $out['coperte']++;
+            } else {
+                if (($x['convenzione'] ?? '') !== 'no') {
+                    // Senza promemoria automatici finché il gestore non invia la richiesta (conv_promemoria = 3)
+                    $conn->query("UPDATE prenotazioni SET convenzione = 'no', conv_promemoria = 3 WHERE id = " . (int)$x['id']);
+                    $out['nuove_da_stipulare']++;
+                }
+                $out['da_stipulare']++;
+            }
+        }
+        return $out;
     }
 }
 
@@ -4028,7 +4364,7 @@ if (!function_exists('puo_vedere_prenotazione')) {
 // richiesta: quando aggiungi qualcosa qui, cambia anche il nome del marcatore.
 if (!function_exists('assicura_schema')) {
     function assicura_schema($conn) {
-        $marker = __DIR__ . '/cache/schema_v24.ok';
+        $marker = __DIR__ . '/cache/schema_v27.ok';
         if (is_file($marker)) return;
 
         // 1. Tabelle di servizio (prima create dalle singole pagine a ogni richiesta)
@@ -4100,6 +4436,12 @@ if (!function_exists('assicura_schema')) {
                 per_scuole TINYINT(1) NOT NULL DEFAULT 1, attestati TINYINT(1) NOT NULL DEFAULT 0, updated_at DATETIME DEFAULT NULL
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
             // v11: elenco degli studenti di un'iscrizione (progetti per le scuole) con il codice di verifica dell'attestato
+            // v26: registro delle convenzioni scuola-Dipartimento (Anagrafe scuole)
+            'convenzioni_scuole' => "CREATE TABLE IF NOT EXISTS convenzioni_scuole (
+                id INT AUTO_INCREMENT PRIMARY KEY, scuola_codice VARCHAR(10) NOT NULL, data_stipula DATE DEFAULT NULL, scadenza DATE DEFAULT NULL,
+                protocollo VARCHAR(100) DEFAULT '', note VARCHAR(500) DEFAULT '', avviso_scadenza_inviato TINYINT(1) NOT NULL DEFAULT 0,
+                registrata_da VARCHAR(255) DEFAULT '', created_at DATETIME DEFAULT CURRENT_TIMESTAMP, INDEX idx_scuola (scuola_codice), INDEX idx_scad (scadenza)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
             'partecipanti_prenotazione' => "CREATE TABLE IF NOT EXISTS partecipanti_prenotazione (
                 id INT AUTO_INCREMENT PRIMARY KEY, prenotazione_id INT NOT NULL, cognome VARCHAR(100) NOT NULL DEFAULT '', nome VARCHAR(100) NOT NULL DEFAULT '',
                 codice VARCHAR(20) DEFAULT NULL, escluso TINYINT(1) NOT NULL DEFAULT 0, anonimizzato TINYINT(1) NOT NULL DEFAULT 0, ordine INT NOT NULL DEFAULT 0, created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -4151,6 +4493,12 @@ if (!function_exists('assicura_schema')) {
                 'promemoria_elenco_inviato' => "ADD COLUMN promemoria_elenco_inviato TINYINT(1) NOT NULL DEFAULT 0",
                 // v22: scuola scelta dall'anagrafe (codice meccanografico del plesso), per report e statistiche
                 'scuola_codice' => "ADD COLUMN scuola_codice VARCHAR(10) DEFAULT NULL, ADD INDEX idx_scuola (scuola_codice)",
+                // v25: risposta della scuola sulla convenzione ('si' | 'no'; NULL = domanda non prevista)
+                'convenzione'   => "ADD COLUMN convenzione VARCHAR(10) DEFAULT NULL",
+                // v26: promemoria sulla convenzione inviati alla scuola e avviso ai gestori prima dell'inizio
+                'conv_promemoria'     => "ADD COLUMN conv_promemoria INT NOT NULL DEFAULT 0",
+                'conv_promemoria_il'  => "ADD COLUMN conv_promemoria_il DATETIME DEFAULT NULL",
+                'conv_avviso_gestori' => "ADD COLUMN conv_avviso_gestori TINYINT(1) NOT NULL DEFAULT 0",
             ],
             'eventi' => [
                 'abilita_presenze'      => "ADD COLUMN abilita_presenze TINYINT(1) NOT NULL DEFAULT 1",
@@ -4181,8 +4529,18 @@ if (!function_exists('assicura_schema')) {
                 'attestati'   => "ADD COLUMN attestati TINYINT(1) NOT NULL DEFAULT 0",
                 // v18: progetto che rimanda a un'altra pagina (slug di un'area del portale oppure indirizzo http/https)
                 'destinazione' => "ADD COLUMN destinazione VARCHAR(300) DEFAULT NULL",
+                // v25: attività di Formazione Scuola Lavoro: nel modulo si chiede alla scuola se ha la convenzione (se no: da approvare)
+                'convenzione' => "ADD COLUMN convenzione TINYINT(1) NOT NULL DEFAULT 0",
+                // v27: evento dedicato alle scuole (prenota il docente per la classe, con il numero di studenti)
+                'dedicata_scuole' => "ADD COLUMN dedicata_scuole TINYINT(1) NOT NULL DEFAULT 0",
             ],
             // v12: nomi degli studenti ridotti alle iniziali dopo il periodo di conservazione (i codici restano verificabili)
+            // v27: file della convenzione e dell'Allegato A, docenti di riferimento indicati nell'Allegato A
+            'convenzioni_scuole' => [
+                'file_convenzione' => "ADD COLUMN file_convenzione VARCHAR(255) DEFAULT NULL",
+                'file_allegato'    => "ADD COLUMN file_allegato VARCHAR(255) DEFAULT NULL",
+                'docenti_json'     => "ADD COLUMN docenti_json TEXT DEFAULT NULL",
+            ],
             'partecipanti_prenotazione' => [
                 'anonimizzato' => "ADD COLUMN anonimizzato TINYINT(1) NOT NULL DEFAULT 0 AFTER escluso",
             ],
@@ -4190,6 +4548,10 @@ if (!function_exists('assicura_schema')) {
                 'copertina_path'        => "ADD COLUMN copertina_path VARCHAR(255) DEFAULT NULL",
                 'mostra_in_home'        => "ADD COLUMN mostra_in_home TINYINT(1) NOT NULL DEFAULT 1",
                 'limite_iscrizioni'     => "ADD COLUMN limite_iscrizioni VARCHAR(20) NOT NULL DEFAULT 'nessuno'",
+                // v25: modelli della convenzione con le scuole e PEC a cui inviarla (vuoti = valori del DiBEST)
+                'conv_url_modello'      => "ADD COLUMN conv_url_modello VARCHAR(500) DEFAULT NULL",
+                'conv_url_allegato'     => "ADD COLUMN conv_url_allegato VARCHAR(500) DEFAULT NULL",
+                'conv_pec'              => "ADD COLUMN conv_pec VARCHAR(255) DEFAULT NULL",
                 // CSV dei gestori che ricevono le email sulle prenotazioni; NULL = tutti
                 'notifiche_gestori_ids' => "ADD COLUMN notifiche_gestori_ids TEXT DEFAULT NULL",
                 // v8: colonne usate dal codice ma assenti da schema.sql (sul server aggiunte a mano)

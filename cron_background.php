@@ -137,6 +137,86 @@ while ($res_grp && $g = $res_grp->fetch_assoc()) { if (invia_attestati_gruppo($c
 echo "- Inviati attestati degli studenti per $count_grp iscrizioni.\n";
 
 // =========================================================================
+// TASK 1g: CONVENZIONI CON LE SCUOLE
+// 0) verifica delle iscrizioni alle attività FSL (anche confermate): la convenzione deve coprire il periodo dell'attività;
+// a) promemoria alla scuola ogni 7 giorni (massimo 3) finché la convenzione non arriva, fino alla fine dell'attività
+//    (dopo la richiesta del gestore: le iscrizioni segnate dalla verifica partono senza promemoria);
+// b) avviso ai gestori (una volta) quando l'attività inizia entro 7 giorni e ci sono scuole ancora senza convenzione;
+// c) avviso agli amministratori (una volta) per le convenzioni del registro che scadono entro 60 giorni.
+// =========================================================================
+$stati_conv = "'confermata', 'in_attesa', 'da_approvare', 'richiesta_conferma'";
+// Prima la verifica di tutte le iscrizioni alle attività FSL (anche confermate) con il registro delle convenzioni
+$v_conv = verifica_convenzioni_fsl($conn);
+echo "- Convenzioni FSL: {$v_conv['coperte']} iscrizioni coperte, {$v_conv['da_stipulare']} da stipulare ({$v_conv['nuove_da_stipulare']} nuove), {$v_conv['senza_codice']} con la scuola scritta a mano.\n";
+$res_cv = @$conn->query("SELECT pr.id, pr.scuola_codice, t.data_turno, pd.data_inizio AS pd_inizio, pd.data_fine AS pd_fine FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id
+                         LEFT JOIN progetti_dettagli pd ON pd.evento_id = e.id
+                         WHERE e.archiviato = 0 AND pr.convenzione = 'no' AND IFNULL(pr.stato, 'confermata') IN ($stati_conv)
+                           AND pr.conv_promemoria < 3 AND COALESCE(pr.conv_promemoria_il, pr.data_prenotazione) <= NOW() - INTERVAL 7 DAY
+                           AND (COALESCE(pd.data_fine, t.data_turno) IS NULL OR COALESCE(pd.data_fine, t.data_turno) >= CURDATE())");
+$count_cv = 0; $count_cv_reg = 0;
+while ($res_cv && $x = $res_cv->fetch_assoc()) {
+    // Nel frattempo registrata nell'anagrafe: niente promemoria, la prenotazione si aggiorna
+    [$x_dal, $x_al] = periodo_prenotazione($x);
+    if (!empty($x['scuola_codice']) && convenzione_valida($conn, $x['scuola_codice'], false, $x_dal, $x_al)) { segna_convenzione_ricevuta($conn, (int)$x['id']); $count_cv_reg++; continue; }
+    email_richiesta_convenzione($conn, (int)$x['id'], 'promemoria');
+    $conn->query("UPDATE prenotazioni SET conv_promemoria = conv_promemoria + 1, conv_promemoria_il = NOW() WHERE id = " . (int)$x['id']);
+    $count_cv++;
+}
+echo "- Convenzioni: $count_cv promemoria alle scuole, $count_cv_reg prenotazioni aggiornate dal registro.\n";
+
+$res_cg = @$conn->query("SELECT pr.id, pr.nome, pr.cognome, pr.email, pr.codice_prenotazione, pr.stato, pr.dati_custom_json, pr.scuola_codice,
+                                t.evento_id, t.nome_turno, t.data_turno, e.titolo, e.pagina_id, COALESCE(pd.data_inizio, t.data_turno) AS inizio
+                         FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id
+                         LEFT JOIN progetti_dettagli pd ON pd.evento_id = e.id
+                         WHERE e.archiviato = 0 AND pr.convenzione = 'no' AND pr.conv_avviso_gestori = 0 AND IFNULL(pr.stato, 'confermata') IN ($stati_conv)
+                           AND COALESCE(pd.data_inizio, t.data_turno) BETWEEN CURDATE() AND CURDATE() + INTERVAL 7 DAY
+                         ORDER BY t.evento_id, inizio");
+$per_ev_cg = [];
+while ($res_cg && $x = $res_cg->fetch_assoc()) $per_ev_cg[(int)$x['evento_id']][] = $x;
+foreach ($per_ev_cg as $ev_cg => $righe_cg) {
+    $dest_cg = get_email_gestori_evento($conn, $ev_cg) ?: email_amministratori($conn);
+    $h_cg = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+    $tab_cg = '';
+    foreach ($righe_cg as $x) {
+        $s_cg = !empty($x['scuola_codice']) ? scuola_per_codice($conn, $x['scuola_codice']) : null;
+        $scuola_cg = $s_cg ? etichetta_scuola($s_cg) : (nome_scuola_prenotazione($x) ?: '—');
+        $tab_cg .= "<tr><td style='padding:5px 8px;border-bottom:1px solid #e5e7eb;'>" . $h_cg($scuola_cg) . "</td><td style='padding:5px 8px;border-bottom:1px solid #e5e7eb;'>" . $h_cg(trim($x['nome'] . ' ' . $x['cognome'])) . "<br><span style='color:#6b7280;'>" . $h_cg($x['email']) . "</span></td>"
+                 . "<td style='padding:5px 8px;border-bottom:1px solid #e5e7eb;'>" . $h_cg(etichetta_turno($x)) . "</td><td style='padding:5px 8px;border-bottom:1px solid #e5e7eb;font-family:monospace;'>" . $h_cg($x['codice_prenotazione']) . "</td></tr>";
+    }
+    $link_cg = url_base_sito() . '/admin/iscritti.php?p_id=' . (int)$righe_cg[0]['pagina_id'];
+    $corpo_cg = "<p>L'attività <strong>" . $h_cg($righe_cg[0]['titolo']) . "</strong> inizia il <strong>" . date('d/m/Y', strtotime($righe_cg[0]['inizio'])) . "</strong> e queste scuole non hanno ancora inviato la <strong>convenzione</strong>:</p>"
+              . "<table style='border-collapse:collapse;font-size:13px;width:100%;'><tr style='background:#f3f4f6;'><th style='padding:5px 8px;text-align:left;'>Scuola</th><th style='padding:5px 8px;text-align:left;'>Docente</th><th style='padding:5px 8px;text-align:left;'>Turno</th><th style='padding:5px 8px;text-align:left;'>Codice</th></tr>$tab_cg</table>"
+              . "<p>Quando arriva la convenzione segnala come ricevuta da Iscrizioni: la prenotazione si conferma e la scuola riceve l'email.</p>"
+              . "<p><a href='" . $h_cg($link_cg) . "' style='background:#c2410c;color:#fff;padding:9px 16px;text-decoration:none;border-radius:6px;font-weight:bold;'>Apri Iscrizioni</a></p>";
+    foreach ($dest_cg as $em_cg) inviaNotificaEmail($em_cg, "Convenzioni mancanti: " . $righe_cg[0]['titolo'], $corpo_cg, $conn);
+    $conn->query("UPDATE prenotazioni SET conv_avviso_gestori = 1 WHERE id IN (" . implode(',', array_map(fn($x) => (int)$x['id'], $righe_cg)) . ")");
+}
+echo "- Convenzioni: avvisati i gestori di " . count($per_ev_cg) . " attività in partenza con scuole senza convenzione.\n";
+
+// Solo le convenzioni che scadono senza un rinnovo già registrato per la stessa scuola
+$res_sc = @$conn->query("SELECT c.* FROM convenzioni_scuole c
+                         WHERE c.avviso_scadenza_inviato = 0 AND c.scadenza BETWEEN CURDATE() AND CURDATE() + INTERVAL 60 DAY
+                           AND NOT EXISTS (SELECT 1 FROM convenzioni_scuole c2 WHERE c2.scuola_codice = c.scuola_codice AND c2.id <> c.id
+                                           AND (c2.scadenza IS NULL OR c2.scadenza > c.scadenza))
+                         ORDER BY c.scadenza");
+$righe_sc = [];
+while ($res_sc && $x = $res_sc->fetch_assoc()) $righe_sc[] = $x;
+if ($righe_sc) {
+    $h_sc = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+    $lista_sc = '';
+    foreach ($righe_sc as $x) {
+        $s_sc = scuola_per_codice($conn, $x['scuola_codice']);
+        $lista_sc .= "<li><strong>" . $h_sc($s_sc ? etichetta_scuola($s_sc) : $x['scuola_codice']) . "</strong> (" . $h_sc($x['scuola_codice']) . "): scade il <strong>" . date('d/m/Y', strtotime($x['scadenza'])) . "</strong>"
+                   . ($x['protocollo'] !== '' ? " · prot. " . $h_sc($x['protocollo']) : '') . "</li>";
+    }
+    $corpo_sc = "<p>Queste convenzioni con le scuole scadono nei prossimi 60 giorni:</p><ul>$lista_sc</ul>"
+              . "<p>Dopo la scadenza, alle nuove iscrizioni di queste scuole verrà chiesta di nuovo la convenzione. Il rinnovo si registra in <a href='" . $h_sc(url_base_sito() . '/admin/scuole.php#convenzioni') . "'>Anagrafe scuole → Convenzioni</a>.</p>";
+    foreach (email_amministratori($conn) as $em_sc) inviaNotificaEmail($em_sc, "Convenzioni con le scuole in scadenza (" . count($righe_sc) . ")", $corpo_sc, $conn);
+    $conn->query("UPDATE convenzioni_scuole SET avviso_scadenza_inviato = 1 WHERE id IN (" . implode(',', array_map(fn($x) => (int)$x['id'], $righe_sc)) . ")");
+}
+echo "- Convenzioni: " . count($righe_sc) . " in scadenza segnalate agli amministratori.\n";
+
+// =========================================================================
 // TASK 1c: CONSERVAZIONE DEI NOMI DEGLI STUDENTI (privacy)
 // - Iscrizioni annullate/rifiutate/scadute: l'elenco senza attestati emessi non serve più e si cancella.
 // - Dopo MESI_CONSERVAZIONE_STUDENTI dalla fine del progetto o dal giorno dell'evento (o dall'inserimento, se non

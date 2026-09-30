@@ -213,7 +213,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_prenotazione_ute
             $res_promo = $conn->query("SELECT * FROM prenotazioni WHERE turno_id = $turno_attuale_id AND stato = 'in_attesa' ORDER BY data_prenotazione ASC, id ASC LIMIT 1");
             if ($res_promo && $u_promo = $res_promo->fetch_assoc()) {
                 $id_promo = (int)$u_promo['id'];
-                $conn->query("UPDATE prenotazioni SET stato = 'confermata' WHERE id = $id_promo");
+                $conn->query("UPDATE prenotazioni SET stato = IF(convenzione = 'no', 'da_approvare', 'confermata') WHERE id = $id_promo");
                 decadi_attese_vincolate($conn, $id_promo);
 
                 $proto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https://" : "http://";
@@ -294,7 +294,7 @@ if (isset($_GET['cancella_prenotazione'])) {
             $res_promo = $conn->query("SELECT * FROM prenotazioni WHERE turno_id = $tid_promo AND stato = 'in_attesa' ORDER BY data_prenotazione ASC, id ASC LIMIT 1");
             if ($res_promo && $u_promo = $res_promo->fetch_assoc()) {
                 $id_promo = (int)$u_promo['id'];
-                $conn->query("UPDATE prenotazioni SET stato = 'confermata' WHERE id = $id_promo");
+                $conn->query("UPDATE prenotazioni SET stato = IF(convenzione = 'no', 'da_approvare', 'confermata') WHERE id = $id_promo");
                 decadi_attese_vincolate($conn, $id_promo);
 
                 $proto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https://" : "http://";
@@ -348,7 +348,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['conferma_posto_ok'])
         exit;
     }
 
-    $nuovo_stato_cp = $conferma ? 'confermata' : 'annullata';
+    // Scuola senza convenzione: il posto resta suo, ma la prenotazione si conferma quando arriva la convenzione
+    $senza_conv_cp = ($p_cp['convenzione'] ?? '') === 'no';
+    $nuovo_stato_cp = $conferma ? ($senza_conv_cp ? 'da_approvare' : 'confermata') : 'annullata';
     $stmt_up_cp = $conn->prepare("UPDATE prenotazioni SET stato = ? WHERE id = ?");
     $stmt_up_cp->bind_param("si", $nuovo_stato_cp, $pr_id);
     if (!$stmt_up_cp->execute()) {
@@ -359,7 +361,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['conferma_posto_ok'])
     }
     $conn->commit();
 
-    if ($conferma) {
+    if ($conferma && $senza_conv_cp) {
+        $r_cfg_cp = $conn->query("SELECT pe.* FROM pagine_eventi pe JOIN eventi e ON e.pagina_id = pe.id JOIN turni t ON t.evento_id = e.id WHERE t.id = " . (int)$p_cp['turno_id']);
+        $cfg_cp = $r_cfg_cp ? ($r_cfg_cp->fetch_assoc() ?: []) : [];
+        $body_cp = "<p>Gentile <strong>" . htmlspecialchars($p_cp['nome'] . ' ' . $p_cp['cognome']) . "</strong>,</p>"
+                 . "<p>hai accettato il posto per <strong>" . htmlspecialchars($p_cp['evento_titolo']) . "</strong> (" . htmlspecialchars(etichetta_turno($p_cp)) . ").</p>"
+                 . html_istruzioni_convenzione($cfg_cp, true, (string)$p_cp['codice_prenotazione']);
+        inviaNotificaEmail($p_cp['email'], "Posto accettato, in attesa della convenzione: " . $p_cp['evento_titolo'], $body_cp, $conn, colore_area_turno($conn, $p_cp['turno_id']));
+        $_SESSION['msg_area_pers'] = "<div class='alert alert-warning text-start my-3 shadow-sm small'><div class='fw-bold mb-1'><i class='fa fa-file-signature me-1'></i> Posto accettato: la prenotazione sarà confermata all'arrivo della convenzione.</div>"
+                                   . html_istruzioni_convenzione($cfg_cp, false, (string)$p_cp['codice_prenotazione']) . "</div>";
+    } elseif ($conferma) {
         decadi_attese_vincolate($conn, $pr_id);
         $link_ricevuta_cp = url_base_sito() . "/stampa_ricevuta.php?code=" . urlencode($p_cp['codice_prenotazione']);
         $body_cp = "<p>Gentile <strong>" . htmlspecialchars($p_cp['nome'] . ' ' . $p_cp['cognome']) . "</strong>,</p>"
@@ -756,6 +767,7 @@ require_once 'header.php';
                                             }
                                         }
                                         elseif ($st === 'richiesta_conferma') echo '<span class="badge bg-warning text-dark px-3 py-2"><i class="fa fa-bell me-1"></i>Posto disponibile</span> <a href="area_personale.php?conferma_posto=' . (int)$pr['id'] . '" class="btn btn-success btn-sm fw-bold ms-1"><i class="fa fa-check me-1"></i>Conferma ora</a>';
+                                        elseif ($st === 'da_approvare' && ($pr['convenzione'] ?? '') === 'no') echo '<span class="badge bg-warning text-dark px-3 py-2"><i class="fa fa-file-signature me-1"></i>In attesa della convenzione</span>';
                                         elseif ($st === 'da_approvare') echo '<span class="badge bg-info text-dark px-3 py-2"><i class="fa fa-hourglass-half me-1"></i>In Valutazione</span>';
                                         elseif ($st === 'rifiutata')  echo '<span class="badge bg-secondary px-3 py-2"><i class="fa fa-times me-1"></i>Rifiutata</span>';
                                         elseif ($st === 'annullata')  echo '<span class="badge bg-danger px-3 py-2"><i class="fa fa-ban me-1"></i>Annullata</span>';

@@ -144,6 +144,9 @@ if (isset($_POST['salva_progetto'])) {
     $per_scuole = isset($_POST['per_scuole']) ? 1 : 0;
     $attestati  = isset($_POST['attestati']) ? 1 : 0;
     $lista_attesa = isset($_POST['lista_attesa']) ? 1 : 0; // vale per tutte le edizioni
+    $approvazione = isset($_POST['approvazione']) ? 1 : 0; // iscrizioni confermate dai gestori, per tutte le edizioni
+    $convenzione = isset($_POST['convenzione']) ? 1 : 0;   // attività di Formazione Scuola Lavoro: processo delle convenzioni
+    if ($convenzione) $per_scuole = 1;                     // FSL è sempre dedicata alle scuole
 
     // Edizioni (repliche): ogni riga è un turno. ed_id = turno esistente (0 = nuova).
     // Per le scuole ogni edizione ha 1 posto; altrimenti i posti indicati (predefinito 30).
@@ -238,26 +241,29 @@ if (isset($_POST['salva_progetto'])) {
         $stmt_dest->bind_param("si", $destinazione, $ev_id);
         if (!$stmt_dest->execute()) throw new RuntimeException($conn->error);
 
-        // Edizioni = turni di iscrizione (posti: 1 per le scuole), lista d'attesa se attivata, niente approvazione (ordine di arrivo).
+        $stmt_cv = $conn->prepare("UPDATE progetti_dettagli SET convenzione = ? WHERE evento_id = ?");
+        $stmt_cv->bind_param("ii", $convenzione, $ev_id); $stmt_cv->execute();
+
+        // Edizioni = turni di iscrizione (posti: 1 per le scuole), lista d'attesa e approvazione dei gestori se attivate.
         // Ogni turno ha la sua finestra e i suoi limiti (con una sola edizione: quelli generali, limiti NULL = del progetto).
         if ($destinazione === null) {
         $turni_esistenti = [];
         $r_t = $conn->query("SELECT id FROM turni WHERE evento_id = $ev_id ORDER BY id ASC");
         while ($r_t && $rt = $r_t->fetch_assoc()) $turni_esistenti[] = (int)$rt['id'];
         $tenuti = [];
-        $stmt_up = $conn->prepare("UPDATE turni SET nome_turno = ?, max_posti = ?, data_apertura = ?, data_chiusura = ?, min_partecipanti = ?, max_partecipanti = ?, abilita_lista_attesa = ?, abilita_multi_posto = 0, richiede_approvazione = 0 WHERE id = ?");
+        $stmt_up = $conn->prepare("UPDATE turni SET nome_turno = ?, max_posti = ?, data_apertura = ?, data_chiusura = ?, min_partecipanti = ?, max_partecipanti = ?, abilita_lista_attesa = ?, abilita_multi_posto = 0, richiede_approvazione = ? WHERE id = ?");
         $stmt_in = $conn->prepare("INSERT INTO turni (evento_id, nome_turno, data_turno, orario_inizio, orario_fine, max_posti, data_apertura, data_chiusura, min_partecipanti, max_partecipanti, abilita_lista_attesa, abilita_multi_posto, richiede_approvazione)
-                                   VALUES (?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, 0, 0)");
+                                   VALUES (?, ?, NULL, NULL, NULL, ?, ?, ?, ?, ?, ?, 0, ?)");
         $n_ed = count($edizioni);
         foreach ($edizioni as $k => $ed) {
             // Nome dell'edizione: quello scritto, altrimenti "Edizione N" (o "Iscrizioni" se è l'unica)
             $nome_ed = $ed['nome'] !== '' ? $ed['nome'] : ($n_ed > 1 ? 'Edizione ' . ($k + 1) : 'Iscrizioni');
             if ($ed['id'] > 0 && in_array($ed['id'], $turni_esistenti, true)) {
-                $stmt_up->bind_param("sissiiii", $nome_ed, $ed['posti'], $ed['apertura'], $ed['chiusura'], $ed['min'], $ed['max'], $lista_attesa, $ed['id']);
+                $stmt_up->bind_param("sissiiiii", $nome_ed, $ed['posti'], $ed['apertura'], $ed['chiusura'], $ed['min'], $ed['max'], $lista_attesa, $approvazione, $ed['id']);
                 if (!$stmt_up->execute()) throw new RuntimeException($conn->error);
                 $tenuti[] = $ed['id'];
             } else {
-                $stmt_in->bind_param("isissiii", $ev_id, $nome_ed, $ed['posti'], $ed['apertura'], $ed['chiusura'], $ed['min'], $ed['max'], $lista_attesa);
+                $stmt_in->bind_param("isissiiii", $ev_id, $nome_ed, $ed['posti'], $ed['apertura'], $ed['chiusura'], $ed['min'], $ed['max'], $lista_attesa, $approvazione);
                 if (!$stmt_in->execute()) throw new RuntimeException($conn->error);
                 $tenuti[] = (int)$conn->insert_id;
             }
@@ -597,6 +603,25 @@ if ($mostra_form):
                     <label class="form-check-label small fw-bold" for="pjLista">Lista d'attesa</label>
                 </div>
                 <p class="form-text mt-0 mb-3">Acceso: quando un'edizione è piena <span class="pj-solo-scuole">le altre scuole</span><span class="pj-solo-generico">gli altri</span> entrano in lista d'attesa, in ordine di arrivo, e ricevono il posto se si libera. Spento: a edizione piena le iscrizioni si chiudono.</p>
+                <?php $appr_v = $id_modifica && (int)($tu['richiede_approvazione'] ?? 0) === 1; ?>
+                <div class="form-check form-switch mb-1">
+                    <input class="form-check-input" type="checkbox" name="approvazione" id="pjApprov" value="1" <?php echo $appr_v ? 'checked' : ''; ?>>
+                    <label class="form-check-label small fw-bold" for="pjApprov">Iscrizioni da confermare dai gestori</label>
+                </div>
+                <p class="form-text mt-0 mb-3">Acceso: ogni iscrizione (di tutte le edizioni) resta <strong>da approvare</strong> finché un gestore non la conferma da Iscrizioni; il posto resta occupato nel frattempo.</p>
+                <?php $conv_v = !empty($dp['convenzione']); ?>
+                <div class="form-check form-switch mb-1">
+                    <input class="form-check-input" type="checkbox" name="convenzione" id="pjConv" value="1" <?php echo $conv_v ? 'checked' : ''; ?>>
+                    <label class="form-check-label small fw-bold" for="pjConv"><i class="fa fa-file-signature me-1" aria-hidden="true"></i>Attività di Formazione Scuola Lavoro</label>
+                </div>
+                <p class="form-text mt-0 mb-3">Attiva il processo delle convenzioni: nel modulo la scuola dichiara se ha la convenzione con il Dipartimento, che deve coprire tutto il periodo del progetto (Dal/Al, registro in Anagrafe scuole). Con una convenzione valida l'iscrizione è confermata (o da approvare, se è acceso l'interruttore sopra); senza, resta da approvare con le istruzioni per inviarla (modelli e PEC in Impostazioni area). Promemoria e avvisi partono da soli. Include "Dedicato alle scuole".</p>
+                <script>
+                (function () {
+                    var fsl = document.getElementById('pjConv'), scu = document.getElementById('pjScuole');
+                    if (!fsl || !scu) return;
+                    fsl.addEventListener('change', function () { if (fsl.checked && !scu.checked) { scu.checked = true; scu.dispatchEvent(new Event('change', { bubbles: true })); } });
+                })();
+                </script>
                 <div id="pjEdizioni">
                     <?php foreach ($turni_ed as $k => $te): ?>
                         <div class="pj-ed-blocco">
