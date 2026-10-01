@@ -75,7 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                   . ($v['senza_codice'] ? ", {$v['senza_codice']} con la scuola scritta a mano (abbinala all'anagrafe per verificarla)" : '') . ".",
                   $v['da_stipulare'] || $v['senza_codice'] ? 'warning' : 'success');
     }
-    admin_redirect("fsl.php?p_id=$filtro_p&tab=" . (isset($_POST['conv_verifica']) ? 'verifica' : 'convenzioni') . "&r=" . time());
+    admin_redirect("fsl.php?p_id=$filtro_p&tab=" . (isset($_POST['conv_verifica']) ? 'verifica' : 'convenzioni') . (($_GET['vista'] ?? '') === 'archivio' ? '&vista=archivio' : '') . "&r=" . time());
 }
 
 $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
@@ -154,13 +154,20 @@ while ($r_v && $x = $r_v->fetch_assoc()) {
 $n_inviti = count(array_filter($righe, fn($x) => !empty($x['valutazione_inviata'])));
 $anni = range($anno_corr + 1, max(2020, $anno_corr - 5));
 
-// Registro delle convenzioni raggruppato per scuola (la più recente per prima)
-$conv_per_scuola = [];
+// Registro delle convenzioni raggruppato per scuola (la più recente per prima), diviso in due viste:
+// in vigore (valide, in scadenza, non ancora valide) e archivio (scadute: ci passano da sole il giorno dopo la scadenza)
+$vista_cv = ($_GET['vista'] ?? '') === 'archivio' ? 'archivio' : 'vigore';
+$conv_vigore = []; $conv_archivio = [];
 $r_cv = $conn->query("SELECT c.*, (SELECT COUNT(*) FROM prenotazioni p WHERE p.scuola_codice = c.scuola_codice AND IFNULL(p.stato, 'confermata') NOT IN ('annullata', 'rifiutata', 'scaduta')) AS n_iscr
                       FROM convenzioni_scuole c ORDER BY c.scuola_codice, (c.scadenza IS NULL) DESC, c.scadenza DESC, c.id DESC");
-while ($r_cv && $x = $r_cv->fetch_assoc()) $conv_per_scuola[$x['scuola_codice']][] = $x;
-uasort($conv_per_scuola, fn($a, $b) => strcmp(etichetta_scuola(scuola_per_codice($conn, $a[0]['scuola_codice']) ?? ['denominazione' => $a[0]['scuola_codice']]),
-                                              etichetta_scuola(scuola_per_codice($conn, $b[0]['scuola_codice']) ?? ['denominazione' => $b[0]['scuola_codice']])));
+while ($r_cv && $x = $r_cv->fetch_assoc()) {
+    if ($x['scadenza'] !== null && $x['scadenza'] < date('Y-m-d')) $conv_archivio[$x['scuola_codice']][] = $x;
+    else $conv_vigore[$x['scuola_codice']][] = $x;
+}
+$per_nome_scuola = fn($a, $b) => strcmp(etichetta_scuola(scuola_per_codice($conn, $a[0]['scuola_codice']) ?? ['denominazione' => $a[0]['scuola_codice']]),
+                                        etichetta_scuola(scuola_per_codice($conn, $b[0]['scuola_codice']) ?? ['denominazione' => $b[0]['scuola_codice']]));
+uasort($conv_vigore, $per_nome_scuola); uasort($conv_archivio, $per_nome_scuola);
+$conv_per_scuola = $vista_cv === 'archivio' ? $conv_archivio : $conv_vigore;
 // Iscrizioni senza convenzione valida: da stipulare (attività FSL o richiesta dai gestori) e scuole scritte a mano nelle attività FSL
 $iscr_da_stipulare = [];
 $r_ds = $conn->query("SELECT pr.id, pr.scuola_codice, pr.nome, pr.cognome, pr.email, pr.codice_prenotazione, pr.stato, pr.dati_custom_json,
@@ -182,6 +189,8 @@ while ($r_ds && $x = $r_ds->fetch_assoc()) {
 $conv_mod = null;
 if (!empty($_GET['conv_mod'])) $conv_mod = $conn->query("SELECT * FROM convenzioni_scuole WHERE id = " . (int)$_GET['conv_mod'])->fetch_assoc() ?: null;
 $conv_nuova_s = !$conv_mod && !empty($_GET['conv_nuova']) ? scuola_per_codice($conn, (string)$_GET['conv_nuova']) : null;
+$conv_rinnova = !$conv_mod && !empty($_GET['conv_rinnova']) ? ($conn->query("SELECT * FROM convenzioni_scuole WHERE id = " . (int)$_GET['conv_rinnova'])->fetch_assoc() ?: null) : null;
+if ($conv_rinnova) $conv_nuova_s = scuola_per_codice($conn, $conv_rinnova['scuola_codice']);
 $data_get = fn($k) => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET[$k] ?? '')) ? $_GET[$k] : null;
 [$conv_def_dal, $conv_def_al] = periodo_nuova_convenzione($data_get('dal'), $data_get('al'));
 $oggi_cv = date('Y-m-d'); $tra60_cv = date('Y-m-d', strtotime('+60 days'));
@@ -217,7 +226,7 @@ $oggi_cv = date('Y-m-d'); $tra60_cv = date('Y-m-d', strtotime('+60 days'));
         <li class="nav-item"><a class="nav-link <?php echo $tab === $k_t ? 'active' : ''; ?>" <?php echo $tab === $k_t ? 'aria-current="page"' : ''; ?> href="fsl.php?p_id=<?php echo (int)$filtro_p; ?>&tab=<?php echo $k_t; ?><?php echo in_array($k_t, ['riepilogo', 'valutazioni'], true) ? '&anno=' . $anno : ''; ?>">
             <i class="fa <?php echo $ico_t; ?> me-1" aria-hidden="true"></i><?php echo $lbl_t; ?>
             <?php if ($k_t === 'verifica' && $iscr_da_stipulare): ?><span class="badge bg-danger ms-1"><?php echo count($iscr_da_stipulare); ?></span><?php endif; ?>
-            <?php if ($k_t === 'convenzioni'): ?><span class="badge bg-light text-dark border ms-1"><?php echo count($conv_per_scuola); ?></span><?php endif; ?>
+            <?php if ($k_t === 'convenzioni'): ?><span class="badge bg-light text-dark border ms-1" title="Scuole con convenzione in vigore"><?php echo count($conv_vigore); ?></span><?php endif; ?>
         </a></li>
     <?php endforeach; ?>
 </ul>
@@ -288,8 +297,9 @@ $oggi_cv = date('Y-m-d'); $tra60_cv = date('Y-m-d', strtotime('+60 days'));
     <p class="small text-secondary">Registro delle convenzioni per la Formazione Scuola Lavoro, con i file firmati (convenzione e Allegato A), il periodo di validità e i docenti di riferimento. Nelle attività con l'interruttore <strong>Attività di Formazione Scuola Lavoro</strong> la convenzione deve coprire <strong>tutto il periodo</strong> del progetto (Dal/Al) o il giorno del turno dell'evento: se lo copre, la scuola non deve inviare nulla; se non lo copre, ne va stipulata una nuova. Registrando o modificando una convenzione, le prenotazioni della scuola in attesa si confermano da sole (se il turno non chiede anche l'approvazione) e la scuola riceve l'email. Gli amministratori ricevono un avviso 60 giorni prima della scadenza.</p>
 
     <!-- REGISTRA / MODIFICA -->
-    <h3 class="h6 fw-bold mt-3" id="convForm"><?php echo $conv_mod ? 'Modifica la convenzione' : 'Registra una convenzione'; ?></h3>
-    <?php $cm = $conv_mod ?: []; $cm_doc = json_decode((string)($cm['docenti_json'] ?? ''), true) ?: [['nome' => '', 'email' => '']];
+    <h3 class="h6 fw-bold mt-3" id="convForm"><?php echo $conv_mod ? 'Modifica la convenzione' : ($conv_rinnova ? 'Rinnova la convenzione' : 'Registra una convenzione'); ?></h3>
+    <?php if ($conv_rinnova): ?><p class="small text-secondary mb-2">Nuova convenzione per la stessa scuola, con i docenti di riferimento della precedente (<?php echo $h(testo_validita_convenzione($conv_rinnova)); ?><?php echo $conv_rinnova['protocollo'] !== '' ? (preg_match('/^prot/i', $conv_rinnova['protocollo']) ? ', ' : ', protocollo ') . $h($conv_rinnova['protocollo']) : ''; ?>): controlla le date e carica i nuovi file firmati. La convenzione scaduta resta in archivio.</p><?php endif; ?>
+    <?php $cm = $conv_mod ?: []; $cm_doc = json_decode((string)($cm['docenti_json'] ?? ($conv_rinnova['docenti_json'] ?? '')), true) ?: [['nome' => '', 'email' => '']];
           $cm_s = !empty($cm['scuola_codice']) ? scuola_per_codice($conn, $cm['scuola_codice']) : ($conv_nuova_s ?? null); ?>
     <form method="POST" enctype="multipart/form-data" class="row g-2 align-items-end mb-3 border rounded p-2">
         <?php csrf_field(); ?>
@@ -324,15 +334,22 @@ $oggi_cv = date('Y-m-d'); $tra60_cv = date('Y-m-d', strtotime('+60 days'));
         <div class="col-6 col-lg-6"><label class="form-label small fw-bold mb-1" for="cvNote">Note</label><input type="text" name="note" id="cvNote" class="form-control form-control-sm" maxlength="500" value="<?php echo $h($cm['note'] ?? ''); ?>"></div>
         <div class="col-12 col-lg-3 d-flex gap-2">
             <button type="submit" name="conv_salva" value="1" class="btn btn-sm btn-primary fw-bold flex-grow-1"><i class="fa fa-save me-1" aria-hidden="true"></i><?php echo $conv_mod ? 'Salva le modifiche' : 'Registra'; ?></button>
-            <?php if ($conv_mod || !empty($conv_nuova_s)): ?><a href="fsl.php?p_id=<?php echo $filtro_p; ?>&tab=convenzioni" class="btn btn-sm btn-outline-secondary fw-bold">Annulla</a><?php endif; ?>
+            <?php if ($conv_mod || !empty($conv_nuova_s)): ?><a href="fsl.php?p_id=<?php echo $filtro_p; ?>&tab=convenzioni<?php echo $vista_cv === 'archivio' ? '&vista=archivio' : ''; ?>" class="btn btn-sm btn-outline-secondary fw-bold">Annulla</a><?php endif; ?>
         </div>
     </form>
 
-    <!-- REGISTRO PER SCUOLA -->
-    <?php if ($conv_per_scuola): ?>
-        <div class="d-flex flex-wrap gap-2 mb-2">
-            <input type="search" id="cercaConv" class="form-control form-control-sm" style="max-width:320px;" placeholder="Cerca scuola, docente o protocollo" aria-label="Cerca nel registro delle convenzioni">
+    <!-- REGISTRO PER SCUOLA: in vigore / archivio delle scadute -->
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-2" id="registro">
+        <div class="btn-group btn-group-sm" role="group" aria-label="Vista del registro">
+            <a href="fsl.php?p_id=<?php echo $filtro_p; ?>&tab=convenzioni#registro" class="btn <?php echo $vista_cv === 'vigore' ? 'btn-success' : 'btn-outline-success'; ?> fw-bold" <?php echo $vista_cv === 'vigore' ? 'aria-current="page"' : ''; ?>><i class="fa fa-file-circle-check me-1" aria-hidden="true"></i>In vigore (<?php echo count($conv_vigore); ?>)</a>
+            <a href="fsl.php?p_id=<?php echo $filtro_p; ?>&tab=convenzioni&vista=archivio#registro" class="btn <?php echo $vista_cv === 'archivio' ? 'btn-secondary' : 'btn-outline-secondary'; ?> fw-bold" <?php echo $vista_cv === 'archivio' ? 'aria-current="page"' : ''; ?>><i class="fa fa-box-archive me-1" aria-hidden="true"></i>Archivio scadute (<?php echo count($conv_archivio); ?>)</a>
         </div>
+        <?php if ($conv_per_scuola): ?><input type="search" id="cercaConv" class="form-control form-control-sm" style="max-width:320px;" placeholder="Cerca scuola, docente o protocollo" aria-label="Cerca nel registro delle convenzioni"><?php endif; ?>
+    </div>
+    <p class="small text-secondary mb-2"><?php echo $vista_cv === 'archivio'
+        ? "Convenzioni scadute: ci finiscono da sole il giorno dopo la scadenza e restano consultabili con i loro file. <strong>Rinnova</strong> prepara una nuova convenzione per la stessa scuola; l'eliminazione cancella anche i file."
+        : "Convenzioni valide, in scadenza (entro 60 giorni) o non ancora valide. Il numero sulla scheda conta le scuole."; ?></p>
+    <?php if ($conv_per_scuola): ?>
         <div class="table-responsive">
             <table class="table table-sm align-middle small" id="tabConv">
                 <thead class="table-light"><tr><th>Scuola</th><th>Validità</th><th>Docenti di riferimento</th><th>File</th><th>Protocollo e note</th><th></th></tr></thead>
@@ -354,7 +371,12 @@ $oggi_cv = date('Y-m-d'); $tra60_cv = date('Y-m-d', strtotime('+60 days'));
                             </td>
                             <td><?php echo $h($c['protocollo']); ?><?php if ($c['note'] !== ''): ?><div class="text-secondary"><?php echo $h($c['note']); ?></div><?php endif; ?></td>
                             <td class="text-nowrap">
-                                <a href="fsl.php?p_id=<?php echo $filtro_p; ?>&tab=convenzioni&conv_mod=<?php echo (int)$c['id']; ?>#convForm" class="btn btn-sm btn-outline-primary py-0" title="Modifica" aria-label="Modifica la convenzione"><i class="fa fa-pen"></i></a>
+                                <?php if ($vista_cv === 'archivio' && $i === 0 && empty($conv_vigore[$cod])): ?>
+                                    <a href="fsl.php?p_id=<?php echo $filtro_p; ?>&tab=convenzioni&vista=archivio&conv_rinnova=<?php echo (int)$c['id']; ?>#convForm" class="btn btn-sm btn-success fw-bold py-0" title="Rinnova: nuova convenzione per questa scuola"><i class="fa fa-rotate me-1" aria-hidden="true"></i>Rinnova</a>
+                                <?php elseif ($vista_cv === 'archivio' && $i === 0): ?>
+                                    <span class="badge bg-light text-success border" title="La scuola ha già una convenzione in vigore">rinnovata</span>
+                                <?php endif; ?>
+                                <a href="fsl.php?p_id=<?php echo $filtro_p; ?>&tab=convenzioni<?php echo $vista_cv === 'archivio' ? '&vista=archivio' : ''; ?>&conv_mod=<?php echo (int)$c['id']; ?>#convForm" class="btn btn-sm btn-outline-primary py-0" title="Modifica" aria-label="Modifica la convenzione"><i class="fa fa-pen"></i></a>
                                 <form method="POST" class="d-inline">
                                     <?php csrf_field(); ?>
                                     <button type="submit" name="conv_elimina" value="<?php echo (int)$c['id']; ?>" class="btn btn-sm btn-outline-danger py-0" data-confirm="Eliminare questa convenzione dal registro, con i suoi file?" title="Elimina" aria-label="Elimina la convenzione"><i class="fa fa-trash"></i></button>
@@ -373,7 +395,7 @@ $oggi_cv = date('Y-m-d'); $tra60_cv = date('Y-m-d', strtotime('+60 days'));
         });
         </script>
     <?php else: ?>
-        <p class="text-muted small mb-0">Nessuna convenzione registrata.</p>
+        <p class="text-muted small mb-0"><?php echo $vista_cv === 'archivio' ? 'Nessuna convenzione scaduta.' : 'Nessuna convenzione in vigore.'; ?></p>
     <?php endif; ?>
 </section>
 

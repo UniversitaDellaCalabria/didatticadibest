@@ -199,7 +199,7 @@ if (!function_exists('curl_init') || $http('/eventi/')['codice'] !== 200) {
     }
     $jar = tempnam(sys_get_temp_dir(), 'jar');
     $http('/__accesso?u=1', null, $jar);
-    foreach (['dashboard.php', 'utenti.php?p_id=1', 'iscritti.php?p_id=1', 'eventi.php?p_id=1', 'progetti.php?p_id=2', 'scuole.php', 'fsl.php', 'fsl.php?tab=convenzioni', 'fsl.php?tab=verifica', 'fsl.php?tab=valutazioni', 'fsl.php?tab=convenzioni&conv_mod=1', 'sistema.php', 'impostazioni_area.php?p_id=1', 'statistiche.php?p_id=1'] as $pag) {
+    foreach (['dashboard.php', 'utenti.php?p_id=1', 'iscritti.php?p_id=1', 'eventi.php?p_id=1', 'progetti.php?p_id=2', 'scuole.php', 'fsl.php', 'fsl.php?tab=convenzioni', 'fsl.php?tab=verifica', 'fsl.php?tab=valutazioni', 'fsl.php?tab=convenzioni&conv_mod=1', 'fsl.php?tab=convenzioni&vista=archivio', 'fsl.php?tab=convenzioni&vista=archivio&conv_rinnova=1', 'sistema.php', 'impostazioni_area.php?p_id=1', 'statistiche.php?p_id=1'] as $pag) {
         $r = $http('/eventi/admin/' . $pag, null, $jar);
         $err_php = preg_match('/<b>(Fatal error|Parse error|Warning)<\/b>|Uncaught /', $r['corpo']);
         prova($r['codice'] === 200 && !$err_php && str_contains($r['corpo'], '</html>'), "pannello: $pag", "risposta " . $r['codice'] . ($err_php ? ' con errore PHP' : ''));
@@ -207,7 +207,10 @@ if (!function_exists('curl_init') || $http('/eventi/')['codice'] !== 200) {
     $r = $http('/eventi/area_personale.php', null, $jar);
     prova($r['codice'] === 200 && !preg_match('/<b>(Fatal error|Parse error|Warning)<\/b>|Uncaught /', $r['corpo']) && str_contains($r['corpo'], 'pills-profilo-tab'), "Area personale (con la scheda Profilo)");
     // Iscrizione completa a un progetto FSL (docente di prova, scuola dall'anagrafe) e pulizia
-    // (dati di esempio di strumenti/locale: utente 4, progetto 20 edizione 2 = turno 201, scuola senza convenzione CZPC00004D)
+    // (dati di esempio di strumenti/locale: utente 4, progetto 20 edizione 2 = turno 201; scuola di prova ZZPR00000P sempre senza convenzione)
+    $loc = new mysqli('127.0.0.1', 'root', '', (parse_ini_file($SITO . '/.env.locale')['DB_NAME'] ?? 'eventi_locale'));
+    $loc->query("INSERT IGNORE INTO scuole (codice, denominazione, comune, provincia, regione, tipo) VALUES ('ZZPR00000P', 'SCUOLA DELLE PROVE AUTOMATICHE', 'COSENZA', 'COSENZA', 'CALABRIA', 'LICEO')");
+    $loc->query("DELETE FROM convenzioni_scuole WHERE scuola_codice = 'ZZPR00000P'");
     $jar2 = tempnam(sys_get_temp_dir(), 'jar');
     $http('/__accesso?u=4', null, $jar2);
     $pag = $http('/eventi/fsl.php?progetto=20', null, $jar2);
@@ -215,10 +218,9 @@ if (!function_exists('curl_init') || $http('/eventi/')['codice'] !== 200) {
     if (empty($m_csrf[1]) || !str_contains($pag['corpo'], 'name="turno_id" value="201"')) prova(false, "modulo di iscrizione presente nella scheda del progetto");
     else {
         $r = $http('/eventi/fsl.php?progetto=20', ['csrf_token' => $m_csrf[1], 'invia_prenotazione' => 1, 'turno_id' => 201, 'nome' => 'Luca', 'cognome' => 'Insegnante',
-                   'email' => 'prova.automatica@example.org', 'email_conferma' => 'prova.automatica@example.org', 'custom_scuola' => 'Liceo', 'scuola_codice' => ['scuola' => 'CZPC00004D'],
+                   'email' => 'prova.automatica@example.org', 'email_conferma' => 'prova.automatica@example.org', 'custom_scuola' => 'Liceo', 'scuola_codice' => ['scuola' => 'ZZPR00000P'],
                    'custom_numero_partecipanti' => 15, 'convenzione' => 'no', 'accetta_privacy' => 'on'], $jar2);
         prova(in_array($r['codice'], [302, 303], true) && str_contains($r['dove'], 'st_tipo=convenzione'), "iscrizione FSL senza convenzione: in attesa", $r['codice'] . ' ' . $r['dove']);
-        $loc = new mysqli('127.0.0.1', 'root', '', (parse_ini_file($SITO . '/.env.locale')['DB_NAME'] ?? 'eventi_locale'));
         $pr = $loc->query("SELECT id, stato, convenzione FROM prenotazioni WHERE email = 'prova.automatica@example.org' ORDER BY id DESC LIMIT 1")->fetch_assoc();
         prova(($pr['stato'] ?? '') === 'da_approvare' && ($pr['convenzione'] ?? '') === 'no', "prenotazione salvata da approvare, convenzione da stipulare", json_encode($pr));
         if ($pr) $loc->query("DELETE FROM prenotazioni WHERE id = " . (int)$pr['id']);
