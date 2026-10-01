@@ -184,7 +184,7 @@ $_tmap[array_key_exists($_st, $_tmap) ? $_st : 'testata'] = 'active show';
         <?php csrf_field(); ?>
         <div class="row g-4 mb-4">
             <div class="col-md-6">
-                <label class="form-label small fw-bold">Nome Portale (es. EventiDiBEST)</label>
+                <label class="form-label small fw-bold">Nome Portale (es. Didattica DiBEST)</label>
                 <input type="text" name="nome_portale" class="form-control" value="<?php echo htmlspecialchars($cfg_p['nome_portale'] ?? ''); ?>" required>
             </div>
             <div class="col-md-6">

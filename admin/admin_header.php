@@ -195,7 +195,7 @@ if (!$is_full_admin && $page_cfg) {
 }
 
 // Abilitati solo a una parte della FSL (nessuna area): la loro pagina di partenza è quella
-if (!$is_full_admin && !$pagine_disponibili && in_array(basename($_SERVER['PHP_SELF']), ['index.php', 'dashboard.php', 'aree.php'], true)
+if (!$is_full_admin && !$pagine_disponibili && in_array(basename($_SERVER['PHP_SELF']), ['index.php', 'inizio.php', 'dashboard.php', 'aree.php'], true)
     && ($puo_fsl_convenzioni || $puo_fsl_scuole)) {
     while (ob_get_level() > 0) ob_end_clean();
     header('Location: ' . ($puo_fsl_convenzioni ? 'fsl.php' : 'scuole.php'));
@@ -238,7 +238,7 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Amministrazione - EventiDiBEST</title>
+    <title>Gestione - Didattica DiBEST</title>
     <link rel="icon" type="image/x-icon" href="../<?php echo !empty($cfg_p['favicon_path']) ? $cfg_p['favicon_path'] : 'favicon.ico'; ?>">
     <link href="<?php echo url_vendor('jsdelivr/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css'); ?>" rel="stylesheet">
     <link href="<?php echo url_vendor('datatables/1.13.6/css/dataTables.bootstrap5.min.css'); ?>" rel="stylesheet">
@@ -303,7 +303,7 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
     <!-- SIDEBAR DINAMICA (RBAC) -->
     <div id="sidebar" class="text-white shadow">
         <div class="p-4 border-bottom border-secondary d-flex justify-content-between align-items-center">
-            <h5 class="fw-bold text-danger m-0" style="color:#ff4d4d !important;">EventiDiBEST<br><small class="text-white fs-6">CMS Admin</small></h5>
+            <h5 class="fw-bold text-danger m-0" style="color:#ff4d4d !important;">Didattica DiBEST<br><small class="text-white fs-6">Gestione</small></h5>
             <button class="btn btn-sm btn-outline-light d-lg-none" id="closeSidebar"><i class="fa fa-times"></i></button>
         </div>
         
@@ -325,6 +325,7 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
                 };
                 $chiudi_gruppo = function () { echo '</ul></details></li>'; };
                 ?>
+                <?php if (count($pagine_disponibili) > 1) $voce_menu(['inizio.php'], 'inizio.php', 'fa-house', 'Inizio'); ?>
                 <?php $voce_menu(['dashboard.php', 'index.php'], 'dashboard.php', 'fa-gauge-high', 'Dashboard'); ?>
                 <?php if ($is_full_admin || count($pagine_disponibili) > 1): // un gestore con una sola area non ha nulla da scegliere ?>
                 <li class="nav-item mb-1">
@@ -342,7 +343,7 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
                         <div class="text-secondary fw-bold text-uppercase" style="font-size:.66rem;letter-spacing:.06em;">Area</div>
                         <div class="d-flex align-items-center justify-content-between gap-2">
                             <span class="fw-bold text-white text-truncate" style="min-width:0;" title="<?php echo htmlspecialchars($page_cfg['titolo']); ?>"><?php echo htmlspecialchars($page_cfg['titolo']); ?></span>
-                            <?php if (count($pagine_disponibili) > 1): ?><a href="aree.php?p_id=<?php echo $filtro_p; ?>" class="small text-info text-decoration-none text-nowrap">Cambia</a><?php endif; ?>
+                            <?php if (count($pagine_disponibili) > 1): ?><a href="inizio.php?sezione=<?php echo urlencode(sezione_area($page_cfg)); ?>&amp;p_id=<?php echo $filtro_p; ?>" class="small text-info text-decoration-none text-nowrap">Cambia</a><?php endif; ?>
                         </div>
                         <?php if ((int)($page_cfg['visibile'] ?? 1) === 0): ?><span class="badge bg-warning text-dark mt-1" style="font-size:.65rem;"><i class="fa fa-eye-slash me-1" aria-hidden="true"></i>Nascosta al pubblico</span><?php endif; ?>
                     </div>
@@ -362,6 +363,16 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
                     $mostra_classi = $r_cl && $r_cl->num_rows > 0;
                 }
                 ?>
+                <?php if (tipo_area($page_cfg) === 'calendario'): // Calendari e risorse: prenotazioni a slot invece di eventi e turni
+                    $n_appr = 0;
+                    if ($is_area_manager) {
+                        $r_appr = @$conn->query("SELECT COUNT(*) n FROM prenotazioni_risorse pr JOIN risorse r ON r.id = pr.risorsa_id WHERE r.pagina_id = " . (int)$filtro_p . " AND pr.stato = 'da_approvare' AND pr.fine >= NOW()");
+                        $n_appr = $r_appr ? (int)$r_appr->fetch_assoc()['n'] : 0;
+                        $voce_menu(['prenotazioni_risorse.php'], 'prenotazioni_risorse.php', 'fa-calendar-check', 'Prenotazioni' . ($n_appr ? " ($n_appr da approvare)" : ''));
+                        $voce_menu(['risorse.php'], 'risorse.php', 'fa-door-open', 'Risorse, orari e chiusure');
+                    }
+                ?>
+                <?php else: ?>
                 <?php if ($can_manage_eventi || $can_manage_form): $apri_gruppo('attivita', 'fa-calendar-alt', 'Attività', ['eventi.php', 'progetti.php', 'form_builder.php', 'archivio.php']); ?>
                     <?php if ($vede_eventi) $voce_menu(['eventi.php'], 'eventi.php', 'fa-calendar-day', 'Eventi e turni'); ?>
                     <?php if ($vede_progetti) $voce_menu(['progetti.php'], 'progetti.php', 'fa-diagram-project', 'Progetti'); ?>
@@ -376,6 +387,7 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
                 <?php $chiudi_gruppo(); endif; ?>
 
                 <?php if ($can_manage_iscritti) $voce_menu(['statistiche.php'], 'statistiche.php', 'fa-chart-pie', 'Statistiche'); ?>
+                <?php endif; // fine voci per tipo di area ?>
                 <?php if ($can_manage_settings) $voce_menu(['impostazioni_area.php'], 'impostazioni_area.php', 'fa-paint-brush', 'Impostazioni area'); ?>
                 <?php endif; // fine area corrente ?>
 
@@ -384,12 +396,21 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
                     <li class="nav-item mt-4 mb-2">
                         <div class="text-secondary small fw-bold px-3 mb-1 text-uppercase">Portale</div>
                     </li>
-                    <?php $apri_gruppo('fsl', 'fa-school', 'Scuole e FSL', ['fsl.php', 'scuole.php', 'convenzione_file.php']); ?>
-                        <?php if ($puo_fsl_convenzioni) $voce_menu(['fsl.php', 'convenzione_file.php'], 'fsl.php', 'fa-briefcase', $puo_fsl ? 'Formazione Scuola Lavoro' : 'Convenzioni FSL'); ?>
-                        <?php if ($puo_fsl_scuole) $voce_menu(['scuole.php'], 'scuole.php', 'fa-building-columns', 'Anagrafe scuole'); ?>
+                    <?php if ($puo_fsl_convenzioni) $voce_menu(['fsl.php', 'convenzione_file.php'], 'fsl.php', 'fa-briefcase', $puo_fsl ? 'Formazione Scuola Lavoro' : 'Convenzioni FSL'); ?>
+                    <?php
+                    // Anagrafi comuni a tutto il portale: personale e insegnamenti dalle API di Ateneo, scuole dal Ministero
+                    $vista_ana = $current_page === 'anagrafe_personale.php' ? (string)($_GET['vista'] ?? 'docenti') : '';
+                    $apri_gruppo('anagrafi', 'fa-address-book', 'Anagrafi', ['anagrafe_personale.php', 'anagrafe_docenti.php', 'anagrafe_pta.php', 'anagrafe_insegnamenti.php', 'scuole.php']); ?>
+                        <?php if ($is_full_admin): ?>
+                            <?php $voce_menu(['anagrafe_docenti.php'], 'anagrafe_docenti.php', 'fa-chalkboard-user', 'Docenti', $vista_ana === 'docenti'); ?>
+                            <?php $voce_menu(['anagrafe_pta.php'], 'anagrafe_pta.php', 'fa-user-tie', 'Personale TA', $vista_ana === 'pta'); ?>
+                            <?php $voce_menu(['anagrafe_insegnamenti.php'], 'anagrafe_insegnamenti.php', 'fa-book-open', 'Insegnamenti', $vista_ana === 'insegnamenti'); ?>
+                            <?php $voce_menu([], 'anagrafe_personale.php?vista=corsi', 'fa-graduation-cap', 'Corsi di studio', $vista_ana === 'corsi'); ?>
+                        <?php endif; ?>
+                        <?php if ($puo_fsl_scuole) $voce_menu(['scuole.php'], 'scuole.php', 'fa-building-columns', 'Scuole'); ?>
+                        <?php if ($is_full_admin) $voce_menu([], 'anagrafe_personale.php?vista=strutture', 'fa-sitemap', 'Strutture e aggiornamento', in_array($vista_ana, ['strutture', 'altro'], true)); ?>
                     <?php $chiudi_gruppo(); ?>
                     <?php if ($is_full_admin): ?>
-                        <?php $voce_menu(['anagrafe_personale.php', 'anagrafe_docenti.php', 'anagrafe_pta.php'], 'anagrafe_personale.php', 'fa-address-book', 'Anagrafe di Ateneo'); ?>
                         <?php $apri_gruppo('sito', 'fa-globe', 'Sito pubblico', ['testata.php', 'menu.php']); ?>
                             <?php $voce_menu(['testata.php'], 'testata.php', 'fa-image', 'Testata e home'); ?>
                             <?php $voce_menu(['menu.php'], 'menu.php', 'fa-link', 'Menu'); ?>
@@ -423,7 +444,7 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
         <nav class="navbar navbar-light bg-white border-bottom shadow-sm px-3 py-2 d-flex justify-content-between flex-nowrap gap-2 sticky-top" style="z-index: 998;">
             <button class="btn btn-dark d-lg-none flex-shrink-0" id="sidebarToggle"><i class="fa fa-bars"></i> Menu</button>
             <?php if ($filtro_p > 0 && $page_cfg): $col_top = colore_valido($page_cfg['colore_primario'] ?? '', '#0056B3'); $link_top = count($pagine_disponibili) > 1 || $is_full_admin; ?>
-                <<?php echo $link_top ? 'a href="aree.php?p_id=' . $filtro_p . '"' : 'span'; ?> class="area-top text-decoration-none d-flex align-items-center gap-2" title="Area su cui stai lavorando<?php echo $link_top ? ' — clicca per cambiarla' : ''; ?>" style="border-color: <?php echo $col_top; ?>;">
+                <<?php echo $link_top ? 'a href="inizio.php?sezione=' . urlencode(sezione_area($page_cfg)) . '&amp;p_id=' . $filtro_p . '"' : 'span'; ?> class="area-top text-decoration-none d-flex align-items-center gap-2" title="Area su cui stai lavorando<?php echo $link_top ? ' — clicca per cambiarla' : ''; ?>" style="border-color: <?php echo $col_top; ?>;">
                     <span class="area-top-dot" style="background: <?php echo $col_top; ?>;" aria-hidden="true"></span>
                     <span class="d-none d-sm-inline text-secondary" style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;">Area</span>
                     <span class="area-top-nome fw-bold" style="color: <?php echo $col_top; ?>;"><?php echo htmlspecialchars($page_cfg['titolo']); ?></span>

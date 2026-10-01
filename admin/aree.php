@@ -3,6 +3,20 @@
 // da qui si entra nella gestione di un'area; gli amministratori creano, nascondono ed eliminano le aree.
 require_once 'admin_header.php';
 
+// Tipo dell'area (macroarea): solo amministratori
+if ($is_full_admin && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['tipo_area_pagina'])) {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    $id_t = (int)$_POST['tipo_area_pagina'];
+    $tipo_t = (string)($_POST['tipo_area'] ?? '');
+    if ($tipo_t !== '' && (!isset(TIPI_AREA[$tipo_t]) || !TIPI_AREA[$tipo_t]['disponibile'])) $tipo_t = '';
+    $st_t = $conn->prepare("UPDATE pagine_eventi SET tipo_area = ? WHERE id = ?");
+    $st_t->bind_param("si", $tipo_t, $id_t); $st_t->execute();
+    registra_log_audit($conn, "Tipo di area", ["Area" => $id_t, "Tipo" => $tipo_t !== '' ? TIPI_AREA[$tipo_t]['nome'] : 'non assegnata']);
+    if (function_exists('invalidate_configurazione_portale_cache')) invalidate_configurazione_portale_cache();
+    flash_set("Tipo dell'area aggiornato.");
+    echo "<script>window.location.replace(" . json_encode("aree.php?p_id=$filtro_p") . ");</script>"; exit;
+}
+
 $righe_aree = [];
 foreach ($pagine_disponibili as $a) {
     $id_a = (int)$a['id'];
@@ -47,7 +61,7 @@ foreach ($pagine_disponibili as $a) {
         <a href="nuova_area.php?p_id=<?php echo $filtro_p; ?>" class="btn btn-primary btn-sm fw-bold"><i class="fa fa-plus-circle me-1" aria-hidden="true"></i>Nuova area</a>
     <?php endif; ?>
 </div>
-<p class="text-secondary small mb-3"><?php echo $is_full_admin ? "Tutte le aree del portale." : "Le aree in cui sei abilitato."; ?> Con <strong>Gestisci</strong> entri nell'area: nel menu a sinistra trovi eventi, progetti, iscritti, scanner, sondaggi, statistiche e impostazioni di quell'area.</p>
+<p class="text-secondary small mb-3"><?php echo $is_full_admin ? "Tutte le aree del portale, raggruppate per macroarea: il <strong>tipo</strong> colloca l'area nella home e propone le impostazioni adatte ai nuovi eventi e progetti (le attività esistenti non cambiano)." : "Le aree in cui sei abilitato."; ?> Con <strong>Gestisci</strong> entri nell'area: nel menu a sinistra trovi eventi, progetti, iscritti, scanner, sondaggi, statistiche e impostazioni di quell'area.</p>
 
 <?php if (!$righe_aree): ?>
     <div class="card border-0 shadow-sm"><div class="card-body text-center text-muted py-5">Nessuna area disponibile.</div></div>
@@ -59,7 +73,15 @@ foreach ($pagine_disponibili as $a) {
                 <tr><th>Area</th><th class="d-none d-md-table-cell">Indirizzo</th><th class="d-none d-lg-table-cell">Contenuti</th><th>Stato</th><th class="text-end">Azioni</th></tr>
             </thead>
             <tbody>
-            <?php foreach ($righe_aree as ['a' => $a, 'num' => $num]):
+            <?php
+            // Righe divise per macroarea (in fondo le aree non assegnate)
+            $gruppi_righe = array_fill_keys(array_merge(array_keys(SEZIONI_PORTALE), ['']), []);
+            foreach ($righe_aree as $r_a) $gruppi_righe[sezione_area($r_a['a'])][] = $r_a;
+            foreach (array_filter($gruppi_righe) as $sez_k => $righe_sez):
+                $sez_i = SEZIONI_PORTALE[$sez_k] ?? ['nome' => 'Aree non assegnate', 'icona' => 'fa-circle-question', 'descr' => 'Si comportano come eventi generici: scegli il tipo per collocarle'];
+            ?>
+                <tr class="table-light"><td colspan="5" class="small fw-bold text-uppercase" style="letter-spacing:.05em;"><i class="fa <?php echo $sez_i['icona']; ?> me-1" aria-hidden="true"></i><?php echo htmlspecialchars($sez_i['nome']); ?> <span class="fw-normal text-secondary" style="text-transform:none;letter-spacing:0;">· <?php echo htmlspecialchars($sez_i['descr']); ?></span></td></tr>
+            <?php foreach ($righe_sez as ['a' => $a, 'num' => $num]):
                 $id_a = (int)$a['id'];
                 $col_a = colore_valido($a['colore_primario'] ?? '', '#0056B3');
                 $visibile = (int)($a['visibile'] ?? 1) === 1;
@@ -72,6 +94,16 @@ foreach ($pagine_disponibili as $a) {
                             <div>
                                 <div class="fw-bold"><?php echo htmlspecialchars($a['titolo']); ?></div>
                                 <?php if ($id_a === (int)$filtro_p): ?><span class="badge bg-secondary-subtle text-secondary-emphasis" style="font-size:.65rem;">Area corrente</span><?php endif; ?>
+                                <?php if ($is_full_admin): ?>
+                                    <form method="POST" class="mt-1">
+                                        <?php csrf_field(); ?>
+                                        <input type="hidden" name="tipo_area_pagina" value="<?php echo $id_a; ?>">
+                                        <label class="visually-hidden" for="tipo<?php echo $id_a; ?>">Tipo dell'area <?php echo htmlspecialchars($a['titolo']); ?></label>
+                                        <?php echo html_scelta_tipo_area('tipo_area', tipo_area($a), 'id="tipo' . $id_a . '" onchange="this.form.submit()" style="max-width:260px;font-size:.75rem;"'); ?>
+                                    </form>
+                                <?php elseif (tipo_area($a) !== ''): ?>
+                                    <span class="small text-secondary"><?php echo htmlspecialchars(TIPI_AREA[tipo_area($a)]['nome']); ?></span>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </td>
@@ -109,7 +141,7 @@ foreach ($pagine_disponibili as $a) {
                         </div>
                     </td>
                 </tr>
-            <?php endforeach; ?>
+            <?php endforeach; endforeach; ?>
             </tbody>
         </table>
     </div>

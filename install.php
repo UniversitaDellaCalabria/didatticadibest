@@ -1,5 +1,5 @@
 <?php
-// install.php - Sistema di Installazione EventiDiBEST CMS
+// install.php - Sistema di Installazione Didattica DiBEST
 ini_set('display_errors', 0);
 ini_set('log_errors', 1);
 ini_set('display_startup_errors', 0);
@@ -87,7 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['esegui_installazione'
             `smtp_password` varchar(255) DEFAULT '',
             `smtp_secure` varchar(10) DEFAULT 'tls',
             `smtp_from_email` varchar(255) DEFAULT 'noreply@unical.it',
-            `smtp_from_name` varchar(255) DEFAULT 'Eventi DiBEST',
+            `smtp_from_name` varchar(255) DEFAULT 'Didattica DiBEST',
             `email_conferma_oggetto` varchar(255) DEFAULT 'Conferma Prenotazione',
             `email_conferma_corpo` text DEFAULT NULL,
             `email_canc_utente_oggetto` varchar(255) DEFAULT 'Cancellazione Prenotazione',
@@ -232,7 +232,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['esegui_installazione'
 
         // G. CREAZIONE DEL FILE CONFIG.PHP FISICO
         $config_content = "<?php\n";
-        $config_content .= "// File autogenerato da EventiDiBEST Installer\n";
+        $config_content .= "// File autogenerato da Didattica DiBEST Installer\n";
         $config_content .= "if (session_status() === PHP_SESSION_NONE) { session_start(); }\n\n";
         $config_content .= "// Dati Connessione Database\n";
         $config_content .= "\$db_host = '" . addslashes($db_host) . "';\n";
@@ -258,7 +258,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['esegui_installazione'
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Installazione - EventiDiBEST CMS</title>
+    <title>Installazione - Didattica DiBEST</title>
     <link href="assets/vendor/jsdelivr/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="assets/vendor/cdnjs/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -272,7 +272,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['esegui_installazione'
 <div class="install-box">
     <div class="install-header">
         <i class="fa fa-cogs fa-3x mb-3"></i>
-        <h2 class="fw-bold m-0">EventiDiBEST - Setup Installer</h2>
+        <h2 class="fw-bold m-0">Didattica DiBEST - Setup Installer</h2>
         <p class="m-0 mt-2 opacity-75">Configurazione iniziale del CMS e del Database</p>
     </div>
 

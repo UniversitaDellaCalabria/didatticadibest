@@ -426,7 +426,7 @@ if (!$is_archivio) {
                 if ($res_op && $op = $res_op->fetch_assoc()) {
                     $nome_operatore = trim($op['nome'] . ' ' . $op['cognome']);
                 }
-                $url_area  = "https://dibest2.unical.it/eventi/area_personale.php";
+                $url_area  = url_base_sito() . "/area_personale.php";
                 $oggetto   = "Nuovo messaggio da " . $nome_operatore . " – " . $ev_titolo . " [" . date('d/m H:i') . "]";
                 $body_mail = "
                     <p>Hai ricevuto un nuovo messaggio da <strong>" . htmlspecialchars($nome_operatore) . "</strong>

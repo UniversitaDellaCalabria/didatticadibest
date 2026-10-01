@@ -25,7 +25,7 @@ require_once 'header.php';
 </style>
 <div class="container my-4 pv" style="max-width: 900px;">
     <h1 class="fw-bold mb-1"><i class="fa fa-user-shield me-2 text-danger" aria-hidden="true"></i>Privacy e cookie</h1>
-    <p class="text-secondary">Informativa sul trattamento dei dati personali del portale <strong>Eventi DiBEST</strong> (art. 13 del Regolamento UE 2016/679) · aggiornata al <?php echo $aggiornata; ?></p>
+    <p class="text-secondary">Informativa sul trattamento dei dati personali del portale <strong>Didattica DiBEST</strong> (art. 13 del Regolamento UE 2016/679) · aggiornata al <?php echo $aggiornata; ?></p>
 
     <nav class="indice card border-0 bg-light p-3 mb-4" aria-label="Indice">
         <ol class="mb-0 small">

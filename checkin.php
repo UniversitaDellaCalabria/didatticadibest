@@ -60,7 +60,7 @@ if (!empty($code)) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scanner Ingressi - EventiDiBEST</title>
+    <title>Scanner Ingressi - Didattica DiBEST</title>
     <link href="<?php echo url_vendor('jsdelivr/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css'); ?>" rel="stylesheet">
     <link rel="stylesheet" href="<?php echo url_vendor('cdnjs/ajax/libs/font-awesome/6.4.0/css/all.min.css'); ?>">
     <?php echo script_libreria('html5-qrcode'); ?>

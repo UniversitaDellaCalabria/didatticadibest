@@ -6,7 +6,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sessione Chiusa - EventiDiBEST</title>
+    <title>Sessione Chiusa - Didattica DiBEST</title>
     <link href="assets/vendor/jsdelivr/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="assets/vendor/cdnjs/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -50,7 +50,7 @@
 
     <!-- TITOLO DISCONNESSIONE -->
     <h3 class="fw-bold text-dark mb-2">Sessione Chiusa</h3>
-    <p class="text-secondary mb-4">Sei uscito correttamente dal portale <strong>EventiDiBEST</strong>.</p>
+    <p class="text-secondary mb-4">Sei uscito correttamente dal portale <strong>Didattica DiBEST</strong>.</p>
 
     <!-- BOX AVVISO DI SICUREZZA SSO -->
     <div class="security-box">

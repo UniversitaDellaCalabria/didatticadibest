@@ -108,7 +108,7 @@ if (!function_exists('invia_email_attestato_se_concluso')) {
                . "<a href='" . $link_attestato . "' style='background-color:#198754; color:white; padding:12px 24px; text-decoration:none; border-radius:6px; font-weight:bold; font-size:16px;'>📄 Scarica il tuo Attestato</a>"
                . "</p>"
                . "<p>In alternativa puoi recuperarlo dalla tua <a href='" . $link_area . "'>Area Personale</a>.</p>"
-               . "<p>Cordiali saluti,<br>Il team Eventi DiBEST</p>";
+               . "<p>Cordiali saluti,<br>Il team Didattica DiBEST</p>";
 
         inviaNotificaEmail($row['email'], $oggetto, $corpo, $conn, colore_area_turno($conn, $row['turno_id']));
         $id_safe = (int)$pr_id;

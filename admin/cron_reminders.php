@@ -47,6 +47,17 @@ if ($res_target && $res_target->num_rows > 0) {
     }
 }
 
+// 3. Calendari e risorse: promemoria delle prenotazioni di aule, laboratori e sportelli che iniziano entro 24 ore
+$res_ris = @$conn->query("SELECT id FROM prenotazioni_risorse WHERE stato = 'confermata' AND promemoria_inviato = 0
+                          AND inizio BETWEEN NOW() + INTERVAL 1 HOUR AND NOW() + INTERVAL 24 HOUR");
+while ($res_ris && $x_ris = $res_ris->fetch_assoc()) {
+    $p_ris = prenotazione_risorsa($conn, (int)$x_ris['id']);
+    if ($p_ris && email_prenotazione_risorsa($conn, $p_ris, 'promemoria')) {
+        $conn->query("UPDATE prenotazioni_risorse SET promemoria_inviato = 1 WHERE id = " . (int)$x_ris['id']);
+        $inviati++;
+    }
+}
+
 // Redirect e Output
 if (isset($_GET['manual'])) {
     flash_set(" Elaborazione Reminder completata! Sono stati inviati <strong>$inviati</strong> promemoria.");

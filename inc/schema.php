@@ -8,7 +8,7 @@
 // richiesta: quando aggiungi qualcosa qui, cambia anche il nome del marcatore.
 if (!function_exists('assicura_schema')) {
     function assicura_schema($conn) {
-        $marker = RADICE_SITO . '/cache/schema_v30.ok';
+        $marker = RADICE_SITO . '/cache/schema_v32.ok';
         if (is_file($marker)) return;
 
         // 1. Tabelle di servizio (prima create dalle singole pagine a ogni richiesta)
@@ -45,6 +45,41 @@ if (!function_exists('assicura_schema')) {
             // origine = struttura sincronizzata da cui arriva la persona
             // v30: dati della scheda di Ateneo modificati dalla persona dall'Area personale (vuoto = dato del portale);
             // tabella separata: l'aggiornamento settimanale dalle API non li sovrascrive
+            // v31: anagrafe degli insegnamenti dei corsi del Dipartimento (API activities del portale di Ateneo)
+            'insegnamenti' => "CREATE TABLE IF NOT EXISTS insegnamenti (
+                id INT NOT NULL PRIMARY KEY, codice VARCHAR(30) DEFAULT '', nome VARCHAR(255) NOT NULL DEFAULT '',
+                cds_cod VARCHAR(20) DEFAULT '', cds_nome VARCHAR(255) DEFAULT '', anno_corso TINYINT DEFAULT NULL, anno_accademico SMALLINT DEFAULT NULL, coorte SMALLINT DEFAULT NULL,
+                semestre VARCHAR(60) DEFAULT '', ssd_cod VARCHAR(20) DEFAULT '', ssd VARCHAR(150) DEFAULT '', lingua VARCHAR(60) DEFAULT '',
+                docente VARCHAR(150) DEFAULT '', docente_id VARCHAR(30) DEFAULT '', partizione VARCHAR(150) DEFAULT '', padre_id INT DEFAULT NULL,
+                dipartimento_cod VARCHAR(20) DEFAULT '', presente TINYINT(1) NOT NULL DEFAULT 1, aggiornato_il DATETIME DEFAULT NULL,
+                INDEX idx_cds (cds_cod), INDEX idx_aa (anno_accademico), INDEX idx_nome (nome)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            // v32: Calendari e risorse (aree di tipo "calendario"): aule, laboratori e sportelli prenotabili a slot,
+            // orari settimanali, chiusure (risorsa_id NULL = tutta l'area) e prenotazioni
+            'risorse' => "CREATE TABLE IF NOT EXISTS risorse (
+                id INT AUTO_INCREMENT PRIMARY KEY, pagina_id INT NOT NULL, nome VARCHAR(150) NOT NULL DEFAULT '', tipo VARCHAR(20) NOT NULL DEFAULT 'aula',
+                descrizione TEXT DEFAULT NULL, luogo VARCHAR(255) DEFAULT '', capienza INT DEFAULT NULL, referente VARCHAR(150) DEFAULT '',
+                email_notifiche VARCHAR(500) DEFAULT '', durata_slot SMALLINT NOT NULL DEFAULT 60, max_slot TINYINT NOT NULL DEFAULT 2,
+                anticipo_ore SMALLINT NOT NULL DEFAULT 2, max_giorni SMALLINT NOT NULL DEFAULT 60, accesso VARCHAR(20) NOT NULL DEFAULT 'tutti',
+                approvazione TINYINT(1) NOT NULL DEFAULT 0, ripetizione TINYINT(1) NOT NULL DEFAULT 0, chiede_motivo TINYINT(1) NOT NULL DEFAULT 1,
+                attiva TINYINT(1) NOT NULL DEFAULT 1, ordine INT NOT NULL DEFAULT 0, creata_il DATETIME DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_pagina (pagina_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            'risorse_orari' => "CREATE TABLE IF NOT EXISTS risorse_orari (
+                id INT AUTO_INCREMENT PRIMARY KEY, risorsa_id INT NOT NULL, giorno TINYINT NOT NULL, dalle TIME NOT NULL, alle TIME NOT NULL,
+                INDEX idx_risorsa (risorsa_id, giorno)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            'risorse_chiusure' => "CREATE TABLE IF NOT EXISTS risorse_chiusure (
+                id INT AUTO_INCREMENT PRIMARY KEY, pagina_id INT NOT NULL, risorsa_id INT DEFAULT NULL, dal DATE NOT NULL, al DATE NOT NULL,
+                motivo VARCHAR(255) DEFAULT '', INDEX idx_pagina (pagina_id, dal, al), INDEX idx_risorsa (risorsa_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            'prenotazioni_risorse' => "CREATE TABLE IF NOT EXISTS prenotazioni_risorse (
+                id INT AUTO_INCREMENT PRIMARY KEY, risorsa_id INT NOT NULL, utente_id INT DEFAULT NULL, nome VARCHAR(100) DEFAULT '', cognome VARCHAR(100) DEFAULT '',
+                email VARCHAR(255) DEFAULT '', inizio DATETIME NOT NULL, fine DATETIME NOT NULL, motivo VARCHAR(500) DEFAULT '',
+                stato VARCHAR(20) NOT NULL DEFAULT 'confermata', serie VARCHAR(12) DEFAULT NULL, codice VARCHAR(20) NOT NULL,
+                nota_gestore VARCHAR(500) DEFAULT '', promemoria_inviato TINYINT(1) NOT NULL DEFAULT 0, creata_il DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_codice (codice), INDEX idx_risorsa (risorsa_id, inizio), INDEX idx_utente (utente_id), INDEX idx_stato (stato, inizio)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
             'personale_modifiche' => "CREATE TABLE IF NOT EXISTS personale_modifiche (
                 persona_id VARCHAR(80) NOT NULL PRIMARY KEY, telefono VARCHAR(60) DEFAULT '', ufficio VARCHAR(255) DEFAULT '',
                 ricevimento TEXT DEFAULT NULL, bio TEXT DEFAULT NULL, sito VARCHAR(255) DEFAULT '', aggiornata_il DATETIME DEFAULT NULL
@@ -201,6 +236,8 @@ if (!function_exists('assicura_schema')) {
                 'convenzione' => "ADD COLUMN convenzione TINYINT(1) NOT NULL DEFAULT 0",
                 // v27: evento dedicato alle scuole (prenota il docente per la classe, con il numero di studenti)
                 'dedicata_scuole' => "ADD COLUMN dedicata_scuole TINYINT(1) NOT NULL DEFAULT 0",
+                // v31: insegnamento dell'anagrafe da cui nasce l'attività (aree "Gruppi degli insegnamenti")
+                'insegnamento_id' => "ADD COLUMN insegnamento_id INT DEFAULT NULL",
             ],
             // v12: nomi degli studenti ridotti alle iniziali dopo il periodo di conservazione (i codici restano verificabili)
             // v27: file della convenzione e dell'Allegato A, docenti di riferimento indicati nell'Allegato A
@@ -216,6 +253,8 @@ if (!function_exists('assicura_schema')) {
                 'copertina_path'        => "ADD COLUMN copertina_path VARCHAR(255) DEFAULT NULL",
                 'mostra_in_home'        => "ADD COLUMN mostra_in_home TINYINT(1) NOT NULL DEFAULT 1",
                 'limite_iscrizioni'     => "ADD COLUMN limite_iscrizioni VARCHAR(20) NOT NULL DEFAULT 'nessuno'",
+                // v31: tipo dell'area (fsl, eventi, gruppi, calendario) che la colloca in una macroarea; '' = non assegnata
+                'tipo_area'             => "ADD COLUMN tipo_area VARCHAR(20) NOT NULL DEFAULT ''",
                 // v25: modelli della convenzione con le scuole e PEC a cui inviarla (vuoti = valori del DiBEST)
                 'conv_url_modello'      => "ADD COLUMN conv_url_modello VARCHAR(500) DEFAULT NULL",
                 'conv_url_allegato'     => "ADD COLUMN conv_url_allegato VARCHAR(500) DEFAULT NULL",
@@ -302,6 +341,16 @@ if (!function_exists('assicura_schema')) {
             $g_sql = $conn->real_escape_string($g);
             $conn->query("INSERT INTO ruoli (nome) SELECT '$g_sql' FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM ruoli WHERE nome = '$g_sql')");
         }
+
+        // 4b. v32: indice per le tendine regione / provincia / comune della scelta guidata della scuola
+        $idx = $conn->query("SHOW INDEX FROM scuole WHERE Key_name = 'idx_luogo'");
+        if ($idx && $idx->num_rows === 0) $conn->query("ALTER TABLE scuole ADD INDEX idx_luogo (regione, provincia, comune)");
+
+        // 5. v31: il portale diventa "Didattica DiBEST" (solo dove c'è ancora il nome predefinito di prima)
+        $conn->query("UPDATE configurazione_portale SET nome_portale = 'Didattica DiBEST' WHERE nome_portale IN ('EventiDiBEST', 'Eventi DiBEST', 'Eventi Dibest')");
+        $conn->query("UPDATE impostazioni_sistema SET smtp_from_name = REPLACE(REPLACE(smtp_from_name, 'EventiDiBEST', 'Didattica DiBEST'), 'Eventi DiBEST', 'Didattica DiBEST')
+                      WHERE smtp_from_name LIKE '%Eventi%DiBEST%'");
+        if (function_exists('invalidate_configurazione_portale_cache')) invalidate_configurazione_portale_cache();
 
         if (!is_dir(RADICE_SITO . '/cache')) @mkdir(RADICE_SITO . '/cache', 0755, true);
         @file_put_contents($marker, date('c'));

@@ -157,7 +157,7 @@ if (!function_exists('controllo_sito')) {
             $codice = 0;
             if (function_exists('curl_init')) {
                 $ch = curl_init($base . '/' . $perc);
-                curl_setopt_array($ch, [CURLOPT_NOBODY => false, CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => false, CURLOPT_TIMEOUT => 15, CURLOPT_USERAGENT => 'EventiDiBEST-controllo']);
+                curl_setopt_array($ch, [CURLOPT_NOBODY => false, CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => false, CURLOPT_TIMEOUT => 15, CURLOPT_USERAGENT => 'DidatticaDiBEST-controllo']);
                 $corpo = curl_exec($ch);
                 $codice = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
                 curl_close($ch);
@@ -187,10 +187,10 @@ if (!function_exists('esegui_controllo_sito')) {
             if ($problemi && ($firma !== $stato['firma_avviso'] || strtotime((string)$stato['ultimo_avviso']) < time() - 86400)) {
                 $corpo = "<p>Il controllo automatico del portale ha trovato <strong>" . count($problemi) . " problemi</strong>:</p><ul><li>" . implode('</li><li>', array_map($h, $problemi)) . "</li></ul>"
                        . "<p>Dettagli e nuovo controllo: <a href='$link'>Sistema → Controllo del sito</a>.</p>";
-                foreach (email_amministratori($conn) as $em) inviaNotificaEmail($em, "Portale EventiDiBEST: " . count($problemi) . " problemi rilevati", $corpo, $conn);
+                foreach (email_amministratori($conn) as $em) inviaNotificaEmail($em, "Portale Didattica DiBEST: " . count($problemi) . " problemi rilevati", $corpo, $conn);
                 $stato['ultimo_avviso'] = date('Y-m-d H:i:s'); $stato['firma_avviso'] = $firma;
             } elseif (!$problemi && ($prec['problemi'] ?? 0) > 0) {
-                foreach (email_amministratori($conn) as $em) inviaNotificaEmail($em, "Portale EventiDiBEST: tutto di nuovo a posto", "<p>Il controllo automatico non trova più problemi. Dettagli: <a href='$link'>Sistema → Controllo del sito</a>.</p>", $conn);
+                foreach (email_amministratori($conn) as $em) inviaNotificaEmail($em, "Portale Didattica DiBEST: tutto di nuovo a posto", "<p>Il controllo automatico non trova più problemi. Dettagli: <a href='$link'>Sistema → Controllo del sito</a>.</p>", $conn);
                 $stato['firma_avviso'] = '';
             }
         }
@@ -251,7 +251,7 @@ if (!function_exists('invia_report_email_settimanale')) {
             $corpo .= "<p style='color:#b91c1c;'><strong>Backup: nessuna esecuzione registrata.</strong> Controlla che il cron di admin/cron_backup.php sia attivo.</p>";
         }
         $corpo .= "<p><a href='" . $h(url_base_sito() . '/admin/sistema.php#log-email') . "'>Apri il registro completo nel pannello</a></p>";
-        $oggetto = ($tot['ko'] || ($b && empty($b['ok'])) || !$b ? "⚠️ " : "✅ ") . "Riepilogo settimanale email Eventi DiBEST: {$tot['ok']} inviate, {$tot['ko']} fallite";
+        $oggetto = ($tot['ko'] || ($b && empty($b['ok'])) || !$b ? "⚠️ " : "✅ ") . "Riepilogo settimanale email Didattica DiBEST: {$tot['ok']} inviate, {$tot['ko']} fallite";
         $inviati = 0;
         foreach ($dest as $em) if (inviaNotificaEmail($em, $oggetto, $corpo, $conn)) $inviati++;
         if (!$inviati) return "invio non riuscito: " . ($GLOBALS['ultimo_errore_email'] ?? 'errore sconosciuto');

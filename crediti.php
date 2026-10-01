@@ -5,7 +5,7 @@ require_once 'config.php';
 require_once 'functions.php';
 
 $cfg_cr = function_exists('get_configurazione_portale') ? get_configurazione_portale($conn) : [];
-$cr_portale    = !empty($cfg_cr['nome_portale']) ? $cfg_cr['nome_portale'] : 'Eventi DiBEST';
+$cr_portale    = !empty($cfg_cr['nome_portale']) ? $cfg_cr['nome_portale'] : 'Didattica DiBEST';
 $cr_realizzato = !empty($cfg_cr['footer_realizzato_da']) ? $cfg_cr['footer_realizzato_da'] : 'Realizzato per il Dipartimento da Emanuele Dodaro';
 $cr_assistenza = !empty($cfg_cr['footer_assistenza']) ? $cfg_cr['footer_assistenza'] : 'emanuele.dodaro@unical.it';
 $cr_dip        = !empty($cfg_cr['footer_nome_dipartimento']) ? $cfg_cr['footer_nome_dipartimento'] : 'DiBEST - Dipartimento di Biologia, Ecologia e Scienze della Terra (UNICAL)';

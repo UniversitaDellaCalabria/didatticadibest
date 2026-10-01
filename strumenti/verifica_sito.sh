@@ -19,7 +19,10 @@
 # La cartella strumenti/ è bloccata al web dal suo .htaccess.
 # =========================================================================
 
-BASE="${1:-https://dibest2.unical.it/eventi}"
+# Indirizzo predefinito: la cartella del portale sul server (didattica o eventi); da un altro computer: didattica
+CARTELLA_SITO="$(basename "$(cd "$(dirname "$0")/.." && pwd)")"
+case "$CARTELLA_SITO" in eventi|didattica) ;; *) CARTELLA_SITO=didattica ;; esac
+BASE="${1:-https://dibest2.unical.it/$CARTELLA_SITO}"
 BASE="${BASE%/}"
 shift 2>/dev/null
 AREE=("$@")

@@ -36,7 +36,7 @@ require_once 'header.php';
             document.getElementById('reader').innerHTML = "<div class='p-5'><i class='fa fa-spinner fa-spin fa-3x text-danger mb-3'></i><h4>Registrazione in corso...</h4></div>";
             window.location.replace(decodedText);
         } else {
-            alert("Attenzione: Questo QR Code non appartiene al sistema Eventi DiBEST.");
+            alert("Attenzione: Questo QR Code non appartiene al sistema Didattica DiBEST.");
             html5QrcodeScanner.render(onScanSuccess, onScanFailure);
         }
     }

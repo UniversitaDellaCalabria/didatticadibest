@@ -1,10 +1,10 @@
-// sw.js - Service Worker PWA EventiDiBEST
+// sw.js - Service Worker PWA Didattica DiBEST
 // Le pagine arrivano SEMPRE dal server: contengono nome dell'utente, posti liberi e stato del login,
 // quindi una copia salvata mostrerebbe lo stato precedente (e dati personali dopo il logout).
 // In cache solo le librerie in assets/vendor e assets/js (percorsi con la versione: Cache-First) e la pagina offline.
 // Cambiare SW_VERSION fa cancellare ai browser tutte le cache delle versioni precedenti.
 
-const SW_VERSION = 'dibest-v6';
+const SW_VERSION = 'dibest-v7';
 
 const CACHE_STATIC  = SW_VERSION + '-static';   // CSS, JS, font e icone delle librerie
 const CACHE_OFFLINE = SW_VERSION + '-offline';  // Solo offline.html
@@ -71,7 +71,7 @@ async function cacheFirst(req) {
 async function offlineFallback() {
     const cache = await caches.open(CACHE_OFFLINE);
     return (await cache.match('./offline.html')) || new Response(
-        '<h1>Sei offline</h1><p>Connettiti per usare EventiDiBEST.</p>',
+        '<h1>Sei offline</h1><p>Connettiti per usare Didattica DiBEST.</p>',
         { status: 503, headers: { 'Content-Type': 'text/html; charset=utf-8' } }
     );
 }

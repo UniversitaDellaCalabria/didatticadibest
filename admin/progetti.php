@@ -609,7 +609,7 @@ if ($mostra_form):
                     <label class="form-check-label small fw-bold" for="pjApprov">Iscrizioni da confermare dai gestori</label>
                 </div>
                 <p class="form-text mt-0 mb-3">Acceso: ogni iscrizione (di tutte le edizioni) resta <strong>da approvare</strong> finché un gestore non la conferma da Iscrizioni; il posto resta occupato nel frattempo.</p>
-                <?php $conv_v = !empty($dp['convenzione']); ?>
+                <?php $conv_v = !empty($dp['convenzione']) || (!$id_modifica && tipo_area($page_cfg) === 'fsl'); // nuovo progetto in un'area FSL: già acceso ?>
                 <div class="form-check form-switch mb-1">
                     <input class="form-check-input" type="checkbox" name="convenzione" id="pjConv" value="1" <?php echo $conv_v ? 'checked' : ''; ?>>
                     <label class="form-check-label small fw-bold" for="pjConv"><i class="fa fa-file-signature me-1" aria-hidden="true"></i>Attività di Formazione Scuola Lavoro</label>

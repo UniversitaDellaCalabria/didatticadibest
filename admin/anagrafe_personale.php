@@ -1,6 +1,7 @@
 <?php
-// anagrafe_personale.php - Anagrafe del personale di Ateneo (solo amministratori), dalle API pubbliche del portale Unical:
-// elenchi Docenti / Personale tecnico amministrativo / Altro personale, corsi di studio per il campo dei moduli
+// anagrafe_personale.php - Anagrafi di Ateneo (solo amministratori), dalle API pubbliche del portale Unical:
+// elenchi Docenti / Personale tecnico amministrativo / Altro personale, insegnamenti dei corsi del Dipartimento
+// (anagrafe_insegnamenti.php apre direttamente quella vista), corsi di studio per il campo dei moduli
 // e strutture da sincronizzare (DiBEST di partenza, se ne possono aggiungere altre, es. il dipartimento di un collega).
 // anagrafe_docenti.php e anagrafe_pta.php aprono direttamente il loro elenco.
 require_once 'admin_header.php';
@@ -9,7 +10,7 @@ if (!$is_full_admin) nega_accesso();
 
 function admin_redirect($url) { echo "<script>window.location.replace(" . json_encode($url) . ");</script>"; exit; }
 
-$viste = GRUPPI_PERSONALE + ['corsi' => 'Corsi di studio', 'strutture' => 'Strutture e aggiornamento'];
+$viste = GRUPPI_PERSONALE + ['insegnamenti' => 'Insegnamenti', 'corsi' => 'Corsi di studio', 'strutture' => 'Strutture e aggiornamento'];
 $vista = (string)($_GET['vista'] ?? ($vista_anagrafe ?? 'docenti'));
 if (!isset($viste[$vista])) $vista = 'docenti';
 $url_pagina = 'anagrafe_personale.php?p_id=' . (int)$filtro_p;
@@ -95,19 +96,19 @@ $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
 </style>
 
 <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
-    <h4 class="fw-bold text-dark mb-0"><i class="fa fa-address-book me-2" style="color:#0f766e;" aria-hidden="true"></i>Anagrafe personale di Ateneo</h4>
+    <h4 class="fw-bold text-dark mb-0"><i class="fa fa-address-book me-2" style="color:#0f766e;" aria-hidden="true"></i>Anagrafi di Ateneo</h4>
     <form method="POST" class="m-0">
         <?php csrf_field(); ?>
         <button type="submit" name="sincronizza" value="1" class="btn btn-sm btn-outline-dark fw-bold" data-attesa="Aggiornamento in corso…"><i class="fa fa-rotate me-1" aria-hidden="true"></i>Aggiorna ora dal portale</button>
     </form>
 </div>
-<p class="text-secondary small">Docenti e personale delle strutture scelte, dal portale dell'Università della Calabria (dati pubblici, aggiornati ogni settimana). Servono per scegliere referenti e gestori senza riscrivere nomi ed email, e per riconoscere chi accede: al login con la stessa email la persona entra nel gruppo <strong>Docenti</strong>, <strong>Personale tecnico amministrativo</strong> o <strong>Altro personale di Ateneo</strong>, utilizzabile per riservare gli eventi.</p>
+<p class="text-secondary small">Docenti, personale e insegnamenti, dal portale dell'Università della Calabria (dati pubblici, aggiornati ogni settimana), comuni a tutto il portale. Gli insegnamenti sono quelli dei corsi del proprio dipartimento (la prima struttura). Servono per scegliere referenti e gestori senza riscrivere nomi ed email, e per riconoscere chi accede: al login con la stessa email la persona entra nel gruppo <strong>Docenti</strong>, <strong>Personale tecnico amministrativo</strong> o <strong>Altro personale di Ateneo</strong>, utilizzabile per riservare gli eventi.</p>
 
 <ul class="nav nav-pills ana-tab gap-1 mb-3 flex-wrap">
     <?php foreach ($viste as $k => $et): ?>
         <li class="nav-item"><a class="nav-link <?php echo $vista === $k ? 'active' : ''; ?>" href="<?php echo $h("$url_pagina&vista=$k"); ?>" <?php echo $vista === $k ? 'aria-current="page"' : ''; ?>>
             <?php echo $h($et); ?>
-            <?php if (isset($conteggi[$k])): ?><span class="badge bg-light text-dark ms-1"><?php echo $conteggi[$k]; ?></span><?php elseif ($k === 'corsi'): ?><span class="badge bg-light text-dark ms-1"><?php echo $n_corsi; ?></span><?php endif; ?>
+            <?php if (isset($conteggi[$k])): ?><span class="badge bg-light text-dark ms-1"><?php echo $conteggi[$k]; ?></span><?php elseif ($k === 'corsi'): ?><span class="badge bg-light text-dark ms-1"><?php echo $n_corsi; ?></span><?php elseif ($k === 'insegnamenti'): ?><span class="badge bg-light text-dark ms-1"><?php echo (int)(@$conn->query("SELECT COUNT(*) n FROM insegnamenti WHERE presente = 1 AND anno_accademico = " . anno_accademico_corrente())->fetch_assoc()['n'] ?? 0); ?></span><?php endif; ?>
         </a></li>
     <?php endforeach; ?>
 </ul>
@@ -191,6 +192,77 @@ $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
             </tbody>
         </table>
     </div>
+</section>
+
+<?php elseif ($vista === 'insegnamenti'):
+    // ---------------------------------------------------------------- INSEGNAMENTI
+    $aa_disp = array_map('intval', array_column($conn->query("SELECT DISTINCT anno_accademico a FROM insegnamenti WHERE presente = 1 ORDER BY a")->fetch_all(MYSQLI_ASSOC), 'a'));
+    $f_aa = (int)($_GET['aa'] ?? 0); if (!in_array($f_aa, $aa_disp, true)) $f_aa = in_array(anno_accademico_corrente(), $aa_disp, true) ? anno_accademico_corrente() : (int)(end($aa_disp) ?: 0);
+    $f_cds = (string)($_GET['cds'] ?? ''); $f_anno = (int)($_GET['anno'] ?? 0); $f_sem = (string)($_GET['sem'] ?? ''); $f_q = trim((string)($_GET['q'] ?? ''));
+    $where = ["presente = 1", "anno_accademico = " . $f_aa]; $par = []; $tipi = '';
+    if ($f_cds !== '') { $where[] = "cds_cod = ?"; $par[] = $f_cds; $tipi .= 's'; }
+    if ($f_anno > 0) { $where[] = "anno_corso = ?"; $par[] = $f_anno; $tipi .= 'i'; }
+    if ($f_sem !== '') { $where[] = "semestre = ?"; $par[] = $f_sem; $tipi .= 's'; }
+    if ($f_q !== '') { $where[] = "(nome LIKE ? OR docente LIKE ? OR codice LIKE ? OR ssd_cod LIKE ?)"; $lk = '%' . addcslashes($f_q, '%_\\') . '%'; array_push($par, $lk, $lk, $lk, $lk); $tipi .= 'ssss'; }
+    $st_i = $conn->prepare("SELECT i.*, (SELECT COUNT(*) FROM progetti_dettagli d JOIN eventi e ON e.id = d.evento_id WHERE d.insegnamento_id = i.id AND e.archiviato = 0) AS n_att
+                            FROM insegnamenti i WHERE " . implode(' AND ', $where) . " ORDER BY cds_nome, anno_corso, nome, partizione LIMIT 600");
+    if ($par) $st_i->bind_param($tipi, ...$par);
+    $st_i->execute();
+    $ins = $st_i->get_result()->fetch_all(MYSQLI_ASSOC);
+    $opz_cds = $conn->query("SELECT cds_cod, cds_nome, COUNT(*) n FROM insegnamenti WHERE presente = 1 AND anno_accademico = $f_aa GROUP BY cds_cod, cds_nome ORDER BY cds_nome")->fetch_all(MYSQLI_ASSOC);
+    $opz_sem = array_column($conn->query("SELECT DISTINCT semestre FROM insegnamenti WHERE presente = 1 AND semestre <> '' ORDER BY semestre")->fetch_all(MYSQLI_ASSOC), 'semestre');
+?>
+<section class="ana-sez">
+    <h2><i class="fa fa-book-open me-1" aria-hidden="true"></i>Insegnamenti <?php echo $f_aa ? $f_aa . '/' . ($f_aa + 1) : ''; ?></h2>
+    <p class="small text-secondary">Insegnamenti tenuti nell'anno accademico, per tutti i corsi di studio del Dipartimento, con anno di corso, semestre, settore e docente titolare. Nelle aree <strong>Gruppi degli insegnamenti</strong> un'attività si crea partendo da qui: titolo, corso e docente arrivano da soli.</p>
+    <?php if (!$aa_disp): ?>
+        <p class="text-muted small mb-0">Nessun insegnamento: premi <strong>Aggiorna ora dal portale</strong>.</p>
+    <?php else: ?>
+    <form method="GET" class="row g-2 align-items-end mb-3">
+        <input type="hidden" name="p_id" value="<?php echo (int)$filtro_p; ?>"><input type="hidden" name="vista" value="insegnamenti">
+        <div class="col-6 col-md-2"><label class="form-label small fw-bold mb-1" for="fiAa">Anno accademico</label>
+            <select name="aa" id="fiAa" class="form-select form-select-sm"><?php foreach ($aa_disp as $a): ?><option value="<?php echo $a; ?>" <?php echo $a === $f_aa ? 'selected' : ''; ?>><?php echo $a . '/' . ($a + 1); ?></option><?php endforeach; ?></select></div>
+        <div class="col-md-4"><label class="form-label small fw-bold mb-1" for="fiCds">Corso di studio</label>
+            <select name="cds" id="fiCds" class="form-select form-select-sm"><option value="">Tutti</option><?php foreach ($opz_cds as $o): ?><option value="<?php echo $h($o['cds_cod']); ?>" <?php echo $o['cds_cod'] === $f_cds ? 'selected' : ''; ?>><?php echo $h($o['cds_nome'] . ' (' . $o['n'] . ')'); ?></option><?php endforeach; ?></select></div>
+        <div class="col-6 col-md-1"><label class="form-label small fw-bold mb-1" for="fiAnno">Anno</label>
+            <select name="anno" id="fiAnno" class="form-select form-select-sm"><option value="0">Tutti</option><?php for ($a = 1; $a <= 6; $a++): ?><option value="<?php echo $a; ?>" <?php echo $a === $f_anno ? 'selected' : ''; ?>><?php echo $a; ?>°</option><?php endfor; ?></select></div>
+        <div class="col-6 col-md-2"><label class="form-label small fw-bold mb-1" for="fiSem">Semestre</label>
+            <select name="sem" id="fiSem" class="form-select form-select-sm"><option value="">Tutti</option><?php foreach ($opz_sem as $o): ?><option value="<?php echo $h($o); ?>" <?php echo $o === $f_sem ? 'selected' : ''; ?>><?php echo $h($o); ?></option><?php endforeach; ?></select></div>
+        <div class="col-md-2"><label class="form-label small fw-bold mb-1" for="fiQ">Cerca</label><input type="search" name="q" id="fiQ" class="form-control form-control-sm" value="<?php echo $h($f_q); ?>" placeholder="Nome, docente, SSD"></div>
+        <div class="col-md-1 d-flex gap-1"><button class="btn btn-sm btn-primary fw-bold flex-grow-1" title="Filtra" aria-label="Filtra"><i class="fa fa-filter" aria-hidden="true"></i></button><a class="btn btn-sm btn-outline-secondary" href="<?php echo $h("$url_pagina&vista=insegnamenti"); ?>" title="Togli i filtri" aria-label="Togli i filtri"><i class="fa fa-xmark" aria-hidden="true"></i></a></div>
+    </form>
+    <div class="d-flex justify-content-between align-items-center mb-2 small">
+        <span class="text-secondary"><?php echo count($ins); ?> insegnamenti<?php echo count($ins) >= 600 ? ' (mostrati i primi 600: usa i filtri)' : ''; ?></span>
+        <button type="button" class="btn btn-sm btn-outline-secondary fw-bold" id="csvIns"><i class="fa fa-file-csv me-1" aria-hidden="true"></i>CSV</button>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-sm align-middle small" id="tabIns">
+            <thead class="table-light"><tr><th>Insegnamento</th><th>Corso di studio</th><th class="text-center">Anno</th><th>Semestre</th><th>SSD</th><th>Docente</th><th class="text-center">Attività</th></tr></thead>
+            <tbody>
+            <?php foreach ($ins as $i): ?>
+                <tr>
+                    <td><div class="fw-semibold"><?php echo $h($i['nome']); ?><?php if ($i['partizione'] !== ''): ?> <span class="badge bg-light text-dark border"><?php echo $h($i['partizione']); ?></span><?php endif; ?></div><div class="text-secondary font-monospace"><?php echo $h($i['codice']); ?></div></td>
+                    <td><?php echo $h($i['cds_nome']); ?></td>
+                    <td class="text-center"><?php echo $i['anno_corso'] ? (int)$i['anno_corso'] . '°' : '—'; ?></td>
+                    <td><?php echo $h($i['semestre']); ?></td>
+                    <td><?php echo $h($i['ssd_cod']); ?></td>
+                    <td><?php echo $h($i['docente'] ?: '—'); ?></td>
+                    <td class="text-center"><?php echo (int)$i['n_att'] ?: '—'; ?></td>
+                </tr>
+            <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+    <script>
+    document.getElementById('csvIns').addEventListener('click', function () {
+        var righe = [];
+        document.querySelectorAll('#tabIns tr').forEach(function (tr) { righe.push(Array.prototype.map.call(tr.children, function (c) { return c.textContent.replace(/\s+/g, ' ').trim(); })); });
+        var csv = '\ufeff' + righe.map(function (r) { return r.map(function (v) { return '"' + v.replace(/"/g, '""') + '"'; }).join(';'); }).join('\r\n');
+        var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+        a.download = 'insegnamenti_<?php echo $f_aa; ?>.csv'; document.body.appendChild(a); a.click(); a.remove();
+    });
+    </script>
+    <?php endif; ?>
 </section>
 
 <?php elseif ($vista === 'corsi'):

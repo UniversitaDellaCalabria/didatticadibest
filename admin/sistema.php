@@ -29,7 +29,7 @@ if (isset($_POST['run_reminders_manual'])) {
 if (isset($_POST['invia_email_test'])) {
     csrf_verify($_POST['csrf_token'] ?? '');
     $dest_test = trim($_POST['email_test'] ?? '');
-    $ok_test = inviaNotificaEmail($dest_test, "Email di prova - Eventi DiBEST", "<p>Questa è un'email di prova inviata dal pannello <strong>Sistema Email</strong> il " . date('d/m/Y H:i') . ".</p><p>Se la ricevi, la configurazione SMTP funziona.</p>", $conn);
+    $ok_test = inviaNotificaEmail($dest_test, "Email di prova - Didattica DiBEST", "<p>Questa è un'email di prova inviata dal pannello <strong>Sistema Email</strong> il " . date('d/m/Y H:i') . ".</p><p>Se la ricevi, la configurazione SMTP funziona.</p>", $conn);
     if ($ok_test) flash_set("Email di prova accettata dal server per " . $dest_test . ". Se non arriva entro qualche minuto controlla lo spam.");
     else flash_set("Invio fallito: " . ($GLOBALS['ultimo_errore_email'] ?: 'errore sconosciuto'), 'danger');
     admin_redirect("sistema.php?p_id=$filtro_p&r=" . time() . "#log-email");
@@ -143,7 +143,7 @@ if (isset($_POST['save_system_settings'])) {
             </div>
             <div class="col-md-4">
                 <label class="form-label small fw-bold">Nome Mittente (Visualizzato)</label>
-                <input type="text" name="smtp_from_name" class="form-control" value="<?php echo htmlspecialchars($sys['smtp_from_name'] ?? 'Eventi DiBEST - Unical'); ?>" required>
+                <input type="text" name="smtp_from_name" class="form-control" value="<?php echo htmlspecialchars($sys['smtp_from_name'] ?? 'Didattica DiBEST - Unical'); ?>" required>
             </div>
         </div>
 

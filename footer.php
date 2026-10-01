@@ -12,7 +12,7 @@ if (!function_exists('get_configurazione_portale') && file_exists(__DIR__ . '/fu
     require_once __DIR__ . '/functions.php';
 }
 
-$footer_titolo = 'EventiDiBEST';
+$footer_titolo = 'Didattica DiBEST';
 $footer_sottotitolo = 'Portale Eventi e Laboratori Dipartimentali';
 $footer_nome_dipartimento = 'DiBEST - Dipartimento di Biologia, Ecologia e Scienze della Terra (UNICAL)';
 $footer_indirizzo = 'Via Pietro Bucci, 87036 Rende (CS)';
@@ -96,14 +96,14 @@ if (isset($conn) && $conn instanceof mysqli) {
 
 <script src="<?php echo url_vendor('jsdelivr/npm/bootstrap-italia@2.8.3/dist/js/bootstrap-italia.bundle.min.js'); ?>" integrity="sha384-Uf9ZvEEEoRYjUlBeVUHMbjfQKOtjQKqCfLchDholmnW8vcgVNn8kkh6yne+cfW6v" crossorigin="anonymous"></script>
 <?php if (!empty($GLOBALS['usa_campo_scuola'])): // campo "Scuola" con ricerca nell'anagrafe ?>
-<script src="<?php echo htmlspecialchars(rtrim((string)parse_url(url_base_sito(), PHP_URL_PATH), '/')); ?>/assets/js/campo-scuola.js?v=2"></script>
+<script src="<?php echo htmlspecialchars(rtrim((string)parse_url(url_base_sito(), PHP_URL_PATH), '/')); ?>/assets/js/campo-scuola.js?v=3"></script>
 <?php endif; ?>
 
 <!-- Fase 4: Registrazione Service Worker PWA (Stale-While-Revalidate + Cache-First + fallback offline) -->
 <script>
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
-        navigator.serviceWorker.register('/eventi/sw.js', { scope: '/eventi/' })
+        navigator.serviceWorker.register(<?php $sw_base = rtrim((string)parse_url(url_base_sito(), PHP_URL_PATH), '/') . '/'; echo json_encode($sw_base . 'sw.js'); ?>, { scope: <?php echo json_encode($sw_base); ?> })
             .then(function (reg) {
                 // Controlla aggiornamenti ogni volta che l'utente naviga
                 reg.update();

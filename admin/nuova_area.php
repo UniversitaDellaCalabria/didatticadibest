@@ -28,7 +28,7 @@ while ($r_vm && $vm = $r_vm->fetch_assoc()) $voci_menu[(int)$vm['id']] = $vm['et
 $v = [
     'titolo' => '', 'slug' => '', 'sottotitolo' => '', 'colore_primario' => '#0056b3', 'colore_secondario' => '#0056b3',
     'layout_template' => 'grid', 'num_colonne' => 2, 'larghezza_contenitore' => '85%', 'spazio_card' => 30, 'limite_iscrizioni' => 'nessuno', 'chiedi_matricola' => 1,
-    'mostra_in_home' => 1, 'hero_descrizione' => '', 'crea_menu' => 1, 'etichetta_menu' => '', 'genitore_menu' => 0,
+    'mostra_in_home' => 1, 'hero_descrizione' => '', 'crea_menu' => 1, 'etichetta_menu' => '', 'genitore_menu' => 0, 'tipo_area' => '',
 ];
 $errori = [];
 
@@ -52,6 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['crea_area'])) {
         'crea_menu'         => isset($_POST['crea_menu']) ? 1 : 0,
         'etichetta_menu'    => mb_substr(trim((string)($_POST['etichetta_menu'] ?? '')), 0, 100),
         'genitore_menu'     => array_key_exists((int)($_POST['genitore_menu'] ?? 0), $voci_menu) ? (int)$_POST['genitore_menu'] : 0,
+        'tipo_area'         => isset(TIPI_AREA[$_POST['tipo_area'] ?? '']) && TIPI_AREA[$_POST['tipo_area']]['disponibile'] ? $_POST['tipo_area'] : '',
     ];
 
     if ($v['titolo'] === '') $errori[] = "Indica il nome dell'area.";
@@ -74,7 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['crea_area'])) {
         $conn->begin_transaction();
         try {
         $hero = $v['hero_descrizione'] !== '' ? $v['hero_descrizione']
-              : '<strong style="color: ' . $v['colore_primario'] . ';">Benvenuto/a a ' . htmlspecialchars($v['titolo']) . ':</strong> scopri il programma e iscriviti.';
+              : '<strong style="color: ' . $v['colore_primario'] . ';">Benvenuto/a a ' . htmlspecialchars($v['titolo']) . ':</strong> ' . ($v['tipo_area'] === 'calendario' ? 'scegli la risorsa e prenota uno slot libero.' : 'scopri il programma e iscriviti.');
         $stmt = $conn->prepare("INSERT INTO pagine_eventi (titolo, slug, sottotitolo, colore_primario, colore_secondario, larghezza_contenitore, layout_template, num_colonne,
                                     spazio_card, mostra_sidebar, chiedi_matricola, visibile, mostra_in_home, limite_iscrizioni, sidebar_titolo, hero_descrizione)
                                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, 0, ?, ?, ?, ?)");
@@ -82,6 +83,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['crea_area'])) {
                           $v['layout_template'], $v['num_colonne'], $v['spazio_card'], $v['chiedi_matricola'], $v['mostra_in_home'], $v['limite_iscrizioni'], $v['titolo'], $hero);
         if (!$stmt->execute()) throw new RuntimeException($conn->error);
         $new_id = (int)$conn->insert_id;
+        // Tipo dell'area (macroarea)
+        $st_ta = $conn->prepare("UPDATE pagine_eventi SET tipo_area = ? WHERE id = ?");
+        $st_ta->bind_param("si", $v['tipo_area'], $new_id); $st_ta->execute();
 
         $msg_menu = '';
         if ($v['crea_menu']) {
@@ -104,7 +108,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['crea_area'])) {
     if (!$errori && isset($new_id)) {
         registra_log_audit($conn, "Creazione Area", ["Area" => $v['titolo'], "Slug" => $v['slug'], "Voce di menu" => $v['crea_menu'] ? 'sì (nascosta)' : 'no']);
         flash_set("Area \"" . $v['titolo'] . "\" creata e NASCOSTA al pubblico: la rendi visibile dalla pagina Aree quando è pronta." . $msg_menu, 'success');
-        admin_redirect("impostazioni_area.php?p_id=$new_id");
+        // Calendari e risorse: si parte creando la prima risorsa con i suoi orari
+        admin_redirect($v['tipo_area'] === 'calendario' ? "risorse.php?p_id=$new_id&nuova=1" : "impostazioni_area.php?p_id=$new_id");
     }
 }
 $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
@@ -143,6 +148,25 @@ $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
                             <span class="input-group-text">.php</span>
                         </div>
                         <div class="form-text">Solo lettere, numeri e _. Si compila da solo dal nome.</div>
+                    </div>
+                    <div class="col-12">
+                        <label for="naTipo" class="form-label small fw-bold">Tipo di area (macroarea)</label>
+                        <?php echo html_scelta_tipo_area('tipo_area', $v['tipo_area'], 'id="naTipo"', 'form-select'); ?>
+                        <div class="form-text" id="naTipoDescr">Colloca l'area nella home (Orientamento, Didattica, Calendari e risorse) e propone le impostazioni adatte ai nuovi eventi e progetti. Si cambia quando vuoi dalla pagina Aree.</div>
+                        <script>
+                        (function () {
+                            var descr = <?php echo json_encode(array_map(fn($t) => $t['descr'], TIPI_AREA), JSON_UNESCAPED_UNICODE); ?>, sel = document.getElementById('naTipo');
+                            sel.addEventListener('change', function () {
+                                if (descr[sel.value]) document.getElementById('naTipoDescr').textContent = descr[sel.value];
+                                // Gruppi degli insegnamenti: layout a gruppi e un solo turno (gruppo) per evento
+                                if (sel.value === 'gruppi') {
+                                    var l = document.getElementById('naLayout'), m = document.getElementById('naLimite');
+                                    if (l && l.querySelector('option[value="gruppi"]')) l.value = 'gruppi';
+                                    if (m && m.querySelector('option[value="un_turno"]')) m.value = 'un_turno';
+                                }
+                            });
+                        })();
+                        </script>
                     </div>
                     <div class="col-12">
                         <label for="naSott" class="form-label small fw-bold">Sottotitolo</label>

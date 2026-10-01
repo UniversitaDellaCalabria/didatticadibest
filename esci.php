@@ -28,7 +28,7 @@ if (file_exists($simplesaml_path)) {
     require_once $simplesaml_path;
     $as = new \SimpleSAML\Auth\Simple('default-sp');
     $proto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-    $return_url = $proto . '://' . $_SERVER['HTTP_HOST'] . '/eventi/logout-success.php';
+    $return_url = $proto . '://' . $_SERVER['HTTP_HOST'] . rtrim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'])), '/') . '/logout-success.php';
     $as->logout($return_url);
     // Non arriva mai qui se SAML era attivo
 }

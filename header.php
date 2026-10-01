@@ -41,7 +41,7 @@ if (isset($conn) && $conn instanceof mysqli) {
 $favicon_url = !empty($cfg_portale_header['favicon_path']) ? $cfg_portale_header['favicon_path'] : 'https://www.unical.it/favicon.ico';
 $logo_url = !empty($cfg_portale_header['logo_path']) ? $cfg_portale_header['logo_path'] : '';
 $logo_mobile_url = !empty($cfg_portale_header['logo_mobile_path']) ? $cfg_portale_header['logo_mobile_path'] : '';
-$titolo_portale = !empty($cfg_portale_header['nome_portale']) ? $cfg_portale_header['nome_portale'] : 'EventiDiBEST';
+$titolo_portale = !empty($cfg_portale_header['nome_portale']) ? $cfg_portale_header['nome_portale'] : 'Didattica DiBEST';
 $sottotitolo_portale = !empty($cfg_portale_header['sottotitolo_portale']) ? $cfg_portale_header['sottotitolo_portale'] : 'Portale Eventi e Laboratori Dipartimentali';
 
 $u_logged_header = !empty($_SESSION['utente_id']);

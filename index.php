@@ -1,5 +1,5 @@
 <?php
-$page_title = "EventiDiBEST - Portale Eventi e Laboratori Dipartimentali";
+$page_title = "Didattica DiBEST - Orientamento, didattica e prenotazioni del Dipartimento";
 require_once 'header.php';
 
 $pagine = array_values(array_filter(get_pagine_eventi_visibili($conn), fn($p) => (int)($p['mostra_in_home'] ?? 1) === 1));
@@ -368,8 +368,25 @@ ob_start(); ?>
                 <p class="text-secondary fw-bold fs-4">Nessun evento o area di lavoro attualmente disponibile.</p>
             </div>
         <?php else: ?>
-            <?php foreach ($pagine as $i_area => $p):
+            <?php
+            // Aree divise per macroarea (Orientamento, Didattica, Calendari e risorse) se almeno una ha il tipo assegnato;
+            // altrimenti un'unica griglia come sempre
+            $gruppi_home = raggruppa_aree_per_sezione($pagine);
+            $con_sezioni = (bool)array_diff(array_keys($gruppi_home), ['']);
+            $tag_card = $con_sezioni ? 'h3' : 'h2';
+            $i_area = 0;
+            foreach (($con_sezioni ? $gruppi_home : ['' => $pagine]) as $sez_k => $aree_sez):
+                if ($con_sezioni):
+                    $sz = SEZIONI_PORTALE[$sez_k] ?? ['nome' => 'Altre attività', 'icona' => 'fa-layer-group', 'descr' => ''];
+                    $sez_vis = $aree_max <= 0 || $i_area < $aree_max; ?>
+                <div class="col-12 home-sezione <?php echo $sez_vis ? '' : 'area-extra d-none'; ?>">
+                    <h2 class="h4 fw-bold mb-1 mt-2"><i class="fa <?php echo $sz['icona']; ?> me-2" style="color:#B30000;" aria-hidden="true"></i><?php echo htmlspecialchars($sz['nome']); ?></h2>
+                    <?php if ($sz['descr'] !== ''): ?><p class="text-secondary small mb-0"><?php echo htmlspecialchars($sz['descr']); ?></p><?php endif; ?>
+                </div>
+            <?php endif;
+            foreach ($aree_sez as $p):
                 $nascosta = $aree_max > 0 && $i_area >= $aree_max;
+                $i_area++;
             ?>
                 <div class="<?php echo $col_aree_cls; ?> align-items-stretch <?php echo $nascosta ? 'area-extra d-none' : 'd-flex'; ?>">
                     <div class="card-portal w-100">
@@ -390,7 +407,7 @@ ob_start(); ?>
                                     <span class="badge bg-white text-dark fw-bold text-uppercase" style="backdrop-filter:blur(4px);"><?php echo htmlspecialchars($p['sidebar_intervallo_date'] ?: 'Aperto'); ?></span>
                                     <i class="fa fa-calendar-check fs-4 text-white-50"></i>
                                 </div>
-                                <h2 class="fw-bold mt-2 mb-0" style="text-shadow: 0 1px 4px rgba(0,0,0,0.4);font-size:1.25rem;"><?php echo htmlspecialchars($p['titolo'] . ' ' . ($p['sottotitolo'] ?? '')); ?></h2>
+                                <<?php echo $tag_card; ?> class="fw-bold mt-2 mb-0" style="text-shadow: 0 1px 4px rgba(0,0,0,0.4);font-size:1.25rem;"><?php echo htmlspecialchars($p['titolo'] . ' ' . ($p['sottotitolo'] ?? '')); ?></<?php echo $tag_card; ?>>
                             </div>
                         </div>
                         <div class="card-portal-body">
@@ -402,13 +419,13 @@ ob_start(); ?>
                             </div>
                             <div>
                                 <a href="<?php echo htmlspecialchars($p['slug']); ?>.php" class="btn-esplora w-100 shadow-sm" style="background-color: <?php echo $col1; ?>;color: <?php echo colore_testo_su($col1); ?>;">
-                                    <?php echo $widgets['aree_colonne'] >= 4 ? 'Esplora e Prenota' : 'Esplora Programma e Prenota'; ?> <i class="fa fa-arrow-right ms-2"></i>
+                                    <?php echo tipo_area($p) === 'calendario' ? ($widgets['aree_colonne'] >= 4 ? 'Disponibilità' : 'Vedi disponibilità e prenota') : ($widgets['aree_colonne'] >= 4 ? 'Esplora e Prenota' : 'Esplora Programma e Prenota'); ?> <i class="fa fa-arrow-right ms-2"></i>
                                 </a>
                             </div>
                         </div>
                     </div>
                 </div>
-            <?php endforeach; ?>
+            <?php endforeach; endforeach; ?>
         <?php endif; ?>
     </div>
     <?php if ($aree_extra > 0): ?>
@@ -419,7 +436,7 @@ ob_start(); ?>
         </div>
         <script>
         document.getElementById('btnMostraAree').addEventListener('click', function () {
-            document.querySelectorAll('.area-extra').forEach(function (el) { el.classList.replace('d-none', 'd-flex'); });
+            document.querySelectorAll('.area-extra').forEach(function (el) { el.classList.remove('d-none'); if (!el.classList.contains('home-sezione')) el.classList.add('d-flex'); });
             this.parentNode.remove();
         });
         </script>
@@ -510,7 +527,7 @@ ob_start(); ?>
 endif;
 
 // ── STAMPA NELL'ORDINE CONFIGURATO ────────────────────────────────────────────
-echo '<h1 class="visually-hidden">' . htmlspecialchars($titolo_portale ?? 'EventiDiBEST') . '</h1>';
+echo '<h1 class="visually-hidden">' . htmlspecialchars($titolo_portale ?? 'Didattica DiBEST') . '</h1>';
 foreach ($widgets['ordine'] as $chiave_widget) {
     echo $blocchi[$chiave_widget] ?? '';
 }

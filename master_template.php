@@ -51,6 +51,9 @@ if ($is_visibile === 0) {
     }
 }
 
+// Aree "Calendari e risorse": pagina a slot (aule, laboratori, sportelli) invece di eventi e turni
+if (tipo_area($page_cfg) === 'calendario') { require __DIR__ . '/calendario_area.php'; exit; }
+
 $logged_u_info = null; $val_nome = ''; $val_cognome = ''; $val_email = ''; $val_matricola = '';
 if ($utente_logged) {
     $u_id_logged = (int)$_SESSION['utente_id'];
@@ -1415,6 +1418,10 @@ function evSetRating(btn) {
                 <?php if ($prossima_s): ?><span><i class="fa fa-calendar-days me-1" aria-hidden="true"></i><?php echo count($turni_s) > 1 ? 'Prossimo: ' : ''; ?><?php echo date('d/m/Y', strtotime($prossima_s)); ?></span><?php endif; ?>
                 <?php if ($luogo_s !== ''): ?><span><i class="fa fa-location-dot me-1" aria-hidden="true"></i><?php echo htmlspecialchars($luogo_s); ?><?php if ($url_maps): ?> · <a href="<?php echo htmlspecialchars($url_maps); ?>" target="_blank" rel="noopener" class="text-decoration-underline">Apri in Google Maps<span class="visually-hidden"> (nuova scheda)</span></a><?php endif; ?></span><?php endif; ?>
                 <?php $corso_s = html_corso_pubblico($conn, $dett_s); if ($corso_s !== ''): ?><span><i class="fa fa-building-columns me-1" aria-hidden="true"></i><?php echo $corso_s; ?></span><?php endif; ?>
+                <?php $ins_s = !empty($dett_s['insegnamento_id']) ? insegnamento($conn, (int)$dett_s['insegnamento_id']) : null;
+                if ($ins_s): $info_ins = array_filter([!empty($ins_s['anno_corso']) ? (int)$ins_s['anno_corso'] . '° anno' : '', $ins_s['semestre'], $ins_s['docente'] !== '' ? 'Docente ' . $ins_s['docente'] : '']); ?>
+                    <span><i class="fa fa-book-open me-1" aria-hidden="true"></i>Insegnamento: <?php echo htmlspecialchars($ins_s['nome'] . ($info_ins ? ' · ' . implode(' · ', $info_ins) : '')); ?></span>
+                <?php endif; ?>
             </div>
         </header>
 

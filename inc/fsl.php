@@ -16,7 +16,7 @@ if (!function_exists('prenotazione_di_classe')) {
 // Convenzione scuola-Dipartimento per la Formazione Scuola Lavoro: modelli (scaricati dal portale) e PEC predefiniti,
 // sostituibili per ogni area in Impostazioni area (file caricato in uploads/modelli_convenzione/ oppure link)
 if (!defined('CONV_URL_MODELLO'))  define('CONV_URL_MODELLO', 'assets/modelli/Convenzione_FSL_DiBEST.doc');
-if (!defined('CONV_URL_ALLEGATO')) define('CONV_URL_ALLEGATO', 'assets/modelli/Allegato_A_FSL_DiBEST.docx');
+if (!defined('CONV_URL_ALLEGATO')) define('CONV_URL_ALLEGATO', 'assets/modelli/Allegato_A_FSL_DiBEST.doc');
 if (!defined('CONV_PEC'))          define('CONV_PEC', 'dipartimento.best@pec.unical.it');
 
 if (!function_exists('dati_convenzione')) {
@@ -52,12 +52,17 @@ if (!function_exists('html_istruzioni_convenzione')) {
         $frase = $in_attesa ? "La prenotazione resta <strong>in attesa</strong> finché la scuola non stipula la convenzione con il Dipartimento."
                             : "Per partecipare la scuola deve stipulare la <strong>convenzione</strong> con il Dipartimento.";
         $precompilata = $codice !== '' && empty($cfg['conv_url_modello']) && is_file(RADICE_SITO . '/modelli_documenti/convenzione_precompilabile.docx');
+        $allegato_pre = $codice !== '' && empty($cfg['conv_url_allegato']) && is_file(RADICE_SITO . '/modelli_documenti/allegato_a_precompilabile.docx');
+        $voce_all = $allegato_pre
+            ? "<a href='" . $h(url_base_sito() . '/convenzione_precompilata.php?doc=allegato&code=' . urlencode($codice)) . "'$a>Scarica l'Allegato A già compilato</a> <span style='font-weight:normal;'>(DOCX)</span>"
+              . " · <a href='" . $h($c['allegato']) . "'" . ($per_email ? " style='color:#B30000;'" : " target='_blank' rel='noopener'") . ">modello vuoto</a>"
+            : "<a href='" . $h($c['allegato']) . "'$a>Scarica l'Allegato A</a>" . $fmt($c['allegato']);
         $voce_conv = $precompilata
             ? "<a href='" . $h(url_base_sito() . '/convenzione_precompilata.php?code=' . urlencode($codice)) . "'$a>Scarica la Convenzione già compilata</a> <span style='font-weight:normal;'>(DOCX, con i dati della scuola e della prenotazione: completa i campi evidenziati in giallo)</span>"
               . " · <a href='" . $h($c['modello']) . "'" . ($per_email ? " style='color:#B30000;'" : " target='_blank' rel='noopener'") . ">modello vuoto</a>"
             : "<a href='" . $h($c['modello']) . "'$a>Scarica il modello di Convenzione</a>" . $fmt($c['modello']);
         return "<p style='margin:0 0 6px;'>$frase Compila i modelli:</p>"
-             . "<ul style='margin:0 0 6px;'><li>$voce_conv</li><li><a href='" . $h($c['allegato']) . "'$a>Scarica l'Allegato A</a>" . $fmt($c['allegato']) . "</li></ul>"
+             . "<ul style='margin:0 0 6px;'><li>$voce_conv</li><li>$voce_all</li></ul>"
              . "<p style='margin:0;'>e inviali <strong>firmati digitalmente</strong> alla PEC <a href='mailto:" . $h($c['pec']) . "'$a>" . $h($c['pec']) . "</a>. "
              . ($in_attesa ? "Appena riceviamo la convenzione confermiamo la prenotazione e ti avvisiamo per email.</p>" : "Se la scuola l'ha già inviata, puoi ignorare questo messaggio.</p>");
     }
@@ -338,8 +343,9 @@ if (!function_exists('dati_convenzione_precompilata')) {
 if (!function_exists('genera_convenzione_precompilata')) {
     // Crea il .docx precompilato in un file temporaneo e ne ritorna il percorso (null se il modello o ZipArchive mancano).
     // I campi compilati perdono l'evidenziazione gialla; quelli vuoti restano evidenziati con il testo originale.
-    function genera_convenzione_precompilata($conn, int $pr_id): ?string {
-        $modello = RADICE_SITO . '/modelli_documenti/convenzione_precompilabile.docx';
+    // $doc: 'convenzione' (modelli_documenti/convenzione_precompilabile.docx) o 'allegato' (allegato_a_precompilabile.docx)
+    function genera_convenzione_precompilata($conn, int $pr_id, string $doc = 'convenzione'): ?string {
+        $modello = RADICE_SITO . '/modelli_documenti/' . ($doc === 'allegato' ? 'allegato_a' : 'convenzione') . '_precompilabile.docx';
         $p = dati_prenotazione_convenzione($conn, $pr_id);
         if (!$p || !is_file($modello) || !class_exists('ZipArchive')) return null;
         $originali = ['ISTITUTO' => 'Denominazione Istituzione Scolastica', 'COMUNE' => 'xxxx', 'INDIRIZZO' => 'xxx', 'ISTITUTO_FIRMA' => '…………………………',

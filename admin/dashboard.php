@@ -2,6 +2,9 @@
 // admin/dashboard.php - Dashboard Principale Personalizzata per Ruolo
 require_once 'admin_header.php';
 
+// Aree "Calendari e risorse": la dashboard è l'agenda delle prenotazioni
+if (tipo_area($page_cfg) === 'calendario') { require __DIR__ . '/prenotazioni_risorse.php'; exit; }
+
 // Helper: esegue query e ritorna assoc array o [] se fallisce
 function db_row($conn, $sql) {
     $r = $conn->query($sql);

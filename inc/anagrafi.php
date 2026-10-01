@@ -53,11 +53,18 @@ if (!function_exists('scuola_per_codice')) {
 if (!function_exists('cerca_scuole')) {
     // Ricerca per parole (nome, comune, istituto o codice meccanografico): tutte le parole devono comparire.
     // Prima il codice esatto, poi le scuole della Calabria, poi le altre in ordine di nome.
-    function cerca_scuole($conn, string $q, int $limite = 15): array {
+    // $filtri: ['regione' => ..., 'provincia' => ..., 'comune' => ...] (finestra guidata del campo Scuola);
+    // con il comune o la provincia scelti la ricerca può anche essere vuota (tutte le scuole del luogo).
+    function cerca_scuole($conn, string $q, int $limite = 15, array $filtri = []): array {
         $q = trim(preg_replace('/\s+/u', ' ', $q));
         $parole = array_slice(array_values(array_filter(explode(' ', $q), fn($p) => mb_strlen($p) >= 2)), 0, 6);
-        if (!$parole) return [];
         $where = []; $tipi = ''; $par = [];
+        foreach (['regione', 'provincia', 'comune'] as $f) {
+            $v = mb_strtoupper(trim((string)($filtri[$f] ?? '')));
+            if ($v === '') continue;
+            $where[] = "$f = ?"; $par[] = $v; $tipi .= 's';
+        }
+        if (!$parole && empty($filtri['comune']) && empty($filtri['provincia'])) return [];
         foreach ($parole as $p) {
             $where[] = "(denominazione LIKE ? OR comune LIKE ? OR istituto_denominazione LIKE ? OR codice LIKE ?)";
             $like = '%' . addcslashes($p, '%_\\') . '%';
@@ -66,7 +73,7 @@ if (!function_exists('cerca_scuole')) {
         $codice_esatto = strtoupper(str_replace(' ', '', $q));
         $sql = "SELECT codice, denominazione, istituto_codice, istituto_denominazione, tipo, comune, provincia, regione, statale
                 FROM scuole WHERE " . implode(' AND ', $where) . "
-                ORDER BY (codice = ?) DESC, (regione = 'CALABRIA') DESC, denominazione ASC LIMIT " . max(1, min(30, $limite));
+                ORDER BY (codice = ?) DESC, (regione = 'CALABRIA') DESC, denominazione ASC LIMIT " . max(1, min(200, $limite));
         $par[] = $codice_esatto; $tipi .= 's';
         $st = $conn->prepare($sql);
         if (!$st) return [];
@@ -75,7 +82,8 @@ if (!function_exists('cerca_scuole')) {
         $r = $st->get_result();
         while ($r && $s = $r->fetch_assoc()) {
             $out[] = ['codice' => $s['codice'], 'nome' => etichetta_scuola($s), 'tipo' => maiuscole_scuola((string)$s['tipo']),
-                      'comune' => maiuscole_scuola((string)$s['comune']), 'provincia' => maiuscole_scuola((string)$s['provincia'])];
+                      'comune' => maiuscole_scuola((string)$s['comune']), 'provincia' => maiuscole_scuola((string)$s['provincia']),
+                      'istituto' => !empty($s['istituto_codice']) && $s['istituto_codice'] !== $s['codice'] ? maiuscole_scuola((string)$s['istituto_denominazione']) : ''];
         }
         // Convenzioni con il Dipartimento (registro): 'conv' = periodi di validità [dal, al] ('' = senza limite).
         // Il modulo controlla se uno copre il periodo dell'attività.
@@ -87,6 +95,26 @@ if (!function_exists('cerca_scuole')) {
             foreach ($out as &$o) $o['conv'] = $conv[$o['codice']] ?? [];
             unset($o);
         }
+        return $out;
+    }
+}
+
+if (!function_exists('luoghi_scuole')) {
+    // Regioni, province di una regione o comuni di una provincia presenti nell'anagrafe delle scuole,
+    // con il numero di scuole: [['valore' => 'COSENZA', 'nome' => 'Cosenza', 'n' => 412], ...]
+    function luoghi_scuole($conn, string $livello, string $regione = '', string $provincia = ''): array {
+        $campo = ['regioni' => 'regione', 'province' => 'provincia', 'comuni' => 'comune'][$livello] ?? null;
+        if (!$campo) return [];
+        $where = ["$campo IS NOT NULL", "$campo <> ''"]; $par = []; $tipi = '';
+        if ($campo !== 'regione') { $where[] = 'regione = ?'; $par[] = mb_strtoupper($regione); $tipi .= 's'; }
+        if ($campo === 'comune') { $where[] = 'provincia = ?'; $par[] = mb_strtoupper($provincia); $tipi .= 's'; }
+        $st = $conn->prepare("SELECT $campo AS v, COUNT(*) AS n FROM scuole WHERE " . implode(' AND ', $where) . " GROUP BY $campo ORDER BY $campo");
+        if (!$st) return [];
+        if ($par) $st->bind_param($tipi, ...$par);
+        $st->execute();
+        $out = [];
+        $r = $st->get_result();
+        while ($r && $x = $r->fetch_assoc()) $out[] = ['valore' => $x['v'], 'nome' => maiuscole_scuola((string)$x['v']), 'n' => (int)$x['n']];
         return $out;
     }
 }
@@ -116,10 +144,10 @@ if (!function_exists('html_campo_scuola')) {
         $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
         $id = 'scu_' . bin2hex(random_bytes(4));
         $out = '<div class="scuola-campo position-relative" data-endpoint="' . $h(rtrim((string)parse_url(url_base_sito(), PHP_URL_PATH), '/') . '/cerca_scuole.php') . '">'
-             . '<input type="text" name="custom_' . $h($campo) . '" id="' . $id . '" class="' . $h($classi) . ' scuola-testo" value="' . $h($valore) . '" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="' . $id . '_lista" placeholder="Scrivi nome della scuola o comune" ' . $attr . '>'
+             . '<input type="text" name="custom_' . $h($campo) . '" id="' . $id . '" class="' . $h($classi) . ' scuola-testo" value="' . $h($valore) . '" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="' . $id . '_lista" placeholder="Clicca per scegliere la scuola" ' . $attr . '>'
              . '<input type="hidden" name="scuola_codice[' . $h($campo) . ']" class="scuola-codice" value="' . $h($codice) . '">'
              . '<ul class="scuola-lista list-group position-absolute w-100 shadow" id="' . $id . '_lista" role="listbox" style="z-index:1080;display:none;max-height:260px;overflow-y:auto;"></ul>'
-             . '<div class="form-text scuola-stato">' . ($codice !== '' ? '<i class="fa fa-circle-check text-success me-1"></i>Scuola dall\'anagrafe del Ministero' : 'Scegli la scuola dall\'elenco che compare mentre scrivi. Se non la trovi, scrivi nome completo e comune.') . '</div>'
+             . '<div class="form-text scuola-stato">' . ($codice !== '' ? '<i class="fa fa-circle-check text-success me-1"></i>Scuola dall\'anagrafe del Ministero' : 'Clicca nel campo: scegli regione, provincia e comune, poi la scuola. Se non è in elenco potrai scriverla a mano.') . '</div>'
              . '</div>';
         return $out;
     }
@@ -160,12 +188,12 @@ if (!function_exists('api_unical_get')) {
             $ch = curl_init($url);
             curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => $timeout, CURLOPT_CONNECTTIMEOUT => 8,
                                     CURLOPT_FOLLOWLOCATION => true, CURLOPT_MAXREDIRS => 3, CURLOPT_HTTPHEADER => ['Accept: application/json'],
-                                    CURLOPT_USERAGENT => 'EventiDiBEST/1.0']);
+                                    CURLOPT_USERAGENT => 'DidatticaDiBEST/1.0']);
             $corpo = curl_exec($ch);
             if (curl_getinfo($ch, CURLINFO_HTTP_CODE) !== 200) $corpo = false;
             curl_close($ch);
         } else {
-            $ctx = stream_context_create(['http' => ['timeout' => $timeout, 'header' => "Accept: application/json\r\nUser-Agent: EventiDiBEST/1.0\r\n"]]);
+            $ctx = stream_context_create(['http' => ['timeout' => $timeout, 'header' => "Accept: application/json\r\nUser-Agent: DidatticaDiBEST/1.0\r\n"]]);
             $corpo = @file_get_contents($url, false, $ctx);
         }
         if ($corpo === false || $corpo === '') return null;
@@ -354,6 +382,13 @@ if (!function_exists('sincronizza_anagrafe')) {
             $riepilogo[$cod] = ['ok' => true, 'esito' => $esito];
         }
 
+        // Insegnamenti dei corsi del proprio dipartimento (la prima struttura dell'anagrafe)
+        $prima = (string)($conn->query("SELECT codice FROM anagrafe_strutture ORDER BY aggiunta_il, codice LIMIT 1")->fetch_assoc()['codice'] ?? '');
+        if ($prima !== '' && ($solo_struttura === null || $solo_struttura === $prima) && isset($riepilogo[$prima]) && $riepilogo[$prima]['ok']) {
+            $n_ins = sincronizza_insegnamenti($conn, $prima);
+            $riepilogo[$prima]['esito'] .= $n_ins !== null ? ", $n_ins insegnamenti" : ', insegnamenti non disponibili';
+        }
+
         // Chi non compare più in nessuna struttura (solo se le API hanno risposto per tutte)
         if ($tutte_ok && $solo_struttura === null) {
             $st = $conn->prepare("UPDATE personale_ateneo SET attivo = 0, uscita_il = IFNULL(uscita_il, NOW()) WHERE aggiornata_il IS NULL OR aggiornata_il < ?");
@@ -392,6 +427,104 @@ if (!function_exists('persona_ateneo')) {
             $cache[$id] = $st->get_result()->fetch_assoc() ?: null;
         }
         return $cache[$id];
+    }
+}
+
+if (!function_exists('anno_accademico_corrente')) {
+    // Anno accademico in corso come lo usano le API (2026 = 2026/2027): da settembre quello nuovo
+    function anno_accademico_corrente(): int { return (int)date('n') >= 9 ? (int)date('Y') : (int)date('Y') - 1; }
+}
+
+if (!function_exists('sincronizza_insegnamenti')) {
+    // Insegnamenti del dipartimento $dip (API activities) tenuti nell'anno accademico in corso e nel successivo.
+    // Nelle API "academic_year" è la coorte (anno di immatricolazione) e ogni coorte elenca tutto il suo percorso:
+    // l'insegnamento si tiene nell'anno coorte + anno di corso - 1. Si scaricano le coorti degli ultimi 6 anni.
+    // Ritorna quanti ne sono arrivati, null se le API non rispondono (restano i dati precedenti).
+    function sincronizza_insegnamenti($conn, string $dip): ?int {
+        $aa = anno_accademico_corrente();
+        $tutti = [];
+        for ($coorte = $aa - 5; $coorte <= $aa + 1; $coorte++) {
+            $el = api_unical_tutte('activities/', ['department' => $dip, 'academic_year' => $coorte]);
+            if ($el === null) return null;
+            foreach ($el as $r) {
+                $anno_c = max(1, (int)($r['StudyActivityYear'] ?? 1));
+                $erog = $coorte + $anno_c - 1;
+                if ($erog === $aa || $erog === $aa + 1) { $r['_coorte'] = $coorte; $r['_erog'] = $erog; $tutti[] = $r; }
+            }
+        }
+        $up = $conn->prepare("INSERT INTO insegnamenti (id, codice, nome, cds_cod, cds_nome, anno_corso, anno_accademico, coorte, semestre, ssd_cod, ssd, lingua, docente, docente_id, partizione, padre_id, dipartimento_cod, presente, aggiornato_il)
+                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, NOW())
+                              ON DUPLICATE KEY UPDATE codice=VALUES(codice), nome=VALUES(nome), cds_cod=VALUES(cds_cod), cds_nome=VALUES(cds_nome), anno_corso=VALUES(anno_corso),
+                                anno_accademico=VALUES(anno_accademico), coorte=VALUES(coorte), semestre=VALUES(semestre), ssd_cod=VALUES(ssd_cod), ssd=VALUES(ssd), lingua=VALUES(lingua), docente=VALUES(docente),
+                                docente_id=VALUES(docente_id), partizione=VALUES(partizione), padre_id=VALUES(padre_id), dipartimento_cod=VALUES(dipartimento_cod), presente=1, aggiornato_il=NOW()");
+        $visti = [];
+        foreach ($tutti as $r) {
+            $id = (int)($r['StudyActivityID'] ?? 0);
+            $nome = trim((string)($r['StudyActivityName'] ?? ''));
+            if ($id <= 0 || $nome === '') continue;
+            $cod = mb_substr((string)($r['StudyActivityCod'] ?? ''), 0, 30);
+            $nome = mb_substr(maiuscole_corso($nome), 0, 255);
+            $cds_cod = mb_substr((string)($r['StudyActivityCdSCod'] ?? ''), 0, 20);
+            $cds_nome = mb_substr(maiuscole_corso((string)($r['StudyActivityCdSName'] ?? '')), 0, 255);
+            $anno_c = (int)($r['StudyActivityYear'] ?? 0) ?: null;
+            $aa_r = (int)$r['_erog']; $coorte_r = (int)$r['_coorte'];
+            $sem = mb_substr((string)($r['StudyActivitySemester'] ?? ''), 0, 60);
+            $ssd_cod = mb_substr((string)($r['StudyActivitySSDCod'] ?? ''), 0, 20);
+            $ssd = mb_substr(maiuscole_corso((string)($r['StudyActivitySSD'] ?? '')), 0, 150);
+            $lingua = mb_substr((string)($r['StudyActivityLanguage'] ?? ''), 0, 60);
+            $docente = mb_substr(maiuscole_nome((string)($r['StudyActivityTeacherName'] ?? '')), 0, 150);
+            $doc_id = mb_substr((string)($r['StudyActivityTeacherID'] ?? ''), 0, 30);
+            $part = mb_substr(trim((string)($r['StudyActivityPartitionDes'] ?? $r['StudyActivityExtendedPartitionDes'] ?? '')), 0, 150);
+            $padri = (array)($r['StudyActivityFathers'] ?? []);
+            $padre = null;
+            if ($padri) { $p0 = reset($padri); $padre = (int)(is_array($p0) ? ($p0['StudyActivityID'] ?? $p0['id'] ?? 0) : $p0) ?: null; }
+            $dip_r = mb_substr((string)($r['DepartmentCod'] ?? $dip), 0, 20);
+            $up->bind_param("issssiiisssssssis", $id, $cod, $nome, $cds_cod, $cds_nome, $anno_c, $aa_r, $coorte_r, $sem, $ssd_cod, $ssd, $lingua, $docente, $doc_id, $part, $padre, $dip_r);
+            $up->execute();
+            $visti[] = $id;
+        }
+        // Non più presenti negli anni scaricati; quelli di anni accademici precedenti si conservano un anno
+        $dip_sql = $conn->real_escape_string($dip);
+        $conn->query("UPDATE insegnamenti SET presente = 0 WHERE dipartimento_cod = '$dip_sql' AND anno_accademico >= $aa" . ($visti ? " AND id NOT IN (" . implode(',', array_map('intval', $visti)) . ")" : ''));
+        $conn->query("DELETE FROM insegnamenti WHERE anno_accademico < " . ($aa - 1));
+        return count($visti);
+    }
+}
+
+if (!function_exists('insegnamento')) {
+    function insegnamento($conn, ?int $id): ?array {
+        if (!$id) return null;
+        $r = @$conn->query("SELECT * FROM insegnamenti WHERE id = " . (int)$id);
+        return $r ? ($r->fetch_assoc() ?: null) : null;
+    }
+}
+
+if (!function_exists('etichetta_insegnamento')) {
+    // "Fondamenti di informatica · 1° anno · Primo Semestre · Masciari Elio"
+    function etichetta_insegnamento(array $i, bool $con_corso = false): string {
+        return implode(' · ', array_filter([
+            $i['nome'] . ($i['partizione'] !== '' ? ' (' . $i['partizione'] . ')' : ''),
+            $con_corso ? $i['cds_nome'] : '',
+            !empty($i['anno_corso']) ? (int)$i['anno_corso'] . '° anno' : '',
+            $i['semestre'], $i['docente'],
+        ]));
+    }
+}
+
+if (!function_exists('insegnamenti_per_corso')) {
+    // Insegnamenti presenti di un anno accademico, raggruppati per corso di studio
+    function insegnamenti_per_corso($conn, ?int $anno = null): array {
+        // Default: l'anno accademico in corso; se non ci sono ancora dati, il più recente disponibile
+        if ($anno === null) {
+            $anno = anno_accademico_corrente();
+            if (!(int)(@$conn->query("SELECT COUNT(*) n FROM insegnamenti WHERE presente = 1 AND anno_accademico = $anno")->fetch_assoc()['n'] ?? 0))
+                $anno = (int)(@$conn->query("SELECT MAX(anno_accademico) a FROM insegnamenti WHERE presente = 1")->fetch_assoc()['a'] ?? 0);
+        }
+        if (!$anno) return [];
+        $out = [];
+        $r = @$conn->query("SELECT * FROM insegnamenti WHERE presente = 1 AND anno_accademico = " . (int)$anno . " ORDER BY cds_nome, anno_corso, nome, partizione");
+        while ($r && $x = $r->fetch_assoc()) $out[$x['cds_nome'] ?: 'Altri insegnamenti'][] = $x;
+        return $out;
     }
 }
 
@@ -506,7 +639,7 @@ if (!function_exists('dettaglio_persona')) {
             $dati = false;
             if (function_exists('curl_init')) {
                 $ch = curl_init($url_foto);
-                curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10, CURLOPT_USERAGENT => 'EventiDiBEST/1.0']);
+                curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10, CURLOPT_USERAGENT => 'DidatticaDiBEST/1.0']);
                 $dati = curl_exec($ch);
                 if (curl_getinfo($ch, CURLINFO_HTTP_CODE) !== 200) $dati = false;
                 curl_close($ch);

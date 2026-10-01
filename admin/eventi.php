@@ -243,6 +243,7 @@ if (isset($_POST['add_evento'])) {
     if ($ref_scartate) $avviso_notif .= " Email dei referenti non valide ignorate: " . implode(", ", $ref_scartate) . ".";
 
     salva_attestati_classe_evento($conn, $ev_id, $att_classe);
+    salva_insegnamento_evento($conn, $ev_id);
     if ($classe_ev) assicura_campi_progetto($conn, $filtro_p); // campo "numero di partecipanti" del modulo
     $avvisi_t = [];
     salva_turni_evento($conn, $ev_id, $turni_post, $avvisi_t);
@@ -317,6 +318,7 @@ if (isset($_POST['edit_evento'])) {
     salva_corso_evento($conn, $ev_id);
     if ($ref_scartate) $avviso_notif .= " Email dei referenti non valide ignorate: " . implode(", ", $ref_scartate) . ".";
     salva_attestati_classe_evento($conn, $ev_id, $att_classe);
+    salva_insegnamento_evento($conn, $ev_id);
     if ($classe_ev) assicura_campi_progetto($conn, $filtro_p); // campo "numero di partecipanti" del modulo
     $avvisi_t = [];
     $promossi = salva_turni_evento($conn, $ev_id, $turni_post, $avvisi_t);
@@ -391,6 +393,8 @@ if ($mostra_form):
     $att_classe_v = (int)($dett_f['attestati'] ?? 0) === 1;
     $fsl_v = (int)($dett_f['convenzione'] ?? 0) === 1;
     $scuole_v = $fsl_v || (int)($dett_f['dedicata_scuole'] ?? 0) === 1;
+    // Nuovo evento in un'area di Formazione Scuola Lavoro: "Attività FSL" e "Dedicato alle scuole" già accesi
+    if (empty($ev) && tipo_area($page_cfg) === 'fsl') { $fsl_v = true; $scuole_v = true; }
     if (!$referenti) $referenti = [['ruolo' => 'Referente', 'notifiche' => 1]];
     $col_f = colore_valido($page_cfg['colore_primario'] ?? '', '#0056B3');
     $txt_f = colore_testo_su($col_f);
@@ -439,6 +443,51 @@ form:not(.ev-form-classe) .ev-t-riga2 { grid-template-columns: repeat(3, 1fr); }
                         <label for="evTitolo" class="form-label small fw-bold">Titolo dell'evento <span class="text-danger">*</span></label>
                         <input type="text" name="titolo" id="evTitolo" class="form-control" value="<?php echo $v('titolo'); ?>" maxlength="255" required>
                     </div>
+                    <?php $ins_sel = (int)($dett_f['insegnamento_id'] ?? 0);
+                    if (tipo_area($page_cfg) === 'gruppi' || $ins_sel):
+                        $ins_gruppi = insegnamenti_per_corso($conn);
+                        $ins_cur = insegnamento($conn, $ins_sel);
+                        $ins_in_lista = false;
+                        foreach ($ins_gruppi as $l_g) foreach ($l_g as $i_g) if ((int)$i_g['id'] === $ins_sel) $ins_in_lista = true;
+                        $dati_opt = fn($i) => ' data-nome="' . h($i['nome'] . ($i['partizione'] !== '' ? ' (' . $i['partizione'] . ')' : '')) . '" data-corso="' . h($i['cds_cod']) . '" data-corso-nome="' . h($i['cds_nome']) . '"'; ?>
+                    <div class="col-12">
+                        <label for="evIns" class="form-label small fw-bold"><i class="fa fa-book-open me-1" aria-hidden="true"></i>Insegnamento <span class="fw-normal text-muted">(anagrafe di Ateneo)</span></label>
+                        <input type="search" id="evInsCerca" class="form-control form-control-sm mb-1" placeholder="Filtra per nome, corso o docente" aria-label="Filtra gli insegnamenti">
+                        <select name="insegnamento_id" id="evIns" class="form-select form-select-sm">
+                            <option value="0">— Nessun insegnamento —</option>
+                            <?php if ($ins_cur && !$ins_in_lista): ?><option value="<?php echo (int)$ins_cur['id']; ?>" selected<?php echo $dati_opt($ins_cur); ?>><?php echo h(etichetta_insegnamento($ins_cur, true) . ' – ' . $ins_cur['anno_accademico'] . '/' . ($ins_cur['anno_accademico'] + 1)); ?></option><?php endif; ?>
+                            <?php foreach ($ins_gruppi as $cds_g => $lista_g): ?>
+                                <optgroup label="<?php echo h($cds_g); ?>">
+                                    <?php foreach ($lista_g as $i_g): ?><option value="<?php echo (int)$i_g['id']; ?>" <?php echo (int)$i_g['id'] === $ins_sel ? 'selected' : ''; ?><?php echo $dati_opt($i_g); ?>><?php echo h(etichetta_insegnamento($i_g)); ?></option><?php endforeach; ?>
+                                </optgroup>
+                            <?php endforeach; ?>
+                        </select>
+                        <div class="form-text"><?php echo $ins_gruppi ? "Insegnamenti dell'anno accademico in corso. Scegliendolo si compilano titolo e corso di studio (puoi modificarli); i gruppi sono i turni qui sotto." : "L'anagrafe degli insegnamenti è vuota: aggiornala da Anagrafi → Strutture e aggiornamento."; ?></div>
+                    </div>
+                    <script>
+                    (function () {
+                        var sel = document.getElementById('evIns'), cerca = document.getElementById('evInsCerca'), tit = document.getElementById('evTitolo');
+                        var auto = sel.options[sel.selectedIndex] && sel.options[sel.selectedIndex].dataset.nome === tit.value;
+                        cerca.addEventListener('input', function () {
+                            var q = cerca.value.toLowerCase().trim();
+                            sel.querySelectorAll('optgroup').forEach(function (g) {
+                                var vis = 0;
+                                g.querySelectorAll('option').forEach(function (o) { var ok = !q || (g.label + ' ' + o.textContent).toLowerCase().indexOf(q) !== -1; o.hidden = !ok; if (ok) vis++; });
+                                g.hidden = vis === 0;
+                            });
+                        });
+                        sel.addEventListener('change', function () {
+                            var o = sel.options[sel.selectedIndex];
+                            if (!o || !o.dataset.nome) return;
+                            if (tit.value.trim() === '' || auto) { tit.value = o.dataset.nome; auto = true; }
+                            var corso = document.getElementById('evCorso'), testo = document.getElementById('evCorsoTesto');
+                            if (corso && corso.querySelector('option[value="' + o.dataset.corso + '"]')) { corso.value = o.dataset.corso; corso.dispatchEvent(new Event('change')); }
+                            else if (testo && testo.value.trim() === '') testo.value = o.dataset.corsoNome;
+                        });
+                        tit.addEventListener('input', function () { auto = false; });
+                    })();
+                    </script>
+                    <?php endif; ?>
                     <div class="col-md-6">
                         <label for="evSez" class="form-label small fw-bold">Sottocategoria / Sezione</label>
                         <select name="sottocategoria_id" id="evSez" class="form-select form-select-sm" <?php echo !$can_manage_settings ? 'disabled' : ''; ?>>

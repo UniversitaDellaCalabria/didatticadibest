@@ -10,6 +10,20 @@ error_reporting(E_ALL);
 require_once __DIR__ . '/middleware.php';
 
 // =======================================================================
+// AZIONE: ANNULLA UNA PRENOTAZIONE DI AULA, LABORATORIO O SPORTELLO (Calendari e risorse)
+// =======================================================================
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['annulla_pren_risorsa'])) {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    $p_ris = prenotazione_risorsa($conn, (int)$_POST['annulla_pren_risorsa']);
+    $ok_ris = $p_ris && (int)$p_ris['utente_id'] === (int)$u_id && strtotime($p_ris['inizio']) > time()
+              && cambia_stato_prenotazione_risorsa($conn, (int)$p_ris['id'], 'annullata', false);
+    $_SESSION['msg_area_pers'] = $ok_ris
+        ? "<div class='alert alert-success fw-bold text-center my-3 shadow-sm'><i class='fa fa-check-circle me-1'></i> Prenotazione annullata: lo slot è di nuovo libero.</div>"
+        : "<div class='alert alert-warning fw-bold text-center my-3 shadow-sm'>Non è stato possibile annullare la prenotazione.</div>";
+    header("Location: area_personale.php"); exit;
+}
+
+// =======================================================================
 // AZIONE: INVIO MESSAGGIO ALLA SEGRETERIA (CHAT)
 // =======================================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['invia_messaggio_utente'])) {
@@ -43,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['invia_messaggio_utent
             $body_g = "<p>Gentile Gestore,</p>"
                     . "<p><strong>" . htmlspecialchars($ev_msg_data['nome'] . ' ' . $ev_msg_data['cognome']) . "</strong> ha inviato un messaggio riguardante l'evento <strong>" . htmlspecialchars($ev_msg_data['evento_titolo']) . "</strong>.</p>"
                     . "<p>Accedi al pannello di amministrazione &gt; Messaggi per rispondere.</p>"
-                    . "<p>Cordiali saluti,<br>Sistema EventiDiBEST</p>";
+                    . "<p>Cordiali saluti,<br>Sistema Didattica DiBEST</p>";
             // I messaggi di assistenza vanno a tutti i gestori, indipendentemente dall'interruttore notifiche prenotazioni
             foreach (get_email_gestori_evento($conn, (int)$ev_msg_data['evento_id'], false) as $em_gest) {
                 inviaNotificaEmail($em_gest, $subj_g, $body_g, $conn);
@@ -687,6 +701,38 @@ require_once 'header.php';
                     <button type="submit" name="conferma_posto_ok" value="1" class="btn btn-success fw-bold px-4"><i class="fa fa-check me-1"></i>Conferma il mio posto</button>
                     <button type="submit" name="rinuncia_posto" value="1" class="btn btn-outline-secondary fw-bold" onclick="return confirm('Rinunci al posto? Verrà assegnato al prossimo in lista d\'attesa.');"><i class="fa fa-times me-1"></i>Rinuncio</button>
                 </form>
+            </div>
+        </div>
+    <?php endif; ?>
+
+    <?php
+    // Aule, laboratori e appuntamenti prenotati (aree Calendari e risorse)
+    $mie_risorse = [];
+    $r_mr = @$conn->query("SELECT pr.*, r.nome AS risorsa_nome, r.luogo, p.titolo AS area_titolo, p.slug AS area_slug, p.colore_primario
+                           FROM prenotazioni_risorse pr JOIN risorse r ON r.id = pr.risorsa_id JOIN pagine_eventi p ON p.id = r.pagina_id
+                           WHERE pr.utente_id = " . (int)$u_id . " AND pr.stato IN ('confermata', 'da_approvare') AND pr.fine >= NOW() ORDER BY pr.inizio LIMIT 50");
+    while ($r_mr && $x_mr = $r_mr->fetch_assoc()) $mie_risorse[] = $x_mr;
+    if ($mie_risorse): ?>
+        <div class="card border-0 shadow-sm mb-4" style="border-radius: 12px;">
+            <div class="card-body">
+                <h2 class="h6 fw-bold mb-3"><i class="fa fa-door-open me-1 text-primary" aria-hidden="true"></i>Aule, laboratori e appuntamenti (<?php echo count($mie_risorse); ?>)</h2>
+                <ul class="list-unstyled mb-0 small">
+                <?php foreach ($mie_risorse as $mr): $col_mr = colore_valido($mr['colore_primario'] ?? '', '#0056B3'); ?>
+                    <li class="d-flex flex-wrap align-items-center gap-2 py-2 border-bottom" style="border-left: 4px solid <?php echo $col_mr; ?>; padding-left: 10px;">
+                        <div>
+                            <strong><?php echo htmlspecialchars(quando_risorsa($mr)); ?></strong>
+                            <div><?php echo htmlspecialchars($mr['risorsa_nome']); ?><?php echo $mr['luogo'] !== '' ? ' · ' . htmlspecialchars($mr['luogo']) : ''; ?> · <a href="<?php echo htmlspecialchars($mr['area_slug']); ?>.php?risorsa=<?php echo (int)$mr['risorsa_id']; ?>" class="text-decoration-none"><?php echo htmlspecialchars($mr['area_titolo']); ?></a></div>
+                            <?php if ($mr['motivo'] !== ''): ?><div class="text-secondary"><?php echo htmlspecialchars($mr['motivo']); ?></div><?php endif; ?>
+                        </div>
+                        <?php if ($mr['stato'] === 'da_approvare'): ?><span class="badge bg-warning text-dark">In attesa di approvazione</span><?php endif; ?>
+                        <span class="ms-auto d-flex gap-2 align-items-center">
+                            <a href="risorsa_ics.php?code=<?php echo urlencode($mr['codice']); ?>" class="btn btn-outline-secondary btn-sm" title="Aggiungi al calendario"><i class="fa fa-calendar-plus" aria-hidden="true"></i><span class="visually-hidden">Aggiungi al calendario</span></a>
+                            <form method="POST" action="area_personale.php" class="m-0"><?php csrf_field(); ?>
+                                <button type="submit" name="annulla_pren_risorsa" value="<?php echo (int)$mr['id']; ?>" class="btn btn-outline-danger btn-sm fw-bold" onclick="return confirm('Annullare la prenotazione?');">Annulla</button></form>
+                        </span>
+                    </li>
+                <?php endforeach; ?>
+                </ul>
             </div>
         </div>
     <?php endif; ?>

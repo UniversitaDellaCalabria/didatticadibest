@@ -95,7 +95,7 @@ prova(count($EMAIL) === 1 && str_contains($EMAIL[0]['corpo'], 'valutazione degli
 sezione("Email e documenti per la scuola");
 $istr = html_istruzioni_convenzione([], true, 'FS-1');
 prova(str_contains($istr, 'convenzione_precompilata.php?code=FS-1') && str_contains($istr, 'dipartimento.best@pec.unical.it'), "istruzioni con convenzione precompilata e PEC");
-prova(!str_contains(html_istruzioni_convenzione(['conv_url_modello' => 'https://example.org/mio.docx'], true, 'FS-1'), 'precompilata'), "area con modello proprio: niente precompilata");
+prova(!str_contains(html_istruzioni_convenzione(['conv_url_modello' => 'https://example.org/mio.docx'], true, 'FS-1'), 'convenzione_precompilata.php?code='), "area con modello di convenzione proprio: niente convenzione precompilata");
 $dc = dati_convenzione([]);
 prova(str_ends_with($dc['modello'], '/eventi/assets/modelli/Convenzione_FSL_DiBEST.doc'), "modello servito dal portale");
 prova(!str_contains(dati_convenzione(['conv_url_modello' => '../../etc/passwd'])['modello'], 'passwd'), "percorso non valido ignorato");
@@ -110,6 +110,12 @@ if (class_exists('ZipArchive')) {
     prova(str_contains($testo, 'Numero di studenti: 20') && str_contains($testo, 'Durata: 30 ore') && str_contains($testo, 'Tutor Dipartimento'), "studenti, durata e tutor");
     prova(str_contains($testo, 'Obiettivi del percorso') && !str_contains($testo, 'percorso..'), "descrizione dal progetto, senza doppio punto");
     if ($f) @unlink($f);
+    $fa = genera_convenzione_precompilata($conn, 1, 'allegato');
+    $xa = $fa ? (string)(new class { function leggi($f) { $z = new ZipArchive(); $z->open($f); $x = $z->getFromName('word/document.xml'); $z->close(); return $x; } })->leggi($fa) : '';
+    $ta = strip_tags($xa);
+    prova($fa && !preg_match('/\{\{\w+\}\}/', $xa) && str_contains($ta, 'Numero di studenti: 20') && str_contains($ta, 'Tutor Dipartimento') && str_contains($ta, '2026/2027'), "Allegato A precompilato (A.A. 2026/2027)");
+    if ($fa) @unlink($fa);
+    prova(str_contains(html_istruzioni_convenzione([], true, 'FS-1'), 'doc=allegato&amp;code=FS-1'), "istruzioni con l'Allegato A precompilato");
 } else prova(false, "ZipArchive non disponibile: lancia con -d extension=zip");
 
 sezione("Scheda di valutazione FSL");
@@ -137,6 +143,82 @@ prova($sch['valori']['ufficio'] === 'Cubo 4B' && $sch['valori']['telefono'] === 
 prova(in_array('ufficio', $sch['modificati'], true) && !in_array('telefono', $sch['modificati'], true), "campi modificati riconosciuti");
 salva_modifiche_persona($conn, 'mario.rossi', []);
 prova(!scheda_persona($conn, $p_ate)['modificati'], "ripristino dei dati del portale");
+
+sezione("Macroaree e tipi di area");
+prova(tipo_area(['tipo_area' => 'fsl']) === 'fsl' && tipo_area(['tipo_area' => 'boh']) === '' && tipo_area([]) === '', "tipo dell'area (valido / sconosciuto / assente)");
+prova(sezione_area(['tipo_area' => 'gruppi']) === 'didattica' && sezione_area(['tipo_area' => 'eventi']) === 'orientamento' && sezione_area([]) === '', "macroarea dal tipo");
+$gr = raggruppa_aree_per_sezione([['id' => 1, 'tipo_area' => 'gruppi'], ['id' => 2, 'tipo_area' => 'fsl'], ['id' => 3, 'tipo_area' => ''], ['id' => 4, 'tipo_area' => 'eventi']]);
+prova(array_keys($gr) === ['orientamento', 'didattica', ''] && array_column($gr['orientamento'], 'id') === [2, 4], "aree raggruppate nell'ordine delle macroaree, non assegnate in fondo");
+prova(str_contains(html_scelta_tipo_area('t', 'fsl'), 'value="fsl" selected') && str_contains(html_scelta_tipo_area('t', 'calendario'), 'value="calendario" selected'), "tendina del tipo (anche Calendari e risorse)");
+prova(sezione_area(['tipo_area' => 'calendario']) === 'calendari', "Calendari e risorse nella sua macroarea");
+
+sezione("Scelta guidata della scuola");
+prova(array_column(luoghi_scuole($conn, 'regioni'), 'valore') === ['CALABRIA'], "regioni dell'anagrafe");
+prova(array_column(luoghi_scuole($conn, 'province', 'Calabria'), 'n', 'valore') === ['COSENZA' => 2], "province della regione con il numero di scuole");
+prova(array_column(luoghi_scuole($conn, 'comuni', 'CALABRIA', 'COSENZA'), 'nome') === ['Cosenza', 'Rende'], "comuni della provincia");
+prova(luoghi_scuole($conn, 'boh') === [], "livello sconosciuto: niente");
+$cs_c = cerca_scuole($conn, '', 200, ['regione' => 'CALABRIA', 'provincia' => 'COSENZA', 'comune' => 'RENDE']);
+prova(count($cs_c) === 1 && $cs_c[0]['codice'] === 'CSPS00002B', "scuole del comune senza scrivere nulla");
+prova(cerca_scuole($conn, 'liceo', 20, ['comune' => 'COSENZA'])[0]['codice'] === 'CSPS00001A' && cerca_scuole($conn, '', 20, ['regione' => 'CALABRIA']) === [], "ricerca nel comune; solo la regione non basta");
+prova(cerca_scuole($conn, 'liceo uno')[0]['istituto'] === 'IIS Uno', "istituto di appartenenza nei risultati");
+
+sezione("Calendari e risorse");
+// Area 5 di tipo calendario; risorsa 1: lunedì 9-11 e 14-16, slot da 60', fino a 2 di seguito, ripetibile
+$lun = date('Y-m-d', strtotime('monday next week'));
+$sett = fn(int $n) => date('Y-m-d', strtotime("+$n week", strtotime($lun)));
+$q("INSERT INTO pagine_eventi (id, titolo, slug, tipo_area) VALUES (5, 'Aule', 'aule', 'calendario')");
+$q("INSERT INTO risorse (id, pagina_id, nome, tipo, luogo, durata_slot, max_slot, anticipo_ore, max_giorni, accesso, approvazione, ripetizione) VALUES (1, 5, 'Laboratorio', 'laboratorio', 'Cubo 4B', 60, 2, 0, 60, 'tutti', 0, 1)");
+$q("INSERT INTO risorse_orari (risorsa_id, giorno, dalle, alle) VALUES (1, 1, '09:00', '11:00'), (1, 1, '14:00', '16:00')");
+$q("INSERT INTO utenti (id, codice_fiscale, nome, cognome, email, ruolo_id) VALUES (81, 'RISOR81XXXXXXXXX', 'Ugo', 'Uno', 'ugo@unical.it', 5), (82, 'RISOR82XXXXXXXXX', 'Eva', 'Due', 'eva@unical.it', 5)");
+$ris = risorsa($conn, 1); $u81 = $conn->query("SELECT * FROM utenti WHERE id = 81")->fetch_assoc(); $u82 = $conn->query("SELECT * FROM utenti WHERE id = 82")->fetch_assoc();
+$sl = slot_risorsa($conn, $ris, $lun);
+prova(count($sl) === 4 && array_unique(array_column($sl, 'stato')) === ['libero'] && $sl[2]['inizio'] === "$lun 14:00:00" && $sl[2]['fascia'] === 1, "slot del giorno nelle due fasce");
+prova(slot_risorsa($conn, $ris, date('Y-m-d', strtotime("$lun +1 day"))) === [], "giorno senza orari: nessuno slot");
+$e1 = prenota_risorsa($conn, $ris, $u81, "$lun 09:00:00", 2, 'Esercitazione');
+prova(!$e1['errore'] && count($e1['codici']) === 1 && $e1['stato'] === 'confermata', "prenotazione di due slot", (string)$e1['errore']);
+$p1 = prenotazione_risorsa($conn, $e1['codici'][0] ?? '');
+prova($p1 && $p1['fine'] === "$lun 11:00:00" && $p1['email'] === 'ugo@unical.it', "la prenotazione copre 9-11");
+prova(slot_risorsa($conn, $ris, $lun)[1]['stato'] === 'occupato', "slot occupato dopo la prenotazione");
+prova((bool)prenota_risorsa($conn, $ris, $u82, "$lun 10:00:00", 1)['errore'], "sovrapposizione rifiutata");
+prova((bool)prenota_risorsa($conn, $ris, $u82, "$lun 15:00:00", 2)['errore'], "durata oltre la fascia oraria rifiutata");
+prova((bool)prenota_risorsa($conn, $ris, $u82, "$lun 14:30:00", 1)['errore'], "orario fuori dagli slot rifiutato");
+prova((bool)prenota_risorsa($conn, $ris, $u82, $sett(12) . " 09:00:00", 1)['errore'], "oltre i giorni prenotabili rifiutato");
+$e5 = prenota_risorsa($conn, $ris, $u82, "$lun 14:00:00", 5);
+prova(!$e5['errore'] && prenotazione_risorsa($conn, $e5['codici'][0])['fine'] === "$lun 16:00:00", "numero di slot limitato al massimo consentito");
+$q("INSERT INTO risorse_chiusure (pagina_id, risorsa_id, dal, al, motivo) VALUES (5, NULL, '" . $sett(2) . "', '" . $sett(2) . "', 'Ponte')");
+prova(chiusura_risorsa($conn, $ris, $sett(2)) === 'Ponte' && slot_risorsa($conn, $ris, $sett(2))[0]['stato'] === 'chiuso', "chiusura di tutta l'area");
+$er = prenota_risorsa($conn, $ris, $u82, $sett(1) . " 09:00:00", 1, 'Corso', $sett(3));
+prova(count($er['codici']) === 2 && array_keys($er['saltate']) === [$sett(2)] && $er['serie'] !== null, "ripetizione settimanale: la settimana chiusa viene saltata", json_encode($er));
+$q("UPDATE risorse SET ripetizione = 0 WHERE id = 1"); $ris = risorsa($conn, 1);
+prova(count(prenota_risorsa($conn, $ris, $u82, $sett(4) . " 09:00:00", 1, '', $sett(6))['codici']) === 1, "ripetizione ignorata se la risorsa non la consente");
+$q("UPDATE risorse SET accesso = 'docenti' WHERE id = 1"); $ris = risorsa($conn, 1);
+prova(!puo_prenotare_risorsa($conn, $ris, $u82) && puo_prenotare_risorsa($conn, $ris, ['id' => 1, 'ruolo_id' => 1]) && !puo_prenotare_risorsa($conn, $ris, null), "chi può prenotare (solo docenti; amministratori sempre)");
+$q("UPDATE risorse SET accesso = 'tutti', approvazione = 1 WHERE id = 1"); $ris = risorsa($conn, 1);
+$EMAIL = [];
+$ea = prenota_risorsa($conn, $ris, $u82, $sett(5) . " 10:00:00", 1, 'Tesi');
+$pa = prenotazione_risorsa($conn, $ea['codici'][0] ?? '');
+prova($ea['stato'] === 'da_approvare' && $pa['stato'] === 'da_approvare' && slot_risorsa($conn, $ris, $sett(5))[1]['stato'] === 'occupato', "richiesta da approvare: lo slot resta riservato");
+prova(cambia_stato_prenotazione_risorsa($conn, (int)$pa['id'], 'confermata') && !cambia_stato_prenotazione_risorsa($conn, (int)$pa['id'], 'confermata'), "approvazione (una sola volta)");
+prova(count($EMAIL) === 1 && $EMAIL[0]['a'] === 'eva@unical.it' && str_contains($EMAIL[0]['oggetto'], 'approvata'), "email di approvazione a chi ha prenotato", json_encode(array_column($EMAIL, 'oggetto')));
+prova(cambia_stato_prenotazione_risorsa($conn, (int)$pa['id'], 'annullata', false) && slot_risorsa($conn, $ris, $sett(5))[1]['stato'] === 'libero', "annullamento: lo slot torna libero");
+prova(str_contains(ics_prenotazione_risorsa($p1), 'DTSTART:' . gmdate('Ymd\THis\Z', strtotime("$lun 09:00:00"))) && str_contains(ics_prenotazione_risorsa($p1), 'LOCATION:Cubo 4B'), "file .ics della prenotazione");
+prova(quando_risorsa($p1) === 'Lunedì ' . date('d/m/Y', strtotime($lun)) . ', 09:00–11:00', "testo di data e orario");
+
+sezione("Anagrafe degli insegnamenti e gruppi");
+$aa_p = anno_accademico_corrente();
+$q("INSERT INTO insegnamenti (id, codice, nome, cds_cod, cds_nome, anno_corso, anno_accademico, coorte, semestre, docente, partizione, dipartimento_cod) VALUES
+    (900001, 'A1', 'Anatomia umana', '0827', 'Scienze motorie', 1, $aa_p, $aa_p, 'Primo Semestre', 'Rossi Mario', '', '002014'),
+    (900002, 'B2', 'Fisiologia', '0827', 'Scienze motorie', 2, $aa_p, " . ($aa_p - 1) . ", 'Secondo Semestre', 'Bianchi Anna', 'A-L', '002014'),
+    (900003, 'C3', 'Botanica', '0724', 'Biologia', 1, " . ($aa_p + 1) . ", " . ($aa_p + 1) . ", 'Primo Semestre', '', '', '002014')");
+$ipc = insegnamenti_per_corso($conn);
+prova(array_keys($ipc) === ['Scienze motorie'] && count($ipc['Scienze motorie']) === 2, "insegnamenti dell'anno accademico in corso, per corso");
+prova(etichetta_insegnamento(insegnamento($conn, 900002)) === 'Fisiologia (A-L) · 2° anno · Secondo Semestre · Bianchi Anna', "etichetta dell'insegnamento");
+$_POST = ['insegnamento_id' => '900001']; salva_insegnamento_evento($conn, 10);
+prova((int)$conn->query("SELECT insegnamento_id FROM progetti_dettagli WHERE evento_id = 10")->fetch_assoc()['insegnamento_id'] === 900001, "evento collegato all'insegnamento");
+$_POST = ['insegnamento_id' => '123']; salva_insegnamento_evento($conn, 10);
+prova($conn->query("SELECT insegnamento_id FROM progetti_dettagli WHERE evento_id = 10")->fetch_assoc()['insegnamento_id'] === null, "insegnamento inesistente: nessun collegamento");
+$_POST = [];
+prova(prenotazione_di_classe(false, ['convenzione' => 1]), "il collegamento non tocca gli interruttori dell'evento (FSL ancora attivo)");
 
 sezione("Altre regole");
 prova(prenotazione_di_classe(false, ['convenzione' => 1]) && prenotazione_di_classe(false, ['dedicata_scuole' => 1]) && !prenotazione_di_classe(false, []), "eventi: classe con FSL o dedicato alle scuole");
@@ -190,7 +272,7 @@ if (!function_exists('curl_init') || $http('/eventi/')['codice'] !== 200) {
 } else {
     sezione("Pagine dell'ambiente locale ($BASE)");
     foreach (['/eventi/' => 200, '/eventi/privacy.php' => 200, '/eventi/fsl.php' => 200, '/eventi/openlab' => 200, '/eventi/verifica_attestato.php' => 200,
-              '/eventi/assets/modelli/Convenzione_FSL_DiBEST.doc' => 200, '/eventi/.env.locale' => 403, '/eventi/config.php' => 403,
+              '/eventi/assets/modelli/Convenzione_FSL_DiBEST.doc' => 200, '/eventi/assets/modelli/Allegato_A_FSL_DiBEST.doc' => 200, '/eventi/.env.locale' => 403, '/eventi/config.php' => 403,
               '/eventi/cache/' => 403, '/eventi/uploads/convenzioni/' => 403, '/eventi/modelli_documenti/convenzione_precompilabile.docx' => 403,
               '/eventi/strumenti/prove/esegui.php' => 403, '/eventi/inc/base.php' => 403, '/eventi/cron_background.php' => 403] as $u => $atteso) {
         $r = $http($u);
@@ -199,7 +281,7 @@ if (!function_exists('curl_init') || $http('/eventi/')['codice'] !== 200) {
     }
     $jar = tempnam(sys_get_temp_dir(), 'jar');
     $http('/__accesso?u=1', null, $jar);
-    foreach (['dashboard.php', 'utenti.php?p_id=1', 'iscritti.php?p_id=1', 'eventi.php?p_id=1', 'progetti.php?p_id=2', 'scuole.php', 'fsl.php', 'fsl.php?tab=convenzioni', 'fsl.php?tab=verifica', 'fsl.php?tab=valutazioni', 'fsl.php?tab=convenzioni&conv_mod=1', 'fsl.php?tab=convenzioni&vista=archivio', 'fsl.php?tab=convenzioni&vista=archivio&conv_rinnova=1', 'sistema.php', 'impostazioni_area.php?p_id=1', 'statistiche.php?p_id=1'] as $pag) {
+    foreach (['inizio.php', 'inizio.php?sezione=orientamento', 'dashboard.php', 'utenti.php?p_id=1', 'aree.php', 'nuova_area.php', 'anagrafe_insegnamenti.php', 'anagrafe_personale.php?vista=corsi', 'eventi.php?p_id=1&azione=nuovo', 'progetti.php?p_id=2&azione=nuovo', 'iscritti.php?p_id=1', 'eventi.php?p_id=1', 'progetti.php?p_id=2', 'scuole.php', 'fsl.php', 'fsl.php?tab=convenzioni', 'fsl.php?tab=verifica', 'fsl.php?tab=valutazioni', 'fsl.php?tab=convenzioni&conv_mod=1', 'fsl.php?tab=convenzioni&vista=archivio', 'fsl.php?tab=convenzioni&vista=archivio&conv_rinnova=1', 'sistema.php', 'impostazioni_area.php?p_id=1', 'statistiche.php?p_id=1'] as $pag) {
         $r = $http('/eventi/admin/' . $pag, null, $jar);
         $err_php = preg_match('/<b>(Fatal error|Parse error|Warning)<\/b>|Uncaught /', $r['corpo']);
         prova($r['codice'] === 200 && !$err_php && str_contains($r['corpo'], '</html>'), "pannello: $pag", "risposta " . $r['codice'] . ($err_php ? ' con errore PHP' : ''));
@@ -225,6 +307,43 @@ if (!function_exists('curl_init') || $http('/eventi/')['codice'] !== 200) {
         prova(($pr['stato'] ?? '') === 'da_approvare' && ($pr['convenzione'] ?? '') === 'no', "prenotazione salvata da approvare, convenzione da stipulare", json_encode($pr));
         if ($pr) $loc->query("DELETE FROM prenotazioni WHERE id = " . (int)$pr['id']);
     }
+    // Scelta guidata della scuola (tendine e scuole del comune)
+    $r = $http('/eventi/cerca_scuole.php?elenco=regioni');
+    prova($r['codice'] === 200 && str_contains($r['corpo'], '"CALABRIA"'), "cerca_scuole: regioni");
+    $r = $http('/eventi/cerca_scuole.php?q=&regione=CALABRIA&provincia=COSENZA&comune=COSENZA');
+    prova($r['codice'] === 200 && str_contains($r['corpo'], 'ZZPR00000P'), "cerca_scuole: scuole del comune");
+
+    // Calendari e risorse: area di prova, pagina pubblica, prenotazione, pannello e pulizia
+    $loc->query("DELETE FROM pagine_eventi WHERE slug = 'prove-calendario'");
+    $loc->query("INSERT INTO pagine_eventi (titolo, slug, tipo_area, visibile) VALUES ('Prove calendario', 'prove-calendario', 'calendario', 1)");
+    $pid_c = (int)$loc->insert_id;
+    $loc->query("INSERT INTO risorse (pagina_id, nome, tipo, durata_slot, max_slot, anticipo_ore, max_giorni, chiede_motivo) VALUES ($pid_c, 'Aula delle prove', 'aula', 60, 2, 0, 30, 1)");
+    $rid_c = (int)$loc->insert_id;
+    for ($g = 1; $g <= 7; $g++) $loc->query("INSERT INTO risorse_orari (risorsa_id, giorno, dalle, alle) VALUES ($rid_c, $g, '08:00', '20:00')");
+    $dom = date('Y-m-d', strtotime('+3 days'));
+    $r = $http('/eventi/prove-calendario', null, $jar2);
+    prova($r['codice'] === 200 && str_contains($r['corpo'], 'Aula delle prove') && !preg_match('/<b>(Fatal error|Parse error|Warning)<\/b>|Uncaught /', $r['corpo']), "pagina pubblica dell'area calendario");
+    $r = $http("/eventi/prove-calendario?risorsa=$rid_c&dal=$dom", null, $jar2);
+    preg_match('/name="csrf_token" value="([^"]+)"/', $r['corpo'], $m_csrf);
+    prova(str_contains($r['corpo'], 'data-inizio="' . $dom . ' 10:00:00"'), "settimana con gli slot liberi prenotabili");
+    $r = $http("/eventi/prove-calendario?risorsa=$rid_c", ['csrf_token' => $m_csrf[1] ?? '', 'prenota_risorsa' => 1, 'risorsa_id' => $rid_c, 'inizio' => "$dom 10:00:00", 'n_slot' => 2, 'motivo' => 'Prova automatica', 'settimana' => $dom], $jar2);
+    $pc = $loc->query("SELECT * FROM prenotazioni_risorse WHERE risorsa_id = $rid_c")->fetch_assoc();
+    prova(in_array($r['codice'], [302, 303], true) && ($pc['stato'] ?? '') === 'confermata' && ($pc['fine'] ?? '') === "$dom 12:00:00", "prenotazione dalla pagina pubblica", json_encode($pc));
+    $r = $http('/eventi/risorsa_ics.php?code=' . urlencode($pc['codice'] ?? ''));
+    prova($r['codice'] === 200 && str_contains($r['corpo'], 'BEGIN:VCALENDAR'), "file .ics della prenotazione");
+    $r = $http('/eventi/area_personale.php', null, $jar2);
+    prova(str_contains($r['corpo'], 'Aula delle prove'), "prenotazione nell'Area personale");
+    foreach (["dashboard.php?p_id=$pid_c", "prenotazioni_risorse.php?p_id=$pid_c&periodo=tutte", "risorse.php?p_id=$pid_c", "risorse.php?p_id=$pid_c&modifica=$rid_c"] as $pag) {
+        $r = $http('/eventi/admin/' . $pag, null, $jar);
+        $err_php = preg_match('/<b>(Fatal error|Parse error|Warning)<\/b>|Uncaught /', $r['corpo']);
+        prova($r['codice'] === 200 && !$err_php && str_contains($r['corpo'], '</html>') && str_contains($r['corpo'], 'Aula delle prove'), "pannello calendario: $pag", "risposta " . $r['codice'] . ($err_php ? ' con errore PHP' : ''));
+    }
+    $r = $http("/eventi/admin/prenotazioni_risorse.php?p_id=$pid_c&periodo=tutte&csv=1", null, $jar);
+    prova(str_starts_with($r['corpo'], "\xEF\xBB\xBF") && str_contains($r['corpo'], 'Prova automatica'), "esportazione CSV delle prenotazioni");
+    $loc->query("DELETE FROM prenotazioni_risorse WHERE risorsa_id = $rid_c");
+    $loc->query("DELETE FROM risorse_orari WHERE risorsa_id = $rid_c");
+    $loc->query("DELETE FROM risorse WHERE id = $rid_c");
+    $loc->query("DELETE FROM pagine_eventi WHERE id = $pid_c");
     @unlink($jar); @unlink($jar2);
 }
 

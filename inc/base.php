@@ -298,7 +298,7 @@ if (!function_exists('inviaNotificaEmail')) {
             $nome_loc = date('Ymd_His') . '_' . substr(bin2hex(random_bytes(3)), 0, 6) . '_' . preg_replace('/[^a-z0-9@._-]/i', '_', $to) . '.html';
             @file_put_contents($dir_loc . $nome_loc, "<!-- A: $to | Oggetto: " . htmlspecialchars((string)$subject) . " | Allegati: " . count($allegati) . " -->
 "
-                                                  . impagina_email((string)$body_html, 'Eventi DiBEST (locale)', $colore));
+                                                  . impagina_email((string)$body_html, 'Didattica DiBEST (locale)', $colore));
             registra_log_email($conn, $to, (string)$subject, true, '', 'locale');
             return true;
         }
@@ -316,7 +316,7 @@ if (!function_exists('inviaNotificaEmail')) {
         $user   = $sys['smtp_username'] ?? '';
         $pass   = $sys['smtp_password'] ?? '';
         $from_e = !empty($sys['smtp_from_email']) ? trim($sys['smtp_from_email']) : 'noreply.eventi@unical.it';
-        $from_n = !empty($sys['smtp_from_name']) ? $sys['smtp_from_name'] : 'Eventi DiBEST';
+        $from_n = !empty($sys['smtp_from_name']) ? $sys['smtp_from_name'] : 'Didattica DiBEST';
         $secure = strtolower($sys['smtp_secure'] ?? 'tls');
 
         $body_html = impagina_email((string)$body_html, $from_n, $colore);
@@ -732,11 +732,13 @@ if (!function_exists('html_riepilogo_prenotazione')) {
 
 // ── Attestato: invio immediato se evento concluso ─────────────────────────────
 if (!function_exists('url_base_sito')) {
-    // URL della radice del portale (es. https://dibest2.unical.it/eventi), senza slash finale.
+    // URL della radice del portale (es. https://dibest2.unical.it/didattica), senza slash finale.
     // Calcolato dalla posizione di functions.php: corretto anche se chiamato da /admin o da un cron.
     function url_base_sito(): string {
         // Da riga di comando (cron) non ci sono HTTPS, host né document root: si usa l'indirizzo pubblico
+        // (URL_SITO del file .env, altrimenti https://dibest2.unical.it/eventi)
         $cli = PHP_SAPI === 'cli';
+        if ($cli && function_exists('env_valore') && preg_match('#^https?://[^/]+#i', (string)env_valore('URL_SITO'))) return rtrim((string)env_valore('URL_SITO'), '/');
         $proto = ($cli || (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')) ? 'https://' : 'http://';
         $host = $_SERVER['HTTP_HOST'] ?? 'dibest2.unical.it';
         $doc_root = (!$cli && !empty($_SERVER['DOCUMENT_ROOT'])) ? realpath($_SERVER['DOCUMENT_ROOT']) : '';

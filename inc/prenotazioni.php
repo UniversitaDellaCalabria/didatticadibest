@@ -87,6 +87,17 @@ if (!function_exists('salva_referenti_evento')) {
 
 if (!function_exists('salva_corso_evento')) {
     // Corso di laurea / struttura di un evento normale (campi struttura e corso_codice del modulo), nella scheda progetti_dettagli
+    // Insegnamento dell'anagrafe collegato all'attività (aree "Gruppi degli insegnamenti"); 0 = nessuno
+    function salva_insegnamento_evento($conn, int $ev_id): void {
+        if (!isset($_POST['insegnamento_id'])) return;
+        $ins = insegnamento($conn, (int)$_POST['insegnamento_id']);
+        $id = $ins ? (int)$ins['id'] : null;
+        $stmt = $conn->prepare("INSERT INTO progetti_dettagli (evento_id, insegnamento_id, updated_at) VALUES (?, ?, NOW())
+                                ON DUPLICATE KEY UPDATE insegnamento_id = VALUES(insegnamento_id), updated_at = NOW()");
+        $stmt->bind_param("ii", $ev_id, $id);
+        $stmt->execute();
+    }
+
     function salva_corso_evento($conn, int $ev_id): void {
         if (!isset($_POST['struttura']) && !isset($_POST['corso_codice'])) return;
         $testo = mb_substr(trim((string)($_POST['struttura'] ?? '')), 0, 255);

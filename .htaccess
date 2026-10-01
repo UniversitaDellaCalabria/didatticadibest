@@ -17,20 +17,18 @@ Options -Indexes -MultiViews
 </FilesMatch>
 
 RewriteEngine On
-RewriteBase /eventi/
+# Nessun RewriteBase: le regole valgono qualunque sia la cartella del portale (/didattica, /eventi…)
 
 # =========================================================================
 # 0. SCUDO CARTELLA ADMIN: Lascia funzionare il backend normalmente!
 # =========================================================================
-# Se la richiesta è dentro /admin/ e omette il .php, glielo aggiunge
-RewriteCond %{REQUEST_URI} ^/eventi/admin/ [NC]
+# Se la richiesta è dentro admin/ e omette il .php, glielo aggiunge
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteCond %{REQUEST_FILENAME}\.php -f
-RewriteRule ^(.*)$ $1.php [QSA,L]
+RewriteRule ^(admin/.*)$ $1.php [NC,QSA,L]
 
-# Se la richiesta è dentro /admin/, fermati qui e non leggere le regole sotto
-RewriteCond %{REQUEST_URI} ^/eventi/admin/ [NC]
-RewriteRule ^ - [L]
+# Se la richiesta è dentro admin/, fermati qui e non leggere le regole sotto
+RewriteRule ^admin(/|$) - [NC,L]
 # =========================================================================
 
 # 1. SE IL FILE O LA CARTELLA ESISTE FISICAMENTE, FERMATI QUI E CARICALO

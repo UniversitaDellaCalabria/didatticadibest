@@ -1,18 +1,27 @@
-# EventiDiBEST CMS
+# Didattica DiBEST
 
-Portale open-source per la gestione eventi, prenotazioni e presenze del **Dipartimento DiBEST** — Università della Calabria.
+Portale open-source per orientamento, didattica e prenotazioni del **Dipartimento DiBEST** — Università della Calabria (già EventiDiBEST).
+
+Il portale è organizzato in **macroaree**, ciascuna con le sue aree:
+- **Orientamento**: Formazione Scuola Lavoro (FSL, OpenLab: convenzioni, elenco studenti, attestati, valutazioni) ed eventi e seminari (es. Welcome Week);
+- **Didattica**: gruppi degli insegnamenti (es. Scienze Motorie), con le attività create a partire dall'anagrafe degli insegnamenti;
+- **Calendari e risorse**: aule, laboratori e sportelli (appuntamenti con gli uffici) prenotabili a slot.
+
+Ogni area ha un **tipo** (`pagine_eventi.tipo_area`: fsl, eventi, gruppi, calendario) scelto in Aree o alla creazione: colloca l'area nella home e propone le impostazioni dei nuovi eventi e progetti. Le **anagrafi** (docenti, PTA, insegnamenti, corsi di studio, scuole) sono comuni a tutto il portale.
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![PHP](https://img.shields.io/badge/PHP-8.2%2B-purple.svg)](https://www.php.net/)
 [![MySQL](https://img.shields.io/badge/MySQL-5.7%2B-orange.svg)](https://www.mysql.com/)
-[![Guardalo live](https://img.shields.io/badge/Guardalo-Live-green.svg)](https://dibest2.unical.it/eventi/)
+[![Guardalo live](https://img.shields.io/badge/Guardalo-Live-green.svg)](https://dibest2.unical.it/didattica/)
 
-**Guardalo live:** https://dibest2.unical.it/eventi/
+**Guardalo live:** https://dibest2.unical.it/didattica/ (il vecchio indirizzo /eventi/ rimanda qui)
 
 ---
 
 ## Funzionalita
 
+- **Ingresso nel pannello per macroarea**: chi gestisce più aree sceglie prima la sezione (Orientamento, Didattica, Calendari e risorse) e poi l'area, con card che riassumono i numeri di ciascuna (`admin/inizio.php`); "Cambia" riporta alla sezione dell'area corrente
+- **Calendari e risorse** (aree di tipo `calendario`): aule, laboratori e sportelli con orari settimanali (fino a due fasce al giorno), slot di durata scelta, più slot di seguito, preavviso minimo e giorni prenotabili, chi può prenotare (tutti, studenti, docenti, personale), approvazione facoltativa dei gestori, ripetizione settimanale (le settimane non disponibili vengono saltate e segnalate) e chiusure della risorsa o di tutta l'area. Pagina pubblica con la settimana degli slot liberi, controllo delle sovrapposizioni (anche con richieste contemporanee), email di conferma, approvazione, rifiuto, annullamento e promemoria del giorno prima, file .ics, prenotazioni nell'Area personale con annullamento; nel pannello agenda di oggi, prenotazioni con filtri, approvazione anche di tutta la serie ed export CSV (`admin/risorse.php`, `admin/prenotazioni_risorse.php`)
 - **Gestione eventi multi-area** con sezioni (Pagine) personalizzabili per colori, layout e accessi
 - **8 layout di pagina**: griglia per sezioni, lista cronologica, elenco avanzato con ricerca, calendario, timeline, agenda a schede per giorno, gruppi/corsi, progetti — tutti gestiscono anche i turni senza data fissa
 - **Progetti** (es. Formazione Scuola Lavoro), **dedicati alle scuole o generici**: maschera dedicata con corso di laurea, periodo o "date da definire", requisiti di accesso, ore, articolazione in moduli/fasi/incontri, obiettivi, conoscenze e competenze, referenti con pagina personale; scheda pubblica di ogni progetto con link condivisibile; **edizioni** (repliche) con lista d'attesa in ordine di arrivo — per le scuole una scuola per edizione e numero di studenti controllato, altrimenti posti per edizione; iscrizione con SSO, SPID o CIE
@@ -41,7 +50,7 @@ Portale open-source per la gestione eventi, prenotazioni e presenze del **Dipart
 - **Menu di navigazione** a 3 livelli con ordinamento drag & drop e voci nascondibili
 - **Profilo utente**: pagina dedicata con dati SSO e modifica email personale
 - **Form builder** per campi prenotazione personalizzati per area/evento
-- **Anagrafe delle scuole**: l'elenco ufficiale del Ministero dell'Istruzione (open data, statali e paritarie) si carica dal pannello; il campo "Scuola (anagrafe del Ministero)" dei moduli cerca mentre il docente scrive (nome, comune o codice meccanografico, prima le scuole della Calabria), salva il nome ufficiale e il codice meccanografico e la propone già compilata alle iscrizioni successive; resta possibile scrivere a mano una scuola non in elenco. Le scuole scritte a mano nelle iscrizioni passate si abbinano all'anagrafe con i suggerimenti del portale, così report e statistiche contano ogni scuola una volta sola. La pagina Anagrafe scuole elenca le scuole collegate con i docenti di riferimento, le iscrizioni e le attività (esportabile in CSV)
+- **Anagrafe delle scuole**: l'elenco ufficiale del Ministero dell'Istruzione (open data, statali e paritarie) si carica dal pannello; il campo "Scuola (anagrafe del Ministero)" dei moduli apre una finestra guidata con regione, provincia e comune (tendine con il numero di scuole), ricerca per nome o codice meccanografico ed elenco delle scuole del luogo, oppure "La scuola non è in elenco" per scriverla a mano; salva il nome ufficiale e il codice meccanografico e la propone già compilata alle iscrizioni successive; resta possibile scrivere a mano una scuola non in elenco. Le scuole scritte a mano nelle iscrizioni passate si abbinano all'anagrafe con i suggerimenti del portale, così report e statistiche contano ogni scuola una volta sola. La pagina Anagrafe scuole elenca le scuole collegate con i docenti di riferimento, le iscrizioni e le attività (esportabile in CSV)
 - **Convenzioni con le scuole**: progetti ed eventi possono chiedere nel modulo se la scuola ha già la convenzione con il Dipartimento; con "No" la prenotazione resta in attesa e la scuola scarica dal portale i modelli di Convenzione e Allegato A (assets/modelli, sostituibili per area in Impostazioni area caricando un nuovo file) e riceve la PEC a cui inviarli firmati; la durata proposta per una nuova convenzione è un anno, come nel modello del Dipartimento. Registro delle convenzioni nel pannello **Formazione Scuola Lavoro** (scheda Convenzioni), per scuola: convenzione e Allegato A firmati (PDF o .p7m, scaricabili solo dal pannello), validità dal/al, docenti di riferimento dell'Allegato A, protocollo. La convenzione deve coprire tutto il periodo dell'attività (Dal/Al del progetto, giorno del turno dell'evento): le scuole con una convenzione che lo copre sono riconosciute nel modulo, altrimenti ne va stipulata una nuova. La verifica delle iscrizioni alle attività FSL, anche già confermate, si fa dalla scheda Verifica iscrizioni dello stesso pannello e ogni giorno dal cron. Negli eventi gli interruttori "Dedicato alle scuole" e "Attività di Formazione Scuola Lavoro" (come nei progetti) attivano la prenotazione per classe e il processo delle convenzioni, e quando la convenzione arriva le prenotazioni in attesa si confermano con l'email alla scuola. In Iscrizioni: richiesta della convenzione per email a chi si è già iscritto, "Convenzione ricevuta" (registrata per la scuola), badge sullo stato. Dal cron: promemoria alla scuola ogni 7 giorni (massimo 3), avviso ai gestori 7 giorni prima dell'inizio se mancano convenzioni, avviso agli amministratori 60 giorni prima della scadenza. I progetti possono anche richiedere l'approvazione dei gestori per tutte le edizioni. Con il modello del Dipartimento la scuola scarica anche la **Convenzione già compilata** (`convenzione_precompilata.php`, .docx): istituto, codice meccanografico e sede dall'anagrafe, attività, descrizione, studenti, periodo, durata e tutor; restano evidenziati da completare codice fiscale e dati del Dirigente
 - **Scheda di valutazione della struttura ospitante** (FSL): a fine attività, con la presenza registrata, il docente riceve il link personale a `valutazione_fsl.php` (8 aspetti da 1 a 5, "riproporrebbe", commenti), con un promemoria dopo 7 giorni
 - **Pannello Formazione Scuola Lavoro** (`admin/fsl.php`), a schede: Riepilogo per anno scolastico (attività, scuole, studenti, presenze, convenzioni mancanti), Convenzioni (registro e registrazione), Verifica iscrizioni, Valutazioni; tabelle con export CSV
@@ -153,6 +162,14 @@ Su Windows con XAMPP, da Git Bash: `bash strumenti/locale/avvia.sh` avvia MariaD
 
 Prima di ogni caricamento: `/c/xampp/php/php.exe -d extension=zip strumenti/prove/esegui.php` lancia le prove automatiche (funzioni su un database usa e getta e, se l'ambiente locale è acceso, pagine, file riservati, pannello e un'iscrizione completa). Esce con codice 1 se una prova fallisce. Dopo il caricamento, sul server: `PHP_BIN=/opt/lampp/bin/php bash strumenti/verifica_sito.sh`.
 
+### Indirizzo del portale (/didattica)
+
+Il codice non dipende dal nome della cartella. Per passare da `/eventi` a `/didattica` sul server: `sudo bash /opt/lampp/htdocs/eventi/strumenti/migra_a_didattica.sh` (sposta la cartella, crea in `/eventi` un rimando permanente pagina per pagina, imposta `URL_SITO` nel `.env`); poi aggiornare il crontab come indicato dallo script. `--annulla` torna a `/eventi`.
+
+### Anagrafe degli insegnamenti
+
+Con l'aggiornamento settimanale dell'anagrafe arrivano anche gli insegnamenti dei corsi del proprio dipartimento (la prima struttura) dalle API `activities` del portale di Ateneo. Nelle API `academic_year` è la coorte: l'anno in cui l'insegnamento si tiene è coorte + anno di corso − 1. Si conservano l'anno accademico in corso e il successivo (Anagrafi → Insegnamenti).
+
 ### Aggiornamenti del database
 
 Non servono script SQL manuali dopo un aggiornamento del codice. Al primo accesso la funzione `assicura_schema()` in `inc/schema.php` crea le tabelle e le colonne mancanti e corregge i tipi di colonna dei database più vecchi, poi scrive un marcatore (es. `cache/schema_v29.ok`) e da quel momento non interroga più lo schema. Le pagine non modificano mai la struttura del database: ogni nuova colonna va aggiunta lì, cambiando il nome del marcatore.
@@ -181,12 +198,15 @@ eventidibest-cms/
 │   ├── admin_header.php        # Autenticazione, RBAC, menu dell'area corrente e barra superiore
 │   ├── dashboard.php           # Dashboard con KPI e grafici, scelta dell'area
 │   ├── aree.php                # Elenco delle aree (gestisci, visibile/nascosta, elimina)
+│   ├── inizio.php              # Ingresso: scelta della sezione e dell'area (card)
 │   ├── nuova_area.php          # Creazione di un'area (nasce nascosta, voce di menu nascosta)
+│   ├── risorse.php             # Calendari e risorse: risorse, orari settimanali e chiusure
+│   ├── prenotazioni_risorse.php # Calendari e risorse: agenda, prenotazioni, approvazioni, CSV (dashboard dell'area)
 │   ├── utenti.php              # Utenti, gruppi e abilitazioni, con riepilogo per area
 │   ├── scuole.php              # Anagrafe scuole: caricamento del file del Ministero e abbinamento dello storico, scuole collegate con i docenti (le convenzioni sono in fsl.php)
 │   ├── convenzione_file.php    # Scarica la convenzione o l'Allegato A firmati (solo amministratori; i file sono bloccati al web)
 │   ├── fsl.php                 # Formazione Scuola Lavoro a schede: riepilogo per anno scolastico, convenzioni, verifica delle iscrizioni, valutazioni
-│   ├── anagrafe_personale.php  # Anagrafe del personale di Ateneo: elenchi, corsi di studio, strutture da sincronizzare
+│   ├── anagrafe_personale.php  # Anagrafi di Ateneo: docenti, PTA, insegnamenti (anagrafe_insegnamenti.php), corsi di studio, strutture
 │   ├── anagrafe_docenti.php    # Apre l'elenco dei docenti (anagrafe_pta.php: personale tecnico amministrativo)
 │   ├── cerca_personale.php     # Ricerca nell'anagrafe del personale per referenti e abilitazioni (JSON)
 │   ├── eventi.php              # CRUD eventi, turni, sezioni e referenti, duplicazione
@@ -210,7 +230,7 @@ eventidibest-cms/
 ├── assets/             # Icone PWA
 ├── config.php          # Connessione DB, session, security headers, CSP
 ├── functions.php       # Carica le funzioni condivise da inc/ (nell'ordine giusto)
-├── inc/                # Funzioni per argomento: base, aspetto, liste_attesa, sistema, dati, eventi_progetti, anagrafi, fsl, prenotazioni, attestati, schema (bloccata al web)
+├── inc/                # Funzioni per argomento: base, sezioni, aspetto, liste_attesa, sistema, dati, eventi_progetti, anagrafi, fsl, prenotazioni, attestati, risorse, schema (bloccata al web)
 ├── modelli_documenti/  # Modelli interni per i documenti precompilati (bloccata al web)
 ├── strumenti/          # verifica_sito.sh, ambiente locale (locale/) e prove automatiche (prove/); bloccata al web
 ├── valutazione_fsl.php # Scheda di valutazione della struttura ospitante (link personale del docente)
@@ -226,7 +246,9 @@ eventidibest-cms/
 ├── verifica_attestato.php # Verifica pubblica di un attestato dal codice o dal QR
 ├── privacy.php         # Informativa privacy e cookie
 ├── crediti.php         # Credits: copyright, realizzazione, software open source e licenze
-├── cerca_scuole.php    # Ricerca nell'anagrafe delle scuole per il campo "Scuola" dei moduli (JSON)
+├── cerca_scuole.php    # Anagrafe delle scuole per il campo "Scuola" dei moduli: regioni, province, comuni e scuole (JSON)
+├── calendario_area.php # Pagina pubblica delle aree Calendari e risorse (incluso da master_template.php)
+├── risorsa_ics.php     # File .ics di una prenotazione di aula, laboratorio o sportello
 ├── persona.php         # Pagina pubblica di un referente scelto dall'anagrafe di Ateneo
 ├── profilo.php         # Profilo utente: dati SSO e modifica email
 ├── sw.js               # Service Worker (PWA)
@@ -263,6 +285,9 @@ Il database e` composto da **23 tabelle**:
 | `personale_ateneo` | Anagrafe del personale delle strutture scelte (API del portale Unical): ruolo, struttura, gruppo, settore, recapiti, scheda con foto; gli utenti hanno il campo `persona_id` |
 | `anagrafe_strutture` | Strutture di Ateneo da sincronizzare, con l'esito dell'ultimo aggiornamento |
 | `corsi_studio` | Corsi di studio dei dipartimenti dell'anagrafe, con la scelta di quelli proposti nei moduli |
+| `insegnamenti` | Anagrafe degli insegnamenti dei corsi del Dipartimento (API activities); le attività collegate hanno `progetti_dettagli.insegnamento_id` |
+| `risorse`, `risorse_orari`, `risorse_chiusure` | Calendari e risorse: aule, laboratori e sportelli con regole di prenotazione, orari settimanali e chiusure (della risorsa o di tutta l'area) |
+| `prenotazioni_risorse` | Prenotazioni a slot delle risorse (stato confermata / da approvare / rifiutata / annullata, serie settimanale, codice, promemoria) |
 | `abilitazioni_ambito` | Abilitazioni per perimetro: tutti i progetti / tutti gli eventi di un'area, Formazione Scuola Lavoro (tutto, convenzioni, anagrafe scuole) |
 | `abilitazioni_attesa` | Abilitazioni date a chi non ha ancora fatto accesso: si attivano al primo login con quell'email |
 | `log_attivita` | Audit trail di tutte le operazioni admin |
