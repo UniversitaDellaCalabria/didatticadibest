@@ -8,7 +8,7 @@
 // richiesta: quando aggiungi qualcosa qui, cambia anche il nome del marcatore.
 if (!function_exists('assicura_schema')) {
     function assicura_schema($conn) {
-        $marker = RADICE_SITO . '/cache/schema_v29.ok';
+        $marker = RADICE_SITO . '/cache/schema_v30.ok';
         if (is_file($marker)) return;
 
         // 1. Tabelle di servizio (prima create dalle singole pagine a ogni richiesta)
@@ -43,6 +43,12 @@ if (!function_exists('assicura_schema')) {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
             // v23: anagrafe del personale di Ateneo (API pubbliche del portale), chiave l'ID del portale (nome.cognome);
             // origine = struttura sincronizzata da cui arriva la persona
+            // v30: dati della scheda di Ateneo modificati dalla persona dall'Area personale (vuoto = dato del portale);
+            // tabella separata: l'aggiornamento settimanale dalle API non li sovrascrive
+            'personale_modifiche' => "CREATE TABLE IF NOT EXISTS personale_modifiche (
+                persona_id VARCHAR(80) NOT NULL PRIMARY KEY, telefono VARCHAR(60) DEFAULT '', ufficio VARCHAR(255) DEFAULT '',
+                ricevimento TEXT DEFAULT NULL, bio TEXT DEFAULT NULL, sito VARCHAR(255) DEFAULT '', aggiornata_il DATETIME DEFAULT NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
             'personale_ateneo' => "CREATE TABLE IF NOT EXISTS personale_ateneo (
                 id VARCHAR(80) NOT NULL PRIMARY KEY, cognome VARCHAR(100) NOT NULL DEFAULT '', nome VARCHAR(100) NOT NULL DEFAULT '',
                 email VARCHAR(150) DEFAULT '', telefono VARCHAR(60) DEFAULT '', ufficio VARCHAR(255) DEFAULT '',

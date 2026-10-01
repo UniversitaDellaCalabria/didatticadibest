@@ -395,6 +395,62 @@ if (!function_exists('persona_ateneo')) {
     }
 }
 
+if (!defined('CAMPI_SCHEDA_PERSONA')) define('CAMPI_SCHEDA_PERSONA', [
+    'telefono' => 'Telefono', 'ufficio' => 'Ufficio', 'ricevimento' => 'Orari di ricevimento', 'bio' => 'Profilo', 'sito' => 'Sito web',
+]);
+
+if (!function_exists('modifiche_persona')) {
+    // Campi della scheda modificati dalla persona (Area personale); [] se non ne ha
+    function modifiche_persona($conn, ?string $id): array {
+        $id = trim((string)$id);
+        if ($id === '') return [];
+        $st = @$conn->prepare("SELECT * FROM personale_modifiche WHERE persona_id = ? LIMIT 1");
+        if (!$st) return [];
+        $st->bind_param("s", $id); $st->execute();
+        return $st->get_result()->fetch_assoc() ?: [];
+    }
+}
+
+if (!function_exists('scheda_persona')) {
+    // Scheda da mostrare: dati del portale di Ateneo con sopra le modifiche della persona (campo vuoto = dato del portale).
+    // Ritorna ['valori' => […], 'portale' => […], 'modificati' => [campi]] con i campi di CAMPI_SCHEDA_PERSONA.
+    function scheda_persona($conn, array $p, ?array $det = null): array {
+        $det = $det ?? dettaglio_persona($conn, $p, false);
+        $portale = [
+            'telefono'    => !empty($det['telefoni']) ? implode(', ', $det['telefoni']) : (string)($p['telefono'] ?? ''),
+            'ufficio'     => ($det['ufficio'] ?? '') !== '' ? $det['ufficio'] : (string)($p['ufficio'] ?? ''),
+            'ricevimento' => (string)($det['ricevimento'] ?? ''),
+            'bio'         => ($det['bio'] ?? '') !== '' ? $det['bio'] : (string)($det['cv_breve'] ?? ''),
+            'sito'        => (string)($det['siti'][0] ?? ''),
+        ];
+        $mod = modifiche_persona($conn, $p['id'] ?? '');
+        $valori = []; $modificati = [];
+        foreach ($portale as $k => $v) {
+            $m = trim((string)($mod[$k] ?? ''));
+            if ($m !== '') { $valori[$k] = $m; $modificati[] = $k; } else $valori[$k] = $v;
+        }
+        return ['valori' => $valori, 'portale' => $portale, 'modificati' => $modificati];
+    }
+}
+
+if (!function_exists('salva_modifiche_persona')) {
+    // Salva i campi modificati dalla persona (testi ripuliti, sito solo https). Ritorna null o il messaggio d'errore.
+    function salva_modifiche_persona($conn, string $id, array $post): ?string {
+        $lim = ['telefono' => 60, 'ufficio' => 255, 'ricevimento' => 1000, 'bio' => 3000, 'sito' => 255];
+        $v = [];
+        foreach ($lim as $k => $max) $v[$k] = mb_substr(trim(strip_tags(str_replace("\r", '', (string)($post[$k] ?? '')))), 0, $max);
+        if ($v['telefono'] !== '' && !preg_match('/^[0-9+().\/ ,-]{4,60}$/', $v['telefono'])) return "Il telefono può contenere solo numeri, spazi, + - / ( ) e virgole.";
+        if ($v['sito'] !== '' && !preg_match('#^https://#i', $v['sito'])) $v['sito'] = 'https://' . preg_replace('#^https?://#i', '', $v['sito']);
+        if ($v['sito'] !== '' && !filter_var($v['sito'], FILTER_VALIDATE_URL)) return "Il sito web non è un indirizzo valido.";
+        $st = $conn->prepare("INSERT INTO personale_modifiche (persona_id, telefono, ufficio, ricevimento, bio, sito, aggiornata_il) VALUES (?, ?, ?, ?, ?, ?, NOW())
+                              ON DUPLICATE KEY UPDATE telefono = VALUES(telefono), ufficio = VALUES(ufficio), ricevimento = VALUES(ricevimento),
+                                                      bio = VALUES(bio), sito = VALUES(sito), aggiornata_il = NOW()");
+        if (!$st) return "Salvataggio non riuscito.";
+        $st->bind_param("ssssss", $id, $v['telefono'], $v['ufficio'], $v['ricevimento'], $v['bio'], $v['sito']);
+        return $st->execute() ? null : "Salvataggio non riuscito.";
+    }
+}
+
 if (!function_exists('nome_persona')) {
     function nome_persona(array $p): string { return trim(($p['nome'] ?? '') . ' ' . ($p['cognome'] ?? '')); }
 }
@@ -557,7 +613,8 @@ if (!function_exists('cerca_personale')) {
         $out = []; $r = $st->get_result();
         while ($r && $p = $r->fetch_assoc()) {
             $det = json_decode((string)($p['dettaglio_json'] ?? ''), true) ?: [];
-            $out[] = ['id' => $p['id'], 'nome' => nome_persona($p), 'cognome' => $p['cognome'], 'email' => $p['email'], 'telefono' => $p['telefono'],
+            $tel_mod = trim((string)(modifiche_persona($conn, $p['id'])['telefono'] ?? ''));
+            $out[] = ['id' => $p['id'], 'nome' => nome_persona($p), 'cognome' => $p['cognome'], 'email' => $p['email'], 'telefono' => $tel_mod !== '' ? $tel_mod : $p['telefono'],
                       'ruolo' => $p['ruolo'], 'struttura' => $p['struttura'], 'ssd' => $p['ssd'], 'gruppo' => GRUPPI_PERSONALE[$p['gruppo']] ?? '',
                       'attivo' => (int)$p['attivo'], 'link' => url_portale_persona($p), 'foto' => $det['foto'] ?? ''];
         }

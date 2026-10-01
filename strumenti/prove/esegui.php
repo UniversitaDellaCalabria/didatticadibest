@@ -125,6 +125,19 @@ prova(salva_valutazione_fsl($conn, $p_v, ['voto' => $voti, 'ripeterebbe' => 'si'
 prova(salva_valutazione_fsl($conn, prenotazione_da_valutazione($conn, $tok), ['voto' => $voti, 'ripeterebbe' => 'si']) !== null, "seconda compilazione rifiutata");
 prova((float)$conn->query("SELECT media FROM valutazioni_fsl WHERE prenotazione_id = 1")->fetch_assoc()['media'] === 4.0, "media calcolata");
 
+sezione("Scheda di Ateneo modificabile dalla persona");
+$q("INSERT INTO personale_ateneo (id, cognome, nome, email, telefono, ufficio, ruolo, gruppo, dettaglio_json, dettaglio_il) VALUES ('mario.rossi', 'Rossi', 'Mario', 'mario.rossi@example.org', '0984 111', 'Cubo 1', 'Personale Tecnico Amministrativo', 'pta', '{\"ricevimento\":\"Lunedi 9-11\",\"siti\":[]}', NOW())");
+$p_ate = persona_ateneo($conn, 'mario.rossi');
+$sch = scheda_persona($conn, $p_ate);
+prova($sch['valori']['telefono'] === '0984 111' && $sch['valori']['ricevimento'] === 'Lunedi 9-11' && !$sch['modificati'], "senza modifiche: dati del portale");
+prova(salva_modifiche_persona($conn, 'mario.rossi', ['telefono' => 'abc<script>']) !== null, "telefono non valido rifiutato");
+prova(salva_modifiche_persona($conn, 'mario.rossi', ['ufficio' => 'Cubo 4B', 'sito' => 'example.org/mario', 'bio' => '<b>Ciao</b>']) === null, "modifiche salvate");
+$sch = scheda_persona($conn, $p_ate);
+prova($sch['valori']['ufficio'] === 'Cubo 4B' && $sch['valori']['telefono'] === '0984 111' && $sch['valori']['sito'] === 'https://example.org/mario' && $sch['valori']['bio'] === 'Ciao', "modifiche sopra i dati del portale (sito https, niente HTML)");
+prova(in_array('ufficio', $sch['modificati'], true) && !in_array('telefono', $sch['modificati'], true), "campi modificati riconosciuti");
+salva_modifiche_persona($conn, 'mario.rossi', []);
+prova(!scheda_persona($conn, $p_ate)['modificati'], "ripristino dei dati del portale");
+
 sezione("Altre regole");
 prova(prenotazione_di_classe(false, ['convenzione' => 1]) && prenotazione_di_classe(false, ['dedicata_scuole' => 1]) && !prenotazione_di_classe(false, []), "eventi: classe con FSL o dedicato alle scuole");
 prova(prenotazione_di_classe(true, ['per_scuole' => 1]) && !prenotazione_di_classe(true, ['per_scuole' => 0]), "progetti: classe se dedicati alle scuole");
@@ -191,6 +204,8 @@ if (!function_exists('curl_init') || $http('/eventi/')['codice'] !== 200) {
         $err_php = preg_match('/<b>(Fatal error|Parse error|Warning)<\/b>|Uncaught /', $r['corpo']);
         prova($r['codice'] === 200 && !$err_php && str_contains($r['corpo'], '</html>'), "pannello: $pag", "risposta " . $r['codice'] . ($err_php ? ' con errore PHP' : ''));
     }
+    $r = $http('/eventi/area_personale.php', null, $jar);
+    prova($r['codice'] === 200 && !preg_match('/<b>(Fatal error|Parse error|Warning)<\/b>|Uncaught /', $r['corpo']) && str_contains($r['corpo'], 'pills-profilo-tab'), "Area personale (con la scheda Profilo)");
     // Iscrizione completa a un progetto FSL (docente di prova, scuola dall'anagrafe) e pulizia
     // (dati di esempio di strumenti/locale: utente 4, progetto 20 edizione 2 = turno 201, scuola senza convenzione CZPC00004D)
     $jar2 = tempnam(sys_get_temp_dir(), 'jar');

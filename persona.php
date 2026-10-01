@@ -35,9 +35,13 @@ if (!$pers || !$attivita) {
 $det = dettaglio_persona($conn, $pers); // aggiornata dal portale di Ateneo al massimo una volta a settimana
 $nome = nome_persona($pers);
 $email = $pers['email'] ?: ($attivita[0]['email_ref'] ?? '');
-$telefoni = !empty($det['telefoni']) ? $det['telefoni'] : array_filter([$pers['telefono']]);
-$ufficio = ($det['ufficio'] ?? '') !== '' ? $det['ufficio'] : $pers['ufficio'];
-$bio = ($det['bio'] ?? '') !== '' ? $det['bio'] : ($det['cv_breve'] ?? '');
+// Dati del portale con le modifiche fatte dalla persona nella sua Area personale
+$sch = scheda_persona($conn, $pers, $det)['valori'];
+$telefoni = array_values(array_filter(array_map('trim', explode(',', $sch['telefono']))));
+$ufficio = $sch['ufficio'];
+$bio = $sch['bio'];
+$det['ricevimento'] = $sch['ricevimento'];
+if ($sch['sito'] !== '' && !in_array($sch['sito'], $det['siti'] ?? [], true)) $det['siti'] = array_merge([$sch['sito']], $det['siti'] ?? []);
 
 $page_cfg['titolo'] = $nome;
 require_once 'header.php';

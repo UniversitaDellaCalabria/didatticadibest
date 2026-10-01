@@ -78,6 +78,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['aggiorna_email'])) {
 }
 
 // =======================================================================
+// AZIONE: SCHEDA DI ATENEO (dati dalle API del portale, modificabili dalla persona)
+// =======================================================================
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['aggiorna_scheda_ateneo'])) {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    $pers_sv = !empty($user_info['persona_id']) ? persona_ateneo($conn, $user_info['persona_id']) : null;
+    if (!$pers_sv) {
+        $_SESSION['msg_area_pers'] = "<div class='alert alert-danger fw-bold text-center my-3 shadow-sm'><i class='fa fa-times-circle me-1'></i> Il tuo profilo non è collegato all'anagrafe di Ateneo.</div>";
+    } else {
+        $dati_sv = isset($_POST['ripristina']) ? [] : $_POST;
+        $err_sv = salva_modifiche_persona($conn, $pers_sv['id'], $dati_sv);
+        if ($err_sv === null) registra_log_audit($conn, isset($_POST['ripristina']) ? "Scheda di Ateneo: ripristinati i dati del portale" : "Scheda di Ateneo modificata", ["Persona" => $pers_sv['id']]);
+        $_SESSION['msg_area_pers'] = $err_sv === null
+            ? "<div class='alert alert-success fw-bold text-center my-3 shadow-sm'><i class='fa fa-check-circle me-1'></i> " . (isset($_POST['ripristina']) ? "Ripristinati i dati del portale di Ateneo." : "Scheda aggiornata.") . "</div>"
+            : "<div class='alert alert-danger fw-bold text-center my-3 shadow-sm'><i class='fa fa-times-circle me-1'></i> " . htmlspecialchars($err_sv) . "</div>";
+    }
+    header("Location: area_personale.php#profilo");
+    exit;
+}
+
+// =======================================================================
 // AZIONE: MODIFICA PRENOTAZIONE (SECURE - Prepared Statements + Cambio Turno)
 // =======================================================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['edit_prenotazione_utente'])) {
@@ -611,7 +631,8 @@ require_once 'header.php';
                 <div class="mt-1"><span class="badge bg-light text-dark font-monospace shadow-sm">Matricola: <?php echo htmlspecialchars($user_info['matricola_studente'] ?: $user_info['matricola_dipendente']); ?></span></div>
             <?php endif; ?>
             <?php $pers_ap = !empty($user_info['persona_id']) ? persona_ateneo($conn, $user_info['persona_id']) : null; if ($pers_ap): ?>
-                <div class="mt-1 small"><i class="fa fa-address-book me-1" aria-hidden="true"></i><?php echo htmlspecialchars(implode(' · ', array_filter([GRUPPI_PERSONALE[$pers_ap['gruppo']] ?? '', $pers_ap['ruolo'], $pers_ap['struttura']]))); ?></div>
+                <?php $voci_ap = []; foreach ([GRUPPI_PERSONALE[$pers_ap['gruppo']] ?? '', $pers_ap['ruolo'], $pers_ap['struttura']] as $v_ap) { $v_ap = trim((string)$v_ap); if ($v_ap !== '') $voci_ap[mb_strtolower($v_ap)] = $v_ap; } ?>
+                <div class="mt-1 small"><i class="fa fa-address-book me-1" aria-hidden="true"></i><?php echo htmlspecialchars(implode(' · ', $voci_ap)); ?></div>
             <?php endif; ?>
 
             <!-- MINI KPI -->
@@ -1190,6 +1211,57 @@ require_once 'header.php';
                     </dl>
                 </div>
             </div>
+
+            <?php $pers_sc = !empty($user_info['persona_id']) ? persona_ateneo($conn, $user_info['persona_id']) : null;
+            if ($pers_sc):
+                $det_sc = dettaglio_persona($conn, $pers_sc);   // aggiornata dal portale al massimo una volta a settimana
+                $sc = scheda_persona($conn, $pers_sc, $det_sc);
+                $voci_sc = []; foreach ([GRUPPI_PERSONALE[$pers_sc['gruppo']] ?? '', $pers_sc['ruolo']] as $v_sc) { $v_sc = trim((string)$v_sc); if ($v_sc !== '') $voci_sc[mb_strtolower($v_sc)] = $v_sc; } ?>
+            <!-- Scheda di Ateneo: dati dalle API del portale, alcuni modificabili -->
+            <div class="card shadow-sm border-0 mb-4" id="scheda-ateneo">
+                <div class="card-header fw-bold d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <span><i class="fa fa-address-book me-2 text-secondary" aria-hidden="true"></i>Scheda di Ateneo</span>
+                    <a href="<?php echo htmlspecialchars(url_portale_persona($pers_sc)); ?>" target="_blank" rel="noopener" class="small fw-normal">Pagina sul portale di Ateneo<span class="visually-hidden"> (si apre in una nuova scheda)</span> <i class="fa fa-arrow-up-right-from-square" aria-hidden="true"></i></a>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex gap-3 align-items-center mb-3 flex-wrap">
+                        <?php echo html_avatar_persona($det_sc['foto'] ?? '', 'La tua foto sul portale di Ateneo', 72); ?>
+                        <dl class="row mb-0 flex-grow-1 small">
+                            <dt class="col-sm-4 text-muted">Ruolo</dt><dd class="col-sm-8"><?php echo htmlspecialchars(implode(' · ', $voci_sc) ?: '—'); ?></dd>
+                            <dt class="col-sm-4 text-muted">Struttura</dt><dd class="col-sm-8"><?php echo htmlspecialchars($pers_sc['struttura'] ?: '—'); ?></dd>
+                            <?php if ($pers_sc['ssd'] !== ''): ?><dt class="col-sm-4 text-muted">Settore</dt><dd class="col-sm-8"><?php echo htmlspecialchars($pers_sc['ssd_cod'] . ' – ' . $pers_sc['ssd']); ?></dd><?php endif; ?>
+                            <dt class="col-sm-4 text-muted">Email di Ateneo</dt><dd class="col-sm-8"><?php echo htmlspecialchars($pers_sc['email'] ?: '—'); ?></dd>
+                        </dl>
+                    </div>
+                    <p class="text-muted small mb-3"><i class="fa fa-info-circle me-1" aria-hidden="true"></i>Ruolo, struttura, foto ed email arrivano dal portale dell'Università e si aggiornano ogni settimana: per cambiarli rivolgiti agli uffici di Ateneo. I campi qui sotto puoi correggerli tu: valgono sul portale degli eventi (pagina pubblica di referente e moduli) e l'aggiornamento settimanale non li sovrascrive. Lascia un campo vuoto per usare il dato del portale di Ateneo.</p>
+                    <form method="POST">
+                        <?php csrf_field(); ?>
+                        <input type="hidden" name="aggiorna_scheda_ateneo" value="1">
+                        <div class="row g-3">
+                            <?php foreach (CAMPI_SCHEDA_PERSONA as $k_sc => $lbl_sc):
+                                $mod_sc = in_array($k_sc, $sc['modificati'], true);
+                                $val_sc = $mod_sc ? $sc['valori'][$k_sc] : '';
+                                $port_sc = $sc['portale'][$k_sc];
+                                $lungo = in_array($k_sc, ['ricevimento', 'bio'], true); ?>
+                                <div class="<?php echo $lungo ? 'col-12' : 'col-md-4'; ?>">
+                                    <label class="form-label small fw-bold mb-1" for="sc_<?php echo $k_sc; ?>"><?php echo $lbl_sc; ?><?php if ($mod_sc): ?> <span class="badge bg-info text-dark fw-normal">modificato da te</span><?php endif; ?></label>
+                                    <?php if ($lungo): ?>
+                                        <textarea class="form-control form-control-sm" name="<?php echo $k_sc; ?>" id="sc_<?php echo $k_sc; ?>" rows="<?php echo $k_sc === 'bio' ? 5 : 3; ?>" maxlength="<?php echo $k_sc === 'bio' ? 3000 : 1000; ?>" placeholder="<?php echo htmlspecialchars($port_sc !== '' ? mb_strimwidth(str_replace("\n", ' ', $port_sc), 0, 160, '…') : 'Nessun dato sul portale di Ateneo'); ?>"><?php echo htmlspecialchars($val_sc); ?></textarea>
+                                    <?php else: ?>
+                                        <input type="<?php echo $k_sc === 'sito' ? 'url' : ($k_sc === 'telefono' ? 'tel' : 'text'); ?>" class="form-control form-control-sm" name="<?php echo $k_sc; ?>" id="sc_<?php echo $k_sc; ?>" value="<?php echo htmlspecialchars($val_sc); ?>" maxlength="<?php echo $k_sc === 'telefono' ? 60 : 255; ?>" placeholder="<?php echo htmlspecialchars($port_sc !== '' ? $port_sc : ($k_sc === 'sito' ? 'https://…' : 'Nessun dato sul portale')); ?>">
+                                    <?php endif; ?>
+                                    <div class="form-text">Dal portale di Ateneo: <?php echo $port_sc !== '' ? htmlspecialchars(mb_strimwidth(str_replace("\n", ' ', $port_sc), 0, 120, '…')) : '<em>nessun dato</em>'; ?></div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                        <div class="d-flex gap-2 flex-wrap mt-3">
+                            <button type="submit" class="btn btn-primary btn-sm fw-bold"><i class="fa fa-save me-1" aria-hidden="true"></i>Salva la scheda</button>
+                            <?php if ($sc['modificati']): ?><button type="submit" name="ripristina" value="1" class="btn btn-outline-secondary btn-sm fw-bold" data-confirm="Tornare ai dati del portale di Ateneo per tutti i campi?"><i class="fa fa-rotate-left me-1" aria-hidden="true"></i>Ripristina i dati del portale</button><?php endif; ?>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <?php endif; ?>
 
             <!-- Email -->
             <div class="card shadow-sm border-0 mb-4">
