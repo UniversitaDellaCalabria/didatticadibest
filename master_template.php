@@ -2648,10 +2648,9 @@ function evSetRating(btn) {
 <?php
 // Barra di modifica rapida: solo per chi gestisce l'area o l'evento/progetto aperto (i permessi veri li controlla l'admin)
 $ev_ctx = $progetto_sel ?: ($evento_sel ?: null);
-$gestisce_ev = $utente_logged && $ev_ctx && in_array((int)$_SESSION['utente_id'], ids_gestori_da_campi(0, $ev_ctx['gestori_utenti_ids'] ?? '', $ev_ctx['permessi_gestori_json'] ?? ''), true);
+$gestisce_ev = $utente_logged && $ev_ctx && utente_gestisce_attivita($conn, (int)$_SESSION['utente_id'], (int)$ev_ctx['id']);
 if ($is_gestore_o_admin || $gestisce_ev):
-    $perm_area = (json_decode((string)($page_cfg['permessi_gestori_json'] ?? ''), true) ?: [])[(int)$_SESSION['utente_id']] ?? [];
-    $puo_impostazioni = $is_admin_globale || in_array('full', (array)$perm_area, true);
+    $puo_impostazioni = $is_gestore_o_admin; // chi gestisce tutta l'area ha anche le impostazioni
     $ha_progetti = (bool)array_filter($eventi_by_id, fn($e) => ($e['tipo'] ?? '') === 'progetto');
     $link_admin = [];
     if ($ev_ctx && ($ev_ctx['tipo'] ?? '') === 'progetto') $link_admin[] = ['admin/progetti.php?p_id=' . $p_id . '&id=' . (int)$ev_ctx['id'], 'fa-pen', 'Modifica progetto', true];

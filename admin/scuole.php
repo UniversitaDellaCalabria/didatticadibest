@@ -5,7 +5,7 @@
 // Le convenzioni con le scuole sono in fsl.php (pannello Formazione Scuola Lavoro).
 require_once 'admin_header.php';
 
-if (!$is_full_admin) nega_accesso();
+if (!$puo_fsl_scuole) nega_accesso(); // amministratori e abilitati alla FSL o all'anagrafe scuole
 
 function admin_redirect($url) { echo "<script>window.location.replace(" . json_encode($url) . ");</script>"; exit; }
 
@@ -112,9 +112,13 @@ function importa_anagrafe_scuole($conn, array $file, int $statale, array $region
 // Scuole scritte a mano nelle iscrizioni passate (senza codice), raggruppate per testo
 function scuole_da_abbinare($conn): array {
     $gruppi = [];
-    $r = $conn->query("SELECT id, dati_custom_json FROM prenotazioni WHERE scuola_codice IS NULL AND dati_custom_json IS NOT NULL
-                       AND (dati_custom_json LIKE '%scuol%' OR dati_custom_json LIKE '%istitut%') AND IFNULL(stato, 'confermata') NOT IN ('annullata', 'rifiutata', 'scaduta')");
+    // Senza codice, oppure con un codice che non è (più) nell'anagrafe. Il campo della scuola si riconosce in PHP
+    // (nome_scuola_prenotazione): un LIKE in SQL dipenderebbe da maiuscole e collation del database del server.
+    $r = $conn->query("SELECT id, scuola_codice, dati_custom_json FROM prenotazioni WHERE dati_custom_json IS NOT NULL AND dati_custom_json <> ''
+                       AND IFNULL(stato, 'confermata') NOT IN ('annullata', 'rifiutata', 'scaduta')");
     while ($r && $p = $r->fetch_assoc()) {
+        if (!empty($p['scuola_codice']) && scuola_per_codice($conn, $p['scuola_codice'])) continue;
+        $p['scuola_codice'] = null;
         $nome = nome_scuola_prenotazione($p);
         if ($nome === '') continue;
         $chiave = mb_strtolower(trim(preg_replace('/\s+/u', ' ', $nome)));
@@ -169,7 +173,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         elseif (!isset($gruppi[$chiave])) flash_set("Questo nome non è più da abbinare.", 'warning');
         else {
             $ids = implode(',', array_map('intval', $gruppi[$chiave]['ids']));
-            $st = $conn->prepare("UPDATE prenotazioni SET scuola_codice = ? WHERE id IN ($ids) AND scuola_codice IS NULL");
+            // Le iscrizioni del gruppo sono quelle senza un codice valido (vedi scuole_da_abbinare)
+            $st = $conn->prepare("UPDATE prenotazioni SET scuola_codice = ? WHERE id IN ($ids)");
             $st->bind_param("s", $s['codice']); $st->execute();
             registra_log_audit($conn, "Abbinamento scuola", ["Testo" => $gruppi[$chiave]['testo'], "Codice" => $s['codice'], "Iscrizioni" => $st->affected_rows]);
             flash_set("\"" . $gruppi[$chiave]['testo'] . "\" abbinata a " . etichetta_scuola($s) . " (" . $st->affected_rows . " iscrizioni).");

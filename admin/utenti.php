@@ -62,22 +62,65 @@ if (isset($_POST['del_user'])) {
 }
 
 // ==============================================================================
-// BACKEND: ABILITAZIONI AREA
+// BACKEND: ABILITAZIONI PER PERIMETRO
+// Nell'area corrente: tutta l'area (anche le impostazioni) oppure una parte: tutti i progetti, tutti gli eventi
+// e/o attività scelte. Formazione Scuola Lavoro (tutte le aree): tutto oppure solo convenzioni / anagrafe scuole.
+// Dentro il perimetro si gestisce tutto (attività, iscritti, sondaggi, moduli, attestati, statistiche).
 // ==============================================================================
 
-if (isset($_POST['assegna_permessi'])) {
-    csrf_verify($_POST['csrf_token'] ?? '');
-    $u_id       = (int)$_POST['utente_id'];
-    $permessi   = (array)($_POST['permessi'] ?? []);
-    $ambito     = $_POST['ambito_eventi'] ?? 'tutti';
-    $eventi_sel = array_filter(array_map('intval', (array)($_POST['eventi_specifici'] ?? [])));
+// Perimetro scelto nel modulo (scheda dell'utente o "Abilita una persona")
+function leggi_perimetro_post(): array {
+    $area = in_array($_POST['area_perimetro'] ?? '', ['area', 'parziale'], true) ? $_POST['area_perimetro'] : 'nessuno';
+    $tipi = $area === 'parziale' ? array_values(array_intersect((array)($_POST['area_tipi'] ?? []), ['progetti', 'eventi'])) : [];
+    $att  = $area === 'parziale' ? array_values(array_unique(array_filter(array_map('intval', (array)($_POST['attivita'] ?? []))))) : [];
+    if ($area === 'parziale' && !$tipi && !$att) $area = 'nessuno';
+    $fsl   = in_array($_POST['fsl_perimetro'] ?? '', ['tutto', 'parziale'], true) ? $_POST['fsl_perimetro'] : 'nessuno';
+    $parti = $fsl === 'parziale' ? array_values(array_intersect((array)($_POST['fsl_parti'] ?? []), ['fsl_convenzioni', 'fsl_scuole'])) : [];
+    if ($fsl === 'parziale' && !$parti) $fsl = 'nessuno';
+    return ['area' => $area, 'tipi' => $tipi, 'attivita' => $att, 'fsl' => $fsl, 'fsl_parti' => $parti];
+}
 
-    if ($u_id > 0 && !empty($permessi) && $filtro_p > 0) {
-        // Solo eventi specifici ma nessuno scelto: restano tolte le abilitazioni dell'area
-        if ($ambito === 'specifici' && !$eventi_sel) revoca_permessi_gestore($conn, $filtro_p, $u_id);
-        else assegna_permessi_gestore($conn, $filtro_p, $u_id, $permessi, $ambito === 'specifici' ? $eventi_sel : []);
-        registra_log_audit($conn, "Assegnati permessi", ["Utente" => $u_id, "Area" => $filtro_p, "Ambito" => $ambito]);
-        flash_set("Abilitazioni salvate!");
+// [[ambito, pagina_id, eventi_ids], …] corrispondenti al perimetro
+function ambiti_da_perimetro(array $p, int $pagina_id): array {
+    $out = [];
+    if ($p['area'] === 'area') $out[] = ['area', $pagina_id, []];
+    foreach ($p['tipi'] as $t) $out[] = [$t, $pagina_id, []];
+    if ($p['attivita']) $out[] = ['attivita', $pagina_id, $p['attivita']];
+    if ($p['fsl'] === 'tutto') $out[] = ['fsl', 0, []];
+    foreach ($p['fsl_parti'] as $t) $out[] = [$t, 0, []];
+    return $out;
+}
+
+// Sostituisce le abilitazioni dell'utente nell'area e quelle FSL con il perimetro scelto
+function salva_perimetro($conn, int $uid, int $pagina_id, array $p, int $da): void {
+    revoca_permessi_gestore($conn, $pagina_id, $uid);
+    $conn->query("UPDATE pagine_eventi SET gestore_utente_id = 0 WHERE id = $pagina_id AND gestore_utente_id = $uid");
+    revoca_ambito($conn, $uid, null, $pagina_id);
+    revoca_ambito($conn, $uid, null, 0);
+    foreach (ambiti_da_perimetro($p, $pagina_id) as [$amb, $pag, $ev]) applica_abilitazione($conn, $uid, $amb, $pag, $ev, $da);
+}
+
+// Descrizione breve per riepiloghi e messaggi
+function testo_perimetro(array $p, array $titoli_att = []): string {
+    $parti = [];
+    if ($p['area'] === 'area') $parti[] = "tutta l'area";
+    if (in_array('progetti', $p['tipi'], true)) $parti[] = 'tutti i progetti';
+    if (in_array('eventi', $p['tipi'], true)) $parti[] = 'tutti gli eventi';
+    if ($p['attivita']) $parti[] = count($p['attivita']) === 1 ? '1 attività' . (isset($titoli_att[$p['attivita'][0]]) ? ' (' . $titoli_att[$p['attivita'][0]] . ')' : '') : count($p['attivita']) . ' attività';
+    if ($p['fsl'] === 'tutto') $parti[] = 'Formazione Scuola Lavoro';
+    if (in_array('fsl_convenzioni', $p['fsl_parti'], true)) $parti[] = 'convenzioni FSL';
+    if (in_array('fsl_scuole', $p['fsl_parti'], true)) $parti[] = 'anagrafe scuole';
+    return $parti ? implode(', ', $parti) : 'nessuna abilitazione';
+}
+
+if (isset($_POST['salva_abilitazioni'])) {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    $u_id = (int)$_POST['utente_id'];
+    if ($u_id > 0 && $filtro_p > 0) {
+        $p_sc = leggi_perimetro_post();
+        salva_perimetro($conn, $u_id, $filtro_p, $p_sc, (int)$_SESSION['utente_id']);
+        registra_log_audit($conn, "Abilitazioni salvate", ["Utente" => $u_id, "Area" => $filtro_p, "Perimetro" => testo_perimetro($p_sc)]);
+        flash_set("Abilitazioni salvate: " . testo_perimetro($p_sc) . ".");
     }
     admin_redirect("utenti.php?p_id=$filtro_p");
 }
@@ -90,28 +133,30 @@ if (isset($_POST['abilita_da_anagrafe'])) {
     $pid_ab   = trim((string)($_POST['persona_id'] ?? ''));
     $pers_ab  = persona_ateneo($conn, $pid_ab);
     $nome_ab  = $pers_ab ? nome_persona($pers_ab) : mb_substr(trim((string)($_POST['nominativo'] ?? '')), 0, 200);
-    $permessi = array_values(array_intersect((array)($_POST['permessi'] ?? []), ['eventi', 'iscritti', 'sondaggi', 'form', 'full']));
-    $eventi_sel = ($_POST['ambito_eventi'] ?? 'tutti') === 'specifici' ? array_filter(array_map('intval', (array)($_POST['eventi_specifici'] ?? []))) : [];
-    if (in_array('full', $permessi, true)) $permessi = ['full'];
-    if ($filtro_p <= 0 || !filter_var($email_ab, FILTER_VALIDATE_EMAIL) || !$permessi) {
-        flash_set("Abilitazione non salvata: servono un'email valida e almeno una sezione.", 'danger');
+    $p_ab = leggi_perimetro_post();
+    $ambiti_ab = ambiti_da_perimetro($p_ab, $filtro_p);
+    if ($filtro_p <= 0 || !filter_var($email_ab, FILTER_VALIDATE_EMAIL) || !$ambiti_ab) {
+        flash_set("Abilitazione non salvata: servono un'email valida e almeno una cosa da abilitare.", 'danger');
         admin_redirect("utenti.php?p_id=$filtro_p");
     }
     $st = $conn->prepare("SELECT id FROM utenti WHERE LOWER(email) = ? OR (? <> '' AND persona_id = ?) ORDER BY ultimo_accesso DESC LIMIT 1");
     $st->bind_param("sss", $email_ab, $pid_ab, $pid_ab); $st->execute();
     $u_ab = $st->get_result()->fetch_assoc();
     if ($u_ab) {
-        assegna_permessi_gestore($conn, $filtro_p, (int)$u_ab['id'], $permessi, $eventi_sel);
-        registra_log_audit($conn, "Assegnati permessi", ["Utente" => (int)$u_ab['id'], "Area" => $filtro_p, "Da anagrafe" => $nome_ab]);
-        flash_set("$nome_ab è abilitato/a su quest'area.");
+        salva_perimetro($conn, (int)$u_ab['id'], $filtro_p, $p_ab, (int)$_SESSION['utente_id']);
+        registra_log_audit($conn, "Abilitazioni salvate", ["Utente" => (int)$u_ab['id'], "Area" => $filtro_p, "Perimetro" => testo_perimetro($p_ab), "Da anagrafe" => $nome_ab]);
+        flash_set(($nome_ab ?: $email_ab) . " è abilitato/a: " . testo_perimetro($p_ab) . ".");
     } else {
-        $st = $conn->prepare("DELETE FROM abilitazioni_attesa WHERE email = ? AND pagina_id = ?");
+        $st = $conn->prepare("DELETE FROM abilitazioni_attesa WHERE email = ? AND pagina_id IN (?, 0)");
         $st->bind_param("si", $email_ab, $filtro_p); $st->execute();
-        $perm_s = implode(',', $permessi); $ev_s = implode(',', $eventi_sel); $pid_s = $pers_ab['id'] ?? null; $da = (int)$_SESSION['utente_id'];
-        $st = $conn->prepare("INSERT INTO abilitazioni_attesa (email, persona_id, nominativo, pagina_id, permessi, eventi_ids, creata_da) VALUES (?, ?, ?, ?, ?, ?, ?)");
-        $st->bind_param("sssissi", $email_ab, $pid_s, $nome_ab, $filtro_p, $perm_s, $ev_s, $da); $st->execute();
-        registra_log_audit($conn, "Abilitazione in attesa del primo accesso", ["Email" => $email_ab, "Area" => $filtro_p]);
-        flash_set(($nome_ab ?: $email_ab) . " non ha ancora fatto accesso al portale: l'abilitazione si attiverà al suo primo accesso con $email_ab.");
+        $pid_s = $pers_ab['id'] ?? null; $da = (int)$_SESSION['utente_id'];
+        $st = $conn->prepare("INSERT INTO abilitazioni_attesa (email, persona_id, nominativo, pagina_id, permessi, eventi_ids, creata_da, ambito) VALUES (?, ?, ?, ?, 'full', ?, ?, ?)");
+        foreach ($ambiti_ab as [$amb, $pag, $ev]) {
+            $ev_s = implode(',', $ev);
+            $st->bind_param("sssisis", $email_ab, $pid_s, $nome_ab, $pag, $ev_s, $da, $amb); $st->execute();
+        }
+        registra_log_audit($conn, "Abilitazione in attesa del primo accesso", ["Email" => $email_ab, "Area" => $filtro_p, "Perimetro" => testo_perimetro($p_ab)]);
+        flash_set(($nome_ab ?: $email_ab) . " non ha ancora fatto accesso al portale: l'abilitazione (" . testo_perimetro($p_ab) . ") si attiverà al suo primo accesso con $email_ab.");
     }
     admin_redirect("utenti.php?p_id=$filtro_p");
 }
@@ -119,9 +164,14 @@ if (isset($_POST['abilita_da_anagrafe'])) {
 if (isset($_POST['annulla_attesa'])) {
     csrf_verify($_POST['csrf_token'] ?? '');
     $id_att = (int)$_POST['annulla_attesa'];
-    $conn->query("DELETE FROM abilitazioni_attesa WHERE id = $id_att AND pagina_id = " . (int)$filtro_p);
-    registra_log_audit($conn, "Annullata abilitazione in attesa", ["ID" => $id_att, "Area" => $filtro_p]);
-    flash_set("Abilitazione in attesa annullata.");
+    $r_att = $conn->query("SELECT email FROM abilitazioni_attesa WHERE id = $id_att AND pagina_id IN (" . (int)$filtro_p . ", 0)");
+    if ($r_att && $x_att = $r_att->fetch_assoc()) {
+        // Tutte le abilitazioni in attesa di quella persona (area corrente e FSL)
+        $st = $conn->prepare("DELETE FROM abilitazioni_attesa WHERE email = ? AND pagina_id IN (?, 0)");
+        $st->bind_param("si", $x_att['email'], $filtro_p); $st->execute();
+        registra_log_audit($conn, "Annullata abilitazione in attesa", ["Email" => $x_att['email'], "Area" => $filtro_p]);
+        flash_set("Abilitazione in attesa annullata.");
+    }
     admin_redirect("utenti.php?p_id=$filtro_p");
 }
 
@@ -142,10 +192,9 @@ if (isset($_POST['remove_user_all'])) {
     csrf_verify($_POST['csrf_token'] ?? '');
     $u_id = (int)$_POST['utente_id'];
     if ($filtro_p > 0) {
-        revoca_permessi_gestore($conn, $filtro_p, $u_id);
-        $conn->query("UPDATE pagine_eventi SET gestore_utente_id=0 WHERE id=$filtro_p AND gestore_utente_id=$u_id");
-        registra_log_audit($conn, "Revoca permessi area", ["Utente" => $u_id, "Area" => $filtro_p]);
-        flash_set("Abilitazioni revocate per quest'area.");
+        salva_perimetro($conn, $u_id, $filtro_p, ['area' => 'nessuno', 'tipi' => [], 'attivita' => [], 'fsl' => 'nessuno', 'fsl_parti' => []], (int)$_SESSION['utente_id']);
+        registra_log_audit($conn, "Revoca abilitazioni", ["Utente" => $u_id, "Area" => $filtro_p]);
+        flash_set("Abilitazioni revocate (quest'area e Formazione Scuola Lavoro).");
     }
     admin_redirect("utenti.php?p_id=$filtro_p");
 }
@@ -156,12 +205,14 @@ if (isset($_POST['remove_user_all'])) {
 
 $in_attesa = [];
 if ($filtro_p > 0) {
-    $r_att = $conn->query("SELECT * FROM abilitazioni_attesa WHERE pagina_id = " . (int)$filtro_p . " ORDER BY created_at DESC");
+    $r_att = $conn->query("SELECT * FROM abilitazioni_attesa WHERE pagina_id IN (" . (int)$filtro_p . ", 0) ORDER BY created_at DESC");
     if ($r_att) $in_attesa = $r_att->fetch_all(MYSQLI_ASSOC);
 }
 $ruoli = get_ruoli($conn);
 $ruoli_map = [];
 foreach ($ruoli as $r) $ruoli_map[(int)$r['id']] = $r['nome'];
+// Gruppi di ciascun utente (ruolo principale + gruppi secondari), per il filtro per gruppo dell'elenco
+$gruppi_utente = fn(array $x) => array_values(array_unique(array_filter(array_map('intval', array_merge([(int)($x['ruolo_id'] ?? 5)], explode(',', (string)($x['ruoli_secondari'] ?? '')))))));
 
 $utenti = [];
 // Ruolo in Ateneo di chi è collegato all'anagrafe (letto a parte: le due tabelle possono avere collation diverse)
@@ -177,11 +228,11 @@ if ($res_ut) while ($row = $res_ut->fetch_assoc()) {
     $utenti[] = $row;
 }
 
-$eventi_area   = [];
+$eventi_area   = []; $tipo_att = []; $arch_att = [];
 $mappa_gestori = [];
 if ($filtro_p > 0) {
-    $res_el = $conn->query("SELECT id, titolo FROM eventi WHERE pagina_id=$filtro_p ORDER BY ordine ASC, id DESC");
-    if ($res_el) while ($e = $res_el->fetch_assoc()) $eventi_area[$e['id']] = $e['titolo'];
+    $res_el = $conn->query("SELECT id, titolo, IFNULL(tipo, 'evento') AS tipo, archiviato FROM eventi WHERE pagina_id=$filtro_p ORDER BY archiviato ASC, ordine ASC, id DESC");
+    if ($res_el) while ($e = $res_el->fetch_assoc()) { $eventi_area[$e['id']] = $e['titolo']; $tipo_att[$e['id']] = $e['tipo'] === 'progetto' ? 'progetto' : 'evento'; $arch_att[$e['id']] = (int)$e['archiviato']; }
 
     $res_p2 = $conn->query("SELECT gestore_utente_id, gestori_utenti_ids, permessi_gestori_json FROM pagine_eventi WHERE id=$filtro_p LIMIT 1");
     if ($res_p2 && $pr = $res_p2->fetch_assoc()) {
@@ -220,6 +271,63 @@ if ($filtro_p > 0) {
     $notifiche_attive = get_notifiche_gestori_attive($conn, $filtro_p);
 }
 
+// Perimetro di ciascun utente nell'area corrente e nella FSL (per i riepiloghi e i moduli)
+$PERIMETRO_VUOTO = ['area' => 'nessuno', 'tipi' => [], 'attivita' => [], 'fsl' => 'nessuno', 'fsl_parti' => []];
+$perimetri = [];
+foreach ($mappa_gestori as $uid_m => $g_m) {
+    $p_m = $PERIMETRO_VUOTO;
+    if ($g_m['ambito'] === 'tutti') $p_m['area'] = 'area';
+    else { $p_m['area'] = 'parziale'; $p_m['attivita'] = array_map('intval', $g_m['eventi_ids']); }
+    $perimetri[(int)$uid_m] = $p_m;
+}
+$r_amb = @$conn->query("SELECT utente_id, tipo, pagina_id FROM abilitazioni_ambito WHERE pagina_id IN (" . (int)$filtro_p . ", 0)");
+while ($r_amb && $x_amb = $r_amb->fetch_assoc()) {
+    $uid_m = (int)$x_amb['utente_id'];
+    $p_m = $perimetri[$uid_m] ?? $PERIMETRO_VUOTO;
+    if (in_array($x_amb['tipo'], ['progetti', 'eventi'], true) && (int)$x_amb['pagina_id'] === (int)$filtro_p && $p_m['area'] !== 'area') { $p_m['area'] = 'parziale'; $p_m['tipi'][] = $x_amb['tipo']; }
+    if ($x_amb['tipo'] === 'fsl') { $p_m['fsl'] = 'tutto'; $p_m['fsl_parti'] = []; }
+    if (in_array($x_amb['tipo'], ['fsl_convenzioni', 'fsl_scuole'], true) && $p_m['fsl'] !== 'tutto') { $p_m['fsl'] = 'parziale'; $p_m['fsl_parti'][] = $x_amb['tipo']; }
+    $perimetri[$uid_m] = $p_m;
+}
+// Abilitati alla FSL (valgono in tutte le aree)
+$abilitati_fsl = array_filter($perimetri, fn($p) => $p['fsl'] !== 'nessuno');
+// Abilitati su qualcosa dell'area corrente
+$abilitati_area = array_filter($perimetri, fn($p) => $p['area'] !== 'nessuno');
+
+// Controlli del perimetro (scheda utente e "Abilita una persona"); $pref rende unici gli id
+function html_perimetro(string $pref, array $p, string $titolo_area, array $eventi_area, array $tipo_att, array $arch_att): string {
+    $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+    $chk = fn($c) => $c ? ' checked' : '';
+    $o = '<div class="row g-3 perimetro" data-pref="' . $h($pref) . '">';
+    // Area corrente
+    $o .= '<div class="col-lg-7"><fieldset class="p-2 border rounded bg-white h-100"><legend class="form-label small fw-bold mb-1 float-none w-auto px-1">In quest\'area: ' . $h($titolo_area) . '</legend>';
+    foreach (['nessuno' => 'Nessuna abilitazione', 'area' => "Tutta l'area (attività, iscritti, sondaggi, moduli, statistiche e impostazioni)", 'parziale' => 'Solo una parte:'] as $v => $l) {
+        $o .= '<div class="form-check"><input class="form-check-input per-area" type="radio" name="area_perimetro" id="' . $pref . 'a_' . $v . '" value="' . $v . '"' . $chk($p['area'] === $v) . '><label class="form-check-label small' . ($v === 'area' ? ' fw-bold' : '') . '" for="' . $pref . 'a_' . $v . '">' . $h($l) . '</label></div>';
+    }
+    $o .= '<div class="per-parziale ms-4 mt-1"' . ($p['area'] === 'parziale' ? '' : ' hidden') . '>'
+        . '<div class="form-check"><input class="form-check-input" type="checkbox" name="area_tipi[]" value="progetti" id="' . $pref . 't_pr"' . $chk(in_array('progetti', $p['tipi'], true)) . '><label class="form-check-label small" for="' . $pref . 't_pr">Tutti i progetti <span class="text-muted">(anche quelli creati dopo)</span></label></div>'
+        . '<div class="form-check"><input class="form-check-input" type="checkbox" name="area_tipi[]" value="eventi" id="' . $pref . 't_ev"' . $chk(in_array('eventi', $p['tipi'], true)) . '><label class="form-check-label small" for="' . $pref . 't_ev">Tutti gli eventi <span class="text-muted">(anche quelli creati dopo)</span></label></div>'
+        . '<label class="form-label small mt-2 mb-1" for="' . $pref . 'att">Attività scelte</label><select name="attivita[]" id="' . $pref . 'att" class="form-select form-select-sm per-att" multiple size="5">';
+    foreach (['progetto' => 'Progetti', 'evento' => 'Eventi'] as $tp => $lbl) {
+        $grp = array_filter($eventi_area, fn($id) => ($tipo_att[$id] ?? 'evento') === $tp, ARRAY_FILTER_USE_KEY);
+        if (!$grp) continue;
+        $o .= '<optgroup label="' . $lbl . '">';
+        foreach ($grp as $id => $tit) $o .= '<option value="' . (int)$id . '"' . (in_array((int)$id, $p['attivita'], true) ? ' selected' : '') . '>' . $h($tit) . (!empty($arch_att[$id]) ? ' (archiviato)' : '') . '</option>';
+        $o .= '</optgroup>';
+    }
+    $o .= '</select></div></fieldset></div>';
+    // Formazione Scuola Lavoro
+    $o .= '<div class="col-lg-5"><fieldset class="p-2 border rounded bg-white h-100"><legend class="form-label small fw-bold mb-1 float-none w-auto px-1">Formazione Scuola Lavoro (tutte le aree)</legend>';
+    foreach (['nessuno' => 'Nessuna abilitazione', 'tutto' => 'Tutto: pannello FSL e attività FSL di tutte le aree, con iscritti, sondaggi e attestati', 'parziale' => 'Solo:'] as $v => $l) {
+        $o .= '<div class="form-check"><input class="form-check-input per-fsl" type="radio" name="fsl_perimetro" id="' . $pref . 'f_' . $v . '" value="' . $v . '"' . $chk($p['fsl'] === $v) . '><label class="form-check-label small' . ($v === 'tutto' ? ' fw-bold' : '') . '" for="' . $pref . 'f_' . $v . '">' . $h($l) . '</label></div>';
+    }
+    $o .= '<div class="per-fsl-parti ms-4 mt-1"' . ($p['fsl'] === 'parziale' ? '' : ' hidden') . '>'
+        . '<div class="form-check"><input class="form-check-input" type="checkbox" name="fsl_parti[]" value="fsl_convenzioni" id="' . $pref . 'fc"' . $chk(in_array('fsl_convenzioni', $p['fsl_parti'], true)) . '><label class="form-check-label small" for="' . $pref . 'fc">Convenzioni</label></div>'
+        . '<div class="form-check"><input class="form-check-input" type="checkbox" name="fsl_parti[]" value="fsl_scuole" id="' . $pref . 'fs"' . $chk(in_array('fsl_scuole', $p['fsl_parti'], true)) . '><label class="form-check-label small" for="' . $pref . 'fs">Anagrafe scuole</label></div>'
+        . '</div></fieldset></div></div>';
+    return $o;
+}
+
 // Riepilogo in cima: amministratori del portale e abilitati di ogni area (intera area o singoli eventi)
 $utenti_per_id = [];
 foreach ($utenti as $u_r) $utenti_per_id[(int)$u_r['id']] = $u_r;
@@ -233,6 +341,8 @@ foreach ($pagine_disponibili as $pa) {
     while ($r_ge && $ge = $r_ge->fetch_assoc()) {
         foreach (ids_gestori_da_campi(0, $ge['gestori_utenti_ids'], $ge['permessi_gestori_json']) as $id_g) if (!in_array($id_g, $ids_intera, true)) $ids_eventi[$id_g] = true;
     }
+    $r_ga = @$conn->query("SELECT DISTINCT utente_id FROM abilitazioni_ambito WHERE pagina_id = " . (int)$pa['id']);
+    while ($r_ga && $ga = $r_ga->fetch_assoc()) if (!in_array((int)$ga['utente_id'], $ids_intera, true)) $ids_eventi[(int)$ga['utente_id']] = true;
     $panoramica_aree[] = ['a' => $pa, 'intera' => $ids_intera, 'eventi' => array_keys($ids_eventi)];
 }
 $nome_utente = fn(int $id) => isset($utenti_per_id[$id]) ? trim(mb_strtoupper($utenti_per_id[$id]['cognome'] . ' ' . $utenti_per_id[$id]['nome'])) : "Utente #$id (non più presente)";
@@ -258,7 +368,7 @@ $etichette_perm = ['full' => 'Admin area', 'eventi' => 'Eventi', 'iscritti' => '
 </style>
 
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-    <h4 class="fw-bold text-dark mb-0"><i class="fa fa-user-shield me-2 text-danger"></i>Utenti, Gruppi & Abilitazioni</h4>
+    <h4 class="fw-bold text-dark mb-0"><i class="fa fa-user-shield me-2 text-danger"></i>Utenti, gruppi e abilitazioni</h4>
     <button class="btn btn-sm btn-outline-danger fw-bold" style="border-radius:8px;" data-bs-toggle="modal" data-bs-target="#modCreaGruppo">
         <i class="fa fa-plus me-1"></i>Crea Gruppo
     </button>
@@ -270,7 +380,15 @@ $etichette_perm = ['full' => 'Admin area', 'eventi' => 'Eventi', 'iscritti' => '
         <span class="input-group-text bg-white"><i class="fa fa-search text-muted"></i></span>
         <input type="text" id="cercaUtente" class="form-control" placeholder="Cerca per nome, email, matricola..." oninput="filtraUtenti(this.value)">
     </div>
-    <small class="text-muted"><?php echo count($utenti); ?> utenti totali</small>
+    <?php $conta_gruppi = []; foreach ($utenti as $x_g) foreach ($gruppi_utente($x_g) as $g_id) $conta_gruppi[$g_id] = ($conta_gruppi[$g_id] ?? 0) + 1; ?>
+    <label for="filtroGruppo" class="visually-hidden">Filtra per gruppo</label>
+    <select id="filtroGruppo" class="form-select form-select-sm" style="max-width:260px;" onchange="filtraUtenti(document.getElementById('cercaUtente').value)">
+        <option value="">Tutti i gruppi</option>
+        <?php foreach ($ruoli as $r): ?>
+            <option value="<?php echo (int)$r['id']; ?>"><?php echo htmlspecialchars($r['nome']); ?> (<?php echo (int)($conta_gruppi[(int)$r['id']] ?? 0); ?>)</option>
+        <?php endforeach; ?>
+    </select>
+    <small class="text-muted"><span id="contaUtenti"><?php echo count($utenti); ?></span> di <?php echo count($utenti); ?> utenti</small>
     <?php if ($filtro_p > 0): ?>
         <label for="selAreaAbil" class="small fw-bold ms-md-auto mb-0" style="color:#5b21b6;"><i class="fa fa-key me-1" aria-hidden="true"></i>Abilitazioni sull'area</label>
         <select id="selAreaAbil" class="form-select form-select-sm fw-bold" style="max-width:280px;border-color:#c4b5fd;color:#5b21b6;" onchange="location.href='utenti.php?p_id=' + this.value">
@@ -314,40 +432,62 @@ $etichette_perm = ['full' => 'Admin area', 'eventi' => 'Eventi', 'iscritti' => '
     <div class="col-lg-8">
         <div class="riep-card p-3">
             <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-2">
-                <h6 class="mb-0"><i class="fa fa-key me-1" style="color:#5b21b6;" aria-hidden="true"></i>Abilitati su <?php echo htmlspecialchars($page_cfg['titolo'] ?? ''); ?> (<?php echo count($mappa_gestori); ?>)</h6>
+                <h6 class="mb-0"><i class="fa fa-key me-1" style="color:#5b21b6;" aria-hidden="true"></i>Abilitati su <?php echo htmlspecialchars($page_cfg['titolo'] ?? ''); ?> (<?php echo count($abilitati_area); ?>)</h6>
                 <?php if ($filtro_p > 0): ?><button type="button" class="btn btn-sm fw-bold" style="background:#ede9fe;color:#5b21b6;" data-bs-toggle="modal" data-bs-target="#modAbilitaAnagrafe"><i class="fa fa-user-plus me-1" aria-hidden="true"></i>Abilita una persona</button><?php endif; ?>
             </div>
-            <?php if (!$mappa_gestori): ?>
-                <div class="text-muted small py-2">Nessuno: in quest'area lavorano solo gli amministratori. Per abilitare qualcuno apri la sua scheda qui sotto, sezione "Abilitazioni Area".</div>
+            <?php if (!$abilitati_area && !$in_attesa): ?>
+                <div class="text-muted small py-2">Nessuno: in quest'area lavorano solo gli amministratori. Per abilitare qualcuno usa "Abilita una persona" o apri la sua scheda qui sotto.</div>
             <?php endif; ?>
-            <?php foreach ($mappa_gestori as $id_g => $g): $notif = $notifiche_attive === null || in_array((int)$id_g, (array)$notifiche_attive); ?>
+            <?php foreach ($abilitati_area as $id_g => $p_g): $notif = $notifiche_attive === null || in_array((int)$id_g, (array)$notifiche_attive); ?>
                 <div class="riep-riga flex-wrap">
                     <div style="min-width:200px;flex:1;">
                         <button type="button" class="riep-nome" data-apri="<?php echo (int)$id_g; ?>"><?php echo htmlspecialchars($nome_utente((int)$id_g)); ?></button>
                         <div class="small text-muted">
-                            <?php if ($g['ambito'] === 'tutti'): ?><i class="fa fa-folder-open me-1" aria-hidden="true"></i>Tutta l'area
-                            <?php else: ?><i class="fa fa-calendar-check me-1" aria-hidden="true"></i><?php echo count($g['eventi']) === 1 ? 'Solo l\'evento' : 'Solo ' . count($g['eventi']) . ' eventi'; ?>: <?php echo htmlspecialchars(implode(', ', $g['eventi'])); ?><?php endif; ?>
+                            <i class="fa <?php echo $p_g['area'] === 'area' ? 'fa-folder-open' : 'fa-crosshairs'; ?> me-1" aria-hidden="true"></i><?php echo htmlspecialchars(ucfirst(testo_perimetro(['fsl' => 'nessuno', 'fsl_parti' => []] + $p_g, $eventi_area))); ?>
+                            <?php if ($p_g['attivita'] && count($p_g['attivita']) > 1): ?><span title="<?php echo htmlspecialchars(implode(', ', array_map(fn($i) => $eventi_area[$i] ?? "#$i", $p_g['attivita']))); ?>"> <i class="fa fa-circle-info" aria-hidden="true"></i><span class="visually-hidden">: <?php echo htmlspecialchars(implode(', ', array_map(fn($i) => $eventi_area[$i] ?? "#$i", $p_g['attivita']))); ?></span></span><?php endif; ?>
                         </div>
                     </div>
                     <div class="d-flex flex-wrap gap-1 align-items-center">
-                        <?php foreach (array_unique((array)$g['permessi']) as $pm): ?><span class="perm-chip" style="<?php echo $pm === 'full' ? 'background:#fee2e2;color:#991b1b;' : 'background:#ede9fe;color:#5b21b6;'; ?>"><?php echo htmlspecialchars($etichette_perm[$pm] ?? $pm); ?></span><?php endforeach; ?>
+                        <?php if ($p_g['area'] === 'area'): ?><span class="perm-chip" style="background:#fee2e2;color:#991b1b;">Tutta l'area</span><?php endif; ?>
                         <span class="perm-chip" style="<?php echo $notif ? 'background:#dcfce7;color:#166534;' : 'background:#f1f5f9;color:#64748b;'; ?>" title="<?php echo $notif ? 'Riceve le email delle prenotazioni' : 'Non riceve le email delle prenotazioni'; ?>"><i class="fa <?php echo $notif ? 'fa-bell' : 'fa-bell-slash'; ?>" aria-hidden="true"></i></span>
                     </div>
                 </div>
             <?php endforeach; ?>
-            <?php foreach ($in_attesa as $att): $perm_att = array_filter(explode(',', $att['permessi'])); ?>
+            <?php
+            // Abilitazioni in attesa del primo accesso: una riga per persona
+            $attesa_per_email = [];
+            foreach ($in_attesa as $att) $attesa_per_email[$att['email']][] = $att;
+            foreach ($attesa_per_email as $em_att => $righe_att):
+                $p_att = $PERIMETRO_VUOTO;
+                foreach ($righe_att as $att) {
+                    $amb_att = (string)($att['ambito'] ?? 'area');
+                    if ($amb_att === 'area' && $att['eventi_ids'] !== '') $amb_att = 'attivita';
+                    if ($amb_att === 'area') $p_att['area'] = 'area';
+                    elseif ($amb_att === 'attivita') { $p_att['area'] = $p_att['area'] === 'area' ? 'area' : 'parziale'; $p_att['attivita'] = array_map('intval', explode(',', $att['eventi_ids'])); }
+                    elseif (in_array($amb_att, ['progetti', 'eventi'], true)) { $p_att['area'] = $p_att['area'] === 'area' ? 'area' : 'parziale'; $p_att['tipi'][] = $amb_att; }
+                    elseif ($amb_att === 'fsl') $p_att['fsl'] = 'tutto';
+                    else { $p_att['fsl'] = $p_att['fsl'] === 'tutto' ? 'tutto' : 'parziale'; $p_att['fsl_parti'][] = $amb_att; }
+                }
+                $att = $righe_att[0]; ?>
                 <div class="riep-riga flex-wrap">
                     <div style="min-width:200px;flex:1;">
-                        <span class="fw-bold"><?php echo htmlspecialchars($att['nominativo'] ?: $att['email']); ?></span>
+                        <span class="fw-bold"><?php echo htmlspecialchars($att['nominativo'] ?: $em_att); ?></span>
                         <span class="badge ms-1" style="background:#fef3c7;color:#92400e;" title="Si attiva al primo accesso con questa email"><i class="fa fa-hourglass-half me-1" aria-hidden="true"></i>in attesa del primo accesso</span>
-                        <div class="small text-muted"><?php echo htmlspecialchars($att['email']); ?> · <?php echo $att['eventi_ids'] !== '' ? 'Solo ' . count(explode(',', $att['eventi_ids'])) . ' eventi' : "Tutta l'area"; ?></div>
+                        <div class="small text-muted"><?php echo htmlspecialchars($em_att); ?> · <?php echo htmlspecialchars(testo_perimetro($p_att, $eventi_area)); ?></div>
                     </div>
-                    <div class="d-flex flex-wrap gap-1 align-items-center">
-                        <?php foreach ($perm_att as $pm): ?><span class="perm-chip" style="<?php echo $pm === 'full' ? 'background:#fee2e2;color:#991b1b;' : 'background:#ede9fe;color:#5b21b6;'; ?>"><?php echo htmlspecialchars($etichette_perm[$pm] ?? $pm); ?></span><?php endforeach; ?>
-                        <form method="POST" class="m-0"><?php csrf_field(); ?><button type="submit" name="annulla_attesa" value="<?php echo (int)$att['id']; ?>" class="btn btn-sm btn-link text-danger p-0 ms-1" data-confirm="Annullare l'abilitazione in attesa di <?php echo htmlspecialchars($att['nominativo'] ?: $att['email']); ?>?" title="Annulla" aria-label="Annulla l'abilitazione in attesa"><i class="fa fa-xmark" aria-hidden="true"></i></button></form>
-                    </div>
+                    <form method="POST" class="m-0"><?php csrf_field(); ?><button type="submit" name="annulla_attesa" value="<?php echo (int)$att['id']; ?>" class="btn btn-sm btn-link text-danger p-0 ms-1" data-confirm="Annullare l'abilitazione in attesa di <?php echo htmlspecialchars($att['nominativo'] ?: $em_att); ?>?" title="Annulla" aria-label="Annulla l'abilitazione in attesa"><i class="fa fa-xmark" aria-hidden="true"></i></button></form>
                 </div>
             <?php endforeach; ?>
+
+            <div class="mt-3 pt-2 border-top small">
+                <div class="fw-bold text-secondary mb-1"><i class="fa fa-briefcase me-1" aria-hidden="true"></i>Formazione Scuola Lavoro (tutte le aree)</div>
+                <?php if (!$abilitati_fsl): ?><span class="text-muted">Solo gli amministratori.</span><?php endif; ?>
+                <?php foreach ($abilitati_fsl as $id_f => $p_f): ?>
+                    <div class="mb-1"><button type="button" class="riep-nome" data-apri="<?php echo (int)$id_f; ?>"><?php echo htmlspecialchars($nome_utente((int)$id_f)); ?></button>
+                        <span class="text-muted">· <?php echo htmlspecialchars(testo_perimetro(['area' => 'nessuno', 'tipi' => [], 'attivita' => []] + $p_f)); ?></span></div>
+                <?php endforeach; ?>
+            </div>
+
             <?php $altre = array_filter($panoramica_aree, fn($x) => (int)$x['a']['id'] !== (int)$filtro_p); if ($altre): ?>
                 <div class="mt-3 pt-2 border-top small">
                     <div class="fw-bold text-secondary mb-1">Nelle altre aree</div>
@@ -356,7 +496,7 @@ $etichette_perm = ['full' => 'Admin area', 'eventi' => 'Eventi', 'iscritti' => '
                             <a href="utenti.php?p_id=<?php echo (int)$pa['a']['id']; ?>" class="fw-semibold text-decoration-none"><?php echo htmlspecialchars($pa['a']['titolo']); ?></a>:
                             <?php if ($tot === 0): ?><span class="text-muted">nessun abilitato</span>
                             <?php else:
-                                $nomi = array_merge(array_map(fn($i) => $nome_utente($i), $pa['intera']), array_map(fn($i) => $nome_utente($i) . ' (eventi)', $pa['eventi']));
+                                $nomi = array_merge(array_map(fn($i) => $nome_utente($i), $pa['intera']), array_map(fn($i) => $nome_utente($i) . ' (parte dell\'area)', $pa['eventi']));
                                 echo htmlspecialchars(implode(', ', $nomi));
                             endif; ?>
                         </div>
@@ -383,9 +523,9 @@ $etichette_perm = ['full' => 'Admin area', 'eventi' => 'Eventi', 'iscritti' => '
     $av_bg     = $is_admin ? '#dc2626' : '#475569';
 
     // Dati abilitazioni per questo utente
-    $mg = $mappa_gestori[$uid] ?? null;
+    $pu = $perimetri[$uid] ?? null;   // perimetro nell'area corrente e nella FSL
 ?>
-<div class="usr-card" id="card<?php echo $uid; ?>" data-abil="<?php echo ($mg || in_array($uid, $ids_amministratori, true)) ? '1' : '0'; ?>" data-search="<?php echo htmlspecialchars(strtolower(($u['nome']??'').' '.($u['cognome']??'').' '.($u['email']??'').' '.($u['matricola_studente']??'').' '.($u['matricola_dipendente']??''))); ?>">
+<div class="usr-card" id="card<?php echo $uid; ?>" data-gruppi=",<?php echo implode(',', $gruppi_utente($u)); ?>," data-abil="<?php echo ($pu || in_array($uid, $ids_amministratori, true)) ? '1' : '0'; ?>" data-search="<?php echo htmlspecialchars(strtolower(($u['nome']??'').' '.($u['cognome']??'').' '.($u['email']??'').' '.($u['matricola_studente']??'').' '.($u['matricola_dipendente']??''))); ?>">
 
     <!-- HEADER (click to expand) -->
     <div class="usr-header" data-bs-toggle="collapse" data-bs-target="#usr<?php echo $uid; ?>" aria-expanded="false">
@@ -419,13 +559,11 @@ $etichette_perm = ['full' => 'Admin area', 'eventi' => 'Eventi', 'iscritti' => '
         </div>
 
         <!-- Abilitazione area badge -->
-        <?php if ($filtro_p > 0 && $mg): ?>
+        <?php if ($filtro_p > 0 && $pu): ?>
         <div class="d-none d-md-block">
-            <?php if ($mg['ambito'] === 'tutti'): ?>
-                <span class="perm-chip" style="background:#ede9fe;color:#5b21b6;"><i class="fa fa-folder-open"></i>Area</span>
-            <?php else: ?>
-                <span class="perm-chip" style="background:#dcfce7;color:#166534;"><i class="fa fa-crosshairs"></i><?php echo count($mg['eventi_ids']); ?> eventi</span>
-            <?php endif; ?>
+            <?php if ($pu['area'] === 'area'): ?><span class="perm-chip" style="background:#ede9fe;color:#5b21b6;"><i class="fa fa-folder-open" aria-hidden="true"></i>Area</span>
+            <?php elseif ($pu['area'] === 'parziale'): ?><span class="perm-chip" style="background:#dcfce7;color:#166534;" title="<?php echo htmlspecialchars(testo_perimetro(['fsl' => 'nessuno', 'fsl_parti' => []] + $pu, $eventi_area)); ?>"><i class="fa fa-crosshairs" aria-hidden="true"></i>Parte dell'area</span><?php endif; ?>
+            <?php if ($pu['fsl'] !== 'nessuno'): ?><span class="perm-chip" style="background:#ffedd5;color:#9a3412;"><i class="fa fa-briefcase" aria-hidden="true"></i>FSL</span><?php endif; ?>
         </div>
         <?php $notif_on = ($notifiche_attive === null || in_array($uid, $notifiche_attive, true)); ?>
         <form method="POST" class="d-inline m-0" onclick="event.stopPropagation()">
@@ -529,128 +667,34 @@ $etichette_perm = ['full' => 'Admin area', 'eventi' => 'Eventi', 'iscritti' => '
                 </form>
             </div>
 
-            <!-- SEZIONE 3: ABILITAZIONI AREA -->
+            <!-- SEZIONE 3: ABILITAZIONI (area corrente e Formazione Scuola Lavoro) -->
             <div class="usr-section">
-                <div class="usr-section-label"><i class="fa fa-key"></i>Abilitazioni Area
+                <div class="usr-section-label"><i class="fa fa-key" aria-hidden="true"></i>Abilitazioni
                     <?php if ($filtro_p > 0): ?>
-                        <span style="font-size:.65rem;background:#f1f5f9;color:#64748b;padding:1px 7px;border-radius:10px;font-weight:600;"><?php echo htmlspecialchars($page_cfg['titolo'] ?? ''); ?></span>
+                        <span style="font-size:.65rem;background:#f1f5f9;color:#64748b;padding:1px 7px;border-radius:10px;font-weight:600;"><?php echo htmlspecialchars($page_cfg['titolo'] ?? ''); ?> e FSL</span>
                     <?php endif; ?>
                 </div>
 
                 <?php if ($filtro_p == 0): ?>
-                    <p class="text-muted small mb-0"><i class="fa fa-info-circle me-1"></i>Seleziona un'area dal menu in alto per gestire le abilitazioni di questo utente.</p>
+                    <p class="text-muted small mb-0"><i class="fa fa-info-circle me-1" aria-hidden="true"></i>Seleziona un'area dal menu in alto per gestire le abilitazioni di questo utente.</p>
 
                 <?php elseif ($is_admin): ?>
-                    <span class="perm-chip" style="background:#fee2e2;color:#991b1b;font-size:.8rem;"><i class="fa fa-shield-alt me-1"></i>Admin Globale — accesso completo a tutte le aree</span>
+                    <span class="perm-chip" style="background:#fee2e2;color:#991b1b;font-size:.8rem;"><i class="fa fa-shield-alt me-1" aria-hidden="true"></i>Admin Globale — accesso completo a tutte le aree</span>
 
-                <?php else:
-                    // Permessi correnti
-                    $cur_ambito  = $mg ? $mg['ambito']     : 'tutti';
-                    $cur_perms   = $mg ? $mg['permessi']   : [];
-                    $cur_ev_ids  = $mg ? $mg['eventi_ids'] : [];
-                ?>
+                <?php else: $p_cur = $pu ?? $PERIMETRO_VUOTO; ?>
                 <form method="POST">
                     <?php csrf_field(); ?>
                     <input type="hidden" name="utente_id" value="<?php echo $uid; ?>">
-
-                    <?php if ($mg): ?>
-                    <div class="mb-2 p-2 rounded d-flex align-items-center gap-2 flex-wrap" style="background:#f0fdf4;border:1px solid #bbf7d0;">
-                        <span style="font-size:.75rem;font-weight:600;color:#166534;"><i class="fa fa-check-circle me-1"></i>Abilitazioni attive:</span>
-                        <?php
-                        if (in_array('full', $cur_perms)) echo '<span class="perm-chip" style="background:#fee2e2;color:#991b1b;">Admin Area</span>';
-                        if (in_array('eventi',   $cur_perms)) echo '<span class="perm-chip" style="background:#dbeafe;color:#1d4ed8;">Eventi</span>';
-                        if (in_array('iscritti', $cur_perms)) echo '<span class="perm-chip" style="background:#dcfce7;color:#166534;">Iscritti</span>';
-                        if (in_array('sondaggi', $cur_perms)) echo '<span class="perm-chip" style="background:#fef3c7;color:#92400e;">Sondaggi</span>';
-                        if (in_array('form',     $cur_perms)) echo '<span class="perm-chip" style="background:#e0f2fe;color:#0c4a6e;">Form</span>';
-                        ?>
-                        <?php if ($cur_ambito === 'tutti'): ?>
-                            <span class="perm-chip" style="background:#ede9fe;color:#5b21b6;"><i class="fa fa-folder-open"></i>Intera area</span>
-                        <?php else: ?>
-                            <span class="perm-chip" style="background:#dcfce7;color:#166534;"><i class="fa fa-crosshairs"></i><?php echo count($cur_ev_ids); ?> eventi specifici</span>
-                        <?php endif; ?>
-                    </div>
-                    <?php endif; ?>
-
-                    <div class="row g-3">
-                        <!-- Permessi sezioni -->
-                        <div class="col-md-5">
-                            <label class="form-label small fw-bold">Sezioni abilitate</label>
-                            <div class="d-flex flex-wrap gap-2 p-2 border rounded bg-white">
-                                <?php
-                                $perm_defs = [
-                                    'eventi'   => ['label'=>'Eventi',   'col'=>'#1d4ed8'],
-                                    'iscritti' => ['label'=>'Iscritti', 'col'=>'#166534'],
-                                    'sondaggi' => ['label'=>'Sondaggi', 'col'=>'#92400e'],
-                                    'form'     => ['label'=>'Form',     'col'=>'#0c4a6e'],
-                                    'full'     => ['label'=>'Admin Area','col'=>'#991b1b'],
-                                ];
-                                foreach ($perm_defs as $pk => $pd):
-                                    $chk = in_array($pk, $cur_perms) ? 'checked' : '';
-                                    $is_full_perm = $pk === 'full';
-                                ?>
-                                <div class="form-check m-0">
-                                    <input class="form-check-input <?php echo $is_full_perm ? 'perm-full-'.$uid : 'perm-sec-'.$uid; ?>"
-                                        type="checkbox" name="permessi[]" value="<?php echo $pk; ?>"
-                                        id="p_<?php echo $uid; ?>_<?php echo $pk; ?>" <?php echo $chk; ?>
-                                        <?php echo $is_full_perm ? 'onchange="toggleFull'.$uid.'(this)"' : ''; ?>>
-                                    <label class="form-check-label small fw-bold" for="p_<?php echo $uid; ?>_<?php echo $pk; ?>" style="color:<?php echo $pd['col']; ?>">
-                                        <?php echo $pd['label']; ?>
-                                    </label>
-                                </div>
-                                <?php endforeach; ?>
-                            </div>
-                        </div>
-
-                        <!-- Ambito: area o eventi specifici -->
-                        <div class="col-md-7">
-                            <label class="form-label small fw-bold">Ambito</label>
-                            <div class="p-2 border rounded bg-white">
-                                <div class="form-check mb-1">
-                                    <input class="form-check-input" type="radio" name="ambito_eventi" id="amb_tutti_<?php echo $uid; ?>" value="tutti"
-                                        <?php echo $cur_ambito === 'tutti' ? 'checked' : ''; ?>
-                                        onchange="document.getElementById('boxEv<?php echo $uid; ?>').classList.add('d-none')">
-                                    <label class="form-check-label small fw-bold" for="amb_tutti_<?php echo $uid; ?>"><i class="fa fa-folder-open text-primary me-1"></i>Intera area</label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="ambito_eventi" id="amb_spec_<?php echo $uid; ?>" value="specifici"
-                                        <?php echo $cur_ambito === 'specifici' ? 'checked' : ''; ?>
-                                        onchange="document.getElementById('boxEv<?php echo $uid; ?>').classList.remove('d-none')">
-                                    <label class="form-check-label small fw-bold" for="amb_spec_<?php echo $uid; ?>"><i class="fa fa-crosshairs text-success me-1"></i>Solo eventi specifici</label>
-                                </div>
-                                <div id="boxEv<?php echo $uid; ?>" class="mt-2 <?php echo $cur_ambito === 'specifici' ? '' : 'd-none'; ?>">
-                                    <select name="eventi_specifici[]" class="form-select form-select-sm select2-multi-abil" multiple="multiple">
-                                        <?php foreach ($eventi_area as $e_id => $e_titolo): ?>
-                                            <option value="<?php echo $e_id; ?>" <?php echo in_array($e_id, $cur_ev_ids) ? 'selected' : ''; ?>>
-                                                <?php echo htmlspecialchars($e_titolo); ?>
-                                            </option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Bottoni -->
+                    <p class="small text-secondary mb-2">Dentro ciò che abiliti la persona gestisce tutto: attività, iscritti e check-in, sondaggi, moduli, attestati e statistiche.</p>
+                    <?php echo html_perimetro('u' . $uid . '_', $p_cur, (string)($page_cfg['titolo'] ?? ''), $eventi_area, $tipo_att, $arch_att); ?>
                     <div class="mt-2 d-flex gap-2">
-                        <button type="submit" name="assegna_permessi" class="btn btn-sm btn-primary fw-bold"><i class="fa fa-save me-1"></i>Salva abilitazioni</button>
-                        <?php if ($mg): ?>
-                        <button type="submit" name="remove_user_all" class="btn btn-sm btn-outline-danger fw-bold"
-                            data-confirm="Revocare tutte le abilitazioni di questo utente per quest'area?">
-                            <i class="fa fa-trash-alt me-1"></i>Revoca tutto
-                        </button>
+                        <button type="submit" name="salva_abilitazioni" value="1" class="btn btn-sm btn-primary fw-bold"><i class="fa fa-save me-1" aria-hidden="true"></i>Salva abilitazioni</button>
+                        <?php if ($pu): ?>
+                        <button type="submit" name="remove_user_all" value="1" class="btn btn-sm btn-outline-danger fw-bold" data-confirm="Togliere tutte le abilitazioni di questa persona su quest'area e sulla Formazione Scuola Lavoro?"><i class="fa fa-trash-alt me-1" aria-hidden="true"></i>Revoca tutto</button>
                         <?php endif; ?>
                     </div>
                 </form>
-
-                <script>
-                function toggleFull<?php echo $uid; ?>(el) {
-                    document.querySelectorAll('.perm-sec-<?php echo $uid; ?>').forEach(function(c){ c.checked = el.checked; c.disabled = el.checked; });
-                }
-                // Init: se full è già checked, disabilita gli altri
-                (function(){ var f = document.querySelector('.perm-full-<?php echo $uid; ?>'); if(f && f.checked) document.querySelectorAll('.perm-sec-<?php echo $uid; ?>').forEach(function(c){ c.disabled=true; }); })();
-                </script>
-
-                <?php endif; // end abilitazioni section ?>
+                <?php endif; ?>
             </div><!-- /sezione abilitazioni -->
 
         </div><!-- /usr-body -->
@@ -679,29 +723,7 @@ $etichette_perm = ['full' => 'Admin area', 'eventi' => 'Eventi', 'iscritti' => '
                         <div class="col-md-6"><label class="form-label small fw-bold" for="abAnEmail">Email <span class="text-danger">*</span></label><input type="email" name="email" id="abAnEmail" class="form-control form-control-sm" required placeholder="nome.cognome@unical.it"></div>
                     </div>
                     <div id="abAnScelta" class="small mt-1" style="color:#0f766e;" hidden><i class="fa fa-address-book me-1" aria-hidden="true"></i><span></span></div>
-                    <div class="row g-3 mt-1">
-                        <div class="col-md-5">
-                            <span class="form-label small fw-bold d-block">Sezioni abilitate</span>
-                            <div class="d-flex flex-wrap gap-2 p-2 border rounded bg-white">
-                                <?php foreach (['eventi' => 'Eventi', 'iscritti' => 'Iscritti', 'sondaggi' => 'Sondaggi', 'form' => 'Form', 'full' => 'Admin Area'] as $pk => $pl): ?>
-                                    <div class="form-check m-0"><input class="form-check-input ab-perm" type="checkbox" name="permessi[]" value="<?php echo $pk; ?>" id="abP<?php echo $pk; ?>" <?php echo in_array($pk, ['eventi', 'iscritti'], true) ? 'checked' : ''; ?>><label class="form-check-label small fw-bold" for="abP<?php echo $pk; ?>"><?php echo $pl; ?></label></div>
-                                <?php endforeach; ?>
-                            </div>
-                        </div>
-                        <div class="col-md-7">
-                            <span class="form-label small fw-bold d-block">Ambito</span>
-                            <div class="p-2 border rounded bg-white">
-                                <div class="form-check mb-1"><input class="form-check-input" type="radio" name="ambito_eventi" id="abAmbT" value="tutti" checked onchange="document.getElementById('abAnEv').classList.add('d-none')"><label class="form-check-label small fw-bold" for="abAmbT">Intera area</label></div>
-                                <div class="form-check"><input class="form-check-input" type="radio" name="ambito_eventi" id="abAmbS" value="specifici" onchange="document.getElementById('abAnEv').classList.remove('d-none')"><label class="form-check-label small fw-bold" for="abAmbS">Solo eventi specifici</label></div>
-                                <div id="abAnEv" class="mt-2 d-none">
-                                    <label class="visually-hidden" for="abAnEvSel">Eventi</label>
-                                    <select name="eventi_specifici[]" id="abAnEvSel" class="form-select form-select-sm" multiple size="5">
-                                        <?php foreach ($eventi_area as $e_id => $e_titolo): ?><option value="<?php echo (int)$e_id; ?>"><?php echo htmlspecialchars($e_titolo); ?></option><?php endforeach; ?>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <div class="mt-2"><?php echo html_perimetro('ab_', $PERIMETRO_VUOTO, (string)($page_cfg['titolo'] ?? ''), $eventi_area, $tipo_att, $arch_att); ?></div>
                 </div>
                 <div class="modal-footer py-2">
                     <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Annulla</button>
@@ -724,11 +746,6 @@ document.getElementById('formAbAn').addEventListener('persona-scelta', function 
 });
 ['abAnNome', 'abAnEmail'].forEach(function (id) {
     document.getElementById(id).addEventListener('input', function () { document.getElementById('abAnPid').value = ''; document.getElementById('abAnScelta').hidden = true; });
-});
-// "Admin Area" comprende tutte le sezioni
-document.getElementById('abPfull').addEventListener('change', function () {
-    var on = this.checked;
-    document.querySelectorAll('#formAbAn .ab-perm:not(#abPfull)').forEach(function (c) { c.checked = on || c.checked; c.disabled = on; });
 });
 </script>
 <?php endif; ?>
@@ -793,12 +810,25 @@ document.addEventListener('click', function (e) {
     card.scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
 
+// Abilitazioni: "Solo una parte" mostra progetti/eventi/attività, "Solo" della FSL mostra le sue parti
+document.addEventListener('change', function (e) {
+    var box = e.target.closest('.perimetro'); if (!box) return;
+    if (e.target.classList.contains('per-area')) box.querySelector('.per-parziale').hidden = e.target.value !== 'parziale';
+    if (e.target.classList.contains('per-fsl')) box.querySelector('.per-fsl-parti').hidden = e.target.value !== 'parziale';
+});
+
+// Ricerca per testo, per gruppo (ruolo principale o secondario) e solo abilitati, combinabili
 function filtraUtenti(q) {
     q = q.toLowerCase().trim();
+    var solo = document.getElementById('soloAbilitati').checked;
+    var gruppo = document.getElementById('filtroGruppo').value, n = 0;
     document.querySelectorAll('#listaUtenti .usr-card').forEach(function(card) {
-        var solo = document.getElementById('soloAbilitati').checked;
-        card.style.display = ((!q || card.dataset.search.includes(q)) && (!solo || card.dataset.abil === '1')) ? '' : 'none';
+        var ok = (!q || card.dataset.search.includes(q)) && (!solo || card.dataset.abil === '1')
+              && (!gruppo || card.dataset.gruppi.indexOf(',' + gruppo + ',') !== -1);
+        card.style.display = ok ? '' : 'none';
+        if (ok) n++;
     });
+    document.getElementById('contaUtenti').textContent = n;
 }
 </script>
 

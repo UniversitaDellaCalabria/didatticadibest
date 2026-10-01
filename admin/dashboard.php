@@ -53,7 +53,7 @@ $msg_unread = (int)(db_row($conn,
 
 // Ultime 8 prenotazioni
 $last_prenotazioni = db_rows($conn,
-    "SELECT p.codice_prenotazione, p.nome, p.cognome, p.stato, p.presente,
+    "SELECT p.codice_prenotazione, p.nome, p.cognome, p.stato, p.presente, p.convenzione,
             p.data_prenotazione, e.titolo as evento_titolo,
             t.data_turno, t.orario_inizio
      FROM prenotazioni p
@@ -304,9 +304,15 @@ $kpi_defs = [
                 <a href="iscritti.php?p_id=<?php echo $filtro_p; ?>" class="btn btn-outline-secondary btn-sm" style="border-radius:7px;font-size:.75rem;">Vedi tutte →</a>
             </div>
             <?php foreach ($last_prenotazioni as $pr):
-                $s = strtolower($pr['stato'] ?? '');
+                // Stessi stati di Iscrizioni: "da approvare" senza convenzione = in attesa della convenzione (non annullata)
+                $s = strtolower($pr['stato'] ?? '') ?: 'confermata';
                 if (in_array($s, ['confermata','confermato','confirmed'])) { $bc='#dcfce7'; $tc='#166534'; $bl='Confermata'; }
-                elseif (in_array($s, ['in_attesa','pending']))             { $bc='#fef3c7'; $tc='#92400e'; $bl='In attesa'; }
+                elseif (in_array($s, ['in_attesa','pending']))             { $bc='#fef3c7'; $tc='#92400e'; $bl="In lista d'attesa"; }
+                elseif ($s === 'da_approvare' && ($pr['convenzione'] ?? '') === 'no') { $bc='#fff7ed'; $tc='#9a3412'; $bl='In attesa della convenzione'; }
+                elseif ($s === 'da_approvare')                              { $bc='#e0f2fe'; $tc='#0c4a6e'; $bl='Da approvare'; }
+                elseif ($s === 'richiesta_conferma')                        { $bc='#fef3c7'; $tc='#92400e'; $bl='Posto offerto'; }
+                elseif ($s === 'rifiutata')                                 { $bc='#fee2e2'; $tc='#991b1b'; $bl='Rifiutata'; }
+                elseif ($s === 'scaduta')                                   { $bc='#f1f5f9'; $tc='#334155'; $bl='Scaduta'; }
                 else                                                        { $bc='#fee2e2'; $tc='#991b1b'; $bl='Annullata'; }
             ?>
             <div class="pr-row">

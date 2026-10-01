@@ -19,7 +19,7 @@ set_exception_handler(function (Throwable $e) {
     exit;
 });
 
-$puo_creare = $is_full_admin || $is_area_manager;
+$puo_creare = $puo_creare_progetti; // amministratori, chi gestisce tutta l'area o tutti i progetti dell'area
 
 // Progetto dell'area corrente, visibile al gestore
 function progetto_autorizzato($conn, int $ev_id, int $p_id, string $rbac): bool {

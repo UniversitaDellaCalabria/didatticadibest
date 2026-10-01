@@ -36,6 +36,7 @@ $res = $conn->query("SELECT * FROM log_accessi $cond ORDER BY created_at DESC LI
 if ($res) while ($r = $res->fetch_assoc()) $righe[] = $r;
 ?>
 
+<?php schede_sistema('log_accessi.php'); ?>
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <h4 class="fw-bold text-dark m-0"><i class="fa fa-sign-in-alt text-success me-2"></i> Log Accessi SSO</h4>
     <span class="badge bg-secondary fs-6"><?php echo $total; ?> accessi totali</span>

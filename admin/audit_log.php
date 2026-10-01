@@ -17,6 +17,7 @@ $sql_log = "SELECT l.*, u.nome, u.cognome, u.codice_fiscale
 $res_log = $conn->query($sql_log);
 ?>
 
+<?php schede_sistema('audit_log.php'); ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="fw-bold text-dark m-0"><i class="fa fa-user-secret text-danger me-2"></i> Registro Audit (System Log)</h4>
     <span class="badge bg-secondary">Ultime 1000 operazioni</span>

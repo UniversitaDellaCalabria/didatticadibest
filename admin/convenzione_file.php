@@ -3,7 +3,7 @@
 // I file stanno in uploads/convenzioni/, bloccata al web: si leggono solo da qui, dal pannello.
 require_once 'admin_header.php';
 
-if (!$is_full_admin) nega_accesso();
+if (!$puo_fsl_convenzioni) nega_accesso(); // amministratori e abilitati alla FSL o alle convenzioni
 
 $id = (int)($_GET['id'] ?? 0);
 $col = ($_GET['f'] ?? '') === 'all' ? 'file_allegato' : 'file_convenzione';

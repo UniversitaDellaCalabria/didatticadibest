@@ -133,7 +133,7 @@ function salva_attestati_classe_evento($conn, int $ev_id, int $attivi): void {
 }
 
 // Creazione di un nuovo evento: come il pulsante "Crea evento" (solo amministratori)
-$puo_creare_ev = $is_full_admin;
+$puo_creare_ev = $puo_creare_eventi; // amministratori, chi gestisce tutta l'area o tutti gli eventi dell'area
 
 if (isset($_POST['duplica_turno'])) {
     csrf_verify($_POST['csrf_token'] ?? '');

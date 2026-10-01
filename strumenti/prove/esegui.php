@@ -34,7 +34,7 @@ if ($rc !== 0) { fwrite(STDERR, "Import dello schema non riuscito: " . implode("
 $conn->select_db('eventi_prova');
 $conn->set_charset('utf8mb4');
 require $SITO . '/functions.php';
-@unlink($SITO . '/cache/schema_v28.ok');
+@unlink($SITO . '/cache/schema_v29.ok');
 $marker = glob($SITO . '/cache/schema_v*.ok');
 foreach ($marker as $m) rename($m, $m . '.bak');     // non toccare l'ambiente locale: si ripristina alla fine
 assicura_schema($conn);
@@ -131,6 +131,34 @@ prova(prenotazione_di_classe(true, ['per_scuole' => 1]) && !prenotazione_di_clas
 prova(annullamento_scaduto(['annullabile_fino' => date('Y-m-d H:i:s', time() - 60)]) && !annullamento_scaduto(['annullabile_fino' => null]), "termine per annullare");
 prova(colore_valido('#abc') === '#AABBCC' && colore_valido('red') === '#B30000', "colori validati");
 
+sezione("Abilitazioni per perimetro");
+// Area 2: progetto FSL 20 + evento 21 non FSL; area 1: evento FSL 10
+$q("INSERT INTO eventi (id, pagina_id, titolo, tipo) VALUES (21, 2, 'Evento FSL no', 'evento')");
+$q("INSERT INTO utenti (id, codice_fiscale, nome, cognome, email, ruolo_id) VALUES (71, 'PERIM71XXXXXXXXX', 'Pia', 'Progetti', 'pia@unical.it', 4), (72, 'PERIM72XXXXXXXXX', 'Fabio', 'Fsl', 'fabio@unical.it', 4)");
+assegna_ambito($conn, 71, 'progetti', 2);
+assegna_ambito($conn, 72, 'fsl');
+prova(attivita_da_ambiti($conn, 71, 2) === [20], "tutti i progetti: solo i progetti dell'area");
+prova(attivita_da_ambiti($conn, 71, 1) === [], "tutti i progetti: niente nelle altre aree");
+$a72 = aree_da_ambiti($conn, 72); sort($a72);
+prova($a72 === [1, 2] && attivita_da_ambiti($conn, 72, 2) === [20], "FSL: attività FSL di tutte le aree, non le altre");
+prova(utente_gestisce_attivita($conn, 71, 20) && !utente_gestisce_attivita($conn, 71, 21) && !utente_gestisce_attivita($conn, 71, 10), "gestione della singola attività");
+prova(in_array(71, ids_ambito_attivita($conn, 20, false), true) && !in_array(72, ids_ambito_attivita($conn, 20, false), true), "notifiche: perimetri dell'area sì, FSL di tutte le aree no");
+$q("INSERT INTO abilitazioni_attesa (email, nominativo, pagina_id, permessi, eventi_ids, ambito) VALUES ('nuovo@unical.it', 'Nuovo', 2, 'full', '', 'eventi'), ('nuovo@unical.it', 'Nuovo', 0, 'full', '', 'fsl_scuole')");
+$q("INSERT INTO utenti (id, codice_fiscale, nome, cognome, email, ruolo_id) VALUES (73, 'PERIM73XXXXXXXXX', 'Nuovo', 'Arrivato', 'nuovo@unical.it', 4)");
+collega_utente_anagrafe($conn, 73, 'nuovo@unical.it');
+prova(ha_ambito($conn, 73, 'eventi', 2) && ha_ambito($conn, 73, 'fsl_scuole') && (int)$conn->query("SELECT COUNT(*) n FROM abilitazioni_attesa")->fetch_assoc()['n'] === 0, "abilitazioni in attesa attivate al primo accesso");
+revoca_ambito($conn, 71, null, 2);
+prova(!ha_ambito($conn, 71, 'progetti', 2), "revoca");
+
+sezione("Convenzione chiesta in un'attività non FSL");
+// Evento 21 (non FSL): convenzione chiesta da Iscrizioni ('no'), poi la convenzione nel registro copre il giorno del turno
+$q("INSERT INTO turni (id, evento_id, data_turno, max_posti) VALUES (210, 21, '" . $giorni(20) . "', 30)");
+$q("INSERT INTO prenotazioni (id, turno_id, codice_prenotazione, stato, nome, cognome, email, scuola_codice, convenzione) VALUES (210, 210, 'OP-NONFSL1', 'confermata', 'Ada', 'Docente', 'ada@scuola.it', 'CSPS020009', 'no')");
+$q("INSERT INTO convenzioni_scuole (scuola_codice, data_stipula, scadenza) VALUES ('CSPS020009', '" . $giorni(-30) . "', '" . $giorni(300) . "')");
+convenzione_valida($conn, 'CSPS020009', true);
+verifica_convenzioni_fsl($conn);
+prova($conn->query("SELECT convenzione FROM prenotazioni WHERE id = 210")->fetch_assoc()['convenzione'] === 'ricevuta', "la verifica la segna ricevuta anche fuori dalle attività FSL");
+
 // ---------------------------------------------------------------------------
 // Prove delle pagine sull'ambiente locale (se acceso)
 $BASE = getenv('BASE_LOCALE') ?: 'http://127.0.0.1:8080';
@@ -158,7 +186,7 @@ if (!function_exists('curl_init') || $http('/eventi/')['codice'] !== 200) {
     }
     $jar = tempnam(sys_get_temp_dir(), 'jar');
     $http('/__accesso?u=1', null, $jar);
-    foreach (['dashboard.php', 'iscritti.php?p_id=1', 'eventi.php?p_id=1', 'progetti.php?p_id=2', 'scuole.php', 'fsl.php', 'fsl.php?tab=convenzioni', 'fsl.php?tab=verifica', 'fsl.php?tab=valutazioni', 'fsl.php?tab=convenzioni&conv_mod=1', 'sistema.php', 'impostazioni_area.php?p_id=1', 'statistiche.php?p_id=1'] as $pag) {
+    foreach (['dashboard.php', 'utenti.php?p_id=1', 'iscritti.php?p_id=1', 'eventi.php?p_id=1', 'progetti.php?p_id=2', 'scuole.php', 'fsl.php', 'fsl.php?tab=convenzioni', 'fsl.php?tab=verifica', 'fsl.php?tab=valutazioni', 'fsl.php?tab=convenzioni&conv_mod=1', 'sistema.php', 'impostazioni_area.php?p_id=1', 'statistiche.php?p_id=1'] as $pag) {
         $r = $http('/eventi/admin/' . $pag, null, $jar);
         $err_php = preg_match('/<b>(Fatal error|Parse error|Warning)<\/b>|Uncaught /', $r['corpo']);
         prova($r['codice'] === 200 && !$err_php && str_contains($r['corpo'], '</html>'), "pannello: $pag", "risposta " . $r['codice'] . ($err_php ? ' con errore PHP' : ''));

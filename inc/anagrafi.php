@@ -602,6 +602,30 @@ if (!function_exists('assegna_permessi_gestore')) {
     }
 }
 
+if (!function_exists('applica_abilitazione')) {
+    // Abilita un utente a un perimetro: 'area' (tutta l'area), 'attivita' ($eventi_ids dell'area),
+    // 'progetti' / 'eventi' (tutte le attività di quel tipo dell'area), 'fsl', 'fsl_convenzioni', 'fsl_scuole'.
+    // Dentro il perimetro l'utente gestisce tutto (le vecchie sezioni separate non si usano più).
+    function applica_abilitazione($conn, int $uid, string $ambito, int $pagina_id, array $eventi_ids = [], int $da = 0): bool {
+        if ($ambito === 'area' && $eventi_ids) $ambito = 'attivita'; // abilitazioni in attesa salvate prima dei perimetri
+        if ($ambito === 'area') { assegna_permessi_gestore($conn, $pagina_id, $uid, ['full']); return true; }
+        if ($ambito === 'attivita') {
+            if (!$eventi_ids) return false;
+            // Si aggiungono alle attività già assegnate nell'area (senza toglierle)
+            foreach ($eventi_ids as $e_id) {
+                $e_id = (int)$e_id;
+                $r = $conn->query("SELECT permessi_gestori_json FROM eventi WHERE id = $e_id AND pagina_id = $pagina_id LIMIT 1");
+                if (!$r || !($row = $r->fetch_assoc())) continue;
+                $ej = json_decode($row['permessi_gestori_json'] ?: '{}', true) ?: [];
+                $ej[$uid] = ['full'];
+                $conn->query("UPDATE eventi SET permessi_gestori_json = '" . $conn->real_escape_string(json_encode($ej)) . "' WHERE id = $e_id");
+            }
+            return true;
+        }
+        return assegna_ambito($conn, $uid, $ambito, $pagina_id, $da);
+    }
+}
+
 if (!function_exists('revoca_permessi_gestore')) {
     function revoca_permessi_gestore($conn, int $pagina_id, int $uid): void {
         $r = $conn->query("SELECT permessi_gestori_json, gestori_utenti_ids FROM pagine_eventi WHERE id = $pagina_id LIMIT 1");
@@ -660,7 +684,7 @@ if (!function_exists('collega_utente_anagrafe')) {
                 $st->bind_param("s", $e); $st->execute();
                 $res_a = $st->get_result();
                 while ($res_a && $a = $res_a->fetch_assoc()) {
-                    assegna_permessi_gestore($conn, (int)$a['pagina_id'], $uid, explode(',', $a['permessi']), array_filter(array_map('intval', explode(',', (string)$a['eventi_ids']))));
+                    applica_abilitazione($conn, $uid, (string)($a['ambito'] ?? 'area'), (int)$a['pagina_id'], array_filter(array_map('intval', explode(',', (string)$a['eventi_ids']))), (int)($a['creata_da'] ?? 0));
                     $conn->query("DELETE FROM abilitazioni_attesa WHERE id = " . (int)$a['id']);
                     registra_log_audit($conn, "Attivata abilitazione in attesa", ["Utente" => $uid, "Email" => $e, "Area" => (int)$a['pagina_id']]);
                 }
@@ -821,6 +845,8 @@ if (!function_exists('avvisi_anagrafe')) {
         while ($r && $x = $r->fetch_assoc()) foreach (ids_gestori_da_campi($x['gestore_utente_id'], $x['gestori_utenti_ids'], $x['permessi_gestori_json']) as $i) $ids_g[$i] = true;
         $r = $conn->query("SELECT gestori_utenti_ids, permessi_gestori_json FROM eventi WHERE archiviato = 0");
         while ($r && $x = $r->fetch_assoc()) foreach (ids_gestori_da_campi(0, $x['gestori_utenti_ids'], $x['permessi_gestori_json']) as $i) $ids_g[$i] = true;
+        $r = @$conn->query("SELECT DISTINCT utente_id FROM abilitazioni_ambito");
+        while ($r && $x = $r->fetch_assoc()) $ids_g[(int)$x['utente_id']] = true;
         if ($ids_g && $usciti) {
             $r = $conn->query("SELECT id, nome, cognome, persona_id FROM utenti WHERE id IN (" . implode(',', array_map('intval', array_keys($ids_g))) . ") AND persona_id IS NOT NULL");
             while ($r && $u = $r->fetch_assoc()) if (isset($usciti[$u['persona_id']])) $out['gestori'][] = $u + ['uscita_il' => $usciti[$u['persona_id']]['uscita_il']];

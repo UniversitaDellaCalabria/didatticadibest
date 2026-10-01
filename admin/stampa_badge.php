@@ -12,9 +12,9 @@ if (!$can_manage_iscritti) {
 // 1. Recupero Dati filtrati per i Permessi
 $tutti_gli_eventi = [];
 $filtro_ev_sql = "";
-if (!$is_full_admin && !$can_manage_settings) {
-    // Se non è admin globale o gestore intera area, vede solo i propri eventi
-    $filtro_ev_sql = " AND (FIND_IN_SET($u_id_curr, e.gestori_utenti_ids) > 0 OR JSON_CONTAINS(JSON_KEYS(COALESCE(e.permessi_gestori_json, '{}')), '\"$u_id_curr\"')) ";
+if (!$is_full_admin && !$is_area_manager) {
+    // Chi non gestisce tutta l'area vede solo le attività del suo perimetro
+    $filtro_ev_sql = $sql_filtro_eventi_rbac;
 }
 $res_ev = $conn->query("SELECT e.id, e.titolo FROM eventi e WHERE e.pagina_id = $filtro_p AND e.archiviato = 0 $filtro_ev_sql ORDER BY e.ordine ASC, e.id DESC");
 if ($res_ev) {
@@ -62,10 +62,11 @@ if (isset($_POST['avvia_stampa'])) {
         if (isset($_POST['stampa_staff'])) {
             $staff_ids = [];
             
-            $res_e = $conn->query("SELECT gestori_utenti_ids FROM eventi WHERE id = $ev_id");
+            $res_e = $conn->query("SELECT gestori_utenti_ids, permessi_gestori_json FROM eventi WHERE id = $ev_id");
             if ($res_e && $e_row = $res_e->fetch_assoc()) {
-                $staff_ids = array_merge($staff_ids, explode(',', $e_row['gestori_utenti_ids'] ?? ''));
+                $staff_ids = array_merge($staff_ids, ids_gestori_da_campi(0, $e_row['gestori_utenti_ids'], $e_row['permessi_gestori_json']));
             }
+            $staff_ids = array_merge($staff_ids, ids_ambito_attivita($conn, $ev_id, false));
             
             $res_p = $conn->query("SELECT gestori_utenti_ids, permessi_gestori_json FROM pagine_eventi WHERE id = $filtro_p");
             if ($res_p && $p_row = $res_p->fetch_assoc()) {

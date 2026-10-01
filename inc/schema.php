@@ -8,7 +8,7 @@
 // richiesta: quando aggiungi qualcosa qui, cambia anche il nome del marcatore.
 if (!function_exists('assicura_schema')) {
     function assicura_schema($conn) {
-        $marker = RADICE_SITO . '/cache/schema_v28.ok';
+        $marker = RADICE_SITO . '/cache/schema_v29.ok';
         if (is_file($marker)) return;
 
         // 1. Tabelle di servizio (prima create dalle singole pagine a ogni richiesta)
@@ -82,6 +82,14 @@ if (!function_exists('assicura_schema')) {
             // v11: elenco degli studenti di un'iscrizione (progetti per le scuole) con il codice di verifica dell'attestato
             // v26: registro delle convenzioni scuola-Dipartimento (Anagrafe scuole)
             // v28: scheda di valutazione della struttura ospitante compilata dal docente a fine attività FSL
+            // v29: abilitazioni per perimetro (oltre a quelle su tutta l'area o su singole attività, salvate nelle aree/attività):
+            // tipo 'progetti' / 'eventi' = tutte le attività di quel tipo dell'area (pagina_id), anche future;
+            // 'fsl' = pannello e attività di Formazione Scuola Lavoro di tutte le aree; 'fsl_convenzioni' / 'fsl_scuole' = solo quella parte (pagina_id 0)
+            'abilitazioni_ambito' => "CREATE TABLE IF NOT EXISTS abilitazioni_ambito (
+                id INT AUTO_INCREMENT PRIMARY KEY, utente_id INT NOT NULL, tipo VARCHAR(20) NOT NULL, pagina_id INT NOT NULL DEFAULT 0,
+                creata_da INT DEFAULT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_ambito (utente_id, tipo, pagina_id), INDEX idx_pagina (pagina_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
             'valutazioni_fsl' => "CREATE TABLE IF NOT EXISTS valutazioni_fsl (
                 id INT AUTO_INCREMENT PRIMARY KEY, prenotazione_id INT NOT NULL, evento_id INT NOT NULL, scuola_codice VARCHAR(10) DEFAULT NULL,
                 compilata_da VARCHAR(150) DEFAULT '', risposte_json TEXT, media DECIMAL(3,2) DEFAULT NULL, ripeterebbe VARCHAR(10) DEFAULT '',
@@ -244,6 +252,10 @@ if (!function_exists('assicura_schema')) {
                 'scuola_codice'        => "ADD COLUMN scuola_codice VARCHAR(10) DEFAULT NULL",
                 // v23: persona dell'anagrafe di Ateneo collegata al login (per email)
                 'persona_id'           => "ADD COLUMN persona_id VARCHAR(80) DEFAULT NULL, ADD INDEX idx_persona (persona_id)",
+            ],
+            'abilitazioni_attesa' => [
+                // v29: perimetro dell'abilitazione in attesa del primo accesso ('area', 'attivita', 'progetti', 'eventi', 'fsl', 'fsl_convenzioni', 'fsl_scuole')
+                'ambito' => "ADD COLUMN ambito VARCHAR(20) NOT NULL DEFAULT 'area'",
             ],
         ];
         foreach ($colonne as $tabella => $cols) {

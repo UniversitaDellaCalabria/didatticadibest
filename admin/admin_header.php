@@ -116,8 +116,11 @@ if (isset($_POST['del_pagina_completa']) && $is_full_admin) {
 }
 
 // ==============================================================================
-// 2. RECUPERO AREE DI LAVORO (MOTORE REGEX ANTIPROIETTILE)
+// 2. AREE DI LAVORO DELL'UTENTE
+// Un'area compare se l'utente la gestisce tutta, se gestisce almeno un'attività oppure se ha un perimetro
+// che la riguarda (tutti i progetti / tutti gli eventi dell'area, attività di Formazione Scuola Lavoro).
 // ==============================================================================
+$aree_ambito = $is_full_admin ? [] : aree_da_ambiti($conn, (int)$u_id_curr);
 $pagine_disponibili = [];
 $res_all_p = $conn->query("SELECT * FROM pagine_eventi ORDER BY ordine ASC, id ASC");
 
@@ -125,23 +128,18 @@ if ($res_all_p) {
     while ($p_row = $res_all_p->fetch_assoc()) {
         if ($is_full_admin) {
             $pagine_disponibili[] = $p_row;
-        } else {
-            $p_id = (int)$p_row['id'];
-            $has_access = in_array((int)$u_id_curr, ids_gestori_da_campi($p_row['gestore_utente_id'], $p_row['gestori_utenti_ids'], $p_row['permessi_gestori_json']), true);
-
-            if (!$has_access) {
-                $res_ev = $conn->query("SELECT gestori_utenti_ids, permessi_gestori_json FROM eventi WHERE pagina_id = $p_id");
-                if ($res_ev) {
-                    while ($e_row = $res_ev->fetch_assoc()) {
-                        if (in_array((int)$u_id_curr, ids_gestori_da_campi(0, $e_row['gestori_utenti_ids'], $e_row['permessi_gestori_json']), true)) { $has_access = true; break; }
-                    }
-                }
-            }
-
-            if ($has_access) {
-                $pagine_disponibili[] = $p_row;
+            continue;
+        }
+        $p_id = (int)$p_row['id'];
+        $has_access = in_array((int)$u_id_curr, ids_gestori_da_campi($p_row['gestore_utente_id'], $p_row['gestori_utenti_ids'], $p_row['permessi_gestori_json']), true)
+                   || in_array($p_id, $aree_ambito, true);
+        if (!$has_access) {
+            $res_ev = $conn->query("SELECT gestori_utenti_ids, permessi_gestori_json FROM eventi WHERE pagina_id = $p_id");
+            while ($res_ev && $e_row = $res_ev->fetch_assoc()) {
+                if (in_array((int)$u_id_curr, ids_gestori_da_campi(0, $e_row['gestori_utenti_ids'], $e_row['permessi_gestori_json']), true)) { $has_access = true; break; }
             }
         }
+        if ($has_access) $pagine_disponibili[] = $p_row;
     }
 }
 
@@ -159,86 +157,69 @@ if ($filtro_p > 0) {
 }
 
 // ==============================================================================
-// 3. MOTORE RBAC & ISOLAMENTO EVENTI (CON REGEX)
+// 3. PERMESSI NELL'AREA CORRENTE
+// Dentro il proprio perimetro si gestisce tutto: attività, iscritti, sondaggi, moduli, attestati, statistiche.
+// - tutta l'area: come un amministratore, ma solo per quell'area (anche Impostazioni area);
+// - attività scelte, tutti i progetti, tutti gli eventi, attività FSL: solo quelle ($sql_filtro_eventi_rbac).
+// Le vecchie abilitazioni con solo alcune sezioni (eventi, iscritti…) valgono ora per tutto il perimetro.
 // ==============================================================================
-$can_manage_eventi = $is_full_admin;
-$can_manage_iscritti = $is_full_admin;
-$can_manage_sondaggi = $is_full_admin;
-$can_manage_form = $is_full_admin;
-$can_manage_settings = $is_full_admin;
+$uid_rbac = (int)$u_id_curr;
+$puo_fsl             = $is_full_admin || ha_ambito($conn, $uid_rbac, 'fsl');
+$puo_fsl_convenzioni = $puo_fsl || ha_ambito($conn, $uid_rbac, 'fsl_convenzioni');
+$puo_fsl_scuole      = $puo_fsl || ha_ambito($conn, $uid_rbac, 'fsl_scuole');
 
+$can_manage_eventi = $can_manage_iscritti = $can_manage_sondaggi = $can_manage_form = $can_manage_settings = $is_full_admin;
 $is_area_manager = $is_full_admin;
+$puo_creare_eventi = $puo_creare_progetti = $is_full_admin;
 $allowed_events_ids = [];
 
 if (!$is_full_admin && $page_cfg) {
-    // Controlla se è Manager di Tutta l'Area
-    if (in_array((int)$u_id_curr, ids_gestori_da_campi($page_cfg['gestore_utente_id'], $page_cfg['gestori_utenti_ids'], $page_cfg['permessi_gestori_json']), true)) {
-        
+    if (in_array($uid_rbac, ids_gestori_da_campi($page_cfg['gestore_utente_id'], $page_cfg['gestori_utenti_ids'], $page_cfg['permessi_gestori_json']), true)) {
         $is_area_manager = true;
-        
-        $permessi_json = json_decode($page_cfg['permessi_gestori_json'] ?? '{}', true) ?: [];
-        if (isset($permessi_json[$u_id_curr])) {
-            $p_user = $permessi_json[$u_id_curr];
-            if (in_array('full', $p_user)) { 
-                $can_manage_eventi = $can_manage_iscritti = $can_manage_sondaggi = $can_manage_form = $can_manage_settings = true; 
-            } else {
-                if (in_array('eventi', $p_user)) $can_manage_eventi = true;
-                if (in_array('iscritti', $p_user)) $can_manage_iscritti = true;
-                if (in_array('sondaggi', $p_user)) $can_manage_sondaggi = true;
-                if (in_array('form', $p_user)) $can_manage_form = true;
-            }
-        } else {
-            $can_manage_eventi = $can_manage_iscritti = $can_manage_sondaggi = $can_manage_form = true;
+        $can_manage_eventi = $can_manage_iscritti = $can_manage_sondaggi = $can_manage_form = $can_manage_settings = true;
+        $puo_creare_eventi = $puo_creare_progetti = true;
+    } else {
+        // Attività assegnate una per una
+        $res_ev_perms = $conn->query("SELECT id, permessi_gestori_json, gestori_utenti_ids FROM eventi WHERE pagina_id = $filtro_p");
+        while ($res_ev_perms && $ev_row = $res_ev_perms->fetch_assoc()) {
+            if (in_array($uid_rbac, ids_gestori_da_campi(0, $ev_row['gestori_utenti_ids'], $ev_row['permessi_gestori_json']), true)) $allowed_events_ids[] = (int)$ev_row['id'];
         }
-    }
-
-    // Controlla i Singoli Eventi e ISOLA
-    $res_ev_perms = $conn->query("SELECT id, permessi_gestori_json, gestori_utenti_ids FROM eventi WHERE pagina_id = $filtro_p");
-    if ($res_ev_perms) {
-        while ($ev_row = $res_ev_perms->fetch_assoc()) {
-            $ev_id = $ev_row['id'];
-            $has_event_access = false;
-            
-            if (in_array((int)$u_id_curr, ids_gestori_da_campi(0, $ev_row['gestori_utenti_ids'], $ev_row['permessi_gestori_json']), true)) {
-                $has_event_access = true;
-            }
-            
-            if ($has_event_access) {
-                $allowed_events_ids[] = $ev_id; // Colleziona gli ID consentiti
-                
-                if (!$is_area_manager) {
-                    $ev_json = json_decode($ev_row['permessi_gestori_json'] ?? '{}', true) ?: [];
-                    if (isset($ev_json[$u_id_curr])) {
-                        $p_ev = $ev_json[$u_id_curr];
-                        if (in_array('full', $p_ev)) { 
-                            $can_manage_eventi = $can_manage_iscritti = $can_manage_sondaggi = $can_manage_form = true; 
-                        } else {
-                            if (in_array('eventi', $p_ev)) $can_manage_eventi = true;
-                            if (in_array('iscritti', $p_ev)) $can_manage_iscritti = true;
-                            if (in_array('sondaggi', $p_ev)) $can_manage_sondaggi = true;
-                            if (in_array('form', $p_ev)) $can_manage_form = true;
-                        }
-                    } else {
-                        // Se è nel vecchio formato, sblocca almeno la gestione di base
-                        $can_manage_eventi = true;
-                        $can_manage_iscritti = true;
-                    }
-                }
-            }
+        // Perimetri: tutti i progetti / tutti gli eventi dell'area (anche quelli che verranno creati), attività FSL
+        $allowed_events_ids = array_values(array_unique(array_merge($allowed_events_ids, attivita_da_ambiti($conn, $uid_rbac, $filtro_p))));
+        $puo_creare_progetti = ha_ambito($conn, $uid_rbac, 'progetti', $filtro_p);
+        $puo_creare_eventi   = ha_ambito($conn, $uid_rbac, 'eventi', $filtro_p);
+        if ($allowed_events_ids || $puo_creare_progetti || $puo_creare_eventi) {
+            $can_manage_eventi = $can_manage_iscritti = $can_manage_sondaggi = $can_manage_form = true;
         }
     }
 }
 
-// VARIABILE MAGICA GLOBALE PER I FILTRI
+// Abilitati solo a una parte della FSL (nessuna area): la loro pagina di partenza è quella
+if (!$is_full_admin && !$pagine_disponibili && in_array(basename($_SERVER['PHP_SELF']), ['index.php', 'dashboard.php', 'aree.php'], true)
+    && ($puo_fsl_convenzioni || $puo_fsl_scuole)) {
+    while (ob_get_level() > 0) ob_end_clean();
+    header('Location: ' . ($puo_fsl_convenzioni ? 'fsl.php' : 'scuole.php'));
+    exit;
+}
+
+if (!function_exists('schede_sistema')) {
+    // Schede comuni di "Sistema e registri" (una sola voce di menu per tre pagine)
+    function schede_sistema(string $attiva): void {
+        global $filtro_p;
+        $schede = ['sistema.php' => ['fa-envelope', 'Email e controlli'], 'audit_log.php' => ['fa-user-secret', 'Registro operazioni'], 'log_accessi.php' => ['fa-right-to-bracket', 'Accessi SSO']];
+        echo '<ul class="nav nav-pills gap-1 mb-3 flex-wrap" style="--bs-nav-pills-link-active-bg:#1e293b;">';
+        foreach ($schede as $file => [$ico, $nome]) {
+            $on = $file === $attiva;
+            echo '<li class="nav-item"><a class="nav-link fw-bold' . ($on ? ' active' : ' bg-light text-dark') . '" style="font-size:.85rem;" href="' . $file . '?p_id=' . (int)$filtro_p . '"' . ($on ? ' aria-current="page"' : '') . '><i class="fa ' . $ico . ' me-1" aria-hidden="true"></i>' . $nome . '</a></li>';
+        }
+        echo '</ul>';
+    }
+}
+
+// Filtro sulle attività per chi non gestisce tutta l'area
 $sql_filtro_eventi_rbac = "";
 if (!$is_full_admin && !$is_area_manager) {
-    if (!empty($allowed_events_ids)) {
-        // Applica i paraocchi: vedi solo i tuoi eventi
-        $sql_filtro_eventi_rbac = " AND e.id IN (" . implode(',', $allowed_events_ids) . ") ";
-    } else {
-        // Taglia fuori tutto
-        $sql_filtro_eventi_rbac = " AND e.id = -1 "; 
-    }
+    $sql_filtro_eventi_rbac = $allowed_events_ids ? " AND e.id IN (" . implode(',', $allowed_events_ids) . ") " : " AND e.id = -1 ";
 }
 
 $sys = $conn->query("SELECT * FROM impostazioni_sistema WHERE id = 1")->fetch_assoc();
@@ -287,6 +268,14 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
         .nav-pills .nav-link.active { background-color: #990000; color: #fff; }
         .nav-pills .nav-link:hover:not(.active) { background-color: rgba(255,255,255,0.1); color: #fff; }
         #sidebar .nav > li { width: 100%; min-width: 0; }
+        /* Gruppi richiudibili del menu */
+        .side-grp > summary { list-style: none; cursor: pointer; display: flex; align-items: center; }
+        .side-grp > summary::-webkit-details-marker { display: none; }
+        .side-grp-freccia { margin-left: auto; font-size: .7rem; opacity: .7; transition: transform .15s; }
+        .side-grp[open] > summary .side-grp-freccia { transform: rotate(90deg); }
+        .side-grp-voci { padding-left: 14px; border-left: 1px solid rgba(255,255,255,.12); margin-left: 24px; }
+        .side-grp-voci .nav-link { padding: 7px 12px; font-weight: 500; font-size: .9rem; margin-bottom: 2px; }
+        .side-grp > summary:focus-visible { outline: 2px solid #93c5fd; outline-offset: 1px; }
         .area-top { border: 2px solid; border-radius: 999px; padding: 4px 12px; background: #fff; max-width: 42vw; }
         .area-top:hover { background: #f8fafc; }
         .area-top-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
@@ -320,15 +309,27 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
         
         <div class="p-3">
             <ul class="nav nav-pills flex-column">
-                <li class="nav-item">
-                    <a class="nav-link w-100 <?php echo ($current_page == 'dashboard.php' || $current_page == 'index.php') ? 'active' : ''; ?>" href="dashboard.php?p_id=<?php echo $filtro_p; ?>">
-                        <i class="fa fa-gauge-high me-2 text-center" style="width:20px;"></i> Dashboard
-                    </a>
-                </li>
+                <?php
+                // Voce del menu; $attive = pagine che la accendono (la prima è il link)
+                $voce_menu = function (array $attive, string $href, string $icona, string $testo, bool $accesa = false) use ($current_page, $filtro_p) {
+                    $on = $accesa || in_array($current_page, $attive, true);
+                    echo '<li class="nav-item"><a class="nav-link w-100' . ($on ? ' active' : '') . '" href="' . htmlspecialchars($href) . (str_contains($href, '?') ? '&amp;' : '?') . 'p_id=' . (int)$filtro_p . '"' . ($on ? ' aria-current="page"' : '') . '>'
+                       . '<i class="fa ' . $icona . ' me-2 text-center" style="width:20px;" aria-hidden="true"></i> ' . htmlspecialchars($testo) . '</a></li>';
+                };
+                // Gruppo richiudibile: aperto se contiene la pagina corrente, altrimenti come l'ha lasciato l'utente (localStorage)
+                $apri_gruppo = function (string $id, string $icona, string $titolo, array $pagine) use ($current_page) {
+                    $qui = in_array($current_page, $pagine, true);
+                    echo '<li class="nav-item side-grp-li"><details class="side-grp" data-grp="' . $id . '"' . ($qui ? ' open data-qui="1"' : '') . '>'
+                       . '<summary class="nav-link w-100"><i class="fa ' . $icona . ' me-2 text-center" style="width:20px;" aria-hidden="true"></i> ' . htmlspecialchars($titolo)
+                       . '<i class="fa fa-chevron-right side-grp-freccia" aria-hidden="true"></i></summary><ul class="nav nav-pills flex-column side-grp-voci">';
+                };
+                $chiudi_gruppo = function () { echo '</ul></details></li>'; };
+                ?>
+                <?php $voce_menu(['dashboard.php', 'index.php'], 'dashboard.php', 'fa-gauge-high', 'Dashboard'); ?>
                 <?php if ($is_full_admin || count($pagine_disponibili) > 1): // un gestore con una sola area non ha nulla da scegliere ?>
                 <li class="nav-item mb-1">
                     <a class="nav-link w-100 <?php echo in_array($current_page, ['aree.php', 'nuova_area.php'], true) ? 'active' : ''; ?>" href="aree.php?p_id=<?php echo $filtro_p; ?>">
-                        <i class="fa fa-layer-group me-2 text-center" style="width:20px;"></i> Aree
+                        <i class="fa fa-layer-group me-2 text-center" style="width:20px;" aria-hidden="true"></i> Aree
                         <span class="badge rounded-pill bg-secondary ms-1" style="font-size:.65rem;"><?php echo count($pagine_disponibili); ?></span>
                     </a>
                 </li>
@@ -343,167 +344,76 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
                             <span class="fw-bold text-white text-truncate" style="min-width:0;" title="<?php echo htmlspecialchars($page_cfg['titolo']); ?>"><?php echo htmlspecialchars($page_cfg['titolo']); ?></span>
                             <?php if (count($pagine_disponibili) > 1): ?><a href="aree.php?p_id=<?php echo $filtro_p; ?>" class="small text-info text-decoration-none text-nowrap">Cambia</a><?php endif; ?>
                         </div>
-                        <?php if ((int)($page_cfg['visibile'] ?? 1) === 0): ?><span class="badge bg-warning text-dark mt-1" style="font-size:.65rem;"><i class="fa fa-eye-slash me-1"></i>Nascosta al pubblico</span><?php endif; ?>
+                        <?php if ((int)($page_cfg['visibile'] ?? 1) === 0): ?><span class="badge bg-warning text-dark mt-1" style="font-size:.65rem;"><i class="fa fa-eye-slash me-1" aria-hidden="true"></i>Nascosta al pubblico</span><?php endif; ?>
                     </div>
                 </li>
-
-                <?php if ($can_manage_eventi): ?>
-                <li class="nav-item">
-                    <a class="nav-link w-100 <?php echo ($current_page == 'eventi.php') ? 'active' : ''; ?>" href="eventi.php?p_id=<?php echo $filtro_p; ?>">
-                        <i class="fa fa-calendar-alt me-2 text-center" style="width:20px;"></i> Eventi e Turni
-                    </a>
-                </li>
                 <?php
-                // Voce "Progetti": nelle aree con layout Progetti o che contengono già dei progetti
-                $mostra_progetti = ($page_cfg['layout_template'] ?? '') === 'progetti';
-                if (!$mostra_progetti && $filtro_p) {
-                    $r_np = $conn->query("SELECT 1 FROM eventi WHERE pagina_id = " . (int)$filtro_p . " AND tipo = 'progetto' LIMIT 1");
-                    $mostra_progetti = $r_np && $r_np->num_rows > 0;
-                }
-                ?>
-                <?php if ($mostra_progetti): ?>
-                <li class="nav-item">
-                    <a class="nav-link w-100 <?php echo ($current_page == 'progetti.php') ? 'active' : ''; ?>" href="progetti.php?p_id=<?php echo $filtro_p; ?>">
-                        <i class="fa fa-diagram-project me-2 text-center" style="width:20px;"></i> Progetti
-                    </a>
-                </li>
-                <?php endif; ?>
-                <?php
-                // Studenti e attestati: aree con progetti per le scuole o eventi con attestati per la classe
+                // Quali voci servono: progetti ed eventi solo se ce ne sono (o se si possono creare) nel perimetro dell'utente
+                $tipi_vis = ['progetto' => false, 'evento' => false];
+                $r_tipi = $conn->query("SELECT DISTINCT IF(e.tipo = 'progetto', 'progetto', 'evento') AS t FROM eventi e WHERE e.pagina_id = " . (int)$filtro_p . " $sql_filtro_eventi_rbac");
+                while ($r_tipi && $x_t = $r_tipi->fetch_assoc()) $tipi_vis[$x_t['t']] = true;
+                $vede_eventi = $can_manage_eventi && ($is_area_manager || $puo_creare_eventi || $tipi_vis['evento']);
+                $vede_progetti = $can_manage_eventi && (($page_cfg['layout_template'] ?? '') === 'progetti' || $tipi_vis['progetto'] || $puo_creare_progetti && !$is_area_manager);
+                // Studenti e attestati: progetti per le scuole o eventi per le classi
                 $mostra_classi = false;
-                if ($filtro_p && $can_manage_iscritti) {
-                    $r_cl = $conn->query("SELECT 1 FROM eventi e LEFT JOIN progetti_dettagli d ON d.evento_id = e.id WHERE e.pagina_id = " . (int)$filtro_p . " AND e.archiviato = 0
+                if ($can_manage_iscritti) {
+                    $r_cl = $conn->query("SELECT 1 FROM eventi e LEFT JOIN progetti_dettagli d ON d.evento_id = e.id WHERE e.pagina_id = " . (int)$filtro_p . " AND e.archiviato = 0 $sql_filtro_eventi_rbac
                                           AND ((e.tipo = 'progetto' AND IFNULL(d.per_scuole, 1) = 1) OR (IFNULL(e.tipo, 'evento') <> 'progetto' AND d.attestati = 1)) LIMIT 1");
                     $mostra_classi = $r_cl && $r_cl->num_rows > 0;
                 }
-                if ($mostra_classi): ?>
-                <li class="nav-item">
-                    <a class="nav-link w-100 <?php echo ($current_page == 'partecipanti.php') ? 'active' : ''; ?>" href="partecipanti.php?p_id=<?php echo $filtro_p; ?>">
-                        <i class="fa fa-graduation-cap me-2 text-center" style="width:20px;"></i> Studenti e attestati
-                    </a>
-                </li>
-                <?php endif; ?>
-                <li class="nav-item">
-                    <a class="nav-link w-100 <?php echo ($current_page == 'archivio.php') ? 'active' : ''; ?>" href="archivio.php?p_id=<?php echo $filtro_p; ?>">
-                        <i class="fa fa-archive me-2 text-center" style="width:20px;"></i> Archivio Storico
-                    </a>
-                </li>
-                <?php endif; ?>
+                ?>
+                <?php if ($can_manage_eventi || $can_manage_form): $apri_gruppo('attivita', 'fa-calendar-alt', 'Attività', ['eventi.php', 'progetti.php', 'form_builder.php', 'archivio.php']); ?>
+                    <?php if ($vede_eventi) $voce_menu(['eventi.php'], 'eventi.php', 'fa-calendar-day', 'Eventi e turni'); ?>
+                    <?php if ($vede_progetti) $voce_menu(['progetti.php'], 'progetti.php', 'fa-diagram-project', 'Progetti'); ?>
+                    <?php if ($can_manage_form) $voce_menu(['form_builder.php'], 'form_builder.php', 'fa-list-check', 'Moduli di iscrizione'); ?>
+                    <?php if ($can_manage_eventi) $voce_menu(['archivio.php'], 'archivio.php', 'fa-box-archive', 'Archivio'); ?>
+                <?php $chiudi_gruppo(); endif; ?>
 
-                <?php if ($can_manage_form): ?>
-                <li class="nav-item">
-                    <a class="nav-link w-100 <?php echo ($current_page == 'form_builder.php') ? 'active' : ''; ?>" href="form_builder.php?p_id=<?php echo $filtro_p; ?>">
-                        <i class="fa fa-list-check me-2 text-center" style="width:20px;"></i> Form Builder
-                    </a>
-                </li>
-                <?php endif; ?>
-                
-                <?php if ($can_manage_iscritti): ?>
-                <li class="nav-item mt-2">
-                    <a class="nav-link w-100 <?php echo ($current_page == 'iscritti.php') ? 'active' : ''; ?>" href="iscritti.php?p_id=<?php echo $filtro_p; ?>">
-                        <i class="fa fa-users me-2 text-center" style="width:20px;"></i> Iscritti & Check-in
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link w-100 <?php echo ($current_page == 'scanner.php') ? 'active' : ''; ?>" href="scanner.php?p_id=<?php echo $filtro_p; ?>">
-                        <i class="fa fa-qrcode me-2 text-center" style="width:20px;" aria-hidden="true"></i> Scanner Check-in
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link w-100 <?php echo ($current_page == 'stampa_badge.php') ? 'active' : ''; ?>" href="stampa_badge.php?p_id=<?php echo $filtro_p; ?>">
-                        <i class="fa fa-id-badge me-2 text-center" style="width:20px;"></i> Stampa Badge
-                    </a>
-                </li>
-                <?php endif; ?>
+                <?php if ($can_manage_iscritti || $can_manage_sondaggi): $apri_gruppo('partecipanti', 'fa-users', 'Partecipanti', ['iscritti.php', 'scanner.php', 'stampa_badge.php', 'stampa_lista_iscritti.php', 'partecipanti.php', 'sondaggi.php']); ?>
+                    <?php if ($can_manage_iscritti) $voce_menu(['iscritti.php', 'scanner.php', 'stampa_badge.php', 'stampa_lista_iscritti.php'], 'iscritti.php', 'fa-user-check', 'Iscritti e check-in'); ?>
+                    <?php if ($mostra_classi) $voce_menu(['partecipanti.php'], 'partecipanti.php', 'fa-graduation-cap', 'Studenti e attestati'); ?>
+                    <?php if ($can_manage_sondaggi) $voce_menu(['sondaggi.php'], 'sondaggi.php', 'fa-star', 'Sondaggi'); ?>
+                <?php $chiudi_gruppo(); endif; ?>
 
-                <?php if ($can_manage_sondaggi): ?>
-                    <li class="nav-item mt-2">
-                        <a class="nav-link w-100 <?php echo ($current_page == 'sondaggi.php') ? 'active' : ''; ?>" href="sondaggi.php?p_id=<?php echo $filtro_p; ?>" <?php echo ($current_page == 'sondaggi.php') ? '' : 'style="background-color: #198754; color: white;"'; ?>>
-                            <i class="fa fa-star me-2 text-center" style="width:20px;"></i> Sondaggi & Feedback
-                        </a>
-                    </li>
-                <?php endif; ?>
-                
-                <?php if ($can_manage_iscritti): ?>
-                    <li class="nav-item">
-                        <a class="nav-link w-100 <?php echo ($current_page == 'statistiche.php') ? 'active' : ''; ?>" href="statistiche.php?p_id=<?php echo $filtro_p; ?>">
-                            <i class="fa fa-chart-pie me-2 text-center" style="width:20px;"></i> Statistiche & Report
-                        </a>
-                    </li>
-                <?php endif; ?>
-                
-                <?php if ($can_manage_settings): ?>
-                    <li class="nav-item mt-2">
-                        <a class="nav-link w-100 <?php echo ($current_page == 'impostazioni_area.php') ? 'active' : ''; ?>" href="impostazioni_area.php?p_id=<?php echo $filtro_p; ?>">
-                            <i class="fa fa-paint-brush me-2 text-center" style="width:20px;"></i> Impostazioni Area
-                        </a>
-                    </li>
-                <?php endif; ?>
+                <?php if ($can_manage_iscritti) $voce_menu(['statistiche.php'], 'statistiche.php', 'fa-chart-pie', 'Statistiche'); ?>
+                <?php if ($can_manage_settings) $voce_menu(['impostazioni_area.php'], 'impostazioni_area.php', 'fa-paint-brush', 'Impostazioni area'); ?>
                 <?php endif; // fine area corrente ?>
 
-                <?php if ($is_full_admin): ?>
-                    <!-- ── Portale: impostazioni generali, valide per tutte le aree ── -->
+                <?php if ($is_full_admin || $puo_fsl_convenzioni || $puo_fsl_scuole): ?>
+                    <!-- ── Portale: valido per tutte le aree ── -->
                     <li class="nav-item mt-4 mb-2">
                         <div class="text-secondary small fw-bold px-3 mb-1 text-uppercase">Portale</div>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link w-100 <?php echo ($current_page == 'testata.php') ? 'active' : ''; ?>" href="testata.php?p_id=<?php echo $filtro_p; ?>">
-                            <i class="fa fa-image me-2 text-center" style="width:20px;"></i> Testata, Logo & Home
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link w-100 <?php echo ($current_page == 'menu.php') ? 'active' : ''; ?>" href="menu.php?p_id=<?php echo $filtro_p; ?>">
-                            <i class="fa fa-link me-2 text-center" style="width:20px;"></i> Menu Navigazione
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link w-100 <?php echo ($current_page == 'scuole.php') ? 'active' : ''; ?>" href="scuole.php?p_id=<?php echo $filtro_p; ?>">
-                            <i class="fa fa-school me-2 text-center" style="width:20px;"></i> Anagrafe scuole
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link w-100 <?php echo ($current_page == 'fsl.php') ? 'active' : ''; ?>" href="fsl.php?p_id=<?php echo $filtro_p; ?>">
-                            <i class="fa fa-briefcase me-2 text-center" style="width:20px;" aria-hidden="true"></i> Formazione Scuola Lavoro
-                        </a>
-                    </li>
-                    <?php $vista_ana_menu = $current_page === 'anagrafe_personale.php' ? (string)($_GET['vista'] ?? 'docenti') : ''; ?>
-                    <li class="nav-item">
-                        <a class="nav-link w-100 <?php echo ($current_page == 'anagrafe_docenti.php' || $vista_ana_menu === 'docenti') ? 'active' : ''; ?>" href="anagrafe_docenti.php?p_id=<?php echo $filtro_p; ?>">
-                            <i class="fa fa-chalkboard-user me-2 text-center" style="width:20px;" aria-hidden="true"></i> Anagrafe docenti
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link w-100 <?php echo ($current_page == 'anagrafe_pta.php' || $vista_ana_menu === 'pta') ? 'active' : ''; ?>" href="anagrafe_pta.php?p_id=<?php echo $filtro_p; ?>">
-                            <i class="fa fa-user-tie me-2 text-center" style="width:20px;" aria-hidden="true"></i> Anagrafe PTA
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link w-100 <?php echo in_array($vista_ana_menu, ['altro', 'corsi', 'strutture'], true) ? 'active' : ''; ?>" href="anagrafe_personale.php?p_id=<?php echo $filtro_p; ?>&amp;vista=corsi">
-                            <i class="fa fa-graduation-cap me-2 text-center" style="width:20px;" aria-hidden="true"></i> Corsi e strutture Ateneo
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="utenti.php?p_id=<?php echo $filtro_p; ?>" class="nav-link w-100 <?php echo ($current_page == 'utenti.php') ? 'active' : ''; ?>">
-                            <i class="fa fa-users-cog me-2 text-center" style="width:20px;"></i> Utenti & Abilitazioni
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link w-100 <?php echo ($current_page == 'audit_log.php') ? 'active' : ''; ?>" href="audit_log.php?p_id=<?php echo $filtro_p; ?>">
-                            <i class="fa fa-user-secret me-2 text-center" style="width:20px;"></i> Registro Audit
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link w-100 <?php echo ($current_page == 'log_accessi.php') ? 'active' : ''; ?>" href="log_accessi.php?p_id=<?php echo $filtro_p; ?>">
-                            <i class="fa fa-sign-in-alt me-2 text-center" style="width:20px;"></i> Log Accessi SSO
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link w-100 <?php echo ($current_page == 'sistema.php') ? 'active' : ''; ?>" href="sistema.php?p_id=<?php echo $filtro_p; ?>">
-                            <i class="fa fa-envelope me-2 text-center" style="width:20px;"></i> Sistema Email
-                        </a>
-                    </li>
+                    <?php $apri_gruppo('fsl', 'fa-school', 'Scuole e FSL', ['fsl.php', 'scuole.php', 'convenzione_file.php']); ?>
+                        <?php if ($puo_fsl_convenzioni) $voce_menu(['fsl.php', 'convenzione_file.php'], 'fsl.php', 'fa-briefcase', $puo_fsl ? 'Formazione Scuola Lavoro' : 'Convenzioni FSL'); ?>
+                        <?php if ($puo_fsl_scuole) $voce_menu(['scuole.php'], 'scuole.php', 'fa-building-columns', 'Anagrafe scuole'); ?>
+                    <?php $chiudi_gruppo(); ?>
+                    <?php if ($is_full_admin): ?>
+                        <?php $voce_menu(['anagrafe_personale.php', 'anagrafe_docenti.php', 'anagrafe_pta.php'], 'anagrafe_personale.php', 'fa-address-book', 'Anagrafe di Ateneo'); ?>
+                        <?php $apri_gruppo('sito', 'fa-globe', 'Sito pubblico', ['testata.php', 'menu.php']); ?>
+                            <?php $voce_menu(['testata.php'], 'testata.php', 'fa-image', 'Testata e home'); ?>
+                            <?php $voce_menu(['menu.php'], 'menu.php', 'fa-link', 'Menu'); ?>
+                        <?php $chiudi_gruppo(); ?>
+                        <?php $voce_menu(['utenti.php'], 'utenti.php', 'fa-users-cog', 'Utenti e abilitazioni'); ?>
+                        <?php $voce_menu(['sistema.php', 'audit_log.php', 'log_accessi.php'], 'sistema.php', 'fa-gear', 'Sistema e registri'); ?>
+                    <?php endif; ?>
                 <?php endif; ?>
             </ul>
+            <script>
+            // Gruppi del menu: si ricorda quali l'utente ha aperto o chiuso (quello della pagina corrente resta aperto)
+            (function () {
+                var chiave = 'adminMenuGruppi', stato = {};
+                try { stato = JSON.parse(localStorage.getItem(chiave) || '{}') || {}; } catch (e) {}
+                document.querySelectorAll('#sidebar .side-grp').forEach(function (d) {
+                    var g = d.dataset.grp;
+                    if (!d.dataset.qui && stato[g] === 1) d.open = true;
+                    d.addEventListener('toggle', function () {
+                        stato[g] = d.open ? 1 : 0;
+                        try { localStorage.setItem(chiave, JSON.stringify(stato)); } catch (e) {}
+                    });
+                });
+            })();
+            </script>
         </div>
     </div>
     

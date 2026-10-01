@@ -419,6 +419,9 @@ if (!function_exists('get_gestori_ids_area')) {
         if ($res && $r = $res->fetch_assoc()) $ids = ids_gestori_da_campi($r['gestore_utente_id'], $r['gestori_utenti_ids'], $r['permessi_gestori_json']);
         $res = $conn->query("SELECT gestori_utenti_ids, permessi_gestori_json FROM eventi WHERE pagina_id = $pagina_id");
         if ($res) while ($r = $res->fetch_assoc()) $ids = array_merge($ids, ids_gestori_da_campi(0, $r['gestori_utenti_ids'], $r['permessi_gestori_json']));
+        // Abilitati a tutti i progetti o a tutti gli eventi dell'area
+        $res = @$conn->query("SELECT DISTINCT utente_id FROM abilitazioni_ambito WHERE pagina_id = $pagina_id AND tipo IN ('progetti', 'eventi')");
+        if ($res) while ($r = $res->fetch_assoc()) $ids[] = (int)$r['utente_id'];
         return array_values(array_unique($ids));
     }
 }
@@ -457,7 +460,8 @@ if (!function_exists('get_email_gestori_evento')) {
         if (!$r) return [];
         $ids = array_unique(array_merge(
             ids_gestori_da_campi($r['gestore_utente_id'], $r['p_csv'], $r['p_json']),
-            ids_gestori_da_campi(0, $r['ev_csv'], $r['ev_json'])
+            ids_gestori_da_campi(0, $r['ev_csv'], $r['ev_json']),
+            ids_ambito_attivita($conn, $evento_id, false)   // perimetri dell'area (progetti / eventi), non la FSL di tutte le aree
         ));
         if ($solo_notifiche_attive) {
             $attivi = get_notifiche_gestori_attive($conn, (int)$r['pagina_id']);
@@ -468,6 +472,149 @@ if (!function_exists('get_email_gestori_evento')) {
         $res_u = $conn->query("SELECT DISTINCT email FROM utenti WHERE id IN (" . implode(',', array_map('intval', $ids)) . ") AND email IS NOT NULL AND email != ''");
         if ($res_u) while ($u = $res_u->fetch_assoc()) $emails[] = $u['email'];
         return $emails;
+    }
+}
+
+// ── Abilitazioni per perimetro ───────────────────────────────────────────────
+// Oltre a "tutta l'area" (JSON dell'area) e "singole attività" (JSON dell'attività) si può abilitare un utente a:
+//   'progetti' / 'eventi'  tutte le attività di quel tipo di un'area, anche quelle create dopo (pagina_id = area)
+//   'fsl'                  pannello Formazione Scuola Lavoro + tutte le attività FSL di tutte le aree
+//   'fsl_convenzioni'      solo il registro delle convenzioni;  'fsl_scuole'  solo l'anagrafe delle scuole
+// Dentro il perimetro l'utente vede e gestisce tutto: attività, iscritti, sondaggi, moduli, attestati, statistiche.
+if (!defined('TIPI_AMBITO')) define('TIPI_AMBITO', [
+    'progetti'        => "Tutti i progetti dell'area",
+    'eventi'          => "Tutti gli eventi dell'area",
+    'fsl'             => "Formazione Scuola Lavoro: tutto",
+    'fsl_convenzioni' => "Formazione Scuola Lavoro: solo convenzioni",
+    'fsl_scuole'      => "Formazione Scuola Lavoro: solo anagrafe scuole",
+]);
+
+if (!function_exists('ambiti_utente')) {
+    // [['tipo' => …, 'pagina_id' => …], …] dell'utente
+    function ambiti_utente($conn, int $uid, bool $rileggi = false): array {
+        static $cache = [];
+        if ($rileggi) $cache = [];
+        if ($uid <= 0) return [];
+        if (!isset($cache[$uid])) {
+            $cache[$uid] = [];
+            $r = @$conn->query("SELECT tipo, pagina_id FROM abilitazioni_ambito WHERE utente_id = $uid");
+            while ($r && $x = $r->fetch_assoc()) $cache[$uid][] = ['tipo' => $x['tipo'], 'pagina_id' => (int)$x['pagina_id']];
+        }
+        return $cache[$uid];
+    }
+}
+
+if (!function_exists('ha_ambito')) {
+    function ha_ambito($conn, int $uid, string $tipo, int $pagina_id = 0): bool {
+        foreach (ambiti_utente($conn, $uid) as $a) if ($a['tipo'] === $tipo && $a['pagina_id'] === $pagina_id) return true;
+        return false;
+    }
+}
+
+if (!function_exists('sql_attivita_ambiti')) {
+    // Condizione SQL (alias e = eventi) con le attività dell'area comprese nei perimetri dell'utente; '' se nessuna
+    function sql_attivita_ambiti($conn, int $uid, int $pagina_id): string {
+        $cond = [];
+        if (ha_ambito($conn, $uid, 'progetti', $pagina_id)) $cond[] = "e.tipo = 'progetto'";
+        if (ha_ambito($conn, $uid, 'eventi', $pagina_id)) $cond[] = "IFNULL(e.tipo, 'evento') <> 'progetto'";
+        if (ha_ambito($conn, $uid, 'fsl')) $cond[] = "e.id IN (SELECT evento_id FROM progetti_dettagli WHERE convenzione = 1)";
+        return $cond ? '(' . implode(' OR ', $cond) . ')' : '';
+    }
+}
+
+if (!function_exists('attivita_da_ambiti')) {
+    // ID delle attività dell'area comprese nei perimetri dell'utente
+    function attivita_da_ambiti($conn, int $uid, int $pagina_id): array {
+        $cond = sql_attivita_ambiti($conn, $uid, $pagina_id);
+        if ($cond === '') return [];
+        $ids = [];
+        $r = $conn->query("SELECT e.id FROM eventi e WHERE e.pagina_id = $pagina_id AND $cond");
+        while ($r && $x = $r->fetch_assoc()) $ids[] = (int)$x['id'];
+        return $ids;
+    }
+}
+
+if (!function_exists('aree_da_ambiti')) {
+    // Aree in cui l'utente lavora grazie ai perimetri (tipo di attività, oppure attività FSL)
+    function aree_da_ambiti($conn, int $uid): array {
+        $aree = [];
+        foreach (ambiti_utente($conn, $uid) as $a) if (in_array($a['tipo'], ['progetti', 'eventi'], true) && $a['pagina_id'] > 0) $aree[$a['pagina_id']] = true;
+        if (ha_ambito($conn, $uid, 'fsl')) {
+            $r = $conn->query("SELECT DISTINCT e.pagina_id FROM eventi e JOIN progetti_dettagli pd ON pd.evento_id = e.id WHERE pd.convenzione = 1");
+            while ($r && $x = $r->fetch_assoc()) $aree[(int)$x['pagina_id']] = true;
+        }
+        return array_keys($aree);
+    }
+}
+
+if (!function_exists('ids_ambito_attivita')) {
+    // Utenti che vedono un'attività grazie a un perimetro ('progetti'/'eventi' della sua area; con $con_fsl anche 'fsl')
+    function ids_ambito_attivita($conn, int $ev_id, bool $con_fsl = true): array {
+        $r = $conn->query("SELECT e.pagina_id, IFNULL(e.tipo, 'evento') AS tipo, IFNULL(pd.convenzione, 0) AS fsl
+                           FROM eventi e LEFT JOIN progetti_dettagli pd ON pd.evento_id = e.id WHERE e.id = $ev_id LIMIT 1");
+        $e = $r ? $r->fetch_assoc() : null;
+        if (!$e) return [];
+        $tipo = $e['tipo'] === 'progetto' ? 'progetti' : 'eventi';
+        $cond = "(tipo = '$tipo' AND pagina_id = " . (int)$e['pagina_id'] . ")" . ($con_fsl && (int)$e['fsl'] === 1 ? " OR tipo = 'fsl'" : '');
+        $ids = [];
+        $r = @$conn->query("SELECT DISTINCT utente_id FROM abilitazioni_ambito WHERE $cond");
+        while ($r && $x = $r->fetch_assoc()) $ids[] = (int)$x['utente_id'];
+        return $ids;
+    }
+}
+
+if (!function_exists('utente_gestisce_attivita')) {
+    // L'utente lavora su questa attività: gestore dell'area, dell'attività o con un perimetro che la comprende
+    function utente_gestisce_attivita($conn, int $uid, int $ev_id): bool {
+        if ($uid <= 0 || $ev_id <= 0) return false;
+        $r = $conn->query("SELECT e.gestori_utenti_ids AS ev_csv, e.permessi_gestori_json AS ev_json, pe.gestore_utente_id, pe.gestori_utenti_ids AS p_csv, pe.permessi_gestori_json AS p_json
+                           FROM eventi e JOIN pagine_eventi pe ON e.pagina_id = pe.id WHERE e.id = $ev_id LIMIT 1");
+        $x = $r ? $r->fetch_assoc() : null;
+        if (!$x) return false;
+        if (in_array($uid, ids_gestori_da_campi($x['gestore_utente_id'], $x['p_csv'], $x['p_json']), true)) return true;
+        if (in_array($uid, ids_gestori_da_campi(0, $x['ev_csv'], $x['ev_json']), true)) return true;
+        return in_array($uid, ids_ambito_attivita($conn, $ev_id), true);
+    }
+}
+
+if (!function_exists('utente_ha_abilitazioni')) {
+    // Ha almeno un'abilitazione: su un'area, su un'attività o un perimetro (progetti, eventi, FSL)
+    function utente_ha_abilitazioni($conn, int $uid): bool {
+        if ($uid <= 0) return false;
+        if (ambiti_utente($conn, $uid)) return true;
+        $r = $conn->query("SELECT gestore_utente_id, gestori_utenti_ids, permessi_gestori_json FROM pagine_eventi");
+        while ($r && $x = $r->fetch_assoc()) if (in_array($uid, ids_gestori_da_campi($x['gestore_utente_id'], $x['gestori_utenti_ids'], $x['permessi_gestori_json']), true)) return true;
+        $r = $conn->query("SELECT gestori_utenti_ids, permessi_gestori_json FROM eventi WHERE archiviato = 0");
+        while ($r && $x = $r->fetch_assoc()) if (in_array($uid, ids_gestori_da_campi(0, $x['gestori_utenti_ids'], $x['permessi_gestori_json']), true)) return true;
+        return false;
+    }
+}
+
+if (!function_exists('assegna_ambito')) {
+    function assegna_ambito($conn, int $uid, string $tipo, int $pagina_id = 0, int $da = 0): bool {
+        if ($uid <= 0 || !isset(TIPI_AMBITO[$tipo])) return false;
+        if (in_array($tipo, ['fsl', 'fsl_convenzioni', 'fsl_scuole'], true)) $pagina_id = 0;
+        elseif ($pagina_id <= 0) return false;
+        $st = $conn->prepare("INSERT IGNORE INTO abilitazioni_ambito (utente_id, tipo, pagina_id, creata_da) VALUES (?, ?, ?, ?)");
+        $st->bind_param("isii", $uid, $tipo, $pagina_id, $da);
+        $ok = $st->execute();
+        ambiti_utente($conn, $uid, true);
+        return $ok;
+    }
+}
+
+if (!function_exists('revoca_ambito')) {
+    // $tipo null = tutti i perimetri dell'utente nell'area $pagina_id (con $pagina_id 0: quelli FSL)
+    function revoca_ambito($conn, int $uid, ?string $tipo, int $pagina_id = 0): void {
+        if ($tipo !== null) {
+            $st = $conn->prepare("DELETE FROM abilitazioni_ambito WHERE utente_id = ? AND tipo = ? AND pagina_id = ?");
+            $st->bind_param("isi", $uid, $tipo, $pagina_id);
+        } else {
+            $st = $conn->prepare("DELETE FROM abilitazioni_ambito WHERE utente_id = ? AND pagina_id = ?");
+            $st->bind_param("ii", $uid, $pagina_id);
+        }
+        $st->execute();
+        ambiti_utente($conn, $uid, true);
     }
 }
 

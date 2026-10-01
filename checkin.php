@@ -30,28 +30,8 @@ if (!empty($code)) {
         // ==========================================
         // VERIFICA "PARAOCCHI" (RBAC) SULL'EVENTO
         // ==========================================
-        $is_authorized = $is_full_admin;
-        if (!$is_authorized) {
-            // Controlla vecchio campo CSV
-            $allowed_ids = array_filter(explode(',', $p['ev_gestori'] ?? ''));
-            $pg_ids = array_filter(explode(',', $p['pg_gestori'] ?? ''));
-            if ($p['pg_gestore_singolo']) $pg_ids[] = $p['pg_gestore_singolo'];
-            if (in_array((string)$u_id, array_merge($allowed_ids, $pg_ids))) {
-                $is_authorized = true;
-            }
-            // Controlla nuovo campo permessi_gestori_json (sistema abilitazioni)
-            if (!$is_authorized) {
-                $ev_json = json_decode($p['ev_permessi_json'] ?? '{}', true) ?: [];
-                $pg_json = json_decode($p['pg_permessi_json'] ?? '{}', true) ?: [];
-                $uid_str = (string)$u_id;
-                if (
-                    (isset($ev_json[$uid_str]) && in_array('iscritti', $ev_json[$uid_str])) ||
-                    (isset($pg_json[$uid_str]) && in_array('iscritti', $pg_json[$uid_str]))
-                ) {
-                    $is_authorized = true;
-                }
-            }
-        }
+        // Amministratori e chiunque gestisca l'attività (tutta l'area, l'attività, tutti i progetti/eventi dell'area, FSL)
+        $is_authorized = $is_full_admin || utente_gestisce_attivita($conn, (int)$u_id, (int)($p['evento_id'] ?? 0));
 
         if (!$is_authorized) {
             $esito_classe = "alert-danger";

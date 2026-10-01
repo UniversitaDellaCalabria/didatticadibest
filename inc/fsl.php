@@ -376,10 +376,11 @@ if (!function_exists('verifica_convenzioni_fsl')) {
     // Ritorna ['coperte' => n, 'da_stipulare' => n, 'nuove_da_stipulare' => n, 'senza_codice' => n].
     function verifica_convenzioni_fsl($conn): array {
         $out = ['coperte' => 0, 'da_stipulare' => 0, 'nuove_da_stipulare' => 0, 'senza_codice' => 0];
-        $r = @$conn->query("SELECT pr.id, pr.scuola_codice, pr.convenzione, t.data_turno, pd.data_inizio AS pd_inizio, pd.data_fine AS pd_fine
+        // Attività FSL e, in qualsiasi attività, le iscrizioni a cui è stata chiesta la convenzione (es. da Iscrizioni in OpenLab)
+        $r = @$conn->query("SELECT pr.id, pr.scuola_codice, pr.convenzione, t.data_turno, pd.data_inizio AS pd_inizio, pd.data_fine AS pd_fine, IFNULL(pd.convenzione, 0) AS fsl
                             FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id
-                            JOIN progetti_dettagli pd ON pd.evento_id = e.id
-                            WHERE pd.convenzione = 1 AND e.archiviato = 0
+                            LEFT JOIN progetti_dettagli pd ON pd.evento_id = e.id
+                            WHERE (pd.convenzione = 1 OR pr.convenzione IN ('no', 'si')) AND e.archiviato = 0
                               AND IFNULL(pr.stato, 'confermata') IN ('confermata', 'da_approvare', 'in_attesa', 'richiesta_conferma')
                               AND COALESCE(pd.data_fine, t.data_turno, CURDATE()) >= CURDATE()");
         while ($r && $x = $r->fetch_assoc()) {
@@ -388,6 +389,9 @@ if (!function_exists('verifica_convenzioni_fsl')) {
             if (convenzione_valida($conn, $x['scuola_codice'], false, $dal, $al)) {
                 if (($x['convenzione'] ?? '') !== 'ricevuta') segna_convenzione_ricevuta($conn, (int)$x['id']);
                 $out['coperte']++;
+            } elseif ((int)$x['fsl'] !== 1) {
+                // Attività non FSL: si aggiorna solo quando la convenzione arriva, lo stato resta com'è
+                continue;
             } else {
                 if (($x['convenzione'] ?? '') !== 'no') {
                     // Senza promemoria automatici finché il gestore non invia la richiesta (conv_promemoria = 3)

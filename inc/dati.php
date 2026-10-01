@@ -598,7 +598,7 @@ if (!function_exists('get_prenotazione_per_checkin_admin')) {
     function get_prenotazione_per_checkin_admin($conn, string $code): ?array {
         $stmt = $conn->prepare(
             "SELECT pr.id, pr.stato, pr.presente, pr.nome, pr.cognome,
-               e.titolo as evento_titolo,
+               e.id AS evento_id, e.titolo as evento_titolo,
                e.gestori_utenti_ids as ev_gestori,
                e.permessi_gestori_json as ev_permessi_json,
                pe.gestore_utente_id as pg_gestore_singolo,

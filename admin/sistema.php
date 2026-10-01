@@ -96,6 +96,7 @@ if (isset($_POST['save_system_settings'])) {
 ?>
 
 <!-- FRONT-END DELLA PAGINA -->
+<?php schede_sistema('sistema.php'); ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="fw-bold text-dark m-0"><i class="fa fa-envelope text-primary me-2"></i> Sistema Email & Promemoria</h4>
     

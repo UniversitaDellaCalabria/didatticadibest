@@ -31,8 +31,8 @@ $u_email_sql = strtolower($user_info['email'] ?? '');
 // 5. Helper: Protezione Aree Riservate a Gestori e Admin
 if (!function_exists('require_admin_or_gestore')) {
     function require_admin_or_gestore() {
-        global $is_full_admin, $is_gestore;
-        if (!$is_full_admin && !$is_gestore) {
+        global $is_full_admin, $is_gestore, $conn, $u_id;
+        if (!$is_full_admin && !$is_gestore && !utente_ha_abilitazioni($conn, (int)$u_id)) {
             die("<!DOCTYPE html>
                  <html lang='it'><head><title>Accesso Negato</title>
                  <style>body{font-family:sans-serif;background:#f8fafc;color:#1e293b;text-align:center;padding-top:10vh;} a{color:#0056b3;font-weight:bold;text-decoration:none;}</style></head>

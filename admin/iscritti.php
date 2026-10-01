@@ -684,6 +684,7 @@ $col_area_i = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
             <span class="badge p-2" style="background:#f1f5f9;color:#64748b;border-radius:8px;"><i class="fa fa-lock me-1"></i>Sola Lettura</span>
         <?php else: ?>
             <a href="scanner.php?p_id=<?php echo $filtro_p; ?>" class="btn btn-sm fw-bold text-white" style="background:<?php echo $col_area_i; ?>;border-radius:8px;border:none;"><i class="fa fa-qrcode me-1"></i>Scanner</a>
+            <a href="stampa_badge.php?p_id=<?php echo $filtro_p; ?>" class="btn btn-sm fw-bold" style="border-radius:8px;background:#f1f5f9;border:1px solid #e2e8f0;color:#334155;"><i class="fa fa-id-badge me-1" aria-hidden="true"></i>Stampa badge</a>
             <a href="../cron_attestati.php" class="btn btn-sm btn-outline-success fw-bold" style="border-radius:8px;" data-confirm="Vuoi scansionare tutti gli eventi terminati e inviare le email agli studenti presenti?"><i class="fa fa-graduation-cap me-1"></i>Attestati</a>
             <button type="button" class="btn btn-sm fw-bold" style="border-radius:8px;background:#f1f5f9;border:1px solid #e2e8f0;color:#334155;" data-bs-toggle="modal" data-bs-target="#modMailMassiva"><i class="fa fa-paper-plane me-1"></i>Mail Massiva</button>
             <button type="button" class="btn btn-sm fw-bold text-white" style="background:<?php echo $col_area_i; ?>;border-radius:8px;border:none;" data-bs-toggle="modal" data-bs-target="#modPrenotazioneManuale"><i class="fa fa-user-plus me-1"></i>+ Manuale</button>

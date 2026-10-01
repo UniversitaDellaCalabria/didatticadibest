@@ -7,13 +7,16 @@
 // Tabelle esportabili in CSV.
 require_once 'admin_header.php';
 
-if (!$is_full_admin) nega_accesso();
+// Amministratori e abilitati alla FSL (tutto) o alle sole convenzioni
+if (!$puo_fsl_convenzioni) nega_accesso();
 
 function admin_redirect($url) { echo "<script>window.location.replace(" . json_encode($url) . ");</script>"; exit; }
 
 $SCHEDE = ['riepilogo' => ['Riepilogo', 'fa-chart-column'], 'convenzioni' => ['Convenzioni', 'fa-file-signature'],
            'verifica' => ['Verifica iscrizioni', 'fa-list-check'], 'valutazioni' => ['Valutazioni', 'fa-star']];
-$tab = isset($SCHEDE[$_GET['tab'] ?? '']) ? $_GET['tab'] : 'riepilogo';
+// Abilitati alle sole convenzioni: solo quella scheda
+if (!$puo_fsl) $SCHEDE = array_intersect_key($SCHEDE, ['convenzioni' => 1]);
+$tab = isset($SCHEDE[$_GET['tab'] ?? '']) ? $_GET['tab'] : array_key_first($SCHEDE);
 
 // ── Azioni: registro delle convenzioni e verifica delle iscrizioni ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -44,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($esito_cv === null) {
             foreach ($file_cv as $f_nuovo) @unlink(dirname(__DIR__) . '/' . $f_nuovo);
             flash_set("Convenzione non salvata: scegli la scuola dall'elenco dell'anagrafe e controlla le date (\"valida fino al\" non può precedere \"valida dal\").", 'danger');
-            admin_redirect("fsl.php?p_id=$filtro_p&tab=convenzioni" . ($id_cv > 0 ? "&conv_mod=$id_cv" : '') . "#convForm");
+            admin_redirect("fsl.php?p_id=$filtro_p&tab=convenzioni" . ($id_cv > 0 ? "&conv_mod=$id_cv" : '') . "&r=" . time() . "#convForm");
         }
         [$id_cv, $n_cv] = $esito_cv;
         if ($vecchia) foreach ($file_cv as $campo => $f_nuovo) if (!empty($vecchia[$campo])) @unlink(dirname(__DIR__) . '/' . $vecchia[$campo]);
@@ -64,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash_set("Convenzione eliminata dal registro con i suoi file. Premi \"Verifica ora\" per aggiornare le iscrizioni della scuola.", 'warning');
         }
     }
-    if (isset($_POST['conv_verifica'])) {
+    if (isset($_POST['conv_verifica']) && $puo_fsl) {
         $v = verifica_convenzioni_fsl($conn);
         registra_log_audit($conn, "Verifica convenzioni FSL", $v);
         flash_set("Verifica completata: {$v['coperte']} iscrizioni coperte da una convenzione, {$v['da_stipulare']} senza convenzione valida per il periodo"
@@ -168,7 +171,13 @@ $r_ds = $conn->query("SELECT pr.id, pr.scuola_codice, pr.nome, pr.cognome, pr.em
                         AND COALESCE(pd.data_fine, t.data_turno, CURDATE()) >= CURDATE()
                         AND (pr.convenzione = 'no' OR (pd.convenzione = 1 AND pr.scuola_codice IS NULL AND IFNULL(pr.convenzione, '') <> 'ricevuta'))
                       ORDER BY COALESCE(pd.data_inizio, t.data_turno), pr.data_prenotazione");
-while ($r_ds && $x = $r_ds->fetch_assoc()) $iscr_da_stipulare[] = $x;
+// Il registro può essere cambiato dopo l'ultima verifica: chi ora è coperto non va in elenco (si aggiorna con "Verifica ora" o dal cron)
+$iscr_ora_coperte = 0;
+while ($r_ds && $x = $r_ds->fetch_assoc()) {
+    [$x_dal, $x_al] = periodo_prenotazione($x);
+    if (!empty($x['scuola_codice']) && convenzione_valida($conn, $x['scuola_codice'], false, $x_dal, $x_al)) { $iscr_ora_coperte++; continue; }
+    $iscr_da_stipulare[] = $x;
+}
 // Modifica di una convenzione, oppure nuova con scuola e periodo proposti (pulsante "Registra" della verifica)
 $conv_mod = null;
 if (!empty($_GET['conv_mod'])) $conv_mod = $conn->query("SELECT * FROM convenzioni_scuole WHERE id = " . (int)$_GET['conv_mod'])->fetch_assoc() ?: null;
@@ -380,6 +389,9 @@ $oggi_cv = date('Y-m-d'); $tra60_cv = date('Y-m-d', strtotime('+60 days'));
             </form>
         </div>
         <p class="small text-secondary mb-2">Controlla tutte le iscrizioni (anche confermate) alle attività FSL non ancora concluse, per OpenLab, Formazione Scuola Lavoro e ogni altra area: dove la convenzione copre il periodo l'iscrizione risulta <strong>Convenzione ricevuta</strong>; dove non lo copre diventa <strong>Convenzione da stipulare</strong>, senza cambiare lo stato della prenotazione e senza email automatiche. La richiesta alla scuola la invii da Iscrizioni ("Chiedi la convenzione per email"); da lì partono anche i promemoria. La verifica si ripete ogni giorno da sola.</p>
+        <?php if ($iscr_ora_coperte): ?>
+            <div class="alert alert-info small py-2"><i class="fa fa-circle-info me-1" aria-hidden="true"></i><?php echo $iscr_ora_coperte === 1 ? "Un'iscrizione segnata «da stipulare» ora è coperta" : "$iscr_ora_coperte iscrizioni segnate «da stipulare» ora sono coperte"; ?> da una convenzione del registro: premi <strong>Verifica ora</strong> per segnarle come ricevute (chi era in attesa viene confermato e avvisato per email).</div>
+        <?php endif; ?>
         <?php if ($iscr_da_stipulare): ?>
             <div class="table-responsive">
                 <table class="table table-sm align-middle small mb-0">

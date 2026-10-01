@@ -310,6 +310,9 @@ if ($mesi_ut > 0) {
             foreach (ids_gestori_da_campi($g['singolo'], $g['gestori_utenti_ids'], $g['permessi_gestori_json']) as $id_g) $ids_gestori[$id_g] = true;
         }
     }
+    // … e chi ha un perimetro (tutti i progetti / eventi di un'area, Formazione Scuola Lavoro)
+    $r_g = @$conn->query("SELECT DISTINCT utente_id FROM abilitazioni_ambito");
+    while ($r_g && $g = $r_g->fetch_assoc()) $ids_gestori[(int)$g['utente_id']] = true;
     $esclusi_gestori = $ids_gestori ? ' AND id NOT IN (' . implode(',', array_map('intval', array_keys($ids_gestori))) . ')' : '';
     $cond_ut = "ruolo_id NOT IN (1, 2) AND FIND_IN_SET('1', IFNULL(ruoli_secondari, '')) = 0 AND FIND_IN_SET('2', IFNULL(ruoli_secondari, '')) = 0
                 AND COALESCE(ultimo_accesso, '1970-01-01') < NOW() - INTERVAL $mesi_ut MONTH" . $esclusi_gestori;
