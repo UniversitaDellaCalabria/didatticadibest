@@ -369,7 +369,7 @@ if (!function_exists('genera_docx_convenzione')) {
     // $attivita = una riga per attività (TITOLO, DESCRIZIONE, STUDENTI, PERIODO, DURATA, TUTOR_DIBEST, TUTOR_SCUOLA): il blocco
     // dell'Allegato A ("Titolo corso" … riga tratteggiata) si ripete per ogni attività. $logo = immagine della scuola in testa.
     // I campi compilati perdono l'evidenziazione gialla; quelli vuoti restano evidenziati con il testo originale.
-    function genera_docx_convenzione(string $doc, array $scuola, array $attivita, ?string $logo = null): ?string {
+    function genera_docx_convenzione(string $doc, array $scuola, array $attivita, ?string $logo = null, string $protocollo = ''): ?string {
         $modello = RADICE_SITO . '/modelli_documenti/' . ($doc === 'allegato' ? 'allegato_a' : 'convenzione') . '_precompilabile.docx';
         if (!is_file($modello) || !class_exists('ZipArchive')) return null;
         $tmp = tempnam(sys_get_temp_dir(), 'conv') . '.docx';
@@ -422,6 +422,8 @@ if (!function_exists('genera_docx_convenzione')) {
             }
         }
         $xml = $sostituisci($xml, $scuola + array_fill_keys(array_keys(CONV_SEGNAPOSTI), ''));
+        // Protocollo (assegnato dal Dipartimento): in alto a destra, prima del testo
+        if (trim($protocollo) !== '') $xml = preg_replace('#<w:body>#', '<w:body><w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t xml:space="preserve">' . htmlspecialchars('Prot. n. ' . trim($protocollo), ENT_XML1, 'UTF-8') . '</w:t></w:r></w:p>', $xml, 1);
         // Firma compilata: "Il Dirigente Scolastico dell'Istituto" non resta evidenziato
         if (trim((string)($scuola['ISTITUTO_FIRMA'] ?? '')) !== '')
             $xml = preg_replace_callback('#<w:r\b(?:(?!</w:r>).)*?</w:r>#s', fn($m) => preg_match('#<w:t(?: [^>]*)?>[^<]*(Il Dirigente Scolastico|dell.Istituto)[^<]*</w:t>#u', $m[0]) ? preg_replace('#<w:highlight [^>]*/>#', '', $m[0]) : $m[0], $xml);

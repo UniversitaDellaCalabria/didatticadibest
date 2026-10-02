@@ -372,16 +372,23 @@ prova(count($fogli) === 3 && $fogli[0] === 'Tutte le pratiche' && (new DOMDocume
 
 sezione("Iter delle pratiche");
 $q("INSERT INTO personale_ateneo (id, cognome, nome, email, gruppo, attivo) VALUES ('man.prova', 'Manager', 'Marta', 'marta.man@unical.it', 'pta', 1), ('cdl.prova', 'Referente', 'Carlo', 'carlo.cdl@unical.it', 'docenti', 1), ('car.prova', 'Carriere', 'Carla', 'carla.car@unical.it', 'pta', 1), ('int.prova', 'Tutor', 'Irene', 'irene.int@unical.it', 'docenti', 1)");
-aggiungi_operatore_ufficio($conn, 'man.prova', '', ['pratiche'], 'manager');
-aggiungi_operatore_ufficio($conn, 'cdl.prova', '', ['pratiche'], 'referente_cdl', ['Corso di laurea in Scienze naturali']);
-aggiungi_operatore_ufficio($conn, 'car.prova', '', ['pratiche'], 'carriere');
-aggiungi_operatore_ufficio($conn, 'int.prova', '', ['pratiche'], 'internazionalizzazione');
-$op = []; foreach (operatori_ufficio($conn) as $o) $op[$o['profilo']] = (int)$o['id'];
-prova(isset($op['manager'], $op['referente_cdl'], $op['carriere'], $op['internazionalizzazione']), "operatori con i profili dell'iter");
+$uff = []; foreach (uffici_didattica($conn, true) as $id_u => $u) $uff[$u['chiave']] = $id_u;
+prova(count($uff) === 5 && (int)uffici_didattica($conn)[$uff['manager']]['smista'] === 1 && (int)uffici_didattica($conn)[$uff['referente_cdl']]['segue_corsi'] === 1, "uffici di partenza dell'Ufficio didattico");
+aggiungi_operatore_ufficio($conn, 'man.prova', '', ['pratiche'], $uff['manager']);
+aggiungi_operatore_ufficio($conn, 'cdl.prova', '', ['pratiche'], $uff['referente_cdl'], ['Corso di laurea in Scienze naturali']);
+aggiungi_operatore_ufficio($conn, 'car.prova', '', ['pratiche'], $uff['carriere']);
+aggiungi_operatore_ufficio($conn, 'int.prova', '', ['pratiche'], $uff['internazionalizzazione']);
+$op = []; foreach (operatori_ufficio($conn) as $o) if ($o['ufficio_id']) $op[uffici_didattica($conn)[(int)$o['ufficio_id']]['chiave']] = (int)$o['id'];
+prova(isset($op['manager'], $op['referente_cdl'], $op['carriere'], $op['internazionalizzazione']), "personale assegnato agli uffici");
+$q("INSERT INTO didattica_uffici (nome, smista, segue_corsi, ordine) VALUES ('Tirocini', 0, 0, 9)");
+$id_tir = (int)$conn->insert_id;
+prova(ufficio_didattica_id($conn, $id_tir) === null && ufficio_didattica_id($conn, 'carriere') === $uff['carriere'], "ufficio nuovo letto dopo l'aggiornamento; chiavi dei modelli riconosciute");
+uffici_didattica($conn, true);
+prova(ufficio_didattica_id($conn, $id_tir) === $id_tir, "ufficio creato dal pannello disponibile per l'iter");
 $q("INSERT INTO didattica_moduli (id, titolo, categoria, tipo, campi_json, iter_json, attivo) VALUES (503, 'Attività all\'estero', 'Mobilità', 'online', '" . $conn->real_escape_string(json_encode([['etichetta' => 'Corso di studio', 'tipo' => 'corso_studio']])) . "', '[\"internazionalizzazione\",\"referente_cdl\",\"carriere\"]', 1)");
 $m503 = modulo_didattica($conn, 503);
-prova(passi_pratica($m503) === [0 => 'Ricevuta e da smistare', 1 => PROFILI_UFFICIO['internazionalizzazione'], 2 => PROFILI_UFFICIO['referente_cdl'], 3 => PROFILI_UFFICIO['carriere']], "passi dell'iter dal modulo");
-prova(iter_modulo(['iter_json' => '["manager","inventato"]']) === ['operatore'], "iter senza passi validi: un solo passo generico");
+prova(passi_pratica($m503) === [0 => 'Ricevuta e da smistare', 1 => 'Internazionalizzazione', 2 => 'Referenti dei corsi di studio', 3 => 'Carriere studenti'], "passi dell'iter dal modulo");
+prova(iter_modulo(['iter_json' => '["manager","inventato"]']) === [0] && iter_modulo(['iter_json' => json_encode([$id_tir, 'carriere'])]) === [$id_tir, $uff['carriere']], "iter: uffici per id o chiave; chi smista e uffici inesistenti esclusi");
 $EMAIL = [];
 $pi = crea_pratica($conn, $m503, $u73, [['etichetta' => 'Corso di studio', 'tipo' => 'corso_studio', 'valore' => 'Corso di laurea in Scienze naturali', 'file' => null, 'nome_file' => null]]);
 prova(in_array('marta.man@unical.it', array_column($EMAIL, 'a'), true) && !in_array('carlo.cdl@unical.it', array_column($EMAIL, 'a'), true), "nuova pratica: avviso al manager che smista");
@@ -435,6 +442,39 @@ prova(substr_count($xa, 'Titolo corso:') === 2 && str_contains($xa, 'Laboratorio
 $istr = html_istruzioni_convenzione([], true, 'FS-PROVA01');
 prova(str_contains($istr, 'convenzione_online.php?code=FS-PROVA01') && str_contains($istr, 'firma digitalmente'), "le istruzioni portano al modulo guidato");
 prova(str_contains(html_istruzioni_convenzione([]), 'Al termine della prenotazione'), "nel modulo di prenotazione si annuncia la compilazione online");
+
+sezione("Scadenze, promemoria, protocollo e statistiche");
+$ieri = date('Y-m-d', strtotime('-1 day')); $domani = date('Y-m-d', strtotime('+1 day'));
+prova(periodo_modulo([])[0] && periodo_modulo(['aperto_dal' => $ieri, 'aperto_al' => $domani])[0] && !periodo_modulo(['aperto_al' => $ieri])[0] && !periodo_modulo(['aperto_dal' => $domani])[0], "modulo compilabile solo nel periodo");
+prova(str_starts_with(periodo_modulo(['aperto_dal' => $domani])[1], 'Si compila dal '), "testo del periodo per chi non può ancora compilare");
+// Pratica ferma: assegnata, senza movimenti da 10 giorni (promemoria del modulo a 7)
+$conn->query("UPDATE didattica_moduli SET giorni_promemoria = 7 WHERE id = 503");
+$conn->query("UPDATE pratiche SET stato = 'in_lavorazione', aggiornata_il = NOW() - INTERVAL 10 DAY, promemoria_il = NULL WHERE id = $pi");
+$EMAIL = [];
+prova(promemoria_pratiche_ferme($conn) >= 1 && in_array('carla.car@unical.it', array_column($EMAIL, 'a'), true), "promemoria a chi ha in carico la pratica ferma");
+$EMAIL = [];
+promemoria_pratiche_ferme($conn);
+prova(!in_array('carla.car@unical.it', array_column($EMAIL, 'a'), true), "un solo promemoria per periodo di attesa");
+$conn->query("UPDATE pratiche SET protocollo = '1234/2026', protocollo_data = '2026-10-01' WHERE id = $pi");
+$ppi = pratiche_per_esportazione($conn, [$pi])[0];
+prova(testo_segnaposti_pratica('Prot. {PROTOCOLLO}', $ppi) === 'Prot. 1234/2026 del 01/10/2026', "protocollo nel testo del verbale");
+$xls_p = genera_excel_pratiche($conn, [$ppi]); $s_p = '';
+if ($xls_p && ($z = new ZipArchive())->open($xls_p) === true) { $s_p = (string)$z->getFromName('xl/worksheets/sheet1.xml'); $z->close(); } @unlink($xls_p);
+prova(str_contains($s_p, '>Protocollo<') && str_contains($s_p, '1234/2026 del 01/10/2026'), "protocollo nell'Excel");
+$stp = statistiche_pratiche($conn, date('Y-m-d', strtotime('-1 year')), date('Y-m-d'));
+prova($stp['totale'] >= 1 && isset($stp['per_modulo']["Attività all'estero"]) && isset($stp['per_corso']['Corso di laurea in Scienze naturali']), "statistiche per modulo e per corso");
+prova(isset($stp['tempi_passi']['Smistamento'], $stp['tempi_passi']['Internazionalizzazione']), "tempi medi per passo dell'iter", json_encode(array_keys($stp['tempi_passi'])));
+// Statistiche delle risorse: area 950 con lo sportello dell'ufficio, orari lun-ven 9-13, una prenotazione confermata e una annullata
+$q("INSERT INTO risorse_orari (risorsa_id, giorno, dalle, alle) VALUES ($rid_u, 1, '09:00:00', '13:00:00'), ($rid_u, 2, '09:00:00', '13:00:00')");
+$lun_s = date('Y-m-d', strtotime('monday this week'));
+$q("INSERT INTO prenotazioni_risorse (risorsa_id, inizio, fine, stato, codice) VALUES ($rid_u, '$lun_s 09:00:00', '$lun_s 11:00:00', 'confermata', 'ST-1'), ($rid_u, '$lun_s 11:00:00', '$lun_s 12:00:00', 'annullata', 'ST-2')");
+$sr = statistiche_risorse($conn, 950, $lun_s, date('Y-m-d', strtotime($lun_s . ' +6 days')));
+$sx = $sr['risorse'][$rid_u] ?? [];
+prova(($sx['prenotazioni'] ?? 0) === 2 && ($sx['annullate'] ?? 0) === 1 && ($sx['ore'] ?? 0) == 2 && ($sx['ore_aperte'] ?? 0) == 8 && ($sx['utilizzo'] ?? 0) === 25, "statistiche della risorsa: ore, ore aperte, utilizzo, annullate", json_encode($sx));
+prova(($sr['fasce'][1][9] ?? 0) === 1 && ($sr['fasce'][1][10] ?? 0) === 1 && empty($sr['fasce'][1][11]), "fasce più richieste (le annullate non contano)");
+$fdp = genera_docx_convenzione('allegato', $scuola_cv, $att_cv, null, '456/2026 del 02/10/2026'); $xp = '';
+if ($fdp && ($z = new ZipArchive())->open($fdp) === true) { $xp = (string)$z->getFromName('word/document.xml'); $z->close(); } @unlink($fdp);
+prova(str_contains($xp, 'Prot. n. 456/2026 del 02/10/2026'), "protocollo nei documenti della convenzione");
 
 // ---------------------------------------------------------------------------
 // Prove delle pagine sull'ambiente locale (se acceso)

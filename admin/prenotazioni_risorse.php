@@ -77,7 +77,7 @@ if (isset($_GET['csv'])) {
 
 $risorse = $conn->query("SELECT id, nome, attiva FROM risorse WHERE pagina_id = $pid ORDER BY ordine, nome")->fetch_all(MYSQLI_ASSOC);
 // Vista: calendario (griglia risorse × ore, mese) oppure elenco con filtri
-$modo = ($_GET['modo'] ?? 'calendario') === 'elenco' ? 'elenco' : 'calendario';
+$modo = in_array($_GET['modo'] ?? '', ['elenco', 'statistiche'], true) ? $_GET['modo'] : 'calendario';
 $kpi = $conn->query("SELECT
         SUM(pr.stato = 'confermata' AND DATE(pr.inizio) = CURDATE()) AS oggi,
         SUM(pr.stato = 'confermata' AND pr.inizio >= NOW() AND pr.inizio < NOW() + INTERVAL 7 DAY) AS settimana,
@@ -106,6 +106,7 @@ $url_pub = '../' . $page_cfg['slug'] . '.php';
 <ul class="nav nav-pills gap-1 mb-3" style="--bs-nav-pills-link-active-bg:#1e293b;">
     <li class="nav-item"><a class="nav-link fw-bold<?php echo $modo === 'calendario' ? ' active' : ' bg-light text-dark'; ?>" href="prenotazioni_risorse.php?p_id=<?php echo $pid; ?>&amp;modo=calendario"<?php echo $modo === 'calendario' ? ' aria-current="page"' : ''; ?>><i class="fa fa-calendar-days me-1" aria-hidden="true"></i>Calendario</a></li>
     <li class="nav-item"><a class="nav-link fw-bold<?php echo $modo === 'elenco' ? ' active' : ' bg-light text-dark'; ?>" href="prenotazioni_risorse.php?p_id=<?php echo $pid; ?>&amp;modo=elenco"<?php echo $modo === 'elenco' ? ' aria-current="page"' : ''; ?>><i class="fa fa-list me-1" aria-hidden="true"></i>Elenco, approvazioni e CSV</a></li>
+    <li class="nav-item"><a class="nav-link fw-bold<?php echo $modo === 'statistiche' ? ' active' : ' bg-light text-dark'; ?>" href="prenotazioni_risorse.php?p_id=<?php echo $pid; ?>&amp;modo=statistiche"<?php echo $modo === 'statistiche' ? ' aria-current="page"' : ''; ?>><i class="fa fa-chart-column me-1" aria-hidden="true"></i>Statistiche</a></li>
 </ul>
 
 <?php if ($modo === 'calendario'):
@@ -122,6 +123,58 @@ $url_pub = '../' . $page_cfg['slug'] . '.php';
         'filtri' => ['tipo' => $f_tipo, 'capienza' => $f_cap], 'campi_nascosti' => ['p_id' => $pid, 'modo' => 'calendario']]);
     echo '<p class="small text-secondary mt-2 mb-0"><i class="fa fa-circle-info me-1" aria-hidden="true"></i>Clicca una riga per prenotare la risorsa dalla pagina pubblica; per approvare o annullare usa la scheda Elenco.</p></div></div>';
     require_once 'admin_footer.php'; exit;
+endif; ?>
+
+<?php if ($modo === 'statistiche'):
+    // Statistiche dell'area: ore prenotate e utilizzo per risorsa, fasce più richieste, annullamenti
+    $s_dal = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['dal'] ?? '')) ? $_GET['dal'] : date('Y-m-d', strtotime('-3 months'));
+    $s_al = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['al'] ?? '')) ? $_GET['al'] : date('Y-m-d', strtotime('+1 month'));
+    $sr = statistiche_risorse($conn, $pid, $s_dal, $s_al);
+    $max_f = max(1, ...array_values(array_map(fn($r) => max($r ?: [0]), $sr['fasce'] ?: [[0]])));
+    $ore_f = range(7, 20);
+?>
+    <form method="GET" class="d-flex flex-wrap gap-2 align-items-end mb-3">
+        <input type="hidden" name="p_id" value="<?php echo $pid; ?>"><input type="hidden" name="modo" value="statistiche">
+        <div><label class="form-label small fw-bold mb-0" for="srDal">Dal</label><input type="date" class="form-control form-control-sm" id="srDal" name="dal" value="<?php echo $h($s_dal); ?>"></div>
+        <div><label class="form-label small fw-bold mb-0" for="srAl">Al</label><input type="date" class="form-control form-control-sm" id="srAl" name="al" value="<?php echo $h($s_al); ?>"></div>
+        <button class="btn btn-sm btn-primary fw-bold">Aggiorna</button>
+    </form>
+    <div class="row g-3 mb-3">
+        <?php $tt = $sr['totali'] + ['prenotazioni' => 0, 'ore' => 0, 'annullate' => 0, 'rifiutate' => 0];
+        foreach ([['Prenotazioni', $tt['prenotazioni'], '#0056B3', 'fa-calendar-check'], ['Ore prenotate', $tt['ore'], '#047857', 'fa-clock'],
+                  ['Annullate', $tt['annullate'] . ($tt['prenotazioni'] ? ' (' . round($tt['annullate'] * 100 / $tt['prenotazioni']) . '%)' : ''), '#b91c1c', 'fa-ban'],
+                  ['Rifiutate', $tt['rifiutate'], '#b45309', 'fa-circle-xmark']] as [$t, $v, $c, $i]): ?>
+            <div class="col-6 col-lg-3"><div class="card border-0 shadow-sm h-100"><div class="card-body py-2"><div class="small text-secondary"><i class="fa <?php echo $i; ?> me-1" style="color:<?php echo $c; ?>;" aria-hidden="true"></i><?php echo $t; ?></div><div class="fs-3 fw-bold" style="color:<?php echo $c; ?>;"><?php echo $h($v); ?></div></div></div></div>
+        <?php endforeach; ?>
+    </div>
+    <div class="card border-0 shadow-sm mb-3"><div class="card-body">
+        <h6 class="fw-bold">Per risorsa</h6>
+        <p class="small text-secondary mb-2">Ore prenotate (prenotazioni confermate) sulle ore di apertura degli orari settimanali del periodo (senza togliere le chiusure).</p>
+        <div class="table-responsive"><table class="table table-sm align-middle small mb-0">
+            <thead class="table-light"><tr><th>Risorsa</th><th class="text-center">Prenotazioni</th><th class="text-center">Confermate</th><th class="text-center">Annullate</th><th class="text-center">Rifiutate</th><th class="text-center">Ore prenotate</th><th class="text-center">Ore aperte</th><th style="width:22%;">Utilizzo</th></tr></thead><tbody>
+            <?php foreach ($sr['risorse'] as $x): ?>
+                <tr><td class="fw-bold"><?php echo $h($x['nome']); ?><div class="text-secondary fw-normal"><?php echo $h(TIPI_RISORSA[$x['tipo']][0] ?? ''); ?></div></td>
+                    <td class="text-center"><?php echo $x['prenotazioni']; ?></td><td class="text-center"><?php echo $x['confermate']; ?></td><td class="text-center"><?php echo $x['annullate']; ?></td><td class="text-center"><?php echo $x['rifiutate']; ?></td>
+                    <td class="text-center"><?php echo $x['ore']; ?></td><td class="text-center"><?php echo $x['ore_aperte'] ?: '—'; ?></td>
+                    <td><?php if ($x['utilizzo'] !== null): ?><div class="d-flex align-items-center gap-2"><div class="flex-grow-1 bg-light rounded" style="height:8px;"><div class="rounded" style="height:8px;width:<?php echo min(100, $x['utilizzo']); ?>%;background:#047857;"></div></div><span class="small text-secondary"><?php echo $x['utilizzo']; ?>%</span></div><?php else: ?><span class="text-secondary">orari non impostati</span><?php endif; ?></td></tr>
+            <?php endforeach; ?>
+            <?php if (!$sr['risorse']): ?><tr><td colspan="8" class="text-center text-muted py-3">Nessuna risorsa nell'area.</td></tr><?php endif; ?>
+        </tbody></table></div>
+    </div></div>
+    <div class="card border-0 shadow-sm mb-3"><div class="card-body">
+        <h6 class="fw-bold">Fasce più richieste</h6>
+        <p class="small text-secondary mb-2">Ore prenotate per giorno della settimana e fascia oraria (più scuro = più richiesto).</p>
+        <div class="table-responsive"><table class="table table-sm table-bordered text-center small mb-0" style="table-layout:fixed;">
+            <thead class="table-light"><tr><th style="width:90px;"></th><?php foreach ($ore_f as $o): ?><th><?php echo $o; ?></th><?php endforeach; ?></tr></thead><tbody>
+            <?php foreach (GIORNI_SETTIMANA as $g => $nome_g): ?>
+                <tr><th class="text-start"><?php echo $h($nome_g); ?></th>
+                    <?php foreach ($ore_f as $o): $v = $sr['fasce'][$g][$o] ?? 0; $alfa = $v ? 0.15 + 0.85 * $v / $max_f : 0; ?>
+                        <td style="background:rgba(4,120,87,<?php echo round($alfa, 2); ?>);color:<?php echo $alfa > .55 ? '#fff' : '#334155'; ?>;" title="<?php echo $h($nome_g . ' ore ' . $o . ': ' . $v); ?>"><?php echo $v ?: ''; ?></td>
+                    <?php endforeach; ?></tr>
+            <?php endforeach; ?>
+        </tbody></table></div>
+    </div></div>
+<?php require_once 'admin_footer.php'; exit;
 endif; ?>
 
 <div class="row g-3 mb-3">

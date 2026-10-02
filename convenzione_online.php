@@ -86,7 +86,8 @@ if (isset($_GET['scarica']) && $dati) {
     $doc = $_GET['scarica'] === 'allegato' ? 'allegato' : 'convenzione';
     [$scuola, $att] = $doc_dati();
     $logo = $cc['logo'] && is_file(RADICE_SITO . '/' . $cc['logo']) ? RADICE_SITO . '/' . $cc['logo'] : null;
-    $file = genera_docx_convenzione($doc, $scuola, $att, $logo);
+    $prot_cc = trim((string)($cc['protocollo'] ?? '') . (!empty($cc['protocollo_data']) ? ' del ' . date('d/m/Y', strtotime($cc['protocollo_data'])) : ''));
+    $file = genera_docx_convenzione($doc, $scuola, $att, $logo, (string)($cc['protocollo'] ?? '') !== '' ? $prot_cc : '');
     if ($file) {
         $conn->query("UPDATE convenzioni_compilate SET scaricata_il = NOW() WHERE id = " . (int)$cc['id']);
         $nome = ($doc === 'allegato' ? 'Allegato_A_FSL_' : 'Convenzione_FSL_') . preg_replace('/[^A-Za-z0-9]+/', '_', (string)($s['codice'] ?: $s['denominazione'])) . '.docx';

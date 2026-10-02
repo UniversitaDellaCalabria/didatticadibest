@@ -21,6 +21,16 @@ $tab = isset($SCHEDE[$_GET['tab'] ?? '']) ? $_GET['tab'] : array_key_first($SCHE
 // ── Azioni: registro delle convenzioni e verifica delle iscrizioni ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify($_POST['csrf_token'] ?? '');
+    // Protocollo di una convenzione compilata online dalla scuola: compare nei documenti Word generati
+    if (isset($_POST['conv_online_prot'])) {
+        $id_co = (int)$_POST['conv_online_prot'];
+        $pr_co = mb_substr(trim((string)($_POST['protocollo'] ?? '')), 0, 100);
+        $pd_co = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['protocollo_data'] ?? '')) ? $_POST['protocollo_data'] : null;
+        $st_co = $conn->prepare("UPDATE convenzioni_compilate SET protocollo = ?, protocollo_data = ? WHERE id = ?");
+        $st_co->bind_param("ssi", $pr_co, $pd_co, $id_co); $st_co->execute();
+        flash_set("Protocollo salvato: compare nei documenti della convenzione.");
+        admin_redirect("fsl.php?p_id=$filtro_p&tab=convenzioni&r=" . time());
+    }
     // Registro delle convenzioni: registrazione o modifica (con i file firmati e i docenti dell'Allegato A)
     if (isset($_POST['conv_salva'])) {
         $id_cv = (int)($_POST['conv_id'] ?? 0);
@@ -303,12 +313,13 @@ $oggi_cv = date('Y-m-d'); $tra60_cv = date('Y-m-d', strtotime('+60 days'));
     <details class="border rounded p-2 mb-3" style="background:#fffbeb;"<?php echo count($cv_online) <= 5 ? ' open' : ''; ?>>
         <summary class="fw-bold small"><i class="fa fa-wand-magic-sparkles me-1" aria-hidden="true"></i>Compilate online dalle scuole (<?php echo count($cv_online); ?>): in attesa della PEC con i documenti firmati</summary>
         <div class="table-responsive mt-2"><table class="table table-sm small align-middle mb-0">
-            <thead><tr><th>Scuola</th><th>Dirigente</th><th>Attività nell'Allegato A</th><th>Compilata</th><th></th></tr></thead><tbody>
+            <thead><tr><th>Scuola</th><th>Dirigente</th><th>Attività nell'Allegato A</th><th>Compilata</th><th>Protocollo</th><th></th></tr></thead><tbody>
             <?php foreach ($cv_online as $co): $dco = json_decode((string)$co['dati_json'], true) ?: []; $sco = $dco['scuola'] ?? []; $reg = convenzione_valida($conn, $co['scuola_codice']); ?>
                 <tr><td><strong><?php echo $h($sco['denominazione'] ?? ''); ?></strong><div class="text-secondary"><?php echo $h($co['scuola_codice'] ?: 'scuola non in anagrafe'); ?><?php echo !empty($sco['pec']) ? ' · ' . $h($sco['pec']) : ''; ?></div></td>
                     <td><?php echo $h($sco['dirigente'] ?? ''); ?></td>
                     <td><?php echo count($dco['attivita'] ?? []); ?><?php $np = count(array_filter($dco['attivita'] ?? [], fn($a) => empty($a['pr']))); echo $np ? " <span class='badge bg-warning text-dark'>$np da prenotare</span>" : ''; ?></td>
                     <td class="text-nowrap"><?php echo date('d/m/Y', strtotime($co['aggiornata_il'])); ?><?php echo $reg ? ' <span class="badge bg-success">registrata</span>' : ''; ?></td>
+                    <td><form method="POST" class="d-flex gap-1"><?php csrf_field(); ?><input class="form-control form-control-sm" style="width:110px;" name="protocollo" value="<?php echo $h($co['protocollo'] ?? ''); ?>" placeholder="n." aria-label="Numero di protocollo"><input type="date" class="form-control form-control-sm" style="width:130px;" name="protocollo_data" value="<?php echo $h($co['protocollo_data'] ?? ''); ?>" aria-label="Data del protocollo"><button class="btn btn-sm btn-outline-secondary py-0" name="conv_online_prot" value="<?php echo (int)$co['id']; ?>" aria-label="Salva il protocollo"><i class="fa fa-check" aria-hidden="true"></i></button></form></td>
                     <td class="text-nowrap"><a class="btn btn-sm btn-outline-primary py-0" href="../convenzione_online.php?t=<?php echo $h($co['token']); ?>&amp;scarica=convenzione"><i class="fa fa-file-word me-1" aria-hidden="true"></i>Word</a>
                         <?php if (!$reg && $co['scuola_codice']): ?><a class="btn btn-sm btn-outline-success py-0" href="fsl.php?p_id=<?php echo (int)$filtro_p; ?>&amp;tab=convenzioni&amp;conv_nuova=<?php echo $h($co['scuola_codice']); ?>#convForm">Registra</a><?php endif; ?></td></tr>
             <?php endforeach; ?>

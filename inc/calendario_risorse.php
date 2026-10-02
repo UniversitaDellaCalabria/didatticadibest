@@ -277,3 +277,43 @@ document.addEventListener("click", function (e) {
 </script>';
     }
 }
+
+if (!function_exists('statistiche_risorse')) {
+    // Statistiche delle prenotazioni dell'area $pid tra $dal e $al: per risorsa (prenotazioni, ore prenotate, ore aperte
+    // secondo gli orari settimanali, utilizzo, annullate e rifiutate) e fasce più richieste (giorno della settimana × ora).
+    function statistiche_risorse($conn, int $pid, string $dal, string $al): array {
+        $risorse = $conn->query("SELECT id, nome, tipo FROM risorse WHERE pagina_id = $pid ORDER BY ordine, nome")->fetch_all(MYSQLI_ASSOC);
+        $per = []; $fasce = [];
+        foreach ($risorse as $r) $per[(int)$r['id']] = ['nome' => $r['nome'], 'tipo' => $r['tipo'], 'prenotazioni' => 0, 'confermate' => 0, 'annullate' => 0, 'rifiutate' => 0, 'ore' => 0.0, 'ore_aperte' => 0.0];
+        if (!$per) return ['risorse' => [], 'fasce' => [], 'totali' => []];
+        // Ore aperte: orari settimanali di ogni giorno del periodo (al massimo un anno)
+        $orari = [];
+        $r = $conn->query("SELECT risorsa_id, giorno, TIME_TO_SEC(TIMEDIFF(alle, dalle)) / 3600 AS ore FROM risorse_orari WHERE risorsa_id IN (" . implode(',', array_keys($per)) . ")");
+        while ($r && $x = $r->fetch_assoc()) $orari[(int)$x['risorsa_id']][(int)$x['giorno']] = ($orari[(int)$x['risorsa_id']][(int)$x['giorno']] ?? 0) + (float)$x['ore'];
+        $giorni = [];
+        for ($t = strtotime($dal), $fine = min(strtotime($al), strtotime($dal . ' +366 days')); $t <= $fine; $t += 86400) $giorni[] = (int)date('N', $t);
+        foreach ($per as $id => &$p) foreach ($giorni as $g) $p['ore_aperte'] += $orari[$id][$g] ?? 0;
+        unset($p);
+        $st = $conn->prepare("SELECT pr.risorsa_id, pr.stato, pr.inizio, pr.fine FROM prenotazioni_risorse pr JOIN risorse r ON r.id = pr.risorsa_id
+                              WHERE r.pagina_id = ? AND pr.inizio BETWEEN ? AND ?");
+        $a = "$dal 00:00:00"; $b = "$al 23:59:59";
+        $st->bind_param("iss", $pid, $a, $b); $st->execute();
+        $res = $st->get_result();
+        while ($x = $res->fetch_assoc()) {
+            $id = (int)$x['risorsa_id']; if (!isset($per[$id])) continue;
+            $per[$id]['prenotazioni']++;
+            if ($x['stato'] === 'annullata') { $per[$id]['annullate']++; continue; }
+            if ($x['stato'] === 'rifiutata') { $per[$id]['rifiutate']++; continue; }
+            if ($x['stato'] !== 'confermata') continue;
+            $per[$id]['confermate']++;
+            $i = strtotime($x['inizio']); $f = strtotime($x['fine']);
+            $per[$id]['ore'] += max(0, ($f - $i) / 3600);
+            for ($t = $i; $t < $f; $t += 3600) { $g = (int)date('N', $t); $o = (int)date('G', $t); $fasce[$g][$o] = ($fasce[$g][$o] ?? 0) + 1; }
+        }
+        foreach ($per as &$p) { $p['ore'] = round($p['ore'], 1); $p['ore_aperte'] = round($p['ore_aperte'], 1); $p['utilizzo'] = $p['ore_aperte'] > 0 ? (int)round($p['ore'] * 100 / $p['ore_aperte']) : null; }
+        unset($p);
+        $tot = ['prenotazioni' => array_sum(array_column($per, 'prenotazioni')), 'ore' => round(array_sum(array_column($per, 'ore')), 1),
+                'annullate' => array_sum(array_column($per, 'annullate')), 'rifiutate' => array_sum(array_column($per, 'rifiutate'))];
+        return ['risorse' => $per, 'fasce' => $fasce, 'totali' => $tot];
+    }
+}

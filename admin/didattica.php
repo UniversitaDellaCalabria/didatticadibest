@@ -11,7 +11,7 @@ require_once 'admin_header.php';
 if (!$puo_didattica) nega_accesso();
 function admin_redirect($url) { echo "<script>window.location.replace(" . json_encode($url) . ");</script>"; exit; }
 $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
-$tab = in_array($_GET['tab'] ?? '', ['pratiche', 'sedute', 'moduli', 'ufficio'], true) ? $_GET['tab'] : 'pratiche';
+$tab = in_array($_GET['tab'] ?? '', ['pratiche', 'sedute', 'moduli', 'ufficio', 'statistiche'], true) ? $_GET['tab'] : 'pratiche';
 $base = "didattica.php?p_id=" . (int)$filtro_p;
 $uid = (int)$u_id_curr;
 $ids_post = fn() => array_values(array_filter(array_map('intval', (array)($_POST['ids'] ?? []))));
@@ -67,8 +67,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $json_u = $ris_u ? json_encode($ris_u, JSON_UNESCAPED_UNICODE) : null;
             $sed = (int)($_POST['seduta_id'] ?? 0) ?: null;
             $del = mb_substr(trim((string)($_POST['delibera'] ?? '')), 0, 5000);
-            $st = $conn->prepare("UPDATE pratiche SET ufficio_json = ?, seduta_id = ?, delibera = ?, aggiornata_il = NOW() WHERE id = ?");
-            $st->bind_param("sisi", $json_u, $sed, $del, $id); $st->execute();
+            $st = $conn->prepare("UPDATE pratiche SET ufficio_json = ?, seduta_id = ?, delibera = ?, protocollo = ?, protocollo_data = ?, aggiornata_il = NOW() WHERE id = ?");
+            $prot = mb_substr(trim((string)($_POST['protocollo'] ?? '')), 0, 100);
+            $prot_d = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['protocollo_data'] ?? '')) ? $_POST['protocollo_data'] : null;
+            $st->bind_param("sisssi", $json_u, $sed, $del, $prot, $prot_d, $id); $st->execute();
             registra_log_audit($conn, "Pratica: istruttoria salvata", ["Pratica" => $p['codice']]);
             flash_set("Istruttoria salvata.");
         }
@@ -141,12 +143,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $iter = [];
         foreach ((array)($_POST['iter'] ?? []) as $x) if (($id_u = ufficio_didattica_id($conn, (int)$x)) && !(int)(uffici_didattica($conn)[$id_u]['smista'] ?? 0)) $iter[] = $id_u;
         $iter_json = $iter ? json_encode($iter) : null;
+        $dal_m = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['aperto_dal'] ?? '')) ? $_POST['aperto_dal'] : null;
+        $al_m = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['aperto_al'] ?? '')) ? $_POST['aperto_al'] : null;
+        $gg_m = max(0, min(90, (int)($_POST['giorni_promemoria'] ?? 7)));
         if ($id) {
-            $st = $conn->prepare("UPDATE didattica_moduli SET titolo=?, categoria=?, descrizione=?, tipo=?, link=?, campi_json=?, verbale_json=?, iter_json=?, destinatari=?, email_ufficio=?, attivo=?, ordine=?, aggiornato_il=NOW() WHERE id=?");
-            $st->bind_param("ssssssssssiii", $titolo, $cat, $descr, $tipo, $link, $campi_json, $verbale_json, $iter_json, $dest, $emails, $attivo, $ordine, $id); $st->execute();
+            $st = $conn->prepare("UPDATE didattica_moduli SET titolo=?, categoria=?, descrizione=?, tipo=?, link=?, campi_json=?, verbale_json=?, iter_json=?, destinatari=?, email_ufficio=?, attivo=?, ordine=?, aperto_dal=?, aperto_al=?, giorni_promemoria=?, aggiornato_il=NOW() WHERE id=?");
+            $st->bind_param("ssssssssssiissii", $titolo, $cat, $descr, $tipo, $link, $campi_json, $verbale_json, $iter_json, $dest, $emails, $attivo, $ordine, $dal_m, $al_m, $gg_m, $id); $st->execute();
         } else {
-            $st = $conn->prepare("INSERT INTO didattica_moduli (titolo, categoria, descrizione, tipo, link, campi_json, verbale_json, iter_json, destinatari, email_ufficio, attivo, ordine, aggiornato_il) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
-            $st->bind_param("ssssssssssii", $titolo, $cat, $descr, $tipo, $link, $campi_json, $verbale_json, $iter_json, $dest, $emails, $attivo, $ordine); $st->execute();
+            $st = $conn->prepare("INSERT INTO didattica_moduli (titolo, categoria, descrizione, tipo, link, campi_json, verbale_json, iter_json, destinatari, email_ufficio, attivo, ordine, aperto_dal, aperto_al, giorni_promemoria, aggiornato_il) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())");
+            $st->bind_param("ssssssssssiissi", $titolo, $cat, $descr, $tipo, $link, $campi_json, $verbale_json, $iter_json, $dest, $emails, $attivo, $ordine, $dal_m, $al_m, $gg_m); $st->execute();
             $id = (int)$conn->insert_id;
         }
         // Documento da scaricare (pubblico)
@@ -186,6 +191,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $err = aggiungi_operatore_ufficio($conn, (string)($_POST['persona_id'] ?? ''), (string)($_POST['ruolo'] ?? ''), (array)($_POST['compiti'] ?? []), (int)($_POST['ufficio_id'] ?? 0), (array)($_POST['corsi'] ?? []));
         if (!$err) registra_log_audit($conn, "Ufficio didattico: operatore salvato", ["Persona" => $_POST['persona_id'] ?? '']);
         flash_set($err ?? "Operatore salvato: entra nel pannello Didattica con le sue credenziali Unical.", $err ? 'danger' : 'success');
+        admin_redirect("$base&tab=ufficio&r=" . time());
+    }
+    if (isset($_POST['salva_ufficio'])) {
+        $id_u = (int)($_POST['ufficio_id_mod'] ?? 0);
+        $nome_u = mb_substr(trim((string)($_POST['nome_ufficio'] ?? '')), 0, 150);
+        $descr_u = mb_substr(trim((string)($_POST['descr_ufficio'] ?? '')), 0, 500);
+        $sm = isset($_POST['smista']) ? 1 : 0; $sc = isset($_POST['segue_corsi']) ? 1 : 0; $ord_u = (int)($_POST['ordine_ufficio'] ?? 0);
+        if ($nome_u === '') flash_set("Scrivi il nome dell'ufficio.", 'danger');
+        else {
+            if ($id_u) { $st = $conn->prepare("UPDATE didattica_uffici SET nome = ?, descrizione = ?, smista = ?, segue_corsi = ?, ordine = ? WHERE id = ?"); $st->bind_param("ssiiii", $nome_u, $descr_u, $sm, $sc, $ord_u, $id_u); }
+            else { $st = $conn->prepare("INSERT INTO didattica_uffici (nome, descrizione, smista, segue_corsi, ordine) VALUES (?, ?, ?, ?, ?)"); $st->bind_param("ssiii", $nome_u, $descr_u, $sm, $sc, $ord_u); }
+            $st->execute();
+            registra_log_audit($conn, "Ufficio didattico: ufficio salvato", ["Ufficio" => $nome_u]);
+            flash_set("Ufficio «" . $nome_u . "» salvato.");
+        }
+        admin_redirect("$base&tab=ufficio&r=" . time());
+    }
+    if (isset($_POST['elimina_ufficio'])) {
+        $id_u = (int)$_POST['elimina_ufficio'];
+        $n_op = (int)$conn->query("SELECT COUNT(*) n FROM ufficio_didattica WHERE ufficio_id = $id_u")->fetch_assoc()['n'];
+        $in_iter = 0;
+        foreach ($conn->query("SELECT iter_json FROM didattica_moduli WHERE iter_json IS NOT NULL")->fetch_all(MYSQLI_ASSOC) as $mi)
+            foreach (json_decode((string)$mi['iter_json'], true) ?: [] as $x) if (ufficio_didattica_id($conn, $x) === $id_u) $in_iter++;
+        $n_pr = (int)$conn->query("SELECT COUNT(*) n FROM pratiche p JOIN ufficio_didattica o ON o.id = p.assegnata_a WHERE o.ufficio_id = $id_u AND p.stato NOT IN ('accolta', 'respinta', 'chiusa')")->fetch_assoc()['n'];
+        if ($n_op || $in_iter) flash_set("L'ufficio non si può eliminare: " . ($n_op ? "ha $n_op persone (spostale in un altro ufficio)" : '') . ($n_op && $in_iter ? ' e ' : '') . ($in_iter ? "è nell'iter di $in_iter moduli" : '') . ".", 'warning');
+        else { $conn->query("DELETE FROM didattica_uffici WHERE id = $id_u"); flash_set("Ufficio eliminato.", 'warning'); }
         admin_redirect("$base&tab=ufficio&r=" . time());
     }
     if (isset($_POST['togli_operatore'])) {
@@ -274,7 +305,8 @@ if (isset($_GET['esporta']) && in_array($_GET['esporta'], ['xlsx', 'docx'], true
     <?php foreach (['pratiche' => ['fa-inbox', 'Pratiche' . ($n_aperte ? " <span class='badge bg-warning text-dark'>$n_aperte aperte</span>" : '')],
                     'sedute' => ['fa-gavel', 'Sedute e verbali (' . count($sedute) . ')'],
                     'moduli' => ['fa-file-lines', 'Moduli e documenti (' . count($moduli) . ')'],
-                    'ufficio' => ['fa-people-group', 'Ufficio e ricevimento']] as $k => [$ico, $txt]): ?>
+                    'ufficio' => ['fa-people-group', 'Ufficio e ricevimento'],
+                    'statistiche' => ['fa-chart-column', 'Statistiche']] as $k => [$ico, $txt]): ?>
         <li class="nav-item"><a class="nav-link fw-bold<?php echo $tab === $k ? ' active' : ' bg-light text-dark'; ?>" href="<?php echo $base; ?>&amp;tab=<?php echo $k; ?>"><i class="fa <?php echo $ico; ?> me-1" aria-hidden="true"></i><?php echo $txt; ?></a></li>
     <?php endforeach; ?>
 </ul>
@@ -325,7 +357,7 @@ if (isset($_GET['esporta']) && in_array($_GET['esporta'], ['xlsx', 'docx'], true
         <div class="col-lg-7">
             <div class="card border-0 shadow-sm mb-3"><div class="card-body">
                 <div class="d-flex justify-content-between flex-wrap gap-2 mb-2">
-                    <div><h5 class="fw-bold mb-0"><?php echo $h($p['modulo_titolo']); ?></h5><div class="small text-secondary font-monospace"><?php echo $h($p['codice']); ?> · inviata il <?php echo date('d/m/Y H:i', strtotime($p['creata_il'])); ?></div></div>
+                    <div><h5 class="fw-bold mb-0"><?php echo $h($p['modulo_titolo']); ?></h5><div class="small text-secondary font-monospace"><?php echo $h($p['codice']); ?> · inviata il <?php echo date('d/m/Y H:i', strtotime($p['creata_il'])); ?><?php echo ($p['protocollo'] ?? '') !== '' ? ' · prot. ' . $h($p['protocollo']) . (!empty($p['protocollo_data']) ? ' del ' . date('d/m/Y', strtotime($p['protocollo_data'])) : '') : ''; ?></div></div>
                     <div class="d-flex gap-1 align-items-start"><?php echo badge_stato_pratica($p['stato']); ?>
                         <a class="btn btn-sm btn-outline-success py-0" href="<?php echo $base; ?>&amp;tab=pratiche&amp;esporta=xlsx&amp;ids=<?php echo (int)$p['id']; ?>" title="Excel"><i class="fa fa-file-excel" aria-hidden="true"></i><span class="visually-hidden">Excel</span></a>
                         <a class="btn btn-sm btn-outline-primary py-0" href="<?php echo $base; ?>&amp;tab=pratiche&amp;esporta=docx&amp;ids=<?php echo (int)$p['id']; ?>" title="Word"><i class="fa fa-file-word" aria-hidden="true"></i><span class="visually-hidden">Word</span></a></div>
@@ -344,6 +376,8 @@ if (isset($_GET['esporta']) && in_array($_GET['esporta'], ['xlsx', 'docx'], true
                 <h6 class="fw-bold"><i class="fa fa-scale-balanced me-1 text-success" aria-hidden="true"></i>Istruttoria e verbale <span class="small text-secondary fw-normal">(non visibile allo studente)</span></h6>
                 <?php echo html_datalist_didattica($conn, $c_uff); foreach ($c_uff as $c): $c['obbligatorio'] = false; echo html_campo_pratica($c, $val_uff[mb_strtolower($c['etichetta'])] ?? '', $conn); endforeach; ?>
                 <div class="row g-2">
+                    <div class="col-md-7"><label class="form-label small fw-bold" for="ddProt">Numero di protocollo</label><input class="form-control form-control-sm" id="ddProt" name="protocollo" value="<?php echo $h($p['protocollo'] ?? ''); ?>" maxlength="100" placeholder="es. 1234/2026"></div>
+                    <div class="col-md-5"><label class="form-label small fw-bold" for="ddProtD">Data del protocollo</label><input type="date" class="form-control form-control-sm" id="ddProtD" name="protocollo_data" value="<?php echo $h($p['protocollo_data'] ?? ''); ?>"></div>
                     <div class="col-md-5"><label class="form-label small fw-bold" for="ddSed">Seduta del Consiglio</label>
                         <select class="form-select form-select-sm" id="ddSed" name="seduta_id"><option value="0">Nessuna</option>
                             <?php foreach ($sedute as $s): if (!in_array($s, $sedute_future, true) && (int)$s['id'] !== (int)$p['seduta_id']) continue; ?><option value="<?php echo (int)$s['id']; ?>"<?php echo (int)$p['seduta_id'] === (int)$s['id'] ? ' selected' : ''; ?>><?php echo $h(etichetta_seduta($s)); ?></option><?php endforeach; ?></select>
@@ -589,28 +623,103 @@ if (isset($_GET['esporta']) && in_array($_GET['esporta'], ['xlsx', 'docx'], true
         </tbody></table></div></div>
     <?php endif; ?>
 
+<?php elseif ($tab === 'statistiche'):
+    $s_dal = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['dal'] ?? '')) ? $_GET['dal'] : (anno_accademico_corrente() . '-09-01');
+    $s_al = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['al'] ?? '')) ? $_GET['al'] : date('Y-m-d');
+    $stat = statistiche_pratiche($conn, $s_dal, $s_al);
+    $barra = function (int $n, int $tot, string $col) { $pc = $tot ? round($n * 100 / $tot) : 0; return '<div class="d-flex align-items-center gap-2"><div class="flex-grow-1 bg-light rounded" style="height:8px;"><div class="rounded" style="height:8px;width:' . $pc . '%;background:' . $col . ';"></div></div><span class="small text-secondary" style="min-width:34px;">' . $pc . '%</span></div>'; };
+    $tab_stat = function (array $righe, string $titolo_col) use ($h, $barra) { ?>
+        <div class="table-responsive"><table class="table table-sm align-middle small mb-0">
+            <thead class="table-light"><tr><th><?php echo $titolo_col; ?></th><th class="text-center">Totale</th><th class="text-center">Aperte</th><th class="text-center">Accolte</th><th class="text-center">Respinte</th><th class="text-center">Chiuse</th><th style="width:22%;">Accolte sul totale</th><?php if ($righe && array_key_exists('giorni', reset($righe))): ?><th class="text-center">Giorni per chiudere</th><?php endif; ?></tr></thead><tbody>
+            <?php foreach ($righe as $k => $x): ?>
+                <tr><td class="fw-bold"><?php echo $h($k); ?></td><td class="text-center"><?php echo $x['totale']; ?></td><td class="text-center"><?php echo $x['aperte']; ?></td><td class="text-center"><?php echo $x['accolta']; ?></td><td class="text-center"><?php echo $x['respinta']; ?></td><td class="text-center"><?php echo $x['chiusa']; ?></td>
+                    <td><?php echo $barra($x['accolta'], $x['totale'], '#15803d'); ?></td><?php if (array_key_exists('giorni', $x)): ?><td class="text-center"><?php echo $x['giorni'] !== null ? $x['giorni'] : '—'; ?></td><?php endif; ?></tr>
+            <?php endforeach; ?>
+            <?php if (!$righe): ?><tr><td colspan="8" class="text-center text-muted py-3">Nessuna pratica nel periodo.</td></tr><?php endif; ?>
+        </tbody></table></div>
+    <?php };
+?>
+    <form method="GET" class="d-flex flex-wrap gap-2 align-items-end mb-3">
+        <input type="hidden" name="p_id" value="<?php echo (int)$filtro_p; ?>"><input type="hidden" name="tab" value="statistiche">
+        <div><label class="form-label small fw-bold mb-0" for="stDal">Pratiche inviate dal</label><input type="date" class="form-control form-control-sm" id="stDal" name="dal" value="<?php echo $h($s_dal); ?>"></div>
+        <div><label class="form-label small fw-bold mb-0" for="stAl">al</label><input type="date" class="form-control form-control-sm" id="stAl" name="al" value="<?php echo $h($s_al); ?>"></div>
+        <button class="btn btn-sm btn-primary fw-bold">Aggiorna</button>
+        <span class="small text-secondary">Predefinito: dall'inizio dell'anno accademico.</span>
+    </form>
+    <div class="row g-3 mb-3">
+        <?php foreach ([['Pratiche', $stat['totale'], '#0056B3', 'fa-inbox'], ['Aperte', $stat['esiti']['aperte'], '#7c3aed', 'fa-gears'], ['Accolte', $stat['esiti']['accolta'], '#15803d', 'fa-circle-check'],
+                        ['Respinte', $stat['esiti']['respinta'], '#b91c1c', 'fa-circle-xmark'], ['Giorni medi per chiudere', $stat['chiusura_media'] ?? '—', '#b45309', 'fa-hourglass-half']] as [$t, $v, $c, $i]): ?>
+            <div class="col-6 col-lg"><div class="card border-0 shadow-sm h-100"><div class="card-body py-2"><div class="small text-secondary"><i class="fa <?php echo $i; ?> me-1" style="color:<?php echo $c; ?>;" aria-hidden="true"></i><?php echo $t; ?></div><div class="fs-3 fw-bold" style="color:<?php echo $c; ?>;"><?php echo $v; ?></div></div></div></div>
+        <?php endforeach; ?>
+    </div>
+    <div class="card border-0 shadow-sm mb-3"><div class="card-body"><h6 class="fw-bold">Per modulo</h6><?php $tab_stat($stat['per_modulo'], 'Modulo'); ?></div></div>
+    <div class="card border-0 shadow-sm mb-3"><div class="card-body"><h6 class="fw-bold">Per corso di studio</h6><p class="small text-secondary mb-2">Dal campo «Corso di studio» dei moduli che lo chiedono.</p><?php $tab_stat($stat['per_corso'], 'Corso di studio'); ?></div></div>
+    <div class="card border-0 shadow-sm mb-3"><div class="card-body"><h6 class="fw-bold">Tempi medi per passo dell'iter</h6>
+        <p class="small text-secondary mb-2">Giorni da quando la pratica arriva a un passo a quando passa al successivo (o si conclude). «Smistamento» = dall'invio alla prima assegnazione.</p>
+        <?php $max_t = max(1, ...array_values(array_map(fn($x) => (float)$x['media'], $stat['tempi_passi'] ?: [['media' => 1]]))); ?>
+        <div class="table-responsive"><table class="table table-sm align-middle small mb-0"><thead class="table-light"><tr><th>Passo</th><th class="text-center">Pratiche</th><th class="text-center">Media (giorni)</th><th class="text-center">Massimo</th><th style="width:35%;"></th></tr></thead><tbody>
+            <?php foreach ($stat['tempi_passi'] as $nome => $x): ?>
+                <tr><td class="fw-bold"><?php echo $h($nome); ?></td><td class="text-center"><?php echo $x['n']; ?></td><td class="text-center"><?php echo $x['media']; ?></td><td class="text-center"><?php echo $x['max']; ?></td>
+                    <td><div class="bg-light rounded" style="height:8px;"><div class="rounded" style="height:8px;width:<?php echo round($x['media'] * 100 / $max_t); ?>%;background:#b45309;"></div></div></td></tr>
+            <?php endforeach; ?>
+            <?php if (!$stat['tempi_passi']): ?><tr><td colspan="5" class="text-center text-muted py-3">Nessun passaggio nel periodo.</td></tr><?php endif; ?>
+        </tbody></table></div></div></div>
+
 <?php elseif ($tab === 'ufficio'):
     $persone = $conn->query("SELECT id, cognome, nome, email, ruolo, gruppo FROM personale_ateneo WHERE attivo = 1 AND email <> '' ORDER BY FIELD(gruppo, 'pta', 'docenti', 'altro'), cognome, nome")->fetch_all(MYSQLI_ASSOC);
     $corsi_sc = scelte_anagrafe_didattica($conn, 'corso_studio');
-    $html_profilo = function (string $sel) use ($h) { $o = ''; foreach (PROFILI_UFFICIO as $k => $n) $o .= '<option value="' . $k . '"' . ($k === $sel ? ' selected' : '') . '>' . $h($n) . '</option>'; return $o; };
+    $uffici = uffici_didattica($conn);
+    $html_profilo = function ($sel) use ($h, $uffici) { $o = '<option value="0">— nessun ufficio —</option>'; foreach ($uffici as $k => $u) $o .= '<option value="' . $k . '" data-corsi="' . (int)$u['segue_corsi'] . '"' . ((int)$k === (int)$sel ? ' selected' : '') . '>' . $h($u['nome']) . '</option>'; return $o; };
     $html_corsi = function (array $sel) use ($h, $corsi_sc) { $o = ''; foreach ($corsi_sc as $g => $cc) { $o .= '<optgroup label="' . $h($g) . '">'; foreach ($cc as $c) $o .= '<option' . (in_array($c, $sel, true) ? ' selected' : '') . '>' . $h($c) . '</option>'; $o .= '</optgroup>'; } return $o; };
     $gruppi_p = ['pta' => 'Personale tecnico-amministrativo', 'docenti' => 'Docenti', 'altro' => 'Altro personale'];
     $sportelli_uff = sportelli_ufficio_didattica($conn);
     $aree_cal = array_values(array_filter($conn->query("SELECT * FROM pagine_eventi ORDER BY titolo")->fetch_all(MYSQLI_ASSOC), fn($a) => tipo_area($a) === 'calendario'));
     $sono_operatore = utente_operatore_ufficio($conn, $utente_admin);
 ?>
+    <div class="card border-0 shadow-sm mb-3"><div class="card-body">
+        <h5 class="fw-bold mb-1"><i class="fa fa-sitemap me-1 text-primary" aria-hidden="true"></i>Uffici</h5>
+        <p class="small text-secondary">Gli uffici dell'Ufficio didattico: assegna il personale qui sotto e scegli nei moduli quali uffici ricevono la pratica e in che ordine (iter). Gli uffici che <strong>smistano</strong> ricevono le pratiche nuove; in quelli che <strong>seguono i corsi</strong> ogni persona indica i suoi corsi di studio e le pratiche di quei corsi le vengono proposte per prime.</p>
+        <?php $n_per_uff = []; foreach ($operatori as $o) $n_per_uff[(int)$o['ufficio_id']] = ($n_per_uff[(int)$o['ufficio_id']] ?? 0) + 1;
+        foreach (array_merge(array_keys($uffici), ['nuovo']) as $k): ?>
+            <form method="POST" id="fu<?php echo $k; ?>"><?php csrf_field(); ?><input type="hidden" name="ufficio_id_mod" value="<?php echo (int)$k; ?>"></form>
+        <?php endforeach; ?>
+        <div class="table-responsive"><table class="table table-sm align-middle small mb-2">
+            <thead class="table-light"><tr><th>Ufficio</th><th>Descrizione</th><th class="text-center">Smista</th><th class="text-center">Segue i corsi</th><th class="text-center">Ordine</th><th class="text-center">Persone</th><th></th></tr></thead><tbody>
+            <?php foreach ($uffici as $k => $u): $fid = 'fu' . $k; ?>
+                <tr>
+                    <td><input form="<?php echo $fid; ?>" class="form-control form-control-sm fw-bold" name="nome_ufficio" value="<?php echo $h($u['nome']); ?>" maxlength="150" required aria-label="Nome dell'ufficio"></td>
+                    <td><input form="<?php echo $fid; ?>" class="form-control form-control-sm" name="descr_ufficio" value="<?php echo $h($u['descrizione']); ?>" maxlength="500" aria-label="Descrizione"></td>
+                    <td class="text-center"><input form="<?php echo $fid; ?>" class="form-check-input" type="checkbox" name="smista" value="1"<?php echo (int)$u['smista'] ? ' checked' : ''; ?> aria-label="Smista le pratiche nuove"></td>
+                    <td class="text-center"><input form="<?php echo $fid; ?>" class="form-check-input" type="checkbox" name="segue_corsi" value="1"<?php echo (int)$u['segue_corsi'] ? ' checked' : ''; ?> aria-label="Segue i corsi di studio"></td>
+                    <td class="text-center"><input form="<?php echo $fid; ?>" type="number" class="form-control form-control-sm" style="width:64px;" name="ordine_ufficio" value="<?php echo (int)$u['ordine']; ?>" aria-label="Ordine"></td>
+                    <td class="text-center"><?php echo (int)($n_per_uff[$k] ?? 0); ?></td>
+                    <td class="text-nowrap"><button form="<?php echo $fid; ?>" type="submit" name="salva_ufficio" value="1" class="btn btn-sm btn-outline-primary py-0">Salva</button>
+                        <button form="<?php echo $fid; ?>" type="submit" name="elimina_ufficio" value="<?php echo (int)$k; ?>" class="btn btn-sm btn-outline-danger py-0" data-confirm="Eliminare l'ufficio «<?php echo $h($u['nome']); ?>»?" aria-label="Elimina l'ufficio"><i class="fa fa-trash" aria-hidden="true"></i></button></td>
+                </tr>
+            <?php endforeach; ?>
+            <tr class="table-light">
+                <td><input form="funuovo" class="form-control form-control-sm" name="nome_ufficio" maxlength="150" placeholder="Nuovo ufficio (es. Tirocini)" aria-label="Nome del nuovo ufficio"></td>
+                <td><input form="funuovo" class="form-control form-control-sm" name="descr_ufficio" maxlength="500" placeholder="Di cosa si occupa" aria-label="Descrizione del nuovo ufficio"></td>
+                <td class="text-center"><input form="funuovo" class="form-check-input" type="checkbox" name="smista" value="1" aria-label="Smista le pratiche nuove"></td>
+                <td class="text-center"><input form="funuovo" class="form-check-input" type="checkbox" name="segue_corsi" value="1" aria-label="Segue i corsi di studio"></td>
+                <td class="text-center"><input form="funuovo" type="number" class="form-control form-control-sm" style="width:64px;" name="ordine_ufficio" value="<?php echo count($uffici) + 1; ?>" aria-label="Ordine"></td>
+                <td></td>
+                <td><button form="funuovo" type="submit" name="salva_ufficio" value="1" class="btn btn-sm btn-success fw-bold py-0"><i class="fa fa-plus me-1" aria-hidden="true"></i>Aggiungi</button></td>
+            </tr>
+        </tbody></table></div>
+    </div></div>
     <div class="row g-3">
         <div class="col-lg-7">
             <div class="card border-0 shadow-sm"><div class="card-body">
                 <h5 class="fw-bold mb-1"><i class="fa fa-people-group me-1 text-success" aria-hidden="true"></i>Operatori dell'Ufficio didattico</h5>
-                <p class="small text-secondary">Scelti dall'anagrafe di Ateneo: entrano nel pannello Didattica con le loro credenziali Unical e gestiscono pratiche, sedute, modulistica e ricevimento. Il <strong>profilo</strong> decide il ruolo nell'iter delle pratiche: il manager le smista, poi passano al tutor dell'internazionalizzazione, al referente del corso (che segue i suoi corsi) o alle carriere studenti secondo il modulo. I compiti decidono chi riceve gli altri avvisi.</p>
+                <p class="small text-secondary">Scelti dall'anagrafe di Ateneo: entrano nel pannello Didattica con le loro credenziali Unical e gestiscono pratiche, sedute, modulistica e ricevimento. Ognuno appartiene a un <strong>ufficio</strong> (vedi sopra), che decide il suo ruolo nell'iter delle pratiche. I compiti decidono chi riceve gli altri avvisi.</p>
                 <?php if (!$operatori): ?><div class="alert alert-light border small">Nessun operatore: aggiungi il personale dell'ufficio qui sotto.</div><?php endif; ?>
                 <?php foreach ($operatori as $o): ?>
                     <form method="POST" class="border rounded p-2 mb-2">
                         <?php csrf_field(); ?><input type="hidden" name="persona_id" value="<?php echo $h($o['persona_id']); ?>">
                         <div class="d-flex flex-wrap gap-2 align-items-center">
                             <div class="flex-grow-1"><strong><?php echo $h($o['nominativo']); ?></strong> <span class="small text-secondary"><?php echo $h($o['email']); ?></span></div>
-                            <select class="form-select form-select-sm dd-prof" style="max-width:230px;" name="profilo" aria-label="Profilo nell'iter delle pratiche"><?php echo $html_profilo((string)$o['profilo']); ?></select>
+                            <select class="form-select form-select-sm dd-prof" style="max-width:230px;" name="ufficio_id" aria-label="Ufficio"><?php echo $html_profilo((int)$o['ufficio_id']); ?></select>
                             <input type="text" class="form-control form-control-sm" style="max-width:180px;" name="ruolo" value="<?php echo $h($o['ruolo']); ?>" placeholder="Ruolo (es. Responsabile)" aria-label="Ruolo">
                         </div>
                         <div class="d-flex flex-wrap gap-3 align-items-center mt-1 small">
@@ -618,8 +727,8 @@ if (isset($_GET['esporta']) && in_array($_GET['esporta'], ['xlsx', 'docx'], true
                             <span class="ms-auto d-flex gap-1"><button type="submit" name="salva_operatore" value="1" class="btn btn-sm btn-outline-primary py-0">Salva</button>
                                 <button type="submit" name="togli_operatore" value="<?php echo (int)$o['id']; ?>" class="btn btn-sm btn-outline-danger py-0" data-confirm="Togliere <?php echo $h($o['nominativo']); ?> dall'Ufficio didattico?" aria-label="Togli"><i class="fa fa-user-minus" aria-hidden="true"></i></button></span>
                         </div>
-                        <div class="dd-corsi mt-1"<?php echo $o['profilo'] !== 'referente_cdl' ? ' hidden' : ''; ?>><label class="small fw-bold">Corsi di studio seguiti</label><select class="form-select form-select-sm" name="corsi[]" multiple size="4" aria-label="Corsi di studio seguiti"><?php echo $html_corsi(json_decode((string)$o['corsi'], true) ?: []); ?></select></div>
-                        <?php if ($o['profilo'] === 'referente_cdl' && ($cs = json_decode((string)$o['corsi'], true))): ?><div class="small text-secondary mt-1"><i class="fa fa-graduation-cap me-1" aria-hidden="true"></i><?php echo $h(implode(' · ', $cs)); ?></div><?php endif; ?>
+                        <div class="dd-corsi mt-1"<?php echo empty($uffici[(int)$o['ufficio_id']]['segue_corsi']) ? ' hidden' : ''; ?>><label class="small fw-bold">Corsi di studio seguiti</label><select class="form-select form-select-sm" name="corsi[]" multiple size="4" aria-label="Corsi di studio seguiti"><?php echo $html_corsi(json_decode((string)$o['corsi'], true) ?: []); ?></select></div>
+                        <?php if (!empty($uffici[(int)$o['ufficio_id']]['segue_corsi']) && ($cs = json_decode((string)$o['corsi'], true))): ?><div class="small text-secondary mt-1"><i class="fa fa-graduation-cap me-1" aria-hidden="true"></i><?php echo $h(implode(' · ', $cs)); ?></div><?php endif; ?>
                     </form>
                 <?php endforeach; ?>
                 <form method="POST" class="bg-light rounded p-2 mt-3">
@@ -632,7 +741,7 @@ if (isset($_GET['esporta']) && in_array($_GET['esporta'], ['xlsx', 'docx'], true
                         <?php endforeach; if ($g_corr !== null) echo '</optgroup>'; ?>
                     </select>
                     <div class="d-flex flex-wrap gap-3 align-items-center small">
-                        <select class="form-select form-select-sm dd-prof" style="max-width:230px;" name="profilo" aria-label="Profilo nell'iter delle pratiche"><?php echo $html_profilo('operatore'); ?></select>
+                        <select class="form-select form-select-sm dd-prof" style="max-width:230px;" name="ufficio_id" aria-label="Ufficio"><?php echo $html_profilo(0); ?></select>
                         <input type="text" class="form-control form-control-sm" style="max-width:200px;" name="ruolo" placeholder="Ruolo (facoltativo)" aria-label="Ruolo">
                         <?php foreach (COMPITI_UFFICIO as $k => $n): ?><label class="form-check m-0"><input class="form-check-input" type="checkbox" name="compiti[]" value="<?php echo $k; ?>"<?php echo $k !== 'bandi' ? ' checked' : ''; ?>> <?php echo $h($n); ?></label><?php endforeach; ?>
                         <button type="submit" name="salva_operatore" value="1" class="btn btn-sm btn-success fw-bold ms-auto"><i class="fa fa-user-plus me-1" aria-hidden="true"></i>Aggiungi</button>
@@ -681,14 +790,14 @@ if (isset($_GET['esporta']) && in_array($_GET['esporta'], ['xlsx', 'docx'], true
         var c = document.getElementById('opCerca'), s = document.getElementById('opPersona');
         if (!c || !s) return;
         c.addEventListener('input', function () { var q = c.value.toLowerCase(); Array.prototype.forEach.call(s.options, function (o) { o.hidden = q && o.text.toLowerCase().indexOf(q) === -1; }); });
-        document.querySelectorAll('.dd-prof').forEach(function (sp) { sp.addEventListener('change', function () { var d = sp.closest('form').querySelector('.dd-corsi'); if (d) d.hidden = sp.value !== 'referente_cdl'; }); });
+        document.querySelectorAll('.dd-prof').forEach(function (sp) { sp.addEventListener('change', function () { var d = sp.closest('form').querySelector('.dd-corsi'); if (d) d.hidden = !(sp.selectedOptions[0] && sp.selectedOptions[0].dataset.corsi === '1'); }); });
     })();
     </script>
 
 <?php else: // ── MODULI E DOCUMENTI ──
     $mod_m = !empty($_GET['modifica']) ? modulo_didattica($conn, (int)$_GET['modifica']) : null;
     $mostra_form = $mod_m || !empty($_GET['nuovo']);
-    $f = $mod_m ?: ['id' => 0, 'titolo' => '', 'categoria' => '', 'descrizione' => '', 'tipo' => 'documento', 'file_path' => null, 'link' => '', 'campi_json' => null, 'verbale_json' => null, 'destinatari' => 'tutti', 'email_ufficio' => '', 'attivo' => 1, 'ordine' => 0];
+    $f = $mod_m ?: ['id' => 0, 'titolo' => '', 'categoria' => '', 'descrizione' => '', 'tipo' => 'documento', 'file_path' => null, 'link' => '', 'campi_json' => null, 'verbale_json' => null, 'destinatari' => 'tutti', 'email_ufficio' => '', 'attivo' => 1, 'ordine' => 0, 'aperto_dal' => null, 'aperto_al' => null, 'giorni_promemoria' => 7, 'iter_json' => null];
     $campi_f = json_decode((string)$f['campi_json'], true) ?: [];
     $v_f = verbale_modulo($f + ['titolo' => '']); $v_raw = json_decode((string)($f['verbale_json'] ?? ''), true) ?: [];
     // Modelli pronti: riempiono titolo, categoria, campi e parte del verbale (poi si modifica tutto)
@@ -744,6 +853,9 @@ if (isset($_GET['esporta']) && in_array($_GET['esporta'], ['xlsx', 'docx'], true
             <div class="col-md-5"><label class="form-label small fw-bold" for="mEm">Email che riceve le pratiche (facoltativa)</label><input type="text" class="form-control" id="mEm" name="email_ufficio" value="<?php echo $h($f['email_ufficio']); ?>" placeholder="segreteria.didattica@unical.it"><div class="form-text">Vuoto = operatori dell'Ufficio didattico con il compito «Pratiche».</div></div>
             <div class="col-md-1"><label class="form-label small fw-bold" for="mOrd">Ordine</label><input type="number" class="form-control" id="mOrd" name="ordine" value="<?php echo (int)$f['ordine']; ?>"></div>
             <div class="col-md-2 d-flex align-items-end"><label class="form-check"><input class="form-check-input" type="checkbox" name="attivo" value="1"<?php echo (int)$f['attivo'] ? ' checked' : ''; ?>> Pubblicato</label></div>
+            <div class="col-md-3 dd-online"><label class="form-label small fw-bold" for="mDal">Compilabile dal</label><input type="date" class="form-control" id="mDal" name="aperto_dal" value="<?php echo $h($f['aperto_dal'] ?? ''); ?>"></div>
+            <div class="col-md-3 dd-online"><label class="form-label small fw-bold" for="mAl">al</label><input type="date" class="form-control" id="mAl" name="aperto_al" value="<?php echo $h($f['aperto_al'] ?? ''); ?>"><div class="form-text">Vuoti = sempre aperto. Fuori dal periodo il modulo resta visibile ma non si compila.</div></div>
+            <div class="col-md-4 dd-online"><label class="form-label small fw-bold" for="mGg">Promemoria se la pratica è ferma da (giorni)</label><input type="number" min="0" max="90" class="form-control" id="mGg" name="giorni_promemoria" value="<?php echo (int)($f['giorni_promemoria'] ?? 7); ?>" style="max-width:120px;"><div class="form-text">Email a chi l'ha in carico (o a chi smista); 0 = nessun promemoria.</div></div>
         </div>
 
         <fieldset class="dd-online mt-3 border rounded p-2">
@@ -772,14 +884,14 @@ if (isset($_GET['esporta']) && in_array($_GET['esporta'], ['xlsx', 'docx'], true
                 <?php $iter_f = json_decode((string)($f['iter_json'] ?? ''), true) ?: []; for ($ip = 0; $ip < 4; $ip++): ?>
                     <?php if ($ip): ?><span class="text-secondary" aria-hidden="true">→</span><?php endif; ?>
                     <select class="form-select form-select-sm dd-iter" name="iter[]" style="max-width:240px;" aria-label="Passo <?php echo $ip + 1; ?>"><option value="">— passo <?php echo $ip + 1; ?> —</option>
-                        <?php foreach (PROFILI_UFFICIO as $k => $n): if ($k === 'manager') continue; ?><option value="<?php echo $k; ?>"<?php echo ($iter_f[$ip] ?? '') === $k ? ' selected' : ''; ?>><?php echo $h($n); ?></option><?php endforeach; ?></select>
+                        <?php foreach (uffici_didattica($conn) as $k => $u): if ((int)$u['smista']) continue; ?><option value="<?php echo $k; ?>"<?php echo ufficio_didattica_id($conn, $iter_f[$ip] ?? '') === $k ? ' selected' : ''; ?>><?php echo $h($u['nome']); ?></option><?php endforeach; ?></select>
                 <?php endfor; ?>
             </div>
         </fieldset>
 
         <fieldset class="dd-online mt-3 border rounded p-2">
             <legend class="form-label small fw-bold float-none w-auto px-1 mb-1"><i class="fa fa-file-word me-1 text-primary" aria-hidden="true"></i>Nel verbale del Consiglio</legend>
-            <p class="small text-secondary mb-2">Segnaposto: <code>{STUDENTE}</code> (COGNOME NOME), <code>{NOME}</code>, <code>{COGNOME}</code>, <code>{MATRICOLA}</code>, <code>{MODULO}</code>, <code>{DATA}</code> e ogni domanda tra graffe, es. <code>{Corso di studio}</code>. <code>**testo**</code> = grassetto. Le tabelle a righe compaiono sotto il testo di ogni pratica.</p>
+            <p class="small text-secondary mb-2">Segnaposto: <code>{STUDENTE}</code> (COGNOME NOME), <code>{NOME}</code>, <code>{COGNOME}</code>, <code>{MATRICOLA}</code>, <code>{MODULO}</code>, <code>{DATA}</code>, <code>{PROTOCOLLO}</code> e ogni domanda tra graffe, es. <code>{Corso di studio}</code>. <code>**testo**</code> = grassetto. Le tabelle a righe compaiono sotto il testo di ogni pratica.</p>
             <div class="row g-2">
                 <div class="col-md-6"><label class="form-label small fw-bold" for="vSez">Titolo della sezione</label><input type="text" class="form-control form-control-sm" id="vSez" name="v_sezione" value="<?php echo $h($v_raw['sezione'] ?? ''); ?>" placeholder="Vuoto = titolo del modulo"></div>
                 <div class="col-md-6"><label class="form-label small fw-bold" for="vStile">Impaginazione</label><select class="form-select form-select-sm" id="vStile" name="v_stile">
@@ -788,7 +900,7 @@ if (isset($_GET['esporta']) && in_array($_GET['esporta'], ['xlsx', 'docx'], true
                 <div class="col-12"><label class="form-label small fw-bold" for="vIntro">Testo introduttivo (facoltativo)</label><textarea class="form-control form-control-sm" id="vIntro" name="v_intro" rows="2"><?php echo $h($v_raw['intro'] ?? ''); ?></textarea></div>
                 <div class="col-md-7 dd-v-scheda"><label class="form-label small fw-bold" for="vTesto">Testo per ogni pratica</label><textarea class="form-control form-control-sm" id="vTesto" name="v_testo" rows="4" placeholder="<?php echo $h(verbale_modulo(['titolo' => ''])['testo']); ?>"><?php echo $h($v_raw['testo'] ?? ''); ?></textarea></div>
                 <div class="col-md-5 dd-v-scheda"><label class="form-label small fw-bold" for="vDel">Delibera predefinita per ogni pratica</label><textarea class="form-control form-control-sm" id="vDel" name="v_delibera" rows="4"><?php echo $h($v_raw['delibera'] ?? 'Il Consiglio approva.'); ?></textarea><div class="form-text">Si può cambiare pratica per pratica nell'istruttoria.</div></div>
-                <div class="col-md-7 dd-v-elenco"><label class="form-label small fw-bold" for="vCol">Colonne della tabella</label><input type="text" class="form-control form-control-sm" id="vCol" name="v_colonne" value="<?php echo $h($v_raw['colonne'] ?? ''); ?>" placeholder="COGNOME, NOME, MATRICOLA, RELATORE"><div class="form-text">COGNOME, NOME, MATRICOLA, CODICE, DELIBERA o le domande del modulo. Vuoto = tutte.</div></div>
+                <div class="col-md-7 dd-v-elenco"><label class="form-label small fw-bold" for="vCol">Colonne della tabella</label><input type="text" class="form-control form-control-sm" id="vCol" name="v_colonne" value="<?php echo $h($v_raw['colonne'] ?? ''); ?>" placeholder="COGNOME, NOME, MATRICOLA, RELATORE"><div class="form-text">COGNOME, NOME, MATRICOLA, CODICE, PROTOCOLLO, DELIBERA o le domande del modulo. Vuoto = tutte.</div></div>
                 <div class="col-md-5 dd-v-elenco"><label class="form-label small fw-bold" for="vRag">Raggruppa per la domanda</label><input type="text" class="form-control form-control-sm" id="vRag" name="v_raggruppa" value="<?php echo $h($v_raw['raggruppa'] ?? ''); ?>" placeholder="es. Corso di studio"></div>
                 <div class="col-12"><label class="form-label small fw-bold" for="vChi">Testo finale della sezione (facoltativo)</label><textarea class="form-control form-control-sm" id="vChi" name="v_chiusura" rows="2" placeholder="es. Il Consiglio approva."><?php echo $h($v_raw['chiusura'] ?? ''); ?></textarea></div>
             </div>
@@ -800,7 +912,7 @@ if (isset($_GET['esporta']) && in_array($_GET['esporta'], ['xlsx', 'docx'], true
     </div></form>
     <script>
     (function () {
-        var modelli = <?php echo json_encode($modelli, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
+        var modelli = <?php foreach ($modelli as &$mm_i) $mm_i[4]['iter'] = array_values(array_filter(array_map(fn($c) => ufficio_didattica_id($conn, $c), $mm_i[4]['iter'] ?? []))); unset($mm_i); echo json_encode($modelli, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
         var tipo = document.getElementById('mTipo'), box = document.getElementById('ddCampi'), stile = document.getElementById('vStile');
         function aggiorna() {
             document.querySelectorAll('.dd-online').forEach(function (x) { x.hidden = tipo.value !== 'online'; });

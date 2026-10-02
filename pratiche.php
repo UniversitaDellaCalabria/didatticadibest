@@ -43,7 +43,7 @@ require_once 'header.php';
         $richiesta = $p['stato'] === 'integrazione' ? (json_decode((string)($p['richiesta_json'] ?? ''), true) ?: ['tipo' => 'documenti', 'testo' => '']) : null;
         $etichette_ev = ['passaggio' => 'Passaggio', 'attivita' => 'Attività', 'autodich' => 'Autodichiarazione']; ?>
         <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
-            <div><h1 class="fw-bold h3 mb-0"><?php echo $h($p['modulo_titolo']); ?></h1><div class="small text-secondary font-monospace"><?php echo $h($p['codice']); ?> · inviata il <?php echo date('d/m/Y H:i', strtotime($p['creata_il'])); ?></div></div>
+            <div><h1 class="fw-bold h3 mb-0"><?php echo $h($p['modulo_titolo']); ?></h1><div class="small text-secondary font-monospace"><?php echo $h($p['codice']); ?> · inviata il <?php echo date('d/m/Y H:i', strtotime($p['creata_il'])); ?><?php echo ($p['protocollo'] ?? '') !== '' ? ' · prot. ' . $h($p['protocollo']) . (!empty($p['protocollo_data']) ? ' del ' . date('d/m/Y', strtotime($p['protocollo_data'])) : '') : ''; ?></div></div>
             <div class="fs-6"><?php echo badge_stato_pratica($p['stato']); ?></div>
         </div>
         <div class="card border-0 shadow-sm mb-3"><div class="card-body">

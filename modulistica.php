@@ -37,14 +37,14 @@ require_once 'header.php';
         if (!$voci) continue; ?>
         <section class="card border-0 shadow-sm mb-3" style="border-radius:12px;"><div class="card-body">
             <h2 class="h5 fw-bold mb-1"><?php echo $h($cat); ?></h2>
-            <?php foreach ($voci as $m): $online = $m['tipo'] === 'online'; ?>
+            <?php foreach ($voci as $m): $online = $m['tipo'] === 'online'; [$aperto, $periodo] = periodo_modulo($m); ?>
                 <div class="mod-voce">
                     <span class="mod-ico" style="background:<?php echo $online ? '#dcfce7' : '#dbeafe'; ?>;color:<?php echo $online ? '#15803d' : '#1d4ed8'; ?>;" aria-hidden="true"><i class="fa <?php echo $online ? 'fa-pen-to-square' : 'fa-file-arrow-down'; ?>"></i></span>
                     <div class="flex-grow-1" style="min-width:0;">
-                        <h3 class="h6 fw-bold mb-1"><?php echo $h($m['titolo']); ?></h3>
+                        <h3 class="h6 fw-bold mb-1"><?php echo $h($m['titolo']); ?><?php if ($online && $periodo !== ''): ?> <span class="badge <?php echo $aperto ? 'bg-light text-dark border' : 'bg-secondary'; ?> fw-normal"><?php echo $h($periodo); ?></span><?php endif; ?></h3>
                         <?php if (trim(strip_tags((string)$m['descrizione'])) !== ''): ?><div class="small text-secondary"><?php echo strip_tags((string)$m['descrizione'], '<p><br><strong><em><ul><ol><li><a>'); ?></div><?php endif; ?>
                         <div class="d-flex flex-wrap gap-2 mt-2">
-                            <?php if ($online): ?>
+                            <?php if ($online && $aperto): ?>
                                 <a href="modulo.php?id=<?php echo (int)$m['id']; ?>" class="btn btn-sm btn-success fw-bold"><i class="fa fa-pen me-1" aria-hidden="true"></i><?php echo $loggato ? 'Compila online' : 'Accedi e compila'; ?></a>
                             <?php endif; ?>
                             <?php if ($m['file_path']): ?><a href="<?php echo $h($m['file_path']); ?>" class="btn btn-sm btn-outline-primary fw-bold" download><i class="fa fa-download me-1" aria-hidden="true"></i>Scarica (<?php echo strtoupper(pathinfo($m['file_path'], PATHINFO_EXTENSION)); ?>)</a><?php endif; ?>

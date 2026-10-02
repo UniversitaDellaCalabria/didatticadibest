@@ -708,7 +708,8 @@ if (!function_exists('testo_segnaposti_pratica')) {
     function testo_segnaposti_pratica(string $tpl, array $p): string {
         $ris = risposte_pratica_tutte($p);
         $fissi = ['studente' => mb_strtoupper(trim($p['cognome'] . ' ' . $p['nome'])), 'nome' => $p['nome'], 'cognome' => $p['cognome'], 'matricola' => $p['matricola'],
-                  'email' => $p['email'], 'codice' => $p['codice'], 'modulo' => $p['modulo_titolo'] ?? '', 'data' => date('d/m/Y', strtotime($p['creata_il']))];
+                  'email' => $p['email'], 'codice' => $p['codice'], 'modulo' => $p['modulo_titolo'] ?? '', 'data' => date('d/m/Y', strtotime($p['creata_il'])),
+                  'protocollo' => trim(($p['protocollo'] ?? '') . (!empty($p['protocollo_data']) ? ' del ' . date('d/m/Y', strtotime($p['protocollo_data'])) : ''))];
         return preg_replace_callback('/\{([^{}\n]{1,200})\}/u', function ($m) use ($fissi, $ris) {
             $k = mb_strtolower(trim($m[1]));
             if (isset($fissi[$k])) return (string)$fissi[$k];
@@ -760,7 +761,7 @@ if (!function_exists('corpo_pratiche_verbale')) {
                     foreach ($colonne as $col) {
                         $k = mb_strtolower($col);
                         $riga[] = match ($k) { 'cognome' => mb_strtoupper($p['cognome']), 'nome' => mb_strtoupper($p['nome']), 'matricola' => $p['matricola'], 'codice' => $p['codice'],
-                                               'delibera' => (string)$p['delibera'], default => (string)($ris[$k]['valore'] ?? '') };
+                                               'delibera' => (string)$p['delibera'], 'protocollo' => (string)($p['protocollo'] ?? ''), default => (string)($ris[$k]['valore'] ?? '') };
                     }
                     $gruppi[$g][] = $riga;
                 }
@@ -833,8 +834,9 @@ if (!function_exists('genera_verbale_pratiche')) {
 if (!function_exists('genera_excel_pratiche')) {
     // Excel delle pratiche: un foglio con tutte (colonne di tutti i moduli) e un foglio per ogni modulo
     function genera_excel_pratiche($conn, array $pratiche): ?string {
-        $fisse = ['Codice', 'Modulo', 'Categoria', 'Stato', 'Inviata il', 'Aggiornata il', 'Cognome', 'Nome', 'Matricola', 'Email', 'Seduta', 'Delibera'];
-        $base = fn($p) => [$p['codice'], $p['modulo_titolo'], $p['categoria'], STATI_PRATICA[$p['stato']][0] ?? $p['stato'], date('d/m/Y H:i', strtotime($p['creata_il'])),
+        $prot = fn($p) => trim(($p['protocollo'] ?? '') . (!empty($p['protocollo_data']) ? ' del ' . date('d/m/Y', strtotime($p['protocollo_data'])) : ''));
+        $fisse = ['Codice', 'Protocollo', 'Modulo','Categoria', 'Stato', 'Inviata il', 'Aggiornata il', 'Cognome', 'Nome', 'Matricola', 'Email', 'Seduta', 'Delibera'];
+        $base = fn($p) => [$p['codice'], $prot($p), $p['modulo_titolo'], $p['categoria'], STATI_PRATICA[$p['stato']][0] ?? $p['stato'], date('d/m/Y H:i', strtotime($p['creata_il'])),
                            $p['aggiornata_il'] ? date('d/m/Y H:i', strtotime($p['aggiornata_il'])) : '', $p['cognome'], $p['nome'], $p['matricola'], $p['email'],
                            $p['seduta_data'] ? date('d/m/Y', strtotime($p['seduta_data'])) : '', (string)$p['delibera']];
         $etichette = function (array $lista) {
@@ -851,7 +853,7 @@ if (!function_exists('genera_excel_pratiche')) {
             }
             return $out;
         };
-        $larg = [13, 30, 16, 14, 16, 16, 18, 18, 12, 28, 12, 40];
+        $larg = [13, 18, 30, 16,14, 16, 16, 18, 18, 12, 28, 12, 40];
         $et = $etichette($pratiche);
         $fogli = ['Tutte le pratiche' => ['intestazioni' => array_merge($fisse, array_values($et)), 'righe' => $righe_di($pratiche, $et), 'larghezze' => array_merge($larg, array_fill(0, count($et), 30))]];
         $per_modulo = [];
@@ -863,5 +865,96 @@ if (!function_exists('genera_excel_pratiche')) {
             $fogli[$n] = ['intestazioni' => array_merge($fisse, array_values($e2)), 'righe' => $righe_di($lista, $e2), 'larghezze' => array_merge($larg, array_fill(0, count($e2), 30))];
         }
         return xlsx_crea($fogli);
+    }
+}
+
+if (!function_exists('periodo_modulo')) {
+    // Il modulo online si compila solo nel periodo aperto_dal–aperto_al (vuoti = sempre). Ritorna [aperto, testo da mostrare].
+    function periodo_modulo(array $m): array {
+        $oggi = date('Y-m-d'); $d = fn($x) => date('d/m/Y', strtotime($x));
+        $dal = $m['aperto_dal'] ?? null; $al = $m['aperto_al'] ?? null;
+        if ($dal && $oggi < $dal) return [false, 'Si compila dal ' . $d($dal) . ($al ? ' al ' . $d($al) : '')];
+        if ($al && $oggi > $al) return [false, 'Chiuso il ' . $d($al)];
+        if ($al) return [true, 'Aperto fino al ' . $d($al)];
+        return [true, ''];
+    }
+}
+
+if (!function_exists('promemoria_pratiche_ferme')) {
+    // Pratiche aperte senza movimenti da più dei giorni indicati nel modulo: email a chi le ha in carico (o a chi smista,
+    // se non sono ancora assegnate). Un promemoria per ogni periodo di attesa. Ritorna il numero di email inviate.
+    function promemoria_pratiche_ferme($conn): int {
+        $r = @$conn->query("SELECT p.id, m.giorni_promemoria FROM pratiche p JOIN didattica_moduli m ON m.id = p.modulo_id
+                            WHERE p.stato IN ('inviata', 'in_lavorazione') AND m.giorni_promemoria > 0
+                              AND COALESCE(p.aggiornata_il, p.creata_il) < NOW() - INTERVAL m.giorni_promemoria DAY
+                              AND (p.promemoria_il IS NULL OR p.promemoria_il < NOW() - INTERVAL m.giorni_promemoria DAY)");
+        $n = 0; $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+        while ($r && $x = $r->fetch_assoc()) {
+            $p = pratica($conn, (int)$x['id']);
+            if (!$p) continue;
+            $o = !empty($p['assegnata_a']) ? operatore_ufficio($conn, (int)$p['assegnata_a']) : null;
+            $smistano = array_keys(array_filter(uffici_didattica($conn), fn($u) => (int)$u['smista'] === 1));
+            $dest = $o ? [$o['email']] : (array_column(array_filter(operatori_ufficio($conn), fn($op) => in_array((int)$op['ufficio_id'], $smistano, true)), 'email') ?: email_ufficio_didattica($conn, (string)$p['email_ufficio']));
+            $giorni = (int)floor((time() - strtotime($p['aggiornata_il'] ?: $p['creata_il'])) / 86400);
+            foreach ($dest as $e) {
+                inviaNotificaEmail($e, "Pratica ferma da $giorni giorni: " . $p['modulo_titolo'] . " – " . trim($p['cognome'] . ' ' . $p['nome']),
+                    "<p>La pratica <strong>" . $h($p['codice']) . "</strong> (" . $h($p['modulo_titolo']) . ") di " . $h(trim($p['nome'] . ' ' . $p['cognome'])) . " non ha movimenti da <strong>$giorni giorni</strong>"
+                    . ($o ? " ed è in carico a te." : " e non è ancora stata smistata.") . "</p><p style='margin-top:18px;'><a href='" . $h(url_base_sito() . '/admin/didattica.php?tab=pratiche&id=' . (int)$p['id']) . "' style='background:#047857;color:#fff;padding:10px 18px;text-decoration:none;border-radius:6px;font-weight:bold;'>Apri la pratica</a></p>", $conn, '#047857');
+                $n++;
+            }
+            $conn->query("UPDATE pratiche SET promemoria_il = NOW() WHERE id = " . (int)$p['id']);
+        }
+        return $n;
+    }
+}
+
+if (!function_exists('statistiche_pratiche')) {
+    // Statistiche delle pratiche inviate tra $dal e $al: per modulo e per corso di studio (stati ed esiti),
+    // tempi medi per passo dell'iter (dal passaggio al passaggio successivo o alla conclusione) e tempo medio di chiusura.
+    function statistiche_pratiche($conn, string $dal, string $al): array {
+        $st = $conn->prepare("SELECT p.*, m.titolo AS modulo_titolo, m.iter_json FROM pratiche p JOIN didattica_moduli m ON m.id = p.modulo_id WHERE p.creata_il BETWEEN ? AND ?");
+        $a = "$dal 00:00:00"; $b = "$al 23:59:59";
+        $st->bind_param("ss", $a, $b); $st->execute();
+        $pr = $st->get_result()->fetch_all(MYSQLI_ASSOC);
+        $vuoto = ['totale' => 0, 'aperte' => 0, 'accolta' => 0, 'respinta' => 0, 'chiusa' => 0, 'giorni' => []];
+        $per_mod = []; $per_corso = []; $passi = []; $chiusura = [];
+        $finali = ['accolta', 'respinta', 'chiusa'];
+        foreach ($pr as $p) {
+            $corso = 'Senza corso di studio';
+            foreach (json_decode((string)$p['risposte_json'], true) ?: [] as $r) if (($r['tipo'] ?? '') === 'corso_studio' && $r['valore'] !== '') { $corso = $r['valore']; break; }
+            $conta = function (array &$tab, string $k) use ($p, $vuoto, $finali) {
+                $tab[$k] ??= $vuoto;
+                $tab[$k]['totale']++;
+                if (in_array($p['stato'], $finali, true)) $tab[$k][$p['stato']]++; else $tab[$k]['aperte']++;
+            };
+            $conta($per_mod, $p['modulo_titolo']);
+            $conta($per_corso, $corso);
+            // Tempi: eventi della pratica in ordine
+            $ev = $conn->query("SELECT tipo, stato, testo, creato_il FROM pratiche_eventi WHERE pratica_id = " . (int)$p['id'] . " ORDER BY creato_il, id")->fetch_all(MYSQLI_ASSOC);
+            $inizio = strtotime($p['creata_il']); $passo_corr = 'Smistamento'; $t_corr = $inizio; $fine = null;
+            foreach ($ev as $e) {
+                $t = strtotime($e['creato_il']);
+                if ($e['tipo'] === 'passaggio') {
+                    $passi[$passo_corr][] = ($t - $t_corr) / 86400;
+                    $passo_corr = preg_match('/^In carico a: (.+?) – /u', (string)$e['testo'], $mm) ? $mm[1] : 'Ufficio didattico';
+                    $t_corr = $t;
+                } elseif ($e['tipo'] === 'stato' && in_array($e['stato'], $finali, true) && $fine === null) {
+                    $passi[$passo_corr][] = ($t - $t_corr) / 86400;
+                    $fine = $t;
+                }
+            }
+            if ($fine) { $chiusura[] = ($fine - $inizio) / 86400; $per_mod[$p['modulo_titolo']]['giorni'][] = ($fine - $inizio) / 86400; }
+        }
+        $media = fn(array $v) => $v ? round(array_sum($v) / count($v), 1) : null;
+        foreach ($per_mod as &$x) $x['giorni'] = $media($x['giorni']); unset($x);
+        foreach ($per_corso as &$x) unset($x['giorni']); unset($x);
+        $tempi = [];
+        foreach ($passi as $nome => $v) $tempi[$nome] = ['media' => $media($v), 'n' => count($v), 'max' => round(max($v), 1)];
+        uasort($per_mod, fn($a, $b) => $b['totale'] <=> $a['totale']);
+        uasort($per_corso, fn($a, $b) => $b['totale'] <=> $a['totale']);
+        $tot = count($pr);
+        $esiti = ['accolta' => 0, 'respinta' => 0, 'chiusa' => 0, 'aperte' => 0];
+        foreach ($pr as $p) { if (in_array($p['stato'], $finali, true)) $esiti[$p['stato']]++; else $esiti['aperte']++; }
+        return ['totale' => $tot, 'esiti' => $esiti, 'per_modulo' => $per_mod, 'per_corso' => $per_corso, 'tempi_passi' => $tempi, 'chiusura_media' => $media($chiusura)];
     }
 }

@@ -58,6 +58,9 @@ while ($res_ris && $x_ris = $res_ris->fetch_assoc()) {
     }
 }
 
+// 4. Didattica: promemoria a chi ha in carico una pratica ferma da troppi giorni (giorni indicati nel modulo)
+if (function_exists('promemoria_pratiche_ferme')) $inviati += promemoria_pratiche_ferme($conn);
+
 // Redirect e Output
 if (isset($_GET['manual'])) {
     flash_set(" Elaborazione Reminder completata! Sono stati inviati <strong>$inviati</strong> promemoria.");

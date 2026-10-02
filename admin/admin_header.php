@@ -432,11 +432,12 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
                 <?php endif; ?>
 
                 <?php if ($modulo_corrente === 'didattica' && $puo_didattica): ?>
-                    <?php $tab_did = $current_page === 'didattica.php' ? (in_array($_GET['tab'] ?? '', ['sedute', 'moduli', 'ufficio'], true) ? $_GET['tab'] : 'pratiche') : '';
+                    <?php $tab_did = $current_page === 'didattica.php' ? (in_array($_GET['tab'] ?? '', ['sedute', 'moduli', 'ufficio', 'statistiche'], true) ? $_GET['tab'] : 'pratiche') : '';
                     $voce_menu([], 'didattica.php?tab=pratiche', 'fa-inbox', 'Pratiche degli studenti', $tab_did === 'pratiche');
                     $voce_menu([], 'didattica.php?tab=sedute', 'fa-gavel', 'Sedute e verbali', $tab_did === 'sedute');
                     $voce_menu([], 'didattica.php?tab=moduli', 'fa-file-lines', 'Moduli e documenti', $tab_did === 'moduli');
-                    $voce_menu([], 'didattica.php?tab=ufficio', 'fa-people-group', 'Ufficio e ricevimento', $tab_did === 'ufficio'); ?>
+                    $voce_menu([], 'didattica.php?tab=ufficio', 'fa-people-group', 'Ufficio e ricevimento', $tab_did === 'ufficio');
+                    $voce_menu([], 'didattica.php?tab=statistiche', 'fa-chart-column', 'Statistiche', $tab_did === 'statistiche'); ?>
                 <?php endif; ?>
 
                 <?php if ($modulo_corrente === 'portale'): ?>

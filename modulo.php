@@ -13,6 +13,8 @@ if (!$m || $m['tipo'] !== 'online' || !(int)$m['attivo']) {
 }
 $campi = campi_studente(campi_modulo($m['campi_json'])); // i campi dell'ufficio non li vede lo studente
 $puo = utente_destinatario_modulo($conn, $m, $user_info);
+[$aperto, $periodo] = periodo_modulo($m);
+if (!$aperto) $puo = false;
 $errori = [];
 if ($puo && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['invia_modulo'])) {
     csrf_verify($_POST['csrf_token'] ?? '');
@@ -40,7 +42,9 @@ require_once 'header.php';
     <?php if ($m['file_path']): ?><p><a href="<?php echo $h($m['file_path']); ?>" download><i class="fa fa-download me-1" aria-hidden="true"></i>Scarica il documento</a></p><?php endif; ?>
 
     <?php if (!$puo): ?>
-        <div class="alert alert-warning">Questo modulo è riservato a: <strong><?php echo $h(DESTINATARI_MODULO[$m['destinatari']] ?? ''); ?></strong>.</div>
+        <?php if (!$aperto): ?><div class="alert alert-secondary"><i class="fa fa-calendar-xmark me-1" aria-hidden="true"></i>Il modulo non è compilabile ora: <?php echo $h($periodo); ?>.</div>
+        <?php else: ?><div class="alert alert-warning">Questo modulo è riservato a: <strong><?php echo $h(DESTINATARI_MODULO[$m['destinatari']] ?? ''); ?></strong>.</div>
+        <?php endif; ?>
     <?php else: ?>
         <?php if ($errori): ?><div class="alert alert-danger" role="alert"><strong>Controlla i dati:</strong><ul class="mb-0"><?php foreach ($errori as $e): ?><li><?php echo $h($e); ?></li><?php endforeach; ?></ul></div><?php endif; ?>
         <form method="POST" enctype="multipart/form-data" class="card border-0 shadow-sm p-3 p-md-4" style="border-radius:12px;">
