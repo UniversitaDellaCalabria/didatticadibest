@@ -7,7 +7,7 @@ if (!$is_area_manager || tipo_area($page_cfg) !== 'calendario') {
     echo "<div class='alert alert-warning fw-bold shadow-sm m-4'><i class='fa fa-ban me-2'></i>" . (tipo_area($page_cfg) !== 'calendario' ? "Quest'area non è di tipo Calendari e risorse." : "Non gestisci quest'area.") . "</div>";
     require_once 'admin_footer.php'; exit;
 }
-$torna = fn(string $qs = '') => print("<script>window.location.replace(" . json_encode("risorse.php?p_id=$filtro_p" . $qs) . ");</script>");
+$torna = fn(string $qs = '') => print("<script>window.location.replace(" . json_encode("risorse.php?p_id=$filtro_p&r=" . time() . $qs) . ");</script>"); // &r=: con un'ancora la pagina deve ricaricarsi
 $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
 $ora_ok = fn($t) => preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', (string)$t) ? $t . ':00' : null;
 
@@ -43,6 +43,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['salva_risorsa'])) {
         $st->execute();
         $id = (int)$conn->insert_id;
     }
+    // Colore della riga nella vista a calendario (vuoto = grigio)
+    $colore_r = preg_match('/^#[0-9a-fA-F]{6}$/', (string)($_POST['colore'] ?? '')) && empty($_POST['colore_nessuno']) ? strtoupper($_POST['colore']) : null;
+    $st_c = $conn->prepare("UPDATE risorse SET colore = ? WHERE id = ?");
+    $st_c->bind_param("si", $colore_r, $id); $st_c->execute();
+    // Sportello di ricevimento di un docente dell'anagrafe: il docente ne gestisce orari e appuntamenti da ricevimento.php
+    $pers_r = persona_ateneo($conn, (string)($_POST['persona_id'] ?? ''));
+    $pid_r = $pers_r['id'] ?? null;
+    $st_p = $conn->prepare("UPDATE risorse SET persona_id = ? WHERE id = ?");
+    $st_p->bind_param("si", $pid_r, $id); $st_p->execute();
+    if ($pers_r) {
+        // Notifiche al docente e referente, se non indicati
+        if ($emails === '' && !empty($pers_r['email'])) { $st_e = $conn->prepare("UPDATE risorse SET email_notifiche = ? WHERE id = ?"); $st_e->bind_param("si", $pers_r['email'], $id); $st_e->execute(); }
+        if ($referente === '') { $nome_d = nome_persona($pers_r); $st_e = $conn->prepare("UPDATE risorse SET referente = ? WHERE id = ?"); $st_e->bind_param("si", $nome_d, $id); $st_e->execute(); }
+    }
     // Orari: fino a due fasce per giorno
     $conn->query("DELETE FROM risorse_orari WHERE risorsa_id = $id");
     $ins = $conn->prepare("INSERT INTO risorse_orari (risorsa_id, giorno, dalle, alle) VALUES (?, ?, ?, ?)");
@@ -56,7 +70,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['salva_risorsa'])) {
         }
     }
     registra_log_audit($conn, "Risorsa salvata", ["Area" => $page_cfg['titolo'], "Risorsa" => $nome]);
-    flash_set("Risorsa \"" . $h($nome) . "\" salvata." . ($avvisi ? " Orari ignorati perché incompleti o al contrario: " . $h(implode('; ', $avvisi)) . "." : ''), $avvisi ? 'warning' : 'success');
+    flash_set("Risorsa \"" . $nome . "\" salvata." . ($avvisi ? " Orari ignorati perché incompleti o al contrario: " . implode('; ', $avvisi) . "." : ''), $avvisi ? 'warning' : 'success');
     $torna(); exit;
 }
 
@@ -69,14 +83,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['elimina_risorsa'])) {
         $fut = (int)$conn->query("SELECT COUNT(*) n FROM prenotazioni_risorse WHERE risorsa_id = $id AND stato IN ('confermata', 'da_approvare') AND fine >= NOW()")->fetch_assoc()['n'];
         if ($fut > 0) {
             $conn->query("UPDATE risorse SET attiva = 0 WHERE id = $id");
-            flash_set("\"" . $h($r['nome']) . "\" ha $fut prenotazioni future: non l'ho eliminata ma resa non prenotabile. Annulla prima le prenotazioni se vuoi eliminarla.", 'warning');
+            flash_set("\"" . $r['nome'] . "\" ha $fut prenotazioni future: non l'ho eliminata ma resa non prenotabile. Annulla prima le prenotazioni se vuoi eliminarla.", 'warning');
         } else {
             $conn->query("DELETE FROM risorse_orari WHERE risorsa_id = $id");
             $conn->query("DELETE FROM risorse_chiusure WHERE risorsa_id = $id");
             $conn->query("DELETE FROM prenotazioni_risorse WHERE risorsa_id = $id");
             $conn->query("DELETE FROM risorse WHERE id = $id");
             registra_log_audit($conn, "Risorsa eliminata", ["Area" => $page_cfg['titolo'], "Risorsa" => $r['nome']]);
-            flash_set("Risorsa \"" . $h($r['nome']) . "\" eliminata.", 'warning');
+            flash_set("Risorsa \"" . $r['nome'] . "\" eliminata.", 'warning');
         }
     }
     $torna(); exit;
@@ -149,7 +163,16 @@ $url_pub = '../' . $page_cfg['slug'] . '.php';
             <div class="col-md-4"><label class="form-label small fw-bold" for="rLuogo">Luogo</label><input type="text" class="form-control" id="rLuogo" name="luogo" value="<?php echo $h($f['luogo']); ?>" maxlength="255" placeholder="es. Cubo 4B, piano terra"></div>
             <div class="col-md-8"><label class="form-label small fw-bold" for="rDescr">Descrizione</label><textarea class="form-control" id="rDescr" name="descrizione" rows="2" maxlength="3000" placeholder="Attrezzature, regole d'uso, cosa portare…"><?php echo $h($f['descrizione']); ?></textarea></div>
             <div class="col-md-2"><label class="form-label small fw-bold" for="rCap">Capienza</label><input type="number" min="0" class="form-control" id="rCap" name="capienza" value="<?php echo $h($f['capienza']); ?>"></div>
+            <div class="col-md-2"><label class="form-label small fw-bold" for="rCol">Colore nel calendario</label>
+                <input type="color" class="form-control form-control-color w-100" id="rCol" name="colore" oninput="document.getElementById('rColNo').checked = false;" value="<?php echo $h($f['colore'] ?? '') ?: '#e2e8f0'; ?>">
+                <div class="form-check small mt-1"><input class="form-check-input" type="checkbox" name="colore_nessuno" value="1" id="rColNo" <?php echo empty($f['colore']) ? 'checked' : ''; ?>><label class="form-check-label" for="rColNo">nessun colore</label></div></div>
             <div class="col-md-2"><label class="form-label small fw-bold" for="rRef">Referente</label><input type="text" class="form-control" id="rRef" name="referente" value="<?php echo $h($f['referente']); ?>" maxlength="150"></div>
+            <div class="col-md-4"><label class="form-label small fw-bold" for="rDoc">Docente del ricevimento <span class="fw-normal text-muted">(sportelli)</span></label>
+                <select class="form-select" id="rDoc" name="persona_id"><option value="">Nessuno</option>
+                    <?php $r_doc = @$conn->query("SELECT id, cognome, nome FROM personale_ateneo WHERE gruppo = 'docenti' AND attivo = 1 ORDER BY cognome, nome");
+                    while ($r_doc && $d_doc = $r_doc->fetch_assoc()): ?><option value="<?php echo $h($d_doc['id']); ?>"<?php echo ($f['persona_id'] ?? '') === $d_doc['id'] ? ' selected' : ''; ?>><?php echo $h($d_doc['cognome'] . ' ' . $d_doc['nome']); ?></option><?php endwhile; ?>
+                </select>
+                <div class="form-text">Il docente gestisce giorni, orari e appuntamenti da "Il mio ricevimento" (Area personale); dalla sua pagina pubblica gli studenti prenotano.</div></div>
             <div class="col-12"><label class="form-label small fw-bold" for="rEmail">Email per le notifiche</label><input type="text" class="form-control" id="rEmail" name="email_notifiche" value="<?php echo $h($f['email_notifiche']); ?>" placeholder="separate da virgola; vuoto = gestori dell'area">
                 <div class="form-text">Ricevono un'email a ogni nuova prenotazione, richiesta da approvare o annullamento.</div></div>
         </div>

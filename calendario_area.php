@@ -29,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['prenota_risorsa'])) {
     else {
         $esito = prenota_risorsa($conn, $r, $utente, (string)($_POST['inizio'] ?? ''), (int)($_POST['n_slot'] ?? 1), (string)($_POST['motivo'] ?? ''),
                                  !empty($_POST['ripeti']) ? (string)($_POST['ripeti_fino'] ?? '') : null);
-        if ($esito['errore']) flash_set($h($esito['errore']), 'danger');
+        if ($esito['errore']) flash_set($esito['errore'], 'danger');
         else {
             $pren = array_values(array_filter(array_map(fn($c) => prenotazione_risorsa($conn, $c), $esito['codici'])));
             if ($pren) {
@@ -136,7 +136,25 @@ require_once 'header.php';
 
     <?php if (!$risorse): ?>
         <div class="alert alert-info">Al momento non ci sono risorse prenotabili in quest'area.</div>
-    <?php elseif (!$sel): ?>
+    <?php elseif (!$sel):
+        // Due modi di vedere l'area: schede delle risorse oppure calendario di tutte le risorse (giorno, settimana, mese)
+        $vista_cal = in_array($_GET['vista'] ?? '', ['giorno', 'settimana', 'mese'], true) ? $_GET['vista'] : '';
+    ?>
+        <ul class="nav nav-pills gap-1 mb-3">
+            <li class="nav-item"><a class="nav-link fw-bold<?php echo $vista_cal === '' ? ' active' : ''; ?>" style="<?php echo $vista_cal === '' ? 'background:' . $col . ';color:' . $col_txt . ';' : ''; ?>" href="<?php echo $h($pagina_url); ?>"<?php echo $vista_cal === '' ? ' aria-current="page"' : ''; ?>><i class="fa fa-table-cells-large me-1" aria-hidden="true"></i>Risorse</a></li>
+            <li class="nav-item"><a class="nav-link fw-bold<?php echo $vista_cal !== '' ? ' active' : ''; ?>" style="<?php echo $vista_cal !== '' ? 'background:' . $col . ';color:' . $col_txt . ';' : ''; ?>" href="<?php echo $h($pagina_url . '?vista=settimana'); ?>"<?php echo $vista_cal !== '' ? ' aria-current="page"' : ''; ?>><i class="fa fa-calendar-days me-1" aria-hidden="true"></i>Calendario</a></li>
+        </ul>
+        <?php if ($vista_cal !== ''):
+            $f_tipo = isset(TIPI_RISORSA[$_GET['tipo_ris'] ?? '']) ? $_GET['tipo_ris'] : '';
+            $f_cap = max(0, (int)($_GET['capienza'] ?? 0));
+            $ris_cal = array_values(array_filter($risorse, fn($r) => ($f_tipo === '' || $r['tipo'] === $f_tipo) && (!$f_cap || (int)$r['capienza'] >= $f_cap)));
+            $url_cal = fn(array $c) => $pagina_url . '?' . http_build_query(array_filter(array_merge(['vista' => $vista_cal, 'data' => $_GET['data'] ?? '', 'tipo_ris' => $f_tipo, 'capienza' => $f_cap ?: ''], $c), fn($v) => $v !== '' && $v !== null));
+            echo css_calendario_risorse();
+            echo '<div class="card shadow-sm border-0 p-3" style="border-radius:12px;">';
+            echo html_calendario_risorse($conn, $ris_cal, ['vista' => $vista_cal, 'data' => $_GET['data'] ?? date('Y-m-d'), 'uid' => (int)($utente['id'] ?? 0), 'gestore' => false,
+                'url' => $url_cal, 'url_risorsa' => fn(int $id, string $g) => $pagina_url . '?risorsa=' . $id . '&dal=' . $g, 'filtri' => ['tipo' => $f_tipo, 'capienza' => $f_cap]]);
+            echo '<p class="small text-secondary mt-2 mb-0"><i class="fa fa-hand-pointer me-1" aria-hidden="true"></i>Clicca una risorsa (o un orario libero) per prenotarla.</p></div>';
+        else: ?>
         <div class="row g-3">
         <?php foreach ($risorse as $r): $orari = orari_risorsa($conn, (int)$r['id']); ?>
             <div class="col-md-6 col-lg-4">
@@ -155,6 +173,7 @@ require_once 'header.php';
             </div>
         <?php endforeach; ?>
         </div>
+        <?php endif; // schede o calendario ?>
     <?php else:
         $giorni = [];
         for ($i = 0; $i < 7; $i++) {

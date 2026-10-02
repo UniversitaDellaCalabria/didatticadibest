@@ -487,7 +487,25 @@ if (!defined('TIPI_AMBITO')) define('TIPI_AMBITO', [
     'fsl'             => "Formazione Scuola Lavoro: tutto",
     'fsl_convenzioni' => "Formazione Scuola Lavoro: solo convenzioni",
     'fsl_scuole'      => "Formazione Scuola Lavoro: solo anagrafe scuole",
+    // Moduli interi (pagina_id 0): tutte le aree del modulo come "tutta l'area"; Orientamento comprende la FSL
+    'modulo_orientamento' => "Modulo Orientamento (tutte le aree e la Formazione Scuola Lavoro)",
+    'modulo_calendari'    => "Modulo Prenotazioni e risorse (tutte le aree)",
+    'modulo_didattica'    => "Modulo Didattica",
 ]);
+
+if (!function_exists('ha_modulo')) {
+    // Abilitato al modulo intero
+    function ha_modulo($conn, int $uid, string $modulo): bool {
+        return $modulo !== '' && ha_ambito($conn, $uid, 'modulo_' . $modulo);
+    }
+}
+
+if (!function_exists('area_nel_modulo_utente')) {
+    // L'area appartiene a un modulo a cui l'utente è abilitato per intero
+    function area_nel_modulo_utente($conn, int $uid, ?array $pagina): bool {
+        return $pagina && function_exists('modulo_di_area') && ha_modulo($conn, $uid, modulo_di_area($pagina));
+    }
+}
 
 if (!function_exists('ambiti_utente')) {
     // [['tipo' => …, 'pagina_id' => …], …] dell'utente
@@ -517,7 +535,10 @@ if (!function_exists('sql_attivita_ambiti')) {
         $cond = [];
         if (ha_ambito($conn, $uid, 'progetti', $pagina_id)) $cond[] = "e.tipo = 'progetto'";
         if (ha_ambito($conn, $uid, 'eventi', $pagina_id)) $cond[] = "IFNULL(e.tipo, 'evento') <> 'progetto'";
-        if (ha_ambito($conn, $uid, 'fsl')) $cond[] = "e.id IN (SELECT evento_id FROM progetti_dettagli WHERE convenzione = 1)";
+        if (ha_ambito($conn, $uid, 'fsl') || ha_ambito($conn, $uid, 'modulo_orientamento')) $cond[] = "e.id IN (SELECT evento_id FROM progetti_dettagli WHERE convenzione = 1)";
+        // Modulo intero a cui appartiene l'area: tutte le attività
+        $r_p = $conn->query("SELECT * FROM pagine_eventi WHERE id = " . (int)$pagina_id);
+        if ($r_p && ($pag = $r_p->fetch_assoc()) && area_nel_modulo_utente($conn, $uid, $pag)) $cond[] = "1 = 1";
         return $cond ? '(' . implode(' OR ', $cond) . ')' : '';
     }
 }
@@ -539,7 +560,13 @@ if (!function_exists('aree_da_ambiti')) {
     function aree_da_ambiti($conn, int $uid): array {
         $aree = [];
         foreach (ambiti_utente($conn, $uid) as $a) if (in_array($a['tipo'], ['progetti', 'eventi'], true) && $a['pagina_id'] > 0) $aree[$a['pagina_id']] = true;
-        if (ha_ambito($conn, $uid, 'fsl')) {
+        // Moduli interi: tutte le aree del modulo
+        $moduli = array_filter(array_map(fn($a) => str_starts_with($a['tipo'], 'modulo_') ? substr($a['tipo'], 7) : null, ambiti_utente($conn, $uid)));
+        if ($moduli) {
+            $r = $conn->query("SELECT * FROM pagine_eventi");
+            while ($r && $x = $r->fetch_assoc()) if (in_array(modulo_di_area($x), $moduli, true)) $aree[(int)$x['id']] = true;
+        }
+        if (ha_ambito($conn, $uid, 'fsl') || ha_ambito($conn, $uid, 'modulo_orientamento')) {
             $r = $conn->query("SELECT DISTINCT e.pagina_id FROM eventi e JOIN progetti_dettagli pd ON pd.evento_id = e.id WHERE pd.convenzione = 1");
             while ($r && $x = $r->fetch_assoc()) $aree[(int)$x['pagina_id']] = true;
         }
@@ -555,7 +582,12 @@ if (!function_exists('ids_ambito_attivita')) {
         $e = $r ? $r->fetch_assoc() : null;
         if (!$e) return [];
         $tipo = $e['tipo'] === 'progetto' ? 'progetti' : 'eventi';
-        $cond = "(tipo = '$tipo' AND pagina_id = " . (int)$e['pagina_id'] . ")" . ($con_fsl && (int)$e['fsl'] === 1 ? " OR tipo = 'fsl'" : '');
+        $cond = "(tipo = '$tipo' AND pagina_id = " . (int)$e['pagina_id'] . ")" . ($con_fsl && (int)$e['fsl'] === 1 ? " OR tipo IN ('fsl', 'modulo_orientamento')" : '');
+        // Con $con_fsl (perimetri ampi) anche chi ha il modulo intero dell'area
+        if ($con_fsl && function_exists('modulo_di_area')) {
+            $r_p = $conn->query("SELECT * FROM pagine_eventi WHERE id = " . (int)$e['pagina_id']);
+            if ($r_p && $pag = $r_p->fetch_assoc()) $cond .= " OR tipo = 'modulo_" . $conn->real_escape_string(modulo_di_area($pag)) . "'";
+        }
         $ids = [];
         $r = @$conn->query("SELECT DISTINCT utente_id FROM abilitazioni_ambito WHERE $cond");
         while ($r && $x = $r->fetch_assoc()) $ids[] = (int)$x['utente_id'];
@@ -593,7 +625,7 @@ if (!function_exists('utente_ha_abilitazioni')) {
 if (!function_exists('assegna_ambito')) {
     function assegna_ambito($conn, int $uid, string $tipo, int $pagina_id = 0, int $da = 0): bool {
         if ($uid <= 0 || !isset(TIPI_AMBITO[$tipo])) return false;
-        if (in_array($tipo, ['fsl', 'fsl_convenzioni', 'fsl_scuole'], true)) $pagina_id = 0;
+        if (in_array($tipo, ['fsl', 'fsl_convenzioni', 'fsl_scuole'], true) || str_starts_with($tipo, 'modulo_')) $pagina_id = 0;
         elseif ($pagina_id <= 0) return false;
         $st = $conn->prepare("INSERT IGNORE INTO abilitazioni_ambito (utente_id, tipo, pagina_id, creata_da) VALUES (?, ?, ?, ?)");
         $st->bind_param("isii", $uid, $tipo, $pagina_id, $da);

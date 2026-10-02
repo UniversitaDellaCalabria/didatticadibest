@@ -737,6 +737,43 @@ require_once 'header.php';
         </div>
     <?php endif; ?>
 
+    <?php
+    // Sportelli di ricevimento (del docente o, per i suoi operatori, dell'Ufficio didattico): gestione e prossimi appuntamenti
+    $ids_ric = array_map('intval', array_column(sportelli_utente($conn, $user_info), 'id'));
+    if ($ids_ric):
+        $ric_rows = $conn->query("SELECT r.id, (SELECT COUNT(*) FROM prenotazioni_risorse pr WHERE pr.risorsa_id = r.id AND pr.stato IN ('confermata', 'da_approvare') AND pr.fine >= NOW()) AS n,
+                                         (SELECT COUNT(*) FROM prenotazioni_risorse pr WHERE pr.risorsa_id = r.id AND pr.stato = 'da_approvare' AND pr.fine >= NOW()) AS da_appr
+                                  FROM risorse r WHERE r.id IN (" . implode(',', $ids_ric) . ")")->fetch_all(MYSQLI_ASSOC);
+        if ($ric_rows): $n_ric = array_sum(array_column($ric_rows, 'n')); $n_appr = array_sum(array_column($ric_rows, 'da_appr')); ?>
+        <a href="ricevimento.php" class="card border-0 shadow-sm mb-4 text-decoration-none" style="border-radius: 12px; border-left: 5px solid #7c3aed !important;">
+            <div class="card-body d-flex align-items-center gap-3 flex-wrap">
+                <i class="fa fa-user-clock fs-3" style="color:#7c3aed;" aria-hidden="true"></i>
+                <div class="flex-grow-1">
+                    <div class="fw-bold text-dark">Il mio ricevimento</div>
+                    <div class="small text-secondary"><?php echo $n_ric; ?> appuntamenti in programma<?php echo $n_appr ? " · $n_appr da approvare" : ''; ?> · giorni, orari e assenze</div>
+                </div>
+                <span class="btn btn-sm fw-bold text-white" style="background:#7c3aed;">Gestisci</span>
+            </div>
+        </a>
+    <?php endif; endif; ?>
+
+    <?php
+    // Pratiche della didattica (moduli online): collegamento a Le mie pratiche se l'utente ne ha
+    $pr_rows = @$conn->query("SELECT COUNT(*) AS n, SUM(stato = 'integrazione') AS integr, SUM(stato NOT IN ('accolta', 'respinta', 'chiusa')) AS aperte FROM pratiche WHERE utente_id = " . (int)$_SESSION['utente_id']);
+    $pr_rows = $pr_rows ? $pr_rows->fetch_assoc() : null;
+    if ($pr_rows && (int)$pr_rows['n'] > 0): ?>
+        <a href="pratiche.php" class="card border-0 shadow-sm mb-4 text-decoration-none" style="border-radius: 12px; border-left: 5px solid #047857 !important;">
+            <div class="card-body d-flex align-items-center gap-3 flex-wrap">
+                <i class="fa fa-folder-open fs-3" style="color:#047857;" aria-hidden="true"></i>
+                <div class="flex-grow-1">
+                    <div class="fw-bold text-dark">Le mie pratiche</div>
+                    <div class="small text-secondary"><?php echo (int)$pr_rows['aperte']; ?> in corso su <?php echo (int)$pr_rows['n']; ?><?php echo (int)$pr_rows['integr'] ? ' · <strong class="text-danger">' . (int)$pr_rows['integr'] . ' con integrazione richiesta</strong>' : ''; ?> · <span class="text-decoration-underline">modulistica</span></div>
+                </div>
+                <span class="btn btn-sm fw-bold text-white" style="background:#047857;">Apri</span>
+            </div>
+        </a>
+    <?php endif; ?>
+
     <!-- MENU A TAB (RESTYLING COLORI) -->
     <ul class="nav nav-pills nav-fill gap-2 p-1 bg-light rounded-pill border mb-4 shadow-sm custom-tabs" id="pills-tab" role="tablist">
         <li class="nav-item" role="presentation">

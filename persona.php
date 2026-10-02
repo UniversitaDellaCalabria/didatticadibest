@@ -23,7 +23,13 @@ if ($pers) {
         }
     }
 }
-if (!$pers || !$attivita) {
+// Sportelli di ricevimento attivi del docente (Prenotazioni e risorse) in aree visibili
+$sportelli_ric = [];
+if ($pers) {
+    $st_r = $conn->prepare("SELECT r.id, r.nome, r.luogo, p.slug FROM risorse r JOIN pagine_eventi p ON p.id = r.pagina_id WHERE r.persona_id = ? AND r.attiva = 1 AND IFNULL(p.visibile, 1) = 1");
+    if ($st_r) { $st_r->bind_param("s", $pers['id']); $st_r->execute(); $sportelli_ric = $st_r->get_result()->fetch_all(MYSQLI_ASSOC); }
+}
+if (!$pers || (!$attivita && !$sportelli_ric)) {
     http_response_code(404);
     $page_cfg['titolo'] = "Pagina non trovata";
     require_once 'header.php';
@@ -74,6 +80,7 @@ $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
                 <div class="ps-testo"><?php echo $h($bio); ?></div>
             <?php endif; ?>
 
+            <?php if ($attivita): ?>
             <h2>Attività sul portale</h2>
             <div>
                 <?php foreach ($attivita as $a):
@@ -90,6 +97,7 @@ $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
                     </div>
                 <?php endforeach; ?>
             </div>
+            <?php endif; ?>
         </div>
 
         <aside class="col-lg-4">
@@ -105,6 +113,9 @@ $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
                     <div class="ps-testo small"><?php echo $h($det['ricevimento']); ?></div>
                 <?php endif; ?>
 
+                <?php foreach ($sportelli_ric as $sr): ?>
+                    <a href="<?php echo $h($sr['slug'] . '.php?risorsa=' . (int)$sr['id']); ?>" class="btn btn-primary fw-bold w-100 mt-3"><i class="fa fa-user-clock me-1" aria-hidden="true"></i>Prenota il ricevimento<?php echo count($sportelli_ric) > 1 ? ': ' . $h($sr['nome']) : ''; ?></a>
+                <?php endforeach; ?>
                 <h2>Approfondisci</h2>
                 <ul class="list-unstyled mb-0">
                     <li class="mb-1"><a href="<?php echo $h(url_portale_persona($pers)); ?>" target="_blank" rel="noopener"><i class="fa fa-arrow-up-right-from-square me-1" aria-hidden="true"></i>Pagina sul portale di Ateneo<span class="visually-hidden"> (si apre in una nuova scheda)</span></a></li>

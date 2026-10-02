@@ -296,6 +296,26 @@ $oggi_cv = date('Y-m-d'); $tra60_cv = date('Y-m-d', strtotime('+60 days'));
 <section class="scu-sez" id="convenzioni">
     <p class="small text-secondary">Registro delle convenzioni per la Formazione Scuola Lavoro, con i file firmati (convenzione e Allegato A), il periodo di validità e i docenti di riferimento. Nelle attività con l'interruttore <strong>Attività di Formazione Scuola Lavoro</strong> la convenzione deve coprire <strong>tutto il periodo</strong> del progetto (Dal/Al) o il giorno del turno dell'evento: se lo copre, la scuola non deve inviare nulla; se non lo copre, ne va stipulata una nuova. Registrando o modificando una convenzione, le prenotazioni della scuola in attesa si confermano da sole (se il turno non chiede anche l'approvazione) e la scuola riceve l'email. Gli amministratori ricevono un avviso 60 giorni prima della scadenza.</p>
 
+    <?php // Convenzioni compilate online dalle scuole (convenzione_online.php): si aspetta la PEC con i documenti firmati
+    $cv_online = $conn->query("SELECT * FROM convenzioni_compilate WHERE dati_json IS NOT NULL AND aggiornata_il >= NOW() - INTERVAL 1 YEAR ORDER BY aggiornata_il DESC LIMIT 50");
+    $cv_online = $cv_online ? $cv_online->fetch_all(MYSQLI_ASSOC) : [];
+    if ($cv_online): ?>
+    <details class="border rounded p-2 mb-3" style="background:#fffbeb;"<?php echo count($cv_online) <= 5 ? ' open' : ''; ?>>
+        <summary class="fw-bold small"><i class="fa fa-wand-magic-sparkles me-1" aria-hidden="true"></i>Compilate online dalle scuole (<?php echo count($cv_online); ?>): in attesa della PEC con i documenti firmati</summary>
+        <div class="table-responsive mt-2"><table class="table table-sm small align-middle mb-0">
+            <thead><tr><th>Scuola</th><th>Dirigente</th><th>Attività nell'Allegato A</th><th>Compilata</th><th></th></tr></thead><tbody>
+            <?php foreach ($cv_online as $co): $dco = json_decode((string)$co['dati_json'], true) ?: []; $sco = $dco['scuola'] ?? []; $reg = convenzione_valida($conn, $co['scuola_codice']); ?>
+                <tr><td><strong><?php echo $h($sco['denominazione'] ?? ''); ?></strong><div class="text-secondary"><?php echo $h($co['scuola_codice'] ?: 'scuola non in anagrafe'); ?><?php echo !empty($sco['pec']) ? ' · ' . $h($sco['pec']) : ''; ?></div></td>
+                    <td><?php echo $h($sco['dirigente'] ?? ''); ?></td>
+                    <td><?php echo count($dco['attivita'] ?? []); ?><?php $np = count(array_filter($dco['attivita'] ?? [], fn($a) => empty($a['pr']))); echo $np ? " <span class='badge bg-warning text-dark'>$np da prenotare</span>" : ''; ?></td>
+                    <td class="text-nowrap"><?php echo date('d/m/Y', strtotime($co['aggiornata_il'])); ?><?php echo $reg ? ' <span class="badge bg-success">registrata</span>' : ''; ?></td>
+                    <td class="text-nowrap"><a class="btn btn-sm btn-outline-primary py-0" href="../convenzione_online.php?t=<?php echo $h($co['token']); ?>&amp;scarica=convenzione"><i class="fa fa-file-word me-1" aria-hidden="true"></i>Word</a>
+                        <?php if (!$reg && $co['scuola_codice']): ?><a class="btn btn-sm btn-outline-success py-0" href="fsl.php?p_id=<?php echo (int)$filtro_p; ?>&amp;tab=convenzioni&amp;conv_nuova=<?php echo $h($co['scuola_codice']); ?>#convForm">Registra</a><?php endif; ?></td></tr>
+            <?php endforeach; ?>
+            </tbody></table></div>
+    </details>
+    <?php endif; ?>
+
     <!-- REGISTRA / MODIFICA -->
     <h3 class="h6 fw-bold mt-3" id="convForm"><?php echo $conv_mod ? 'Modifica la convenzione' : ($conv_rinnova ? 'Rinnova la convenzione' : 'Registra una convenzione'); ?></h3>
     <?php if ($conv_rinnova): ?><p class="small text-secondary mb-2">Nuova convenzione per la stessa scuola, con i docenti di riferimento della precedente (<?php echo $h(testo_validita_convenzione($conv_rinnova)); ?><?php echo $conv_rinnova['protocollo'] !== '' ? (preg_match('/^prot/i', $conv_rinnova['protocollo']) ? ', ' : ', protocollo ') . $h($conv_rinnova['protocollo']) : ''; ?>): controlla le date e carica i nuovi file firmati. La convenzione scaduta resta in archivio.</p><?php endif; ?>

@@ -16,7 +16,7 @@ $filtri = [
     'periodo' => in_array($_GET['periodo'] ?? '', ['future', 'passate', 'tutte'], true) ? $_GET['periodo'] : 'future',
     'q'       => mb_substr(trim((string)($_GET['q'] ?? '')), 0, 80),
 ];
-$qs = fn(array $cambia = []) => 'prenotazioni_risorse.php?' . http_build_query(array_merge(['p_id' => $pid], array_filter($filtri, fn($v) => $v !== '' && $v !== 0), $cambia));
+$qs = fn(array $cambia = []) => 'prenotazioni_risorse.php?' . http_build_query(array_merge(['p_id' => $pid, 'modo' => 'elenco'], array_filter($filtri, fn($v) => $v !== '' && $v !== 0), $cambia));
 
 // ── Azioni: approva / rifiuta / annulla (anche tutta la serie settimanale) ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['azione_pren'])) {
@@ -76,6 +76,8 @@ if (isset($_GET['csv'])) {
 }
 
 $risorse = $conn->query("SELECT id, nome, attiva FROM risorse WHERE pagina_id = $pid ORDER BY ordine, nome")->fetch_all(MYSQLI_ASSOC);
+// Vista: calendario (griglia risorse × ore, mese) oppure elenco con filtri
+$modo = ($_GET['modo'] ?? 'calendario') === 'elenco' ? 'elenco' : 'calendario';
 $kpi = $conn->query("SELECT
         SUM(pr.stato = 'confermata' AND DATE(pr.inizio) = CURDATE()) AS oggi,
         SUM(pr.stato = 'confermata' AND pr.inizio >= NOW() AND pr.inizio < NOW() + INTERVAL 7 DAY) AS settimana,
@@ -100,6 +102,27 @@ $url_pub = '../' . $page_cfg['slug'] . '.php';
         <a href="risorse.php?p_id=<?php echo $pid; ?>&amp;nuova=1" class="btn btn-primary fw-bold"><i class="fa fa-plus-circle me-1" aria-hidden="true"></i>Crea la prima risorsa</a>
     </div></div>
 <?php require_once 'admin_footer.php'; exit; endif; ?>
+
+<ul class="nav nav-pills gap-1 mb-3" style="--bs-nav-pills-link-active-bg:#1e293b;">
+    <li class="nav-item"><a class="nav-link fw-bold<?php echo $modo === 'calendario' ? ' active' : ' bg-light text-dark'; ?>" href="prenotazioni_risorse.php?p_id=<?php echo $pid; ?>&amp;modo=calendario"<?php echo $modo === 'calendario' ? ' aria-current="page"' : ''; ?>><i class="fa fa-calendar-days me-1" aria-hidden="true"></i>Calendario</a></li>
+    <li class="nav-item"><a class="nav-link fw-bold<?php echo $modo === 'elenco' ? ' active' : ' bg-light text-dark'; ?>" href="prenotazioni_risorse.php?p_id=<?php echo $pid; ?>&amp;modo=elenco"<?php echo $modo === 'elenco' ? ' aria-current="page"' : ''; ?>><i class="fa fa-list me-1" aria-hidden="true"></i>Elenco, approvazioni e CSV</a></li>
+</ul>
+
+<?php if ($modo === 'calendario'):
+    // Griglia di tutte le risorse dell'area (filtri per tipo e capienza); i gestori vedono chi ha prenotato
+    $f_tipo = isset(TIPI_RISORSA[$_GET['tipo_ris'] ?? '']) ? $_GET['tipo_ris'] : '';
+    $f_cap = max(0, (int)($_GET['capienza'] ?? 0));
+    $ris_cal = $conn->query("SELECT * FROM risorse WHERE pagina_id = $pid ORDER BY ordine, nome")->fetch_all(MYSQLI_ASSOC);
+    $ris_cal = array_values(array_filter($ris_cal, fn($r) => ($f_tipo === '' || $r['tipo'] === $f_tipo) && (!$f_cap || (int)$r['capienza'] >= $f_cap)));
+    $url_cal = fn(array $c) => 'prenotazioni_risorse.php?' . http_build_query(array_filter(array_merge(['p_id' => $pid, 'modo' => 'calendario', 'vista' => $_GET['vista'] ?? 'settimana', 'data' => $_GET['data'] ?? '', 'tipo_ris' => $f_tipo, 'capienza' => $f_cap ?: ''], $c), fn($v) => $v !== '' && $v !== null));
+    echo css_calendario_risorse();
+    echo '<div class="card border-0 shadow-sm mb-3"><div class="card-body">';
+    echo html_calendario_risorse($conn, $ris_cal, ['vista' => $_GET['vista'] ?? 'settimana', 'data' => $_GET['data'] ?? date('Y-m-d'), 'uid' => (int)$u_id_curr, 'gestore' => true,
+        'url' => $url_cal, 'url_risorsa' => fn(int $id, string $g) => $url_pub . '?risorsa=' . $id . '&dal=' . $g,
+        'filtri' => ['tipo' => $f_tipo, 'capienza' => $f_cap], 'campi_nascosti' => ['p_id' => $pid, 'modo' => 'calendario']]);
+    echo '<p class="small text-secondary mt-2 mb-0"><i class="fa fa-circle-info me-1" aria-hidden="true"></i>Clicca una riga per prenotare la risorsa dalla pagina pubblica; per approvare o annullare usa la scheda Elenco.</p></div></div>';
+    require_once 'admin_footer.php'; exit;
+endif; ?>
 
 <div class="row g-3 mb-3">
     <?php foreach ([['Oggi', $kpi['oggi'], 'fa-sun', '#0056B3', ''], ['Prossimi 7 giorni', $kpi['settimana'], 'fa-calendar-week', '#047857', ''],
@@ -134,7 +157,7 @@ $url_pub = '../' . $page_cfg['slug'] . '.php';
 <?php endif; ?>
 
 <form method="GET" action="prenotazioni_risorse.php" class="card border-0 shadow-sm mb-3">
-    <input type="hidden" name="p_id" value="<?php echo $pid; ?>">
+    <input type="hidden" name="p_id" value="<?php echo $pid; ?>"><input type="hidden" name="modo" value="elenco">
     <div class="card-body row g-2 align-items-end">
         <div class="col-md-3"><label class="form-label small fw-bold mb-0" for="fRis">Risorsa</label>
             <select class="form-select form-select-sm" id="fRis" name="risorsa"><option value="0">Tutte</option><?php foreach ($risorse as $r): ?><option value="<?php echo (int)$r['id']; ?>"<?php echo $filtri['risorsa'] === (int)$r['id'] ? ' selected' : ''; ?>><?php echo $h($r['nome']); ?></option><?php endforeach; ?></select></div>

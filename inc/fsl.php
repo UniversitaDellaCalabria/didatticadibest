@@ -61,6 +61,21 @@ if (!function_exists('html_istruzioni_convenzione')) {
             ? "<a href='" . $h(url_base_sito() . '/convenzione_precompilata.php?code=' . urlencode($codice)) . "'$a>Scarica la Convenzione già compilata</a> <span style='font-weight:normal;'>(DOCX, con i dati della scuola e della prenotazione: completa i campi evidenziati in giallo)</span>"
               . " · <a href='" . $h($c['modello']) . "'" . ($per_email ? " style='color:#B30000;'" : " target='_blank' rel='noopener'") . ">modello vuoto</a>"
             : "<a href='" . $h($c['modello']) . "'$a>Scarica il modello di Convenzione</a>" . $fmt($c['modello']);
+        // Con il modello del Dipartimento la scuola compila Convenzione e Allegato A online (convenzione_online.php):
+        // nel modulo di prenotazione (senza codice) si annuncia, dopo la prenotazione c'è il link
+        $online = empty($cfg['conv_url_modello']) && is_file(RADICE_SITO . '/modelli_documenti/convenzione_precompilabile.docx');
+        if ($online && $codice === '')
+            return "<p style='margin:0 0 6px;'>$frase</p><p style='margin:0;'><strong>Al termine della prenotazione</strong> potrai compilare online la <strong>Convenzione</strong> e l'<strong>Allegato A</strong> con un modulo guidato: trovi il link nella pagina di conferma e nell'email. Il Dirigente li firma digitalmente e la scuola li invia via PEC a <a href='mailto:" . $h($c['pec']) . "'$a>" . $h($c['pec']) . "</a>.</p>";
+        if ($online) {
+            $url_on = url_base_sito() . '/convenzione_online.php?code=' . urlencode($codice);
+            $bottone = $per_email ? "<p style='margin:12px 0;'><a href='" . $h($url_on) . "' style='background:#B30000;color:#fff;padding:10px 18px;text-decoration:none;border-radius:6px;font-weight:bold;'>Compila online la Convenzione e l'Allegato A</a></p>"
+                                  : "<p style='margin:8px 0;'><a href='" . $h($url_on) . "' class='btn btn-danger btn-sm fw-bold'><i class='fa fa-file-signature me-1'></i>Compila online la Convenzione e l'Allegato A</a></p>";
+            return "<p style='margin:0 0 6px;'>$frase Compila online i documenti con un modulo guidato (dati della scuola e del Dirigente, attività da inserire nell'Allegato A, logo della scuola): li scarichi già pronti in Word.</p>"
+                 . $bottone
+                 . "<p style='margin:0;'>Poi il Dirigente li <strong>firma digitalmente</strong> e la scuola li invia via PEC a <a href='mailto:" . $h($c['pec']) . "'$a>" . $h($c['pec']) . "</a>. "
+                 . ($in_attesa ? "Appena riceviamo la convenzione confermiamo la prenotazione e ti avvisiamo per email." : "Se la scuola l'ha già inviata, puoi ignorare questo messaggio.")
+                 . " <span style='font-size:.9em;'>Preferisci i modelli vuoti? <a href='" . $h($c['modello']) . "'" . ($per_email ? " style='color:#B30000;'" : '') . ">Convenzione</a> · <a href='" . $h($c['allegato']) . "'" . ($per_email ? " style='color:#B30000;'" : '') . ">Allegato A</a></span></p>";
+        }
         return "<p style='margin:0 0 6px;'>$frase Compila i modelli:</p>"
              . "<ul style='margin:0 0 6px;'><li>$voce_conv</li><li>$voce_all</li></ul>"
              . "<p style='margin:0;'>e inviali <strong>firmati digitalmente</strong> alla PEC <a href='mailto:" . $h($c['pec']) . "'$a>" . $h($c['pec']) . "</a>. "
@@ -340,36 +355,143 @@ if (!function_exists('dati_convenzione_precompilata')) {
     }
 }
 
-if (!function_exists('genera_convenzione_precompilata')) {
-    // Crea il .docx precompilato in un file temporaneo e ne ritorna il percorso (null se il modello o ZipArchive mancano).
+if (!defined('CONV_SEGNAPOSTI')) define('CONV_SEGNAPOSTI', [
+    // Testo originale del modello per i segnaposto lasciati vuoti (resta evidenziato in giallo da completare)
+    'ISTITUTO' => 'Denominazione Istituzione Scolastica', 'COMUNE' => 'xxxx', 'INDIRIZZO' => 'xxx', 'ISTITUTO_FIRMA' => '…………………………',
+    'CF_ISTITUTO' => 'xxxxxx', 'DIRIGENTE' => 'Dott./Dott.ssa xxxxxx XXXX', 'DIR_LUOGO_NASCITA' => 'xxxx', 'DIR_DATA_NASCITA' => 'xx/xx/xxxx',
+    'DIR_CF' => 'XXXXXXXXXXXXXXXX', 'DIRIGENTE_FIRMA' => 'Dott./Dott.ssa………………..',
+    'TITOLO' => '……………………', 'DESCRIZIONE' => '…………………………………', 'STUDENTI' => '……………', 'PERIODO' => '…', 'DURATA' => '……',
+    'TUTOR_DIBEST' => 'Prof./Prof.ssa ___________________', 'TUTOR_SCUOLA' => '___________________',
+]);
+
+if (!function_exists('genera_docx_convenzione')) {
+    // Documento (.docx) dal modello del Dipartimento ('convenzione' o 'allegato'): $scuola = segnaposto della scuola e del Dirigente,
+    // $attivita = una riga per attività (TITOLO, DESCRIZIONE, STUDENTI, PERIODO, DURATA, TUTOR_DIBEST, TUTOR_SCUOLA): il blocco
+    // dell'Allegato A ("Titolo corso" … riga tratteggiata) si ripete per ogni attività. $logo = immagine della scuola in testa.
     // I campi compilati perdono l'evidenziazione gialla; quelli vuoti restano evidenziati con il testo originale.
-    // $doc: 'convenzione' (modelli_documenti/convenzione_precompilabile.docx) o 'allegato' (allegato_a_precompilabile.docx)
-    function genera_convenzione_precompilata($conn, int $pr_id, string $doc = 'convenzione'): ?string {
+    function genera_docx_convenzione(string $doc, array $scuola, array $attivita, ?string $logo = null): ?string {
         $modello = RADICE_SITO . '/modelli_documenti/' . ($doc === 'allegato' ? 'allegato_a' : 'convenzione') . '_precompilabile.docx';
-        $p = dati_prenotazione_convenzione($conn, $pr_id);
-        if (!$p || !is_file($modello) || !class_exists('ZipArchive')) return null;
-        $originali = ['ISTITUTO' => 'Denominazione Istituzione Scolastica', 'COMUNE' => 'xxxx', 'INDIRIZZO' => 'xxx', 'ISTITUTO_FIRMA' => '…………………………',
-                      'TITOLO' => '……………………', 'DESCRIZIONE' => '…………………………………', 'STUDENTI' => '……………', 'PERIODO' => '…', 'DURATA' => '……',
-                      'TUTOR_DIBEST' => 'Prof./Prof.ssa ___________________', 'TUTOR_SCUOLA' => '___________________'];
-        $valori = dati_convenzione_precompilata($conn, $p);
+        if (!is_file($modello) || !class_exists('ZipArchive')) return null;
         $tmp = tempnam(sys_get_temp_dir(), 'conv') . '.docx';
         if (!@copy($modello, $tmp)) return null;
         $zip = new ZipArchive();
         if ($zip->open($tmp) !== true) { @unlink($tmp); return null; }
         $xml = (string)$zip->getFromName('word/document.xml');
-        foreach ($originali as $k => $orig) {
-            $xml = preg_replace_callback('#<w:r\b(?:(?!</w:r>).)*?\{\{' . $k . '\}\}(?:(?!</w:r>).)*?</w:r>#s', function ($m) use ($k, $orig, $valori) {
-                $v = trim((string)($valori[$k] ?? ''));
-                $run = $m[0];
-                if ($v === '') return str_replace('{{' . $k . '}}', htmlspecialchars($orig, ENT_XML1, 'UTF-8'), $run);
-                $run = preg_replace('#<w:highlight [^>]*/>#', '', $run);
-                $run = str_replace('w:val="FF0000"', 'w:val="000000"', $run);
-                return str_replace('{{' . $k . '}}', htmlspecialchars($v, ENT_XML1, 'UTF-8'), $run);
-            }, $xml);
+        $sostituisci = function (string $xml, array $valori) {
+            foreach (CONV_SEGNAPOSTI as $k => $orig) {
+                if (!array_key_exists($k, $valori)) continue;
+                $xml = preg_replace_callback('#<w:r\b(?:(?!</w:r>).)*?\{\{' . $k . '\}\}(?:(?!</w:r>).)*?</w:r>#s', function ($m) use ($k, $orig, $valori) {
+                    $v = trim((string)($valori[$k] ?? ''));
+                    $run = $m[0];
+                    if ($v === '') return str_replace('{{' . $k . '}}', htmlspecialchars($orig, ENT_XML1, 'UTF-8'), $run);
+                    $run = preg_replace('#<w:highlight [^>]*/>#', '', $run);
+                    $run = str_replace('w:val="FF0000"', 'w:val="000000"', $run);
+                    return str_replace('{{' . $k . '}}', htmlspecialchars($v, ENT_XML1, 'UTF-8'), $run);
+                }, $xml);
+            }
+            return $xml;
+        };
+        // Blocco dell'Allegato A ripetuto per ogni attività
+        if (preg_match_all('#<w:p\b(?:(?!<w:p\b).)*?</w:p>#s', $xml, $mm, PREG_OFFSET_CAPTURE)) {
+            $ini = $fin = null;
+            foreach ($mm[0] as [$p, $pos]) {
+                if ($ini === null && str_contains($p, '{{TITOLO}}')) $ini = $pos;
+                elseif ($ini !== null && preg_match('/-{10,}/', strip_tags($p))) { $fin = $pos + strlen($p); break; }
+            }
+            if ($ini !== null && $fin !== null) {
+                $blocco = substr($xml, $ini, $fin - $ini);
+                $nuovi = '';
+                $vuoti = array_fill_keys(['TITOLO', 'DESCRIZIONE', 'STUDENTI', 'PERIODO', 'DURATA', 'TUTOR_DIBEST', 'TUTOR_SCUOLA'], '');
+                foreach ($attivita ?: [[]] as $a) {
+                    $b = $sostituisci($blocco, $a + $vuoti);
+                    // Attività compilata: le etichette ("Titolo corso", "Periodo"…) non restano evidenziate; restano gialli solo i campi vuoti
+                    if (trim((string)($a['TITOLO'] ?? '')) !== '') {
+                        $originali = array_values(CONV_SEGNAPOSTI);
+                        $b = preg_replace_callback('#<w:pPr>.*?</w:pPr>#s', fn($m) => preg_replace('#<w:highlight [^>]*/>#', '', $m[0]), $b);
+                        $b = preg_replace_callback('#<w:r\b(?:(?!</w:r>).)*?</w:r>#s', function ($m) use ($originali) {
+                            if (!str_contains($m[0], '<w:highlight')) return $m[0];
+                            preg_match_all('#<w:t(?: [^>]*)?>(.*?)</w:t>#s', $m[0], $tt);
+                            $t = trim(html_entity_decode(implode('', $tt[1]), ENT_QUOTES | ENT_XML1, 'UTF-8'));
+                            foreach ($originali as $o) if ($t !== '' && str_contains($t, $o)) return $m[0];
+                            return preg_replace('#<w:highlight [^>]*/>#', '', $m[0]);
+                        }, $b);
+                    }
+                    $nuovi .= $b;
+                }
+                $xml = substr($xml, 0, $ini) . $nuovi . substr($xml, $fin);
+            }
+        }
+        $xml = $sostituisci($xml, $scuola + array_fill_keys(array_keys(CONV_SEGNAPOSTI), ''));
+        // Firma compilata: "Il Dirigente Scolastico dell'Istituto" non resta evidenziato
+        if (trim((string)($scuola['ISTITUTO_FIRMA'] ?? '')) !== '')
+            $xml = preg_replace_callback('#<w:r\b(?:(?!</w:r>).)*?</w:r>#s', fn($m) => preg_match('#<w:t(?: [^>]*)?>[^<]*(Il Dirigente Scolastico|dell.Istituto)[^<]*</w:t>#u', $m[0]) ? preg_replace('#<w:highlight [^>]*/>#', '', $m[0]) : $m[0], $xml);
+        // Logo della scuola nell'intestazione, al posto della scritta "Logo/intestazione Istituzione Scolastica" (alto 1,5 cm)
+        if ($logo && is_file($logo) && ($dim = @getimagesize($logo))) {
+            $ext = $dim[2] === IMAGETYPE_PNG ? 'png' : 'jpeg';
+            $zip->addFile($logo, 'word/media/logo_scuola.' . $ext);
+            $ct = (string)$zip->getFromName('[Content_Types].xml');
+            if (!preg_match('/Extension="' . $ext . '"/i', $ct)) $zip->addFromString('[Content_Types].xml', str_replace('</Types>', '<Default Extension="' . $ext . '" ContentType="image/' . $ext . '"/></Types>', $ct));
+            $cy = 540000; $cx = (int)round($cy * $dim[0] / max(1, $dim[1])); if ($cx > 2340000) { $cy = (int)round($cy * 2340000 / $cx); $cx = 2340000; }
+            $disegno = '<w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><wp:extent cx="' . $cx . '" cy="' . $cy . '"/><wp:docPr id="9001" name="Logo della scuola"/>'
+                 . '<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="0" name="logo_scuola"/><pic:cNvPicPr/></pic:nvPicPr>'
+                 . '<pic:blipFill><a:blip r:embed="rIdLogoScuola" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' . $cx . '" cy="' . $cy . '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing>';
+            $nel_header = false;
+            for ($i = 0; $i < $zip->numFiles; $i++) {
+                $nome = $zip->getNameIndex($i);
+                if (!preg_match('#^word/header\d+\.xml$#', $nome)) continue;
+                $hx = (string)$zip->getFromName($nome);
+                if (!str_contains($hx, 'Logo/intestazione Istituzione Scolastica')) continue;
+                $hx = preg_replace('#(<w:r\b(?:(?!</w:r>).)*?)<w:t>Logo/intestazione Istituzione Scolastica</w:t>(</w:r>)#s', '$1' . $disegno . '$2', $hx, 1);
+                $zip->addFromString($nome, $hx);
+                $rn = 'word/_rels/' . basename($nome) . '.rels';
+                $rels = (string)$zip->getFromName($rn) ?: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>';
+                $zip->addFromString($rn, str_replace('</Relationships>', '<Relationship Id="rIdLogoScuola" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/logo_scuola.' . $ext . '"/></Relationships>', $rels));
+                $nel_header = true;
+            }
+            if (!$nel_header) {
+                // Modello senza la scritta nell'intestazione: logo in testa al documento
+                $rels = (string)$zip->getFromName('word/_rels/document.xml.rels');
+                $zip->addFromString('word/_rels/document.xml.rels', str_replace('</Relationships>', '<Relationship Id="rIdLogoScuola" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/logo_scuola.' . $ext . '"/></Relationships>', $rels));
+                $xml = preg_replace('#<w:body>#', '<w:body><w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r>' . $disegno . '</w:r></w:p>', $xml, 1);
+            }
         }
         $zip->addFromString('word/document.xml', $xml);
         $zip->close();
         return $tmp;
+    }
+}
+
+if (!function_exists('genera_convenzione_precompilata')) {
+    // Convenzione o Allegato A precompilati con i dati di una prenotazione (link "già compilata" delle email precedenti)
+    function genera_convenzione_precompilata($conn, int $pr_id, string $doc = 'convenzione'): ?string {
+        $p = dati_prenotazione_convenzione($conn, $pr_id);
+        if (!$p) return null;
+        $v = dati_convenzione_precompilata($conn, $p);
+        $att = array_intersect_key($v, array_flip(['TITOLO', 'DESCRIZIONE', 'STUDENTI', 'PERIODO', 'DURATA', 'TUTOR_DIBEST', 'TUTOR_SCUOLA']));
+        return genera_docx_convenzione($doc, array_diff_key($v, $att), [$att]);
+    }
+}
+
+if (!function_exists('attivita_fsl_scuola')) {
+    // Per la convenzione online: attività FSL prenotate dalla scuola (dalla prenotazione $pr_id e, se la scuola è dell'anagrafe,
+    // tutte le sue prenotazioni FSL attive non concluse) e attività FSL ancora prenotabili. Ritorna [prenotate, prenotabili].
+    function attivita_fsl_scuola($conn, int $pr_id, ?string $scuola_codice): array {
+        $sc = strtoupper(trim((string)$scuola_codice));
+        $where = preg_match('/^[A-Z0-9]{10}$/', $sc) ? "(pr.id = $pr_id OR pr.scuola_codice = '" . $conn->real_escape_string($sc) . "')" : "pr.id = $pr_id";
+        $prenotate = [];
+        $r = $conn->query("SELECT pr.id FROM prenotazioni pr JOIN turni t ON t.id = pr.turno_id JOIN progetti_dettagli pd ON pd.evento_id = t.evento_id
+                           WHERE $where AND pd.convenzione = 1 AND IFNULL(pr.stato, 'confermata') NOT IN ('annullata', 'rifiutata', 'scaduta')
+                             AND (pr.id = $pr_id OR COALESCE(pd.data_fine, t.data_turno, CURDATE()) >= CURDATE() - INTERVAL 30 DAY) ORDER BY t.data_turno, pr.id");
+        while ($r && $x = $r->fetch_assoc()) if ($p = dati_prenotazione_convenzione($conn, (int)$x['id'])) $prenotate[(int)$x['id']] = $p;
+        $ev_prenotati = array_map(fn($p) => (int)$p['evento_id'], $prenotate);
+        $prenotabili = [];
+        $r = $conn->query("SELECT e.id AS evento_id, e.titolo AS evento_titolo, e.tipo, e.pagina_id, pe.slug, pd.data_inizio AS pd_inizio, pd.data_fine AS pd_fine,
+                                  MIN(t.data_turno) AS data_turno
+                           FROM eventi e JOIN progetti_dettagli pd ON pd.evento_id = e.id JOIN pagine_eventi pe ON pe.id = e.pagina_id LEFT JOIN turni t ON t.evento_id = e.id AND t.data_turno >= CURDATE()
+                           WHERE pd.convenzione = 1 AND IFNULL(pe.visibile, 1) = 1 AND (t.id IS NOT NULL OR IFNULL(pd.data_fine, CURDATE()) >= CURDATE())
+                           GROUP BY e.id ORDER BY MIN(t.data_turno), e.titolo LIMIT 60");
+        while ($r && $x = $r->fetch_assoc()) if (!in_array((int)$x['evento_id'], $ev_prenotati, true)) $prenotabili[(int)$x['evento_id']] = $x + ['nome_turno' => '', 'orario_inizio' => null, 'orario_fine' => null, 'nome' => '', 'cognome' => '', 'dati_custom_json' => null, 'scuola_codice' => null];
+        return [$prenotate, $prenotabili];
     }
 }
 

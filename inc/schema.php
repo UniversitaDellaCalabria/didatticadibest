@@ -8,7 +8,7 @@
 // richiesta: quando aggiungi qualcosa qui, cambia anche il nome del marcatore.
 if (!function_exists('assicura_schema')) {
     function assicura_schema($conn) {
-        $marker = RADICE_SITO . '/cache/schema_v32.ok';
+        $marker = RADICE_SITO . '/cache/schema_v37.ok';
         if (is_file($marker)) return;
 
         // 1. Tabelle di servizio (prima create dalle singole pagine a ogni richiesta)
@@ -126,6 +126,49 @@ if (!function_exists('assicura_schema')) {
             // v29: abilitazioni per perimetro (oltre a quelle su tutta l'area o su singole attività, salvate nelle aree/attività):
             // tipo 'progetti' / 'eventi' = tutte le attività di quel tipo dell'area (pagina_id), anche future;
             // 'fsl' = pannello e attività di Formazione Scuola Lavoro di tutte le aree; 'fsl_convenzioni' / 'fsl_scuole' = solo quella parte (pagina_id 0)
+            // v34: modulo Didattica – modulistica (documenti da scaricare e moduli online) e pratiche degli studenti
+            'didattica_moduli' => "CREATE TABLE IF NOT EXISTS didattica_moduli (
+                id INT AUTO_INCREMENT PRIMARY KEY, titolo VARCHAR(200) NOT NULL DEFAULT '', descrizione TEXT DEFAULT NULL, categoria VARCHAR(100) NOT NULL DEFAULT '',
+                tipo VARCHAR(10) NOT NULL DEFAULT 'documento', file_path VARCHAR(255) DEFAULT NULL, link VARCHAR(500) DEFAULT NULL, campi_json TEXT DEFAULT NULL,
+                destinatari VARCHAR(20) NOT NULL DEFAULT 'tutti', email_ufficio VARCHAR(500) DEFAULT '', attivo TINYINT(1) NOT NULL DEFAULT 1, ordine INT NOT NULL DEFAULT 0,
+                creato_il DATETIME DEFAULT CURRENT_TIMESTAMP, aggiornato_il DATETIME DEFAULT NULL, INDEX idx_cat (categoria, ordine)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            'pratiche' => "CREATE TABLE IF NOT EXISTS pratiche (
+                id INT AUTO_INCREMENT PRIMARY KEY, modulo_id INT NOT NULL, utente_id INT DEFAULT NULL, codice VARCHAR(20) NOT NULL,
+                nome VARCHAR(100) DEFAULT '', cognome VARCHAR(100) DEFAULT '', email VARCHAR(255) DEFAULT '', matricola VARCHAR(50) DEFAULT '',
+                risposte_json MEDIUMTEXT DEFAULT NULL, stato VARCHAR(20) NOT NULL DEFAULT 'inviata', creata_il DATETIME DEFAULT CURRENT_TIMESTAMP, aggiornata_il DATETIME DEFAULT NULL,
+                UNIQUE KEY uq_codice (codice), INDEX idx_utente (utente_id), INDEX idx_stato (stato), INDEX idx_modulo (modulo_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            'pratiche_eventi' => "CREATE TABLE IF NOT EXISTS pratiche_eventi (
+                id INT AUTO_INCREMENT PRIMARY KEY, pratica_id INT NOT NULL, tipo VARCHAR(10) NOT NULL DEFAULT 'messaggio', autore VARCHAR(10) NOT NULL DEFAULT 'studente',
+                utente_id INT DEFAULT NULL, stato VARCHAR(20) DEFAULT NULL, testo TEXT DEFAULT NULL, allegato VARCHAR(255) DEFAULT NULL, nome_allegato VARCHAR(255) DEFAULT NULL,
+                creato_il DATETIME DEFAULT CURRENT_TIMESTAMP, INDEX idx_pratica (pratica_id, creato_il)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            // v35: Ufficio didattico (operatori scelti dall'anagrafe di Ateneo, con i loro compiti) e sedute del Consiglio
+            // di corso di studio a cui si portano le pratiche (per il verbale in Word)
+            'ufficio_didattica' => "CREATE TABLE IF NOT EXISTS ufficio_didattica (
+                id INT AUTO_INCREMENT PRIMARY KEY, persona_id VARCHAR(80) DEFAULT NULL, email VARCHAR(150) NOT NULL DEFAULT '', nominativo VARCHAR(200) NOT NULL DEFAULT '',
+                ruolo VARCHAR(100) DEFAULT '', compiti VARCHAR(100) NOT NULL DEFAULT '', creato_il DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY uq_email (email)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            'didattica_sedute' => "CREATE TABLE IF NOT EXISTS didattica_sedute (
+                id INT AUTO_INCREMENT PRIMARY KEY, organo VARCHAR(500) NOT NULL DEFAULT '', anno_accademico VARCHAR(20) DEFAULT '', data DATE DEFAULT NULL,
+                ora_inizio VARCHAR(5) DEFAULT '', ora_fine VARCHAR(5) DEFAULT '', luogo VARCHAR(255) DEFAULT '', odg TEXT DEFAULT NULL, presenze TEXT DEFAULT NULL,
+                segretario VARCHAR(200) DEFAULT '', coordinatore VARCHAR(200) DEFAULT '', creata_il DATETIME DEFAULT CURRENT_TIMESTAMP, INDEX idx_data (data)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            // v36: convenzioni FSL compilate online dalla scuola (moduli guidati di Convenzione e Allegato A, documenti Word
+            // generati dai modelli del Dipartimento; poi firma digitale e invio via PEC)
+            'convenzioni_compilate' => "CREATE TABLE IF NOT EXISTS convenzioni_compilate (
+                id INT AUTO_INCREMENT PRIMARY KEY, token VARCHAR(40) NOT NULL, scuola_codice VARCHAR(10) DEFAULT NULL, prenotazione_id INT DEFAULT NULL,
+                email VARCHAR(255) DEFAULT '', dati_json MEDIUMTEXT DEFAULT NULL, logo VARCHAR(255) DEFAULT NULL,
+                creata_il DATETIME DEFAULT CURRENT_TIMESTAMP, aggiornata_il DATETIME DEFAULT NULL, scaricata_il DATETIME DEFAULT NULL,
+                UNIQUE KEY uq_token (token), INDEX idx_scuola (scuola_codice)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            // v37: uffici dell'Ufficio didattico, definiti dal pannello (manager che smista, referenti dei corsi, carriere…):
+            // il personale si assegna a un ufficio e l'iter dei moduli elenca gli uffici che ricevono la pratica
+            'didattica_uffici' => "CREATE TABLE IF NOT EXISTS didattica_uffici (
+                id INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(150) NOT NULL DEFAULT '', descrizione VARCHAR(500) DEFAULT '', chiave VARCHAR(30) DEFAULT NULL,
+                smista TINYINT(1) NOT NULL DEFAULT 0, segue_corsi TINYINT(1) NOT NULL DEFAULT 0, ordine INT NOT NULL DEFAULT 0, creato_il DATETIME DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
             'abilitazioni_ambito' => "CREATE TABLE IF NOT EXISTS abilitazioni_ambito (
                 id INT AUTO_INCREMENT PRIMARY KEY, utente_id INT NOT NULL, tipo VARCHAR(20) NOT NULL, pagina_id INT NOT NULL DEFAULT 0,
                 creata_da INT DEFAULT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -161,6 +204,58 @@ if (!function_exists('assicura_schema')) {
                 'max_partecipanti' => "ADD COLUMN max_partecipanti INT DEFAULT NULL",
                 // v17: oltre questa data/ora chi ha prenotato non può più annullare né cambiare turno (NULL = sempre)
                 'annullabile_fino' => "ADD COLUMN annullabile_fino DATETIME DEFAULT NULL",
+                // v33: aula (risorsa di Prenotazioni e risorse) occupata dal turno: lo slot viene prenotato in automatico
+                'risorsa_id' => "ADD COLUMN risorsa_id INT DEFAULT NULL",
+            ],
+            'risorse' => [
+                // v33: colore della riga nella vista a calendario; docente dello sportello di ricevimento (anagrafe di Ateneo)
+                'colore'     => "ADD COLUMN colore VARCHAR(7) DEFAULT NULL",
+                'persona_id' => "ADD COLUMN persona_id VARCHAR(80) DEFAULT NULL, ADD INDEX idx_persona (persona_id)",
+                // v35: sportello di un ufficio (es. 'didattica'): lo gestiscono gli operatori dell'ufficio
+                'ufficio'    => "ADD COLUMN ufficio VARCHAR(20) NOT NULL DEFAULT ''",
+            ],
+            'pratiche' => [
+                // v35: seduta del Consiglio a cui va la pratica, testo della delibera per il verbale, campi compilati dall'ufficio
+                'seduta_id'    => "ADD COLUMN seduta_id INT DEFAULT NULL, ADD INDEX idx_seduta (seduta_id)",
+                'delibera'     => "ADD COLUMN delibera TEXT DEFAULT NULL",
+                'ufficio_json' => "ADD COLUMN ufficio_json MEDIUMTEXT DEFAULT NULL",
+                // v36: chi ha in carico la pratica, passo dell'iter, integrazione richiesta allo studente (documenti o autodichiarazione)
+                'assegnata_a'   => "ADD COLUMN assegnata_a INT DEFAULT NULL, ADD INDEX idx_assegnata (assegnata_a)",
+                'passo'         => "ADD COLUMN passo TINYINT NOT NULL DEFAULT 0",
+                'richiesta_json' => "ADD COLUMN richiesta_json TEXT DEFAULT NULL",
+                // v37: numero e data di protocollo; ultimo promemoria inviato per la pratica ferma
+                'protocollo'      => "ADD COLUMN protocollo VARCHAR(100) NOT NULL DEFAULT ''",
+                'protocollo_data' => "ADD COLUMN protocollo_data DATE DEFAULT NULL",
+                'promemoria_il'   => "ADD COLUMN promemoria_il DATETIME DEFAULT NULL",
+            ],
+            'convenzioni_compilate' => [
+                // v37: protocollo della convenzione compilata online, riportato nei documenti
+                'protocollo'      => "ADD COLUMN protocollo VARCHAR(100) NOT NULL DEFAULT ''",
+                'protocollo_data' => "ADD COLUMN protocollo_data DATE DEFAULT NULL",
+            ],
+            'ufficio_didattica' => [
+                // v37: ufficio di appartenenza (didattica_uffici) e corsi di studio seguiti (uffici che seguono i corsi)
+                'ufficio_id' => "ADD COLUMN ufficio_id INT DEFAULT NULL",
+                'corsi'   => "ADD COLUMN corsi TEXT DEFAULT NULL",
+            ],
+            'pratiche_eventi' => [
+                // v36: note interne tra i referenti (non visibili allo studente) e nome di chi scrive
+                'interno'     => "ADD COLUMN interno TINYINT(1) NOT NULL DEFAULT 0",
+                'autore_nome' => "ADD COLUMN autore_nome VARCHAR(200) DEFAULT ''",
+            ],
+            'didattica_moduli' => [
+                // v35: come compare il modulo nel verbale (titolo della sezione, testo per ogni pratica, delibera, elenco/scheda)
+                'verbale_json' => "ADD COLUMN verbale_json TEXT DEFAULT NULL",
+                // v36: iter della pratica (profili che la ricevono, in ordine)
+                'iter_json'    => "ADD COLUMN iter_json TEXT DEFAULT NULL",
+                // v37: modulo compilabile solo in un periodo; giorni dopo i quali si avvisa chi ha una pratica ferma (0 = mai)
+                'aperto_dal'        => "ADD COLUMN aperto_dal DATE DEFAULT NULL",
+                'aperto_al'         => "ADD COLUMN aperto_al DATE DEFAULT NULL",
+                'giorni_promemoria' => "ADD COLUMN giorni_promemoria SMALLINT NOT NULL DEFAULT 7",
+            ],
+            'prenotazioni_risorse' => [
+                // v33: prenotazione creata dal turno di un evento (aula collegata): si aggiorna con il turno
+                'turno_id' => "ADD COLUMN turno_id INT DEFAULT NULL, ADD INDEX idx_turno (turno_id)",
             ],
             'sondaggi_domande' => [
                 'condizione_json' => "ADD COLUMN condizione_json TEXT NULL",
@@ -345,6 +440,18 @@ if (!function_exists('assicura_schema')) {
         // 4b. v32: indice per le tendine regione / provincia / comune della scelta guidata della scuola
         $idx = $conn->query("SHOW INDEX FROM scuole WHERE Key_name = 'idx_luogo'");
         if ($idx && $idx->num_rows === 0) $conn->query("ALTER TABLE scuole ADD INDEX idx_luogo (regione, provincia, comune)");
+
+        // 4c. v37: uffici di partenza dell'Ufficio didattico (si cambiano dal pannello) e personale già assegnato a un profilo
+        if ((int)($conn->query("SELECT COUNT(*) n FROM didattica_uffici")->fetch_assoc()['n'] ?? 1) === 0) {
+            $conn->query("INSERT INTO didattica_uffici (nome, descrizione, chiave, smista, segue_corsi, ordine) VALUES
+                ('Manager dell’Ufficio didattico', 'Riceve le pratiche nuove e le smista', 'manager', 1, 0, 1),
+                ('Referenti dei corsi di studio', 'Istruttoria e verbali dei consigli di corso', 'referente_cdl', 0, 1, 2),
+                ('Carriere studenti', 'Registrazione in carriera', 'carriere', 0, 0, 3),
+                ('Internazionalizzazione', 'Mobilità e attività all’estero', 'internazionalizzazione', 0, 0, 4),
+                ('Segreteria didattica', 'Operatori dell’ufficio', 'operatore', 0, 0, 5)");
+        }
+        $col_prof = $conn->query("SHOW COLUMNS FROM ufficio_didattica LIKE 'profilo'");
+        if ($col_prof && $col_prof->num_rows) $conn->query("UPDATE ufficio_didattica o JOIN didattica_uffici u ON u.chiave = o.profilo SET o.ufficio_id = u.id WHERE o.ufficio_id IS NULL");
 
         // 5. v31: il portale diventa "Didattica DiBEST" (solo dove c'è ancora il nome predefinito di prima)
         $conn->query("UPDATE configurazione_portale SET nome_portale = 'Didattica DiBEST' WHERE nome_portale IN ('EventiDiBEST', 'Eventi DiBEST', 'Eventi Dibest')");

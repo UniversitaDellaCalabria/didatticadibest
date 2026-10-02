@@ -164,9 +164,10 @@ if ($filtro_p > 0) {
 // Le vecchie abilitazioni con solo alcune sezioni (eventi, iscritti…) valgono ora per tutto il perimetro.
 // ==============================================================================
 $uid_rbac = (int)$u_id_curr;
-$puo_fsl             = $is_full_admin || ha_ambito($conn, $uid_rbac, 'fsl');
+$puo_fsl             = $is_full_admin || ha_ambito($conn, $uid_rbac, 'fsl') || ha_modulo($conn, $uid_rbac, 'orientamento');
 $puo_fsl_convenzioni = $puo_fsl || ha_ambito($conn, $uid_rbac, 'fsl_convenzioni');
 $puo_fsl_scuole      = $puo_fsl || ha_ambito($conn, $uid_rbac, 'fsl_scuole');
+$puo_didattica       = $is_full_admin || ha_modulo($conn, $uid_rbac, 'didattica') || utente_operatore_ufficio($conn, $utente_admin);
 
 $can_manage_eventi = $can_manage_iscritti = $can_manage_sondaggi = $can_manage_form = $can_manage_settings = $is_full_admin;
 $is_area_manager = $is_full_admin;
@@ -174,7 +175,9 @@ $puo_creare_eventi = $puo_creare_progetti = $is_full_admin;
 $allowed_events_ids = [];
 
 if (!$is_full_admin && $page_cfg) {
-    if (in_array($uid_rbac, ids_gestori_da_campi($page_cfg['gestore_utente_id'], $page_cfg['gestori_utenti_ids'], $page_cfg['permessi_gestori_json']), true)) {
+    // Gestore di tutta l'area, oppure abilitato all'intero modulo a cui l'area appartiene
+    if (in_array($uid_rbac, ids_gestori_da_campi($page_cfg['gestore_utente_id'], $page_cfg['gestori_utenti_ids'], $page_cfg['permessi_gestori_json']), true)
+        || area_nel_modulo_utente($conn, $uid_rbac, $page_cfg)) {
         $is_area_manager = true;
         $can_manage_eventi = $can_manage_iscritti = $can_manage_sondaggi = $can_manage_form = $can_manage_settings = true;
         $puo_creare_eventi = $puo_creare_progetti = true;
@@ -194,13 +197,30 @@ if (!$is_full_admin && $page_cfg) {
     }
 }
 
-// Abilitati solo a una parte della FSL (nessuna area): la loro pagina di partenza è quella
+// Abilitati senza aree (solo una parte della FSL o il modulo Didattica): la loro pagina di partenza è quella
 if (!$is_full_admin && !$pagine_disponibili && in_array(basename($_SERVER['PHP_SELF']), ['index.php', 'inizio.php', 'dashboard.php', 'aree.php'], true)
-    && ($puo_fsl_convenzioni || $puo_fsl_scuole)) {
+    && ($puo_fsl_convenzioni || $puo_fsl_scuole || $puo_didattica)) {
     while (ob_get_level() > 0) ob_end_clean();
-    header('Location: ' . ($puo_fsl_convenzioni ? 'fsl.php' : 'scuole.php'));
+    header('Location: ' . ($puo_fsl_convenzioni ? 'fsl.php' : ($puo_fsl_scuole ? 'scuole.php' : 'didattica.php')));
     exit;
 }
+
+// ==============================================================================
+// 4. MODULI: quelli a cui l'utente ha accesso e quello su cui sta lavorando
+// Il modulo corrente decide il menu: le pagine di un modulo senza aree (PAGINE_MODULO) lo indicano da sole,
+// la pagina iniziale lo riceve con ?sezione=…, tutte le altre seguono l'area corrente.
+// ==============================================================================
+$moduli_utente = [];
+foreach ($pagine_disponibili as $p_m) $moduli_utente[modulo_di_area($p_m)] = true;
+if ($puo_fsl_convenzioni) $moduli_utente['orientamento'] = true;
+if ($puo_didattica) $moduli_utente['didattica'] = true;
+if ($is_full_admin || $puo_fsl_scuole) $moduli_utente['portale'] = true;
+$moduli_utente = array_values(array_filter(array_keys(MODULI_PORTALE), fn($k) => isset($moduli_utente[$k])));
+$pagina_corrente = basename($_SERVER['PHP_SELF']);
+if (isset(PAGINE_MODULO[$pagina_corrente])) $modulo_corrente = PAGINE_MODULO[$pagina_corrente];
+elseif ($pagina_corrente === 'inizio.php') $modulo_corrente = isset(MODULI_PORTALE[$_GET['sezione'] ?? '']) ? $_GET['sezione'] : '';
+elseif (in_array($pagina_corrente, ['aree.php', 'index.php'], true)) $modulo_corrente = '';
+else $modulo_corrente = $page_cfg ? modulo_di_area($page_cfg) : '';
 
 if (!function_exists('schede_sistema')) {
     // Schede comuni di "Sistema e registri" (una sola voce di menu per tre pagine)
@@ -288,6 +308,9 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
             .navbar-azioni { width: 100%; flex-wrap: wrap; justify-content: flex-end; }
         }
         .side-area { background: rgba(255,255,255,0.06); overflow: hidden; }
+        .side-modulo { background: rgba(255,255,255,0.08); color: #fff; }
+        .side-modulo:hover, .side-modulo.attivo { background: rgba(255,255,255,0.16); }
+        .side-altro-modulo { font-weight: 500 !important; font-size: .9rem; padding: 7px 15px !important; }
         @media (max-width: 991.98px) {
             #sidebar { margin-left: -260px; position: fixed; height: 100%; overflow-y: auto; }
             #sidebar.active { margin-left: 0; box-shadow: 5px 0 15px rgba(0,0,0,0.5); }
@@ -325,25 +348,35 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
                 };
                 $chiudi_gruppo = function () { echo '</ul></details></li>'; };
                 ?>
-                <?php if (count($pagine_disponibili) > 1) $voce_menu(['inizio.php'], 'inizio.php', 'fa-house', 'Inizio'); ?>
-                <?php $voce_menu(['dashboard.php', 'index.php'], 'dashboard.php', 'fa-gauge-high', 'Dashboard'); ?>
-                <?php if ($is_full_admin || count($pagine_disponibili) > 1): // un gestore con una sola area non ha nulla da scegliere ?>
+                <?php if (count($moduli_utente) > 1 || count($pagine_disponibili) > 1) $voce_menu([], 'inizio.php', 'fa-table-cells-large', 'Tutti i moduli', $current_page === 'inizio.php' && $modulo_corrente === ''); ?>
+
+                <?php if ($modulo_corrente !== ''): $mod_c = MODULI_PORTALE[$modulo_corrente]; ?>
+                <!-- ── Modulo corrente: il menu mostra solo ciò che gli appartiene ── -->
+                <li class="nav-item mt-3 mb-1">
+                    <a href="inizio.php?sezione=<?php echo urlencode($modulo_corrente); ?>&amp;p_id=<?php echo $filtro_p; ?>" class="side-modulo d-flex align-items-center gap-2 px-3 py-2 rounded text-decoration-none<?php echo $current_page === 'inizio.php' ? ' attivo' : ''; ?>" style="border-left:4px solid <?php echo $mod_c['colore']; ?>;" <?php echo $current_page === 'inizio.php' ? 'aria-current="page"' : ''; ?>>
+                        <i class="fa <?php echo $mod_c['icona']; ?>" style="width:20px;" aria-hidden="true"></i>
+                        <span style="min-width:0;"><span class="d-block text-secondary fw-bold text-uppercase" style="font-size:.62rem;letter-spacing:.06em;">Modulo</span><span class="fw-bold text-white"><?php echo htmlspecialchars($mod_c['nome']); ?></span></span>
+                    </a>
+                </li>
+                <?php endif; ?>
+
+                <?php if (in_array($modulo_corrente, ['orientamento', 'calendari', ''], true) && ($is_full_admin || count($pagine_disponibili) > 1)): // un gestore con una sola area non ha nulla da scegliere ?>
                 <li class="nav-item mb-1">
-                    <a class="nav-link w-100 <?php echo in_array($current_page, ['aree.php', 'nuova_area.php'], true) ? 'active' : ''; ?>" href="aree.php?p_id=<?php echo $filtro_p; ?>">
+                    <a class="nav-link w-100 <?php echo in_array($current_page, ['aree.php'], true) ? 'active' : ''; ?>" href="aree.php?p_id=<?php echo $filtro_p; ?>">
                         <i class="fa fa-layer-group me-2 text-center" style="width:20px;" aria-hidden="true"></i> Aree
                         <span class="badge rounded-pill bg-secondary ms-1" style="font-size:.65rem;"><?php echo count($pagine_disponibili); ?></span>
                     </a>
                 </li>
                 <?php endif; ?>
 
-                <?php if ($filtro_p > 0 && $page_cfg): $col_side = colore_valido($page_cfg['colore_primario'] ?? '', '#0056B3'); ?>
+                <?php if ($filtro_p > 0 && $page_cfg && in_array($modulo_corrente, ['orientamento', 'calendari'], true) && modulo_di_area($page_cfg) === $modulo_corrente): $col_side = colore_valido($page_cfg['colore_primario'] ?? '', '#0056B3'); ?>
                 <!-- ── Area corrente: tutto ciò che riguarda l'area ── -->
-                <li class="nav-item mt-3 mb-2">
+                <li class="nav-item mt-2 mb-2">
                     <div class="side-area px-3 py-2 rounded" style="border-left:4px solid <?php echo $col_side; ?>;">
                         <div class="text-secondary fw-bold text-uppercase" style="font-size:.66rem;letter-spacing:.06em;">Area</div>
                         <div class="d-flex align-items-center justify-content-between gap-2">
                             <span class="fw-bold text-white text-truncate" style="min-width:0;" title="<?php echo htmlspecialchars($page_cfg['titolo']); ?>"><?php echo htmlspecialchars($page_cfg['titolo']); ?></span>
-                            <?php if (count($pagine_disponibili) > 1): ?><a href="inizio.php?sezione=<?php echo urlencode(sezione_area($page_cfg)); ?>&amp;p_id=<?php echo $filtro_p; ?>" class="small text-info text-decoration-none text-nowrap">Cambia</a><?php endif; ?>
+                            <?php if (count($pagine_disponibili) > 1): ?><a href="inizio.php?sezione=<?php echo urlencode($modulo_corrente); ?>&amp;p_id=<?php echo $filtro_p; ?>" class="small text-info text-decoration-none text-nowrap">Cambia</a><?php endif; ?>
                         </div>
                         <?php if ((int)($page_cfg['visibile'] ?? 1) === 0): ?><span class="badge bg-warning text-dark mt-1" style="font-size:.65rem;"><i class="fa fa-eye-slash me-1" aria-hidden="true"></i>Nascosta al pubblico</span><?php endif; ?>
                     </div>
@@ -373,6 +406,7 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
                     }
                 ?>
                 <?php else: ?>
+                <?php $voce_menu(['dashboard.php', 'index.php'], 'dashboard.php', 'fa-gauge-high', 'Dashboard'); ?>
                 <?php if ($can_manage_eventi || $can_manage_form): $apri_gruppo('attivita', 'fa-calendar-alt', 'Attività', ['eventi.php', 'progetti.php', 'form_builder.php', 'archivio.php']); ?>
                     <?php if ($vede_eventi) $voce_menu(['eventi.php'], 'eventi.php', 'fa-calendar-day', 'Eventi e turni'); ?>
                     <?php if ($vede_progetti) $voce_menu(['progetti.php'], 'progetti.php', 'fa-diagram-project', 'Progetti'); ?>
@@ -391,12 +425,21 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
                 <?php if ($can_manage_settings) $voce_menu(['impostazioni_area.php'], 'impostazioni_area.php', 'fa-paint-brush', 'Impostazioni area'); ?>
                 <?php endif; // fine area corrente ?>
 
-                <?php if ($is_full_admin || $puo_fsl_convenzioni || $puo_fsl_scuole): ?>
-                    <!-- ── Portale: valido per tutte le aree ── -->
-                    <li class="nav-item mt-4 mb-2">
-                        <div class="text-secondary small fw-bold px-3 mb-1 text-uppercase">Portale</div>
-                    </li>
-                    <?php if ($puo_fsl_convenzioni) $voce_menu(['fsl.php', 'convenzione_file.php'], 'fsl.php', 'fa-briefcase', $puo_fsl ? 'Formazione Scuola Lavoro' : 'Convenzioni FSL'); ?>
+                <?php if ($modulo_corrente === 'orientamento' && $puo_fsl_convenzioni): ?>
+                    <!-- ── Sottomodulo Formazione Scuola Lavoro (vale per tutte le aree FSL) ── -->
+                    <li class="nav-item mt-3 mb-1"><div class="text-secondary small fw-bold px-3 text-uppercase" style="font-size:.66rem;letter-spacing:.06em;">Sottomodulo</div></li>
+                    <?php $voce_menu(['fsl.php', 'convenzione_file.php'], 'fsl.php', 'fa-briefcase', $puo_fsl ? 'Formazione Scuola Lavoro' : 'Convenzioni FSL'); ?>
+                <?php endif; ?>
+
+                <?php if ($modulo_corrente === 'didattica' && $puo_didattica): ?>
+                    <?php $tab_did = $current_page === 'didattica.php' ? (in_array($_GET['tab'] ?? '', ['sedute', 'moduli', 'ufficio'], true) ? $_GET['tab'] : 'pratiche') : '';
+                    $voce_menu([], 'didattica.php?tab=pratiche', 'fa-inbox', 'Pratiche degli studenti', $tab_did === 'pratiche');
+                    $voce_menu([], 'didattica.php?tab=sedute', 'fa-gavel', 'Sedute e verbali', $tab_did === 'sedute');
+                    $voce_menu([], 'didattica.php?tab=moduli', 'fa-file-lines', 'Moduli e documenti', $tab_did === 'moduli');
+                    $voce_menu([], 'didattica.php?tab=ufficio', 'fa-people-group', 'Ufficio e ricevimento', $tab_did === 'ufficio'); ?>
+                <?php endif; ?>
+
+                <?php if ($modulo_corrente === 'portale'): ?>
                     <?php
                     // Anagrafi comuni a tutto il portale: personale e insegnamenti dalle API di Ateneo, scuole dal Ministero
                     $vista_ana = $current_page === 'anagrafe_personale.php' ? (string)($_GET['vista'] ?? 'docenti') : '';
@@ -411,6 +454,7 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
                         <?php if ($is_full_admin) $voce_menu([], 'anagrafe_personale.php?vista=strutture', 'fa-sitemap', 'Strutture e aggiornamento', in_array($vista_ana, ['strutture', 'altro'], true)); ?>
                     <?php $chiudi_gruppo(); ?>
                     <?php if ($is_full_admin): ?>
+                        <?php $voce_menu(['aree.php', 'nuova_area.php'], 'aree.php', 'fa-layer-group', 'Aree di tutti i moduli'); ?>
                         <?php $apri_gruppo('sito', 'fa-globe', 'Sito pubblico', ['testata.php', 'menu.php']); ?>
                             <?php $voce_menu(['testata.php'], 'testata.php', 'fa-image', 'Testata e home'); ?>
                             <?php $voce_menu(['menu.php'], 'menu.php', 'fa-link', 'Menu'); ?>
@@ -418,6 +462,14 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
                         <?php $voce_menu(['utenti.php'], 'utenti.php', 'fa-users-cog', 'Utenti e abilitazioni'); ?>
                         <?php $voce_menu(['sistema.php', 'audit_log.php', 'log_accessi.php'], 'sistema.php', 'fa-gear', 'Sistema e registri'); ?>
                     <?php endif; ?>
+                <?php endif; ?>
+
+                <?php if (count($moduli_utente) > 1): ?>
+                    <!-- ── Altri moduli: si passa da uno all'altro senza tornare all'inizio ── -->
+                    <li class="nav-item mt-4 mb-1"><div class="text-secondary small fw-bold px-3 text-uppercase" style="font-size:.66rem;letter-spacing:.06em;">Altri moduli</div></li>
+                    <?php foreach ($moduli_utente as $k_m): if ($k_m === $modulo_corrente) continue; $m_m = MODULI_PORTALE[$k_m]; ?>
+                        <li class="nav-item"><a class="nav-link w-100 side-altro-modulo" href="inizio.php?sezione=<?php echo urlencode($k_m); ?>&amp;p_id=<?php echo $filtro_p; ?>"><i class="fa <?php echo $m_m['icona']; ?> me-2 text-center" style="width:20px;color:<?php echo $m_m['colore']; ?>;filter:brightness(1.6);" aria-hidden="true"></i> <?php echo htmlspecialchars($m_m['nome']); ?></a></li>
+                    <?php endforeach; ?>
                 <?php endif; ?>
             </ul>
             <script>
@@ -443,8 +495,14 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
     <div id="page-content-wrapper">
         <nav class="navbar navbar-light bg-white border-bottom shadow-sm px-3 py-2 d-flex justify-content-between flex-nowrap gap-2 sticky-top" style="z-index: 998;">
             <button class="btn btn-dark d-lg-none flex-shrink-0" id="sidebarToggle"><i class="fa fa-bars"></i> Menu</button>
-            <?php if ($filtro_p > 0 && $page_cfg): $col_top = colore_valido($page_cfg['colore_primario'] ?? '', '#0056B3'); $link_top = count($pagine_disponibili) > 1 || $is_full_admin; ?>
-                <<?php echo $link_top ? 'a href="inizio.php?sezione=' . urlencode(sezione_area($page_cfg)) . '&amp;p_id=' . $filtro_p . '"' : 'span'; ?> class="area-top text-decoration-none d-flex align-items-center gap-2" title="Area su cui stai lavorando<?php echo $link_top ? ' — clicca per cambiarla' : ''; ?>" style="border-color: <?php echo $col_top; ?>;">
+            <?php if ($modulo_corrente !== '' && !in_array($modulo_corrente, ['orientamento', 'calendari'], true) || ($page_cfg && $modulo_corrente !== '' && modulo_di_area($page_cfg) !== $modulo_corrente)): $m_top = MODULI_PORTALE[$modulo_corrente]; ?>
+                <a href="inizio.php?sezione=<?php echo urlencode($modulo_corrente); ?>&amp;p_id=<?php echo $filtro_p; ?>" class="area-top text-decoration-none d-flex align-items-center gap-2" title="Modulo su cui stai lavorando" style="border-color: <?php echo $m_top['colore']; ?>;">
+                    <i class="fa <?php echo $m_top['icona']; ?>" style="color: <?php echo $m_top['colore']; ?>;" aria-hidden="true"></i>
+                    <span class="d-none d-sm-inline text-secondary" style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;">Modulo</span>
+                    <span class="area-top-nome fw-bold" style="color: <?php echo $m_top['colore']; ?>;"><?php echo htmlspecialchars($m_top['nome']); ?></span>
+                </a>
+            <?php elseif ($filtro_p > 0 && $page_cfg): $col_top = colore_valido($page_cfg['colore_primario'] ?? '', '#0056B3'); $link_top = count($pagine_disponibili) > 1 || $is_full_admin; ?>
+                <<?php echo $link_top ? 'a href="inizio.php?sezione=' . urlencode(modulo_di_area($page_cfg)) . '&amp;p_id=' . $filtro_p . '"' : 'span'; ?> class="area-top text-decoration-none d-flex align-items-center gap-2" title="Area su cui stai lavorando<?php echo $link_top ? ' — clicca per cambiarla' : ''; ?>" style="border-color: <?php echo $col_top; ?>;">
                     <span class="area-top-dot" style="background: <?php echo $col_top; ?>;" aria-hidden="true"></span>
                     <span class="d-none d-sm-inline text-secondary" style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;">Area</span>
                     <span class="area-top-nome fw-bold" style="color: <?php echo $col_top; ?>;"><?php echo htmlspecialchars($page_cfg['titolo']); ?></span>

@@ -94,7 +94,7 @@ prova(count($EMAIL) === 1 && str_contains($EMAIL[0]['corpo'], 'valutazione degli
 
 sezione("Email e documenti per la scuola");
 $istr = html_istruzioni_convenzione([], true, 'FS-1');
-prova(str_contains($istr, 'convenzione_precompilata.php?code=FS-1') && str_contains($istr, 'dipartimento.best@pec.unical.it'), "istruzioni con convenzione precompilata e PEC");
+prova(str_contains($istr, 'convenzione_online.php?code=FS-1') && str_contains($istr, 'dipartimento.best@pec.unical.it'), "istruzioni con la convenzione da compilare online e PEC");
 prova(!str_contains(html_istruzioni_convenzione(['conv_url_modello' => 'https://example.org/mio.docx'], true, 'FS-1'), 'convenzione_precompilata.php?code='), "area con modello di convenzione proprio: niente convenzione precompilata");
 $dc = dati_convenzione([]);
 prova(str_ends_with($dc['modello'], '/eventi/assets/modelli/Convenzione_FSL_DiBEST.doc'), "modello servito dal portale");
@@ -115,7 +115,7 @@ if (class_exists('ZipArchive')) {
     $ta = strip_tags($xa);
     prova($fa && !preg_match('/\{\{\w+\}\}/', $xa) && str_contains($ta, 'Numero di studenti: 20') && str_contains($ta, 'Tutor Dipartimento') && str_contains($ta, '2026/2027'), "Allegato A precompilato (A.A. 2026/2027)");
     if ($fa) @unlink($fa);
-    prova(str_contains(html_istruzioni_convenzione([], true, 'FS-1'), 'doc=allegato&amp;code=FS-1'), "istruzioni con l'Allegato A precompilato");
+    prova(str_contains(html_istruzioni_convenzione([], true, 'FS-1'), 'Allegato A') && file_exists(RADICE_SITO . '/convenzione_precompilata.php'), "Allegato A nel modulo online (restano validi i link precompilati già inviati)");
 } else prova(false, "ZipArchive non disponibile: lancia con -d extension=zip");
 
 sezione("Scheda di valutazione FSL");
@@ -146,11 +146,45 @@ prova(!scheda_persona($conn, $p_ate)['modificati'], "ripristino dei dati del por
 
 sezione("Macroaree e tipi di area");
 prova(tipo_area(['tipo_area' => 'fsl']) === 'fsl' && tipo_area(['tipo_area' => 'boh']) === '' && tipo_area([]) === '', "tipo dell'area (valido / sconosciuto / assente)");
-prova(sezione_area(['tipo_area' => 'gruppi']) === 'didattica' && sezione_area(['tipo_area' => 'eventi']) === 'orientamento' && sezione_area([]) === '', "macroarea dal tipo");
+prova(sezione_area(['tipo_area' => 'gruppi']) === 'calendari' && sezione_area(['tipo_area' => 'eventi']) === 'orientamento' && sezione_area([]) === '', "macroarea dal tipo (gruppi in Prenotazioni e risorse)");
 $gr = raggruppa_aree_per_sezione([['id' => 1, 'tipo_area' => 'gruppi'], ['id' => 2, 'tipo_area' => 'fsl'], ['id' => 3, 'tipo_area' => ''], ['id' => 4, 'tipo_area' => 'eventi']]);
-prova(array_keys($gr) === ['orientamento', 'didattica', ''] && array_column($gr['orientamento'], 'id') === [2, 4], "aree raggruppate nell'ordine delle macroaree, non assegnate in fondo");
+prova(array_keys($gr) === ['orientamento', 'calendari', ''] && array_column($gr['orientamento'], 'id') === [2, 4], "aree raggruppate nell'ordine delle macroaree, non assegnate in fondo");
 prova(str_contains(html_scelta_tipo_area('t', 'fsl'), 'value="fsl" selected') && str_contains(html_scelta_tipo_area('t', 'calendario'), 'value="calendario" selected'), "tendina del tipo (anche Calendari e risorse)");
 prova(sezione_area(['tipo_area' => 'calendario']) === 'calendari', "Calendari e risorse nella sua macroarea");
+
+sezione("Moduli");
+prova(modulo_di_area(['tipo_area' => '']) === 'orientamento' && modulo_di_area(['tipo_area' => 'fsl']) === 'orientamento' && modulo_di_area(['tipo_area' => 'gruppi']) === 'calendari' && modulo_di_area(['tipo_area' => 'calendario']) === 'calendari', "modulo dell'area (senza tipo: Orientamento)");
+prova(array_keys(MODULI_PORTALE) === ['orientamento', 'calendari', 'didattica', 'portale'] && PAGINE_MODULO['fsl.php'] === 'orientamento' && PAGINE_MODULO['utenti.php'] === 'portale', "moduli e pagine dei moduli");
+$q("INSERT INTO utenti (id, codice_fiscale, nome, cognome, email, ruolo_id) VALUES (96, 'MODUL96XXXXXXXXX', 'Mara', 'Moduli', 'mara@unical.it', 4)");
+$q("UPDATE pagine_eventi SET tipo_area = 'fsl' WHERE id = 2");
+$q("UPDATE pagine_eventi SET tipo_area = 'calendario' WHERE id = 1");
+assegna_ambito($conn, 96, 'modulo_orientamento');
+$a81 = aree_da_ambiti($conn, 96);
+prova(in_array(2, $a81, true) && attivita_da_ambiti($conn, 96, 1) === [10], "modulo Orientamento: le sue aree; in Prenotazioni e risorse solo le attività FSL");
+prova(area_nel_modulo_utente($conn, 96, ['tipo_area' => 'fsl']) && !area_nel_modulo_utente($conn, 96, ['tipo_area' => 'calendario']), "area nel modulo dell'utente");
+prova(utente_gestisce_attivita($conn, 96, 20), "modulo intero: gestisce le attività delle sue aree");
+$q("UPDATE pagine_eventi SET tipo_area = '' WHERE id IN (1, 2)");
+
+sezione("Vista a calendario delle risorse");
+prova(periodo_calendario_risorse('settimana', '2026-10-08') === ['2026-10-05', '2026-10-11'] && periodo_calendario_risorse('mese', '2026-02-10') === ['2026-02-01', '2026-02-28'] && periodo_calendario_risorse('giorno', '2026-10-08') === ['2026-10-08', '2026-10-08'], "periodi di giorno, settimana e mese");
+$cal_html = html_calendario_risorse($conn, [], ['vista' => 'giorno', 'data' => '2026-10-05', 'url' => fn($c) => '?', 'url_risorsa' => fn($i, $g) => '?']);
+prova(str_contains($cal_html, 'Nessuna risorsa') && str_contains($cal_html, 'Non prenotabile'), "senza risorse: legenda e avviso");
+
+sezione("Aule collegate agli eventi");
+$q("INSERT INTO risorse (id, pagina_id, nome, tipo, durata_slot, max_slot, attiva) VALUES (901, 1, 'Aula prova', 'aula', 60, 4, 1)");
+$q("INSERT INTO turni (id, evento_id, data_turno, orario_inizio, orario_fine, max_posti, risorsa_id) VALUES (901, 10, '" . $giorni(30) . "', '10:00:00', '12:00:00', 30, 901), (902, 10, '" . $giorni(30) . "', '11:00:00', '13:00:00', 30, 901)");
+$avv = [];
+sincronizza_aula_turno($conn, 901, $avv);
+$b901 = $conn->query("SELECT * FROM prenotazioni_risorse WHERE turno_id = 901 AND stato = 'confermata'")->fetch_assoc();
+prova($b901 && $b901['inizio'] === $giorni(30) . ' 10:00:00' && $b901['fine'] === $giorni(30) . ' 12:00:00' && !$avv, "il turno occupa l'aula");
+sincronizza_aula_turno($conn, 902, $avv);
+prova(count($avv) === 1 && str_contains($avv[0], 'già occupata') && !$conn->query("SELECT 1 FROM prenotazioni_risorse WHERE turno_id = 902 AND stato = 'confermata'")->num_rows, "aula già occupata: niente doppia prenotazione, avviso");
+$q("UPDATE turni SET orario_inizio = '14:00:00', orario_fine = '15:00:00' WHERE id = 901");
+$avv = []; sincronizza_aula_turno($conn, 901, $avv);
+prova((int)$conn->query("SELECT COUNT(*) n FROM prenotazioni_risorse WHERE turno_id = 901 AND stato = 'confermata' AND TIME(inizio) = '14:00:00'")->fetch_assoc()['n'] === 1, "cambio di orario: la stessa prenotazione si sposta");
+$q("UPDATE turni SET risorsa_id = NULL WHERE id = 901");
+sincronizza_aula_turno($conn, 901, $avv);
+prova(!$conn->query("SELECT 1 FROM prenotazioni_risorse WHERE turno_id = 901 AND stato = 'confermata'")->num_rows, "aula tolta dal turno: torna libera");
 
 sezione("Scelta guidata della scuola");
 prova(array_column(luoghi_scuole($conn, 'regioni'), 'valore') === ['CALABRIA'], "regioni dell'anagrafe");
@@ -253,6 +287,154 @@ $q("INSERT INTO convenzioni_scuole (scuola_codice, data_stipula, scadenza) VALUE
 convenzione_valida($conn, 'CSPS020009', true);
 verifica_convenzioni_fsl($conn);
 prova($conn->query("SELECT convenzione FROM prenotazioni WHERE id = 210")->fetch_assoc()['convenzione'] === 'ricevuta', "la verifica la segna ricevuta anche fuori dalle attività FSL");
+
+sezione("Didattica: moduli online e pratiche");
+$cm = campi_modulo(json_encode([['etichetta' => 'Corso', 'tipo' => 'select', 'opzioni' => 'Biologia; Geologia, Ecologia', 'obbligatorio' => true], ['etichetta' => 'Note', 'tipo' => 'textarea'], ['etichetta' => '', 'tipo' => 'text'], ['etichetta' => 'Strano', 'tipo' => 'script']]));
+prova(count($cm) === 3 && $cm[0]['nome'] === 'c1' && $cm[0]['opzioni'] === ['Biologia', 'Geologia', 'Ecologia'] && $cm[2]['tipo'] === 'text', "campi del modulo normalizzati (opzioni con virgola o punto e virgola)", json_encode($cm));
+$_POST = ['campo_c1' => 'Fisica', 'campo_c2' => ' Testo '];
+[$ris, $err] = leggi_risposte_modulo($cm);
+prova(count($err) === 1 && str_contains($err[0], 'Corso') && $ris[1]['valore'] === 'Testo', "opzione non prevista scartata, campo obbligatorio segnalato", json_encode($err));
+$_POST = ['campo_c1' => 'Geologia'];
+[$ris, $err] = leggi_risposte_modulo($cm);
+$_POST = [];
+prova(!$err && $ris[0]['valore'] === 'Geologia', "risposte valide");
+$q("INSERT INTO didattica_moduli (id, titolo, categoria, tipo, campi_json, destinatari, email_ufficio, attivo) VALUES (500, 'Riconoscimento crediti', 'Carriera', 'online', '" . $conn->real_escape_string(json_encode([['etichetta' => 'Corso', 'tipo' => 'select', 'opzioni' => 'Biologia, Geologia', 'obbligatorio' => true]])) . "', 'tutti', 'segreteria@unical.it', 1)");
+$u73 = $conn->query("SELECT * FROM utenti WHERE id = 73")->fetch_assoc();
+prova(utente_destinatario_modulo($conn, modulo_didattica($conn, 500), $u73) && !utente_destinatario_modulo($conn, modulo_didattica($conn, 500), null), "modulo per tutti: serve l'accesso");
+$EMAIL = [];
+$idp = crea_pratica($conn, modulo_didattica($conn, 500), $u73, $ris);
+$pp = pratica($conn, $idp);
+prova($idp > 0 && $pp['stato'] === 'inviata' && str_starts_with($pp['codice'], 'PR-') && $pp['modulo_titolo'] === 'Riconoscimento crediti', "pratica creata");
+$dest = array_column($EMAIL, 'a');
+prova(in_array('nuovo@unical.it', $dest, true) && in_array('segreteria@unical.it', $dest, true), "email di conferma allo studente e all'ufficio", json_encode($dest));
+$EMAIL = [];
+cambia_stato_pratica($conn, $idp, 'integrazione', 'Manca il piano di studi', 10);
+prova(pratica($conn, $idp)['stato'] === 'integrazione' && ($EMAIL[0]['a'] ?? '') === 'nuovo@unical.it' && str_contains($EMAIL[0]['corpo'] ?? '', 'Manca il piano di studi'), "integrazione richiesta: email allo studente con la nota");
+prova(messaggio_pratica($conn, $idp, 'studente', 73, '') !== null, "messaggio vuoto rifiutato");
+prova(messaggio_pratica($conn, $idp, 'studente', 73, 'Ecco il piano') === null && pratica($conn, $idp)['stato'] === 'in_lavorazione', "la risposta dello studente riporta la pratica in lavorazione");
+prova((int)$conn->query("SELECT COUNT(*) n FROM pratiche_eventi WHERE pratica_id = $idp")->fetch_assoc()['n'] === 4, "storico completo della pratica");
+prova(!cambia_stato_pratica($conn, $idp, 'inventato', '', 10), "stato non previsto rifiutato");
+
+sezione("Ufficio didattico, campi guidati, verbale ed Excel");
+$q("INSERT INTO personale_ateneo (id, cognome, nome, email, gruppo, attivo) VALUES ('op.prova', 'Operatrice', 'Olga', 'olga.op@unical.it', 'pta', 1)");
+$q("INSERT INTO utenti (id, codice_fiscale, nome, cognome, email, ruolo_id) VALUES (97, 'OPERAT97XXXXXXXX', 'Olga', 'Operatrice', 'olga.op@unical.it', 5)");
+$u97 = $conn->query("SELECT * FROM utenti WHERE id = 97")->fetch_assoc();
+prova(!utente_gestisce_didattica($conn, $u97), "prima di essere nell'ufficio non gestisce la Didattica");
+prova(aggiungi_operatore_ufficio($conn, 'op.prova', 'Responsabile', ['pratiche', 'ricevimento', 'inventato']) === null, "operatore aggiunto dall'anagrafe");
+prova(utente_gestisce_didattica($conn, $u97) && utente_operatore_ufficio($conn, $u97, 'ricevimento') && !utente_operatore_ufficio($conn, $u97, 'sedute'), "operatore: gestisce la Didattica, compiti rispettati");
+prova(aggiungi_operatore_ufficio($conn, 'nessuno', '', []) !== null, "persona inesistente rifiutata");
+prova(email_ufficio_didattica($conn, '') === ['olga.op@unical.it'] && email_ufficio_didattica($conn, 'uff@unical.it') === ['uff@unical.it'], "avvisi: email del modulo, altrimenti gli operatori");
+$q("INSERT INTO pagine_eventi (id, titolo, slug, tipo_area) VALUES (950, 'Sportelli', 'sportelli-prova', 'calendario')");
+$rid_u = crea_sportello_ufficio($conn, 950, '', 'Cubo 4B');
+prova($rid_u > 0 && array_column(sportelli_utente($conn, $u97), 'id') == [$rid_u] && risorsa($conn, $rid_u)['email_notifiche'] === 'olga.op@unical.it', "sportello dell'ufficio gestito dall'operatore");
+$ct = campi_modulo(json_encode([['etichetta' => 'Esami sostenuti', 'tipo' => 'tabella', 'opzioni' => 'Insegnamento, CFU, Voto', 'obbligatorio' => true],
+                                 ['etichetta' => 'Anno accademico', 'tipo' => 'anno_accademico'], ['etichetta' => 'Convalide', 'tipo' => 'tabella', 'opzioni' => 'Insegnamento convalidato, CFU', 'ufficio' => true],
+                                 ['etichetta' => 'Dal', 'tipo' => 'date']]));
+prova(count(campi_studente($ct)) === 3 && count(campi_ufficio($ct)) === 1 && campi_ufficio($ct)[0]['etichetta'] === 'Convalide', "campi dello studente e dell'ufficio separati");
+$_POST = ['campo_c1' => [['Zoologia', '', 'Botanica'], ['9', '', '6'], ['28/30', '', '30/30']], 'campo_c2' => '2025/2026', 'campo_c4' => '2026-03-01'];
+[$rt, $et] = leggi_risposte_modulo(campi_studente($ct), $conn);
+$_POST = [];
+prova(!$et && $rt[0]['righe'] === [['Zoologia', '9', '28/30'], ['Botanica', '6', '30/30']] && $rt[0]['colonne'] === ['Insegnamento', 'CFU', 'Voto'] && $rt[1]['valore'] === '2025/2026', "tabella a righe (righe vuote scartate) e anno accademico", json_encode($rt));
+$_POST = ['campo_c2' => '2025-26'];
+[, $et2] = leggi_risposte_modulo(campi_studente($ct), $conn);
+$_POST = [];
+prova(in_array('Esami sostenuti: campo obbligatorio', $et2, true), "tabella obbligatoria vuota segnalata");
+prova(str_contains(html_campo_pratica($ct[0], [['A', '1', '2']]), 'name="campo_c1[0][]" value="A"') && str_contains(html_campo_pratica($ct[0]), 'list="dl_insegnamento"'), "tabella nel modulo con l'elenco degli insegnamenti");
+$q("INSERT INTO didattica_moduli (id, titolo, categoria, tipo, campi_json, verbale_json, attivo) VALUES (501, 'Passaggio di corso', 'Carriera', 'online', '" . $conn->real_escape_string(json_encode([['etichetta' => 'Esami sostenuti', 'tipo' => 'tabella', 'opzioni' => 'Insegnamento, CFU, Voto'], ['etichetta' => 'Anno accademico', 'tipo' => 'anno_accademico'], ['etichetta' => 'Dal', 'tipo' => 'date']])) . "',
+    '" . $conn->real_escape_string(json_encode(['testo' => "Lo studente {STUDENTE}, matricola {MATRICOLA}, per l'a.a. {anno accademico} dal {Dal} chiede il passaggio.", 'delibera' => 'Il Consiglio approva.'])) . "', 1),
+    (502, 'Lavoro finale', 'Lauree', 'online', '" . $conn->real_escape_string(json_encode([['etichetta' => 'Corso di studio', 'tipo' => 'text'], ['etichetta' => 'Relatore', 'tipo' => 'docente']])) . "',
+    '" . $conn->real_escape_string(json_encode(['sezione' => 'Domande lavoro finale', 'stile' => 'elenco', 'colonne' => 'COGNOME, NOME, MATRICOLA, RELATORE', 'raggruppa' => 'Corso di studio'])) . "', 1)");
+$u73['matricola_studente'] = '254671';
+$pa = crea_pratica($conn, modulo_didattica($conn, 501), $u73, $rt);
+$_POST = ['campo_c1' => 'Scienze naturali', 'campo_c2' => 'Sperone Emilio'];
+[$rt2] = leggi_risposte_modulo(campi_modulo(modulo_didattica($conn, 502)['campi_json']), $conn);
+$_POST = [];
+$pb = crea_pratica($conn, modulo_didattica($conn, 502), $u73, $rt2);
+$conn->query("UPDATE pratiche SET ufficio_json = '" . $conn->real_escape_string(json_encode([['etichetta' => 'Convalide', 'tipo' => 'tabella', 'colonne' => ['Insegnamento convalidato', 'CFU'], 'righe' => [['Zoologia generale', '9']], 'valore' => 'Zoologia generale | 9']])) . "' WHERE id = $pa");
+$ppa = pratiche_per_esportazione($conn, [$pa])[0];
+prova(testo_segnaposti_pratica(verbale_modulo($ppa)['testo'], $ppa) === "Lo studente ARRIVATO NUOVO, matricola 254671, per l'a.a. 2025/2026 dal 01/03/2026 chiede il passaggio.", "segnaposti del verbale (maiuscole, date, campi)", testo_segnaposti_pratica(verbale_modulo($ppa)['testo'], $ppa));
+$q("INSERT INTO didattica_sedute (id, organo, anno_accademico, data, ora_inizio, ora_fine, luogo, odg, presenze, segretario, coordinatore) VALUES (60, 'Consiglio del Corso di Laurea in Scienze Naturali', '2026/2027', '2026-10-15', '15:30', '17:00', 'aula L3', 'Comunicazioni\nPratiche studenti\nVarie', 'Professori\nProf. Rossi | PRESENTE', 'la Dott.ssa Bianchi', 'Prof. Rossi')");
+$conn->query("UPDATE pratiche SET seduta_id = 60 WHERE id IN ($pa, $pb)");
+$tutte = pratiche_per_esportazione($conn, [$pa, $pb]);
+$doc = genera_verbale_pratiche($conn, seduta_didattica($conn, 60), $tutte);
+$xml_doc = ''; $logo_ok = false;
+if ($doc && ($z = new ZipArchive())->open($doc) === true) { $xml_doc = (string)$z->getFromName('word/document.xml'); $logo_ok = $z->locateName('word/media/logo.jpg') !== false; $z->close(); }
+$testo_doc = html_entity_decode(strip_tags(str_replace('</w:p>', "\n", $xml_doc)));
+prova($xml_doc !== '' && (new DOMDocument())->loadXML($xml_doc) && $logo_ok, "verbale Word valido con il logo");
+prova(str_contains($testo_doc, 'Il giorno 15 del mese di ottobre 2026 alle ore 15:30') && str_contains($testo_doc, '2. Pratiche studenti') && str_contains($testo_doc, 'Zoologia generale')
+      && str_contains($testo_doc, 'Domande lavoro finale') && str_contains($testo_doc, 'Scienze naturali:') && str_contains($testo_doc, 'Il Consiglio approva.') && str_contains($testo_doc, 'si scioglie alle ore 17:00'), "verbale: intestazione, pratiche nel punto giusto, tabelle, elenco per corso, chiusura");
+prova(strpos($testo_doc, 'Passaggio') < strpos($testo_doc, 'Domande lavoro finale'), "sezioni nell'ordine delle categorie");
+$xls = genera_excel_pratiche($conn, $tutte);
+$fogli = []; $s1 = '';
+if ($xls && ($z = new ZipArchive())->open($xls) === true) { preg_match_all('/sheet name="([^"]+)"/', (string)$z->getFromName('xl/workbook.xml'), $mm); $fogli = $mm[1]; $s1 = (string)$z->getFromName('xl/worksheets/sheet1.xml'); $z->close(); }
+prova(count($fogli) === 3 && $fogli[0] === 'Tutte le pratiche' && (new DOMDocument())->loadXML($s1) && str_contains($s1, 'Zoologia | 9 | 28/30') && str_contains($s1, 'Sperone Emilio') && str_contains($s1, '15/10/2026'), "Excel: foglio con tutte e uno per modulo, tabelle e seduta", json_encode($fogli));
+@unlink($doc); @unlink($xls);
+
+sezione("Iter delle pratiche");
+$q("INSERT INTO personale_ateneo (id, cognome, nome, email, gruppo, attivo) VALUES ('man.prova', 'Manager', 'Marta', 'marta.man@unical.it', 'pta', 1), ('cdl.prova', 'Referente', 'Carlo', 'carlo.cdl@unical.it', 'docenti', 1), ('car.prova', 'Carriere', 'Carla', 'carla.car@unical.it', 'pta', 1), ('int.prova', 'Tutor', 'Irene', 'irene.int@unical.it', 'docenti', 1)");
+aggiungi_operatore_ufficio($conn, 'man.prova', '', ['pratiche'], 'manager');
+aggiungi_operatore_ufficio($conn, 'cdl.prova', '', ['pratiche'], 'referente_cdl', ['Corso di laurea in Scienze naturali']);
+aggiungi_operatore_ufficio($conn, 'car.prova', '', ['pratiche'], 'carriere');
+aggiungi_operatore_ufficio($conn, 'int.prova', '', ['pratiche'], 'internazionalizzazione');
+$op = []; foreach (operatori_ufficio($conn) as $o) $op[$o['profilo']] = (int)$o['id'];
+prova(isset($op['manager'], $op['referente_cdl'], $op['carriere'], $op['internazionalizzazione']), "operatori con i profili dell'iter");
+$q("INSERT INTO didattica_moduli (id, titolo, categoria, tipo, campi_json, iter_json, attivo) VALUES (503, 'Attività all\'estero', 'Mobilità', 'online', '" . $conn->real_escape_string(json_encode([['etichetta' => 'Corso di studio', 'tipo' => 'corso_studio']])) . "', '[\"internazionalizzazione\",\"referente_cdl\",\"carriere\"]', 1)");
+$m503 = modulo_didattica($conn, 503);
+prova(passi_pratica($m503) === [0 => 'Ricevuta e da smistare', 1 => PROFILI_UFFICIO['internazionalizzazione'], 2 => PROFILI_UFFICIO['referente_cdl'], 3 => PROFILI_UFFICIO['carriere']], "passi dell'iter dal modulo");
+prova(iter_modulo(['iter_json' => '["manager","inventato"]']) === ['operatore'], "iter senza passi validi: un solo passo generico");
+$EMAIL = [];
+$pi = crea_pratica($conn, $m503, $u73, [['etichetta' => 'Corso di studio', 'tipo' => 'corso_studio', 'valore' => 'Corso di laurea in Scienze naturali', 'file' => null, 'nome_file' => null]]);
+prova(in_array('marta.man@unical.it', array_column($EMAIL, 'a'), true) && !in_array('carlo.cdl@unical.it', array_column($EMAIL, 'a'), true), "nuova pratica: avviso al manager che smista");
+$pp = pratica($conn, $pi);
+prova((int)operatori_suggeriti($conn, $pp, $m503, 1)[0]['id'] === $op['internazionalizzazione'] && (int)operatori_suggeriti($conn, $pp, $m503, 2)[0]['id'] === $op['referente_cdl'], "operatore proposto per il passo (e il referente del corso della pratica)");
+$EMAIL = [];
+prova(assegna_pratica($conn, $pi, $op['internazionalizzazione'], 1, 'Controlla il Learning Agreement', 50, 'Manager Marta') === null, "smistamento al tutor dell'internazionalizzazione");
+$pp = pratica($conn, $pi);
+prova((int)$pp['assegnata_a'] === $op['internazionalizzazione'] && (int)$pp['passo'] === 1 && $pp['stato'] === 'in_lavorazione' && ($EMAIL[0]['a'] ?? '') === 'irene.int@unical.it', "pratica in carico, in lavorazione, email all'operatore");
+$ev_int = $conn->query("SELECT tipo, interno FROM pratiche_eventi WHERE pratica_id = $pi ORDER BY id")->fetch_all(MYSQLI_ASSOC);
+prova(in_array(['tipo' => 'passaggio', 'interno' => '0'], $ev_int) && in_array(['tipo' => 'messaggio', 'interno' => '1'], $ev_int), "passaggio visibile allo studente, nota del manager interna");
+$EMAIL = [];
+messaggio_pratica($conn, $pi, 'ufficio', 50, 'Parere favorevole', null, true, 'messaggio', 'Tutor Irene');
+prova(!in_array('nuovo@unical.it', array_column($EMAIL, 'a'), true), "nota interna: nessuna email allo studente");
+messaggio_pratica($conn, $pi, 'ufficio', 50, 'Verbale del CdL', null, false, 'attivita', 'Referente Carlo');
+prova((int)$conn->query("SELECT COUNT(*) n FROM pratiche_eventi WHERE pratica_id = $pi AND tipo = 'attivita' AND interno = 0")->fetch_assoc()['n'] === 1, "attività visibile allo studente");
+assegna_pratica($conn, $pi, $op['carriere'], 9, '', 50);
+prova((int)pratica($conn, $pi)['passo'] === 3, "il passo non va oltre l'ultimo");
+cambia_stato_pratica($conn, $pi, 'integrazione', '', 50, 'Carriere Carla', ['tipo' => 'autodichiarazione', 'testo' => "di aver sostenuto l'esame di Zoologia"]);
+prova((json_decode((string)pratica($conn, $pi)['richiesta_json'], true)['tipo'] ?? '') === 'autodichiarazione', "richiesta di autodichiarazione registrata");
+prova(messaggio_pratica($conn, $pi, 'studente', 73, 'ecco', null) === null && pratica($conn, $pi)['stato'] === 'integrazione', "un messaggio non chiude la richiesta di autodichiarazione");
+prova(autodichiarazione_pratica($conn, $pi, 73, '', false) !== null, "autodichiarazione senza conferma rifiutata");
+prova(autodichiarazione_pratica($conn, $pi, 73, 'Voto 28/30', true) === null && pratica($conn, $pi)['stato'] === 'in_lavorazione' && pratica($conn, $pi)['richiesta_json'] === null, "autodichiarazione resa: la pratica torna in lavorazione");
+$ad = $conn->query("SELECT testo FROM pratiche_eventi WHERE pratica_id = $pi AND tipo = 'autodich'")->fetch_assoc()['testo'] ?? '';
+prova(str_contains($ad, "di aver sostenuto l'esame di Zoologia") && str_contains($ad, 'D.P.R. 445/2000') && str_contains($ad, 'Voto 28/30'), "testo dell'autodichiarazione nello storico");
+cambia_stato_pratica($conn, $pi, 'integrazione', '', 50, '', ['tipo' => 'documenti', 'testo' => 'Allega il transcript']);
+messaggio_pratica($conn, $pi, 'studente', 73, 'Allegato', null);
+prova(pratica($conn, $pi)['stato'] === 'in_lavorazione', "integrazione di documenti: la risposta dello studente la chiude");
+prova(str_contains(html_iter_pratica($conn, pratica($conn, $pi), $m503), 'aria-current="step"') && str_contains(html_iter_pratica($conn, pratica($conn, $pi), $m503), 'Carriere Carla'), "iter visibile con chi ha in carico la pratica");
+
+sezione("Convenzione FSL compilata online");
+$scuola_cv = ['ISTITUTO' => 'Liceo Prova (codice meccanografico CSPS020009)', 'ISTITUTO_FIRMA' => 'Liceo Prova', 'COMUNE' => 'Cosenza (CS)', 'INDIRIZZO' => 'Via Roma 1',
+              'CF_ISTITUTO' => '80004560787', 'DIRIGENTE' => 'Dott.ssa Maria Rossi', 'DIRIGENTE_FIRMA' => 'Dott.ssa Maria Rossi', 'DIR_LUOGO_NASCITA' => 'Cosenza', 'DIR_DATA_NASCITA' => '01/01/1970', 'DIR_CF' => 'RSSMRA70A41D086X'];
+$att_cv = [['TITOLO' => 'Laboratorio A', 'DESCRIZIONE' => 'Descrizione A', 'STUDENTI' => '20', 'PERIODO' => '12/11/2026', 'DURATA' => '5 ore', 'TUTOR_DIBEST' => 'Prof. X', 'TUTOR_SCUOLA' => 'Luca Bianchi'],
+           ['TITOLO' => 'Laboratorio B', 'DESCRIZIONE' => '', 'STUDENTI' => '', 'PERIODO' => '13/11/2026', 'DURATA' => '3 ore', 'TUTOR_DIBEST' => 'Prof. Y', 'TUTOR_SCUOLA' => '']];
+$png = tempnam(sys_get_temp_dir(), 'lg') . '.png';
+file_put_contents($png, base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAAEUlEQVR4nGP4z8DwHwQYGBgAJ+UE/O7Q3vYAAAAASUVORK5CYII='));
+$fd = genera_docx_convenzione('convenzione', $scuola_cv, $att_cv, $png);
+$xd = ''; $hd = ''; $media = false;
+if ($fd && ($z = new ZipArchive())->open($fd) === true) { $xd = (string)$z->getFromName('word/document.xml'); $hd = (string)$z->getFromName('word/header1.xml'); $media = $z->locateName('word/media/logo_scuola.png') !== false; $z->close(); }
+$td = html_entity_decode(strip_tags(str_replace('</w:p>', "\n", $xd)));
+prova($xd !== '' && (new DOMDocument())->loadXML($xd) && (new DOMDocument())->loadXML($hd), "convenzione: documento e intestazione validi");
+prova(str_contains($td, 'codice fiscale 80004560787') && str_contains($td, 'Dott.ssa Maria Rossi, nata/o a Cosenza, il 01/01/1970, codice fiscale RSSMRA70A41D086X') && !str_contains($td, '{{'), "dati della scuola e del Dirigente, nessun segnaposto rimasto");
+prova(substr_count($td, 'Titolo corso:') === 2 && str_contains($td, 'Laboratorio A') && str_contains($td, 'Laboratorio B'), "Allegato A ripetuto per ogni attività");
+prova(str_contains($td, 'Numero di studenti: ……………'), "campo vuoto: torna il testo originale da completare");
+prova($media && str_contains($hd, 'rIdLogoScuola') && !str_contains($hd, 'Logo/intestazione Istituzione Scolastica'), "logo della scuola nell'intestazione");
+@unlink($fd); @unlink($png);
+$fa = genera_docx_convenzione('allegato', $scuola_cv, $att_cv);
+$xa = ''; if ($fa && ($z = new ZipArchive())->open($fa) === true) { $xa = html_entity_decode(strip_tags(str_replace('</w:p>', "\n", (string)$z->getFromName('word/document.xml')))); $z->close(); } @unlink($fa);
+prova(substr_count($xa, 'Titolo corso:') === 2 && str_contains($xa, 'Laboratorio B'), "Allegato A da solo con le due attività");
+$istr = html_istruzioni_convenzione([], true, 'FS-PROVA01');
+prova(str_contains($istr, 'convenzione_online.php?code=FS-PROVA01') && str_contains($istr, 'firma digitalmente'), "le istruzioni portano al modulo guidato");
+prova(str_contains(html_istruzioni_convenzione([]), 'Al termine della prenotazione'), "nel modulo di prenotazione si annuncia la compilazione online");
 
 // ---------------------------------------------------------------------------
 // Prove delle pagine sull'ambiente locale (se acceso)

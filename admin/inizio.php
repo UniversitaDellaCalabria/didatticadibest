@@ -1,14 +1,30 @@
 <?php
-// admin/inizio.php - Pagina di ingresso della gestione: prima si sceglie la sezione (Orientamento, Didattica,
-// Calendari e risorse), poi l'area della sezione; cliccando l'area si entra nella sua dashboard.
-// Con aree di una sola sezione si salta direttamente alla scelta dell'area.
+// admin/inizio.php - Pagina di ingresso della gestione, organizzata a moduli: prima si sceglie il modulo
+// (Orientamento, Prenotazioni e risorse, Didattica, Gestione del portale), poi si lavora nella sua pagina:
+// card delle aree per i moduli con aree, card delle funzioni per gli altri. Con un solo modulo si entra direttamente.
 require_once 'admin_header.php';
 
-$gruppi_sez = raggruppa_aree_per_sezione($pagine_disponibili);
-$info_sez = fn(string $k) => SEZIONI_PORTALE[$k] ?? ['nome' => 'Aree non assegnate', 'icona' => 'fa-circle-question', 'descr' => 'Aree senza tipo: si comportano come eventi generici' . ($is_full_admin ? ' (il tipo si sceglie in Aree)' : '')];
-$sez_sel = isset($_GET['sezione']) ? (string)$_GET['sezione'] : null;
-if ($sez_sel !== null && !isset($gruppi_sez[$sez_sel])) $sez_sel = null;
-if ($sez_sel === null && count($gruppi_sez) === 1) $sez_sel = (string)array_key_first($gruppi_sez);
+// Aree divise per modulo (le aree senza tipo stanno in Orientamento)
+$aree_per_modulo = [];
+foreach ($pagine_disponibili as $a_m) $aree_per_modulo[modulo_di_area($a_m)][] = $a_m;
+$sez_sel = $modulo_corrente !== '' && in_array($modulo_corrente, $moduli_utente, true) ? $modulo_corrente : null;
+if ($sez_sel === null && count($moduli_utente) === 1) $sez_sel = $moduli_utente[0];
+
+// Funzioni dei moduli senza aree e del sottomodulo FSL: [titolo, descrizione, icona, pagina]
+$funzioni_modulo = [
+    'orientamento' => $puo_fsl_convenzioni ? [[$puo_fsl ? 'Formazione Scuola Lavoro' : 'Convenzioni FSL', 'Sottomodulo: convenzioni con le scuole, verifica delle iscrizioni, riepilogo per anno e valutazioni', 'fa-briefcase', 'fsl.php']] : [],
+    'calendari'    => [],
+    'didattica'    => $puo_didattica ? [['Pratiche degli studenti', 'Moduli online, pratiche con stato, istruttoria e messaggi', 'fa-inbox', 'didattica.php?tab=pratiche'], ['Sedute e verbali', 'Sedute del Consiglio, verbale in Word ed Excel delle pratiche', 'fa-gavel', 'didattica.php?tab=sedute'], ['Moduli e documenti', 'Modulistica: documenti da scaricare e moduli online guidati', 'fa-file-lines', 'didattica.php?tab=moduli'], ['Ufficio e ricevimento', 'Operatori dell’Ufficio didattico e sportello di ricevimento', 'fa-people-group', 'didattica.php?tab=ufficio']] : [],
+    'portale'      => array_values(array_filter([
+        $is_full_admin ? ['Anagrafi', 'Docenti, personale TA, insegnamenti, corsi di studio e strutture dal portale di Ateneo', 'fa-address-book', 'anagrafe_docenti.php'] : null,
+        $puo_fsl_scuole ? ['Anagrafe scuole', 'Scuole del Ministero, abbinamento delle scuole scritte a mano, scuole collegate', 'fa-building-columns', 'scuole.php'] : null,
+        $is_full_admin ? ['Aree di tutti i moduli', 'Crea, nascondi o elimina le aree e scegli il loro tipo', 'fa-layer-group', 'aree.php'] : null,
+        $is_full_admin ? ['Testata e home', 'Logo, testata, carosello e widget della home', 'fa-image', 'testata.php'] : null,
+        $is_full_admin ? ['Menu del sito', 'Voci del menu di navigazione del sito pubblico', 'fa-link', 'menu.php'] : null,
+        $is_full_admin ? ['Utenti e abilitazioni', 'Amministratori, abilitati per area, per modulo e per la FSL', 'fa-users-cog', 'utenti.php'] : null,
+        $is_full_admin ? ['Sistema e registri', 'Email, backup, controllo notturno, registro operazioni e accessi', 'fa-gear', 'sistema.php'] : null,
+    ])),
+];
 
 // Numeri di un'area (solo per chi la gestisce tutta)
 $numeri_area = function (array $a) use ($conn, $is_full_admin, $u_id_curr): ?array {
@@ -49,45 +65,51 @@ $numeri_area = function (array $a) use ($conn, $is_full_admin, $u_id_curr): ?arr
 [data-bs-theme="dark"] .ini-num strong { color: #f1f5f9; }
 </style>
 
-<?php if (!$pagine_disponibili): ?>
-    <div class="card border-0 shadow-sm"><div class="card-body text-center text-muted py-5">Non risulti assegnato a nessuna area di lavoro.</div></div>
+<?php if (!$moduli_utente): ?>
+    <div class="card border-0 shadow-sm"><div class="card-body text-center text-muted py-5">Non risulti assegnato a nessuna area o modulo.</div></div>
 <?php elseif ($sez_sel === null): ?>
     <h4 class="fw-bold text-dark mb-1"><i class="fa fa-house me-2 text-primary" aria-hidden="true"></i>Da dove vuoi iniziare?</h4>
-    <p class="text-secondary small mb-4">Scegli la sezione, poi l'area su cui lavorare.</p>
+    <p class="text-secondary small mb-4">Scegli il modulo: ognuno ha il suo menu e le sue funzioni, con anagrafi, moduli di iscrizione, sondaggi e scanner in comune.</p>
     <div class="row g-3">
-        <?php foreach ($gruppi_sez as $k => $aree_s): $s = $info_sez($k); $col = ['orientamento' => '#0056B3', 'didattica' => '#047857', 'calendari' => '#7c3aed'][$k] ?? '#64748b'; ?>
-        <div class="col-md-6 col-xl-4">
+        <?php foreach ($moduli_utente as $k): $s = MODULI_PORTALE[$k]; $col = $s['colore']; $aree_s = $aree_per_modulo[$k] ?? []; ?>
+        <div class="col-md-6 col-xl-3">
             <a class="ini-card p-4" href="inizio.php?sezione=<?php echo urlencode($k); ?>&amp;p_id=<?php echo (int)$filtro_p; ?>">
                 <div class="d-flex align-items-center gap-3 mb-3">
                     <span class="ini-ico" style="background: <?php echo $col; ?>1a; color: <?php echo $col; ?>;"><i class="fa <?php echo $s['icona']; ?>" aria-hidden="true"></i></span>
                     <div>
                         <h2 class="h5 fw-bold mb-0"><?php echo htmlspecialchars($s['nome']); ?></h2>
-                        <div class="small text-secondary"><?php echo count($aree_s); ?> <?php echo count($aree_s) === 1 ? 'area' : 'aree'; ?></div>
+                        <?php if ($aree_s): ?><div class="small text-secondary"><?php echo count($aree_s); ?> <?php echo count($aree_s) === 1 ? 'area' : 'aree'; ?></div><?php endif; ?>
                     </div>
                 </div>
                 <p class="small text-secondary mb-3"><?php echo htmlspecialchars($s['descr']); ?></p>
-                <div class="ini-aree mt-auto"><?php foreach ($aree_s as $a): ?><span><?php echo htmlspecialchars($a['titolo']); ?></span><?php endforeach; ?></div>
+                <div class="ini-aree mt-auto">
+                    <?php foreach ($aree_s as $a): ?><span><?php echo htmlspecialchars($a['titolo']); ?></span><?php endforeach; ?>
+                    <?php foreach ($funzioni_modulo[$k] ?? [] as $f): ?><span><i class="fa <?php echo $f[2]; ?> me-1" aria-hidden="true"></i><?php echo htmlspecialchars($f[0]); ?></span><?php endforeach; ?>
+                </div>
             </a>
         </div>
         <?php endforeach; ?>
     </div>
-<?php else: $s = $info_sez($sez_sel); ?>
+<?php else: $s = MODULI_PORTALE[$sez_sel]; $aree_mod = $aree_per_modulo[$sez_sel] ?? []; $funz = $funzioni_modulo[$sez_sel] ?? []; ?>
     <nav aria-label="Percorso" class="small mb-2">
-        <?php if (count($gruppi_sez) > 1): ?><a href="inizio.php?p_id=<?php echo (int)$filtro_p; ?>" class="text-decoration-none"><i class="fa fa-arrow-left me-1" aria-hidden="true"></i>Tutte le sezioni</a><?php endif; ?>
+        <?php if (count($moduli_utente) > 1): ?><a href="inizio.php?p_id=<?php echo (int)$filtro_p; ?>" class="text-decoration-none"><i class="fa fa-arrow-left me-1" aria-hidden="true"></i>Tutti i moduli</a><?php endif; ?>
     </nav>
-    <h4 class="fw-bold text-dark mb-1"><i class="fa <?php echo $s['icona']; ?> me-2 text-primary" aria-hidden="true"></i><?php echo htmlspecialchars($s['nome']); ?></h4>
-    <p class="text-secondary small mb-4"><?php echo htmlspecialchars($s['descr']); ?>. Scegli l'area: entri nella sua dashboard.</p>
-    <div class="row g-3">
-        <?php foreach ($gruppi_sez[$sez_sel] as $a): $col_a = colore_valido($a['colore_primario'] ?? '', '#0056B3'); $num = $numeri_area($a); $t = tipo_area($a); ?>
+    <h4 class="fw-bold text-dark mb-1"><i class="fa <?php echo $s['icona']; ?> me-2" style="color: <?php echo $s['colore']; ?>;" aria-hidden="true"></i><?php echo htmlspecialchars($s['nome']); ?></h4>
+    <p class="text-secondary small mb-4"><?php echo htmlspecialchars($s['descr']); ?>.<?php echo $aree_mod ? " Scegli l'area: entri nella sua dashboard." : ''; ?></p>
+
+    <?php if ($aree_mod): ?>
+    <?php if ($funz): ?><h2 class="h6 fw-bold text-secondary text-uppercase mb-2" style="letter-spacing:.05em;font-size:.75rem;">Aree</h2><?php endif; ?>
+    <div class="row g-3 mb-4">
+        <?php foreach ($aree_mod as $a): $col_a = colore_valido($a['colore_primario'] ?? '', '#0056B3'); $num = $numeri_area($a); $t = tipo_area($a); ?>
         <div class="col-md-6 col-xl-4">
-            <a class="ini-card" href="dashboard.php?p_id=<?php echo (int)$a['id']; ?>">
+            <a class="ini-card" href="<?php echo $t === 'calendario' ? 'prenotazioni_risorse.php' : 'dashboard.php'; ?>?p_id=<?php echo (int)$a['id']; ?>">
                 <div class="ini-area-barra" style="background: <?php echo $col_a; ?>;"></div>
                 <div class="p-4 d-flex flex-column flex-grow-1">
                     <div class="d-flex justify-content-between align-items-start gap-2 mb-1">
                         <h2 class="h5 fw-bold mb-0" style="color: <?php echo $col_a; ?>;"><?php echo htmlspecialchars($a['titolo']); ?></h2>
                         <?php if ((int)($a['visibile'] ?? 1) === 0): ?><span class="badge bg-warning text-dark" style="font-size:.65rem;"><i class="fa fa-eye-slash me-1" aria-hidden="true"></i>Nascosta</span><?php endif; ?>
                     </div>
-                    <div class="small text-secondary mb-3"><?php echo $t !== '' ? htmlspecialchars(TIPI_AREA[$t]['nome']) : 'Eventi generici'; ?><?php if ((int)$a['id'] === (int)$filtro_p): ?> · <span class="fw-bold">ultima usata</span><?php endif; ?></div>
+                    <div class="small text-secondary mb-3"><?php echo $t !== '' ? htmlspecialchars(TIPI_AREA[$t]['nome']) : 'Eventi generici (tipo da assegnare)'; ?><?php if ((int)$a['id'] === (int)$filtro_p): ?> · <span class="fw-bold">ultima usata</span><?php endif; ?></div>
                     <?php if ($num): ?>
                         <div class="ini-num d-flex flex-wrap gap-3 mt-auto">
                             <?php foreach ($num as $n): ?><div class="<?php echo !empty($n[2]) && $n[0] > 0 ? 'ini-avviso' : ''; ?>"><strong><?php echo (int)$n[0]; ?></strong> <?php echo htmlspecialchars($n[1]); ?></div><?php endforeach; ?>
@@ -101,9 +123,29 @@ $numeri_area = function (array $a) use ($conn, $is_full_admin, $u_id_curr): ?arr
         </div>
         <?php endforeach; ?>
     </div>
+    <?php endif; ?>
+
+    <?php if ($funz): ?>
+    <?php if ($aree_mod): ?><h2 class="h6 fw-bold text-secondary text-uppercase mb-2" style="letter-spacing:.05em;font-size:.75rem;"><?php echo $sez_sel === 'orientamento' ? 'Sottomodulo' : 'Funzioni'; ?></h2><?php endif; ?>
+    <div class="row g-3">
+        <?php foreach ($funz as $f): ?>
+        <div class="col-md-6 col-xl-4">
+            <a class="ini-card p-4" href="<?php echo htmlspecialchars($f[3] . (str_contains($f[3], "?") ? "&" : "?")); ?>p_id=<?php echo (int)$filtro_p; ?>">
+                <div class="d-flex align-items-center gap-3 mb-2">
+                    <span class="ini-ico" style="background: <?php echo $s['colore']; ?>1a; color: <?php echo $s['colore']; ?>;"><i class="fa <?php echo $f[2]; ?>" aria-hidden="true"></i></span>
+                    <h2 class="h5 fw-bold mb-0"><?php echo htmlspecialchars($f[0]); ?></h2>
+                </div>
+                <p class="small text-secondary mb-0"><?php echo htmlspecialchars($f[1]); ?></p>
+            </a>
+        </div>
+        <?php endforeach; ?>
+    </div>
+    <?php elseif (!$aree_mod): ?>
+        <div class="card border-0 shadow-sm"><div class="card-body text-muted">Nessuna area in questo modulo<?php echo $is_full_admin ? ': creala da <a href="nuova_area.php?p_id=' . (int)$filtro_p . '">Nuova area</a> scegliendo un tipo di questo modulo' : ''; ?>.</div></div>
+    <?php endif; ?>
 <?php endif; ?>
 
-<?php if ($is_full_admin && $pagine_disponibili): ?>
+<?php if ($is_full_admin && $pagine_disponibili && in_array($sez_sel, [null, 'orientamento', 'calendari'], true)): ?>
     <p class="small text-secondary mt-4 mb-0"><i class="fa fa-layer-group me-1" aria-hidden="true"></i>Per creare, nascondere o assegnare il tipo alle aree vai in <a href="aree.php?p_id=<?php echo (int)$filtro_p; ?>">Aree</a>.</p>
 <?php endif; ?>
 

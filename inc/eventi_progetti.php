@@ -135,6 +135,8 @@ if (!function_exists('elimina_turno')) {
         $conn->query("DELETE m FROM messaggi_prenotazioni m JOIN prenotazioni pr ON m.prenotazione_id = pr.id WHERE pr.turno_id = $t_id");
         $conn->query("DELETE pp FROM partecipanti_prenotazione pp JOIN prenotazioni pr ON pp.prenotazione_id = pr.id WHERE pr.turno_id = $t_id");
         $conn->query("DELETE FROM prenotazioni WHERE turno_id = $t_id");
+        // Aula occupata dal turno (Prenotazioni e risorse): torna libera
+        @$conn->query("UPDATE prenotazioni_risorse SET stato = 'annullata' WHERE turno_id = $t_id AND stato IN ('confermata', 'da_approvare')");
         $conn->query("DELETE FROM turni WHERE id = $t_id");
     }
 }

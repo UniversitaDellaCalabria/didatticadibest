@@ -77,7 +77,9 @@ function leggi_perimetro_post(): array {
     $fsl   = in_array($_POST['fsl_perimetro'] ?? '', ['tutto', 'parziale'], true) ? $_POST['fsl_perimetro'] : 'nessuno';
     $parti = $fsl === 'parziale' ? array_values(array_intersect((array)($_POST['fsl_parti'] ?? []), ['fsl_convenzioni', 'fsl_scuole'])) : [];
     if ($fsl === 'parziale' && !$parti) $fsl = 'nessuno';
-    return ['area' => $area, 'tipi' => $tipi, 'attivita' => $att, 'fsl' => $fsl, 'fsl_parti' => $parti];
+    // Moduli interi: tutte le aree del modulo (Orientamento comprende la FSL)
+    $moduli = array_values(array_intersect((array)($_POST['moduli'] ?? []), ['orientamento', 'calendari', 'didattica']));
+    return ['area' => $area, 'tipi' => $tipi, 'attivita' => $att, 'fsl' => $fsl, 'fsl_parti' => $parti, 'moduli' => $moduli];
 }
 
 // [[ambito, pagina_id, eventi_ids], …] corrispondenti al perimetro
@@ -88,6 +90,7 @@ function ambiti_da_perimetro(array $p, int $pagina_id): array {
     if ($p['attivita']) $out[] = ['attivita', $pagina_id, $p['attivita']];
     if ($p['fsl'] === 'tutto') $out[] = ['fsl', 0, []];
     foreach ($p['fsl_parti'] as $t) $out[] = [$t, 0, []];
+    foreach ($p['moduli'] ?? [] as $m) $out[] = ['modulo_' . $m, 0, []];
     return $out;
 }
 
@@ -110,6 +113,7 @@ function testo_perimetro(array $p, array $titoli_att = []): string {
     if ($p['fsl'] === 'tutto') $parti[] = 'Formazione Scuola Lavoro';
     if (in_array('fsl_convenzioni', $p['fsl_parti'], true)) $parti[] = 'convenzioni FSL';
     if (in_array('fsl_scuole', $p['fsl_parti'], true)) $parti[] = 'anagrafe scuole';
+    foreach ($p['moduli'] ?? [] as $m) $parti[] = 'modulo ' . (MODULI_PORTALE[$m]['nome'] ?? $m);
     return $parti ? implode(', ', $parti) : 'nessuna abilitazione';
 }
 
@@ -192,7 +196,7 @@ if (isset($_POST['remove_user_all'])) {
     csrf_verify($_POST['csrf_token'] ?? '');
     $u_id = (int)$_POST['utente_id'];
     if ($filtro_p > 0) {
-        salva_perimetro($conn, $u_id, $filtro_p, ['area' => 'nessuno', 'tipi' => [], 'attivita' => [], 'fsl' => 'nessuno', 'fsl_parti' => []], (int)$_SESSION['utente_id']);
+        salva_perimetro($conn, $u_id, $filtro_p, ['area' => 'nessuno', 'tipi' => [], 'attivita' => [], 'fsl' => 'nessuno', 'fsl_parti' => [], 'moduli' => []], (int)$_SESSION['utente_id']);
         registra_log_audit($conn, "Revoca abilitazioni", ["Utente" => $u_id, "Area" => $filtro_p]);
         flash_set("Abilitazioni revocate (quest'area e Formazione Scuola Lavoro).");
     }
@@ -272,7 +276,7 @@ if ($filtro_p > 0) {
 }
 
 // Perimetro di ciascun utente nell'area corrente e nella FSL (per i riepiloghi e i moduli)
-$PERIMETRO_VUOTO = ['area' => 'nessuno', 'tipi' => [], 'attivita' => [], 'fsl' => 'nessuno', 'fsl_parti' => []];
+$PERIMETRO_VUOTO = ['area' => 'nessuno', 'tipi' => [], 'attivita' => [], 'fsl' => 'nessuno', 'fsl_parti' => [], 'moduli' => []];
 $perimetri = [];
 foreach ($mappa_gestori as $uid_m => $g_m) {
     $p_m = $PERIMETRO_VUOTO;
@@ -287,10 +291,11 @@ while ($r_amb && $x_amb = $r_amb->fetch_assoc()) {
     if (in_array($x_amb['tipo'], ['progetti', 'eventi'], true) && (int)$x_amb['pagina_id'] === (int)$filtro_p && $p_m['area'] !== 'area') { $p_m['area'] = 'parziale'; $p_m['tipi'][] = $x_amb['tipo']; }
     if ($x_amb['tipo'] === 'fsl') { $p_m['fsl'] = 'tutto'; $p_m['fsl_parti'] = []; }
     if (in_array($x_amb['tipo'], ['fsl_convenzioni', 'fsl_scuole'], true) && $p_m['fsl'] !== 'tutto') { $p_m['fsl'] = 'parziale'; $p_m['fsl_parti'][] = $x_amb['tipo']; }
+    if (str_starts_with($x_amb['tipo'], 'modulo_')) $p_m['moduli'][] = substr($x_amb['tipo'], 7);
     $perimetri[$uid_m] = $p_m;
 }
 // Abilitati alla FSL (valgono in tutte le aree)
-$abilitati_fsl = array_filter($perimetri, fn($p) => $p['fsl'] !== 'nessuno');
+$abilitati_fsl = array_filter($perimetri, fn($p) => $p['fsl'] !== 'nessuno' || !empty($p['moduli']));
 // Abilitati su qualcosa dell'area corrente
 $abilitati_area = array_filter($perimetri, fn($p) => $p['area'] !== 'nessuno');
 
@@ -324,7 +329,13 @@ function html_perimetro(string $pref, array $p, string $titolo_area, array $even
     $o .= '<div class="per-fsl-parti ms-4 mt-1"' . ($p['fsl'] === 'parziale' ? '' : ' hidden') . '>'
         . '<div class="form-check"><input class="form-check-input" type="checkbox" name="fsl_parti[]" value="fsl_convenzioni" id="' . $pref . 'fc"' . $chk(in_array('fsl_convenzioni', $p['fsl_parti'], true)) . '><label class="form-check-label small" for="' . $pref . 'fc">Convenzioni</label></div>'
         . '<div class="form-check"><input class="form-check-input" type="checkbox" name="fsl_parti[]" value="fsl_scuole" id="' . $pref . 'fs"' . $chk(in_array('fsl_scuole', $p['fsl_parti'], true)) . '><label class="form-check-label small" for="' . $pref . 'fs">Anagrafe scuole</label></div>'
-        . '</div></fieldset></div></div>';
+        . '</div></fieldset></div>';
+    // Moduli interi (tutte le aree del modulo, anche quelle create dopo)
+    $o .= '<div class="col-12"><fieldset class="p-2 border rounded bg-white"><legend class="form-label small fw-bold mb-1 float-none w-auto px-1">Moduli interi (tutte le aree del modulo, anche quelle create dopo)</legend><div class="d-flex flex-wrap gap-3">';
+    foreach (['orientamento' => 'Orientamento (comprende la Formazione Scuola Lavoro)', 'calendari' => 'Prenotazioni e risorse', 'didattica' => 'Didattica'] as $k_m => $l_m) {
+        $o .= '<div class="form-check"><input class="form-check-input" type="checkbox" name="moduli[]" value="' . $k_m . '" id="' . $pref . 'm_' . $k_m . '"' . $chk(in_array($k_m, $p['moduli'] ?? [], true)) . '><label class="form-check-label small" for="' . $pref . 'm_' . $k_m . '">' . $h($l_m) . '</label></div>';
+    }
+    $o .= '</div></fieldset></div></div>';
     return $o;
 }
 
@@ -466,6 +477,7 @@ $etichette_perm = ['full' => 'Admin area', 'eventi' => 'Eventi', 'iscritti' => '
                     elseif ($amb_att === 'attivita') { $p_att['area'] = $p_att['area'] === 'area' ? 'area' : 'parziale'; $p_att['attivita'] = array_map('intval', explode(',', $att['eventi_ids'])); }
                     elseif (in_array($amb_att, ['progetti', 'eventi'], true)) { $p_att['area'] = $p_att['area'] === 'area' ? 'area' : 'parziale'; $p_att['tipi'][] = $amb_att; }
                     elseif ($amb_att === 'fsl') $p_att['fsl'] = 'tutto';
+                    elseif (str_starts_with($amb_att, 'modulo_')) $p_att['moduli'][] = substr($amb_att, 7);
                     else { $p_att['fsl'] = $p_att['fsl'] === 'tutto' ? 'tutto' : 'parziale'; $p_att['fsl_parti'][] = $amb_att; }
                 }
                 $att = $righe_att[0]; ?>
@@ -480,7 +492,7 @@ $etichette_perm = ['full' => 'Admin area', 'eventi' => 'Eventi', 'iscritti' => '
             <?php endforeach; ?>
 
             <div class="mt-3 pt-2 border-top small">
-                <div class="fw-bold text-secondary mb-1"><i class="fa fa-briefcase me-1" aria-hidden="true"></i>Formazione Scuola Lavoro (tutte le aree)</div>
+                <div class="fw-bold text-secondary mb-1"><i class="fa fa-cubes me-1" aria-hidden="true"></i>Moduli interi e Formazione Scuola Lavoro (valgono in tutte le aree)</div>
                 <?php if (!$abilitati_fsl): ?><span class="text-muted">Solo gli amministratori.</span><?php endif; ?>
                 <?php foreach ($abilitati_fsl as $id_f => $p_f): ?>
                     <div class="mb-1"><button type="button" class="riep-nome" data-apri="<?php echo (int)$id_f; ?>"><?php echo htmlspecialchars($nome_utente((int)$id_f)); ?></button>

@@ -51,6 +51,8 @@ function leggi_turni_post(bool $classe, array &$errori): array {
             'wa'   => ($_POST['t_wa'][$i] ?? '0') === '1' ? 1 : 0,
             'mp'   => ($_POST['t_mp'][$i] ?? '0') === '1' ? 1 : 0,
             'app'  => ($_POST['t_app'][$i] ?? '0') === '1' ? 1 : 0,
+            // Aula di Prenotazioni e risorse occupata dal turno (0 = nessuna)
+            'aula' => (int)($_POST['t_aula'][$i] ?? 0) ?: null,
         ];
         $vuota = $t['nome'] === null && $t['data'] === null;
         if ($vuota && $t['id'] === 0) continue;
@@ -107,6 +109,11 @@ function salva_turni_evento($conn, int $ev_id, array $turni, array &$avvisi): in
             $in->execute();
             $tenuti[] = (int)$conn->insert_id;
         }
+        // Aula collegata: si salva sul turno e si occupa (o libera) lo slot nel calendario delle risorse
+        $tid_a = end($tenuti); $aula = $t['aula'] ?? null;
+        $st_a = $conn->prepare("UPDATE turni SET risorsa_id = ? WHERE id = ?");
+        $st_a->bind_param("ii", $aula, $tid_a); $st_a->execute();
+        sincronizza_aula_turno($conn, (int)$tid_a, $avvisi, (int)($_SESSION['utente_id'] ?? 0));
     }
     foreach (array_diff($esistenti, $tenuti) as $t_via) {
         $r_n = $conn->query("SELECT COUNT(*) AS n FROM prenotazioni WHERE turno_id = $t_via AND IFNULL(stato, 'confermata') NOT IN ('annullata', 'rifiutata', 'scaduta')");
@@ -247,6 +254,7 @@ if (isset($_POST['add_evento'])) {
     if ($classe_ev) assicura_campi_progetto($conn, $filtro_p); // campo "numero di partecipanti" del modulo
     $avvisi_t = [];
     salva_turni_evento($conn, $ev_id, $turni_post, $avvisi_t);
+    if ($avvisi_t) $avviso_notif .= " Attenzione: " . implode('; ', $avvisi_t) . ".";
 
     if (function_exists('registra_log_audit')) registra_log_audit($conn, "Creazione Evento", ["Evento ID" => $ev_id]);
     flash_set("Evento creato con " . count($turni_post) . " " . (count($turni_post) === 1 ? 'turno' : 'turni') . "!" . $avviso_notif, $avviso_notif ? 'warning' : 'success');
@@ -322,7 +330,7 @@ if (isset($_POST['edit_evento'])) {
     if ($classe_ev) assicura_campi_progetto($conn, $filtro_p); // campo "numero di partecipanti" del modulo
     $avvisi_t = [];
     $promossi = salva_turni_evento($conn, $ev_id, $turni_post, $avvisi_t);
-    if ($avvisi_t) $avviso_notif .= " Attenzione: " . htmlspecialchars(implode('; ', $avvisi_t)) . ".";
+    if ($avvisi_t) $avviso_notif .= " Attenzione: " . implode('; ', $avvisi_t) . ".";
     if (function_exists('registra_log_audit')) registra_log_audit($conn, "Modifica Evento", ["Evento ID" => $ev_id, "Turni" => count($turni_post)]);
     flash_set("Evento modificato!" . ($promossi > 0 ? " Confermate $promossi prenotazioni dalla lista d'attesa." : "") . $avviso_notif, $avviso_notif ? 'warning' : 'success');
     admin_redirect("eventi.php?p_id=$filtro_p&f_ev=$filtro_ev");
@@ -551,6 +559,7 @@ form:not(.ev-form-classe) .ev-t-riga2 { grid-template-columns: repeat(3, 1fr); }
                 <div id="evTurni">
                     <?php
                     $turni_righe = $turni_ev ?: [['id' => 0, 'max_posti' => 30, 'n_iscr' => 0]];
+                    $aule_turni = aule_per_turni($conn); // aule e laboratori di Prenotazioni e risorse
                     $dtl = fn($x) => !empty($x) ? date('Y-m-d\TH:i', strtotime($x)) : '';
                     foreach ($turni_righe as $t):
                         $tid = (int)($t['id'] ?? 0); $n_i = (int)($t['n_iscr'] ?? 0);
@@ -573,6 +582,11 @@ form:not(.ev-form-classe) .ev-t-riga2 { grid-template-columns: repeat(3, 1fr); }
                             <label>Apertura prenotazioni<input type="datetime-local" name="t_ap[]" class="form-control form-control-sm" value="<?php echo $dtl($t['data_apertura'] ?? ''); ?>"></label>
                             <label>Chiusura prenotazioni<input type="datetime-local" name="t_ch[]" class="form-control form-control-sm" value="<?php echo $dtl($t['data_chiusura'] ?? ''); ?>"></label>
                             <label>Annullabile fino a<input type="datetime-local" name="t_ann[]" class="form-control form-control-sm" value="<?php echo $dtl($t['annullabile_fino'] ?? ''); ?>"></label>
+<?php if ($aule_turni): ?>
+                            <label title="L'aula viene prenotata in automatico nel calendario di Prenotazioni e risorse (servono data e orari)">Aula<select name="t_aula[]" class="form-select form-select-sm"><option value="0">Nessuna</option>
+                                <?php foreach ($aule_turni as $area_a => $aule_a): ?><optgroup label="<?php echo h($area_a); ?>"><?php foreach ($aule_a as $id_a => $nome_a): ?><option value="<?php echo (int)$id_a; ?>"<?php echo (int)($t['risorsa_id'] ?? 0) === (int)$id_a ? ' selected' : ''; ?>><?php echo h($nome_a); ?></option><?php endforeach; ?></optgroup><?php endforeach; ?>
+                            </select></label>
+<?php endif; ?>
                             <label class="ev-solo-classe">Studenti min<input type="number" name="t_min[]" class="form-control form-control-sm" min="1" value="<?php echo (int)($t['min_partecipanti'] ?? 0) ?: ''; ?>"></label>
                             <label class="ev-solo-classe">Studenti max<input type="number" name="t_maxs[]" class="form-control form-control-sm" min="1" value="<?php echo (int)($t['max_partecipanti'] ?? 0) ?: ''; ?>" placeholder="es. 18"></label>
                         </div>
