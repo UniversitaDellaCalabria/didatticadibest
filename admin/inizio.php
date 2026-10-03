@@ -1,10 +1,10 @@
 <?php
 // admin/inizio.php - Pagina di ingresso della gestione, organizzata a moduli: prima si sceglie il modulo
-// (Orientamento, Prenotazioni e risorse, Didattica, Gestione del portale), poi si lavora nella sua pagina:
+// (Eventi e seminari, Formazione Scuola Lavoro, Prenotazioni e risorse, Didattica, Gestione del portale), poi si lavora nella sua pagina:
 // card delle aree per i moduli con aree, card delle funzioni per gli altri. Con un solo modulo si entra direttamente.
 require_once 'admin_header.php';
 
-// Aree divise per modulo (le aree senza tipo stanno in Orientamento)
+// Aree divise per modulo (le aree senza tipo stanno in Eventi e seminari)
 $aree_per_modulo = [];
 foreach ($pagine_disponibili as $a_m) $aree_per_modulo[modulo_di_area($a_m)][] = $a_m;
 $sez_sel = $modulo_corrente !== '' && in_array($modulo_corrente, $moduli_utente, true) ? $modulo_corrente : null;
@@ -12,7 +12,8 @@ if ($sez_sel === null && count($moduli_utente) === 1) $sez_sel = $moduli_utente[
 
 // Funzioni dei moduli senza aree e del sottomodulo FSL: [titolo, descrizione, icona, pagina]
 $funzioni_modulo = [
-    'orientamento' => $puo_fsl_convenzioni ? [[$puo_fsl ? 'Formazione Scuola Lavoro' : 'Convenzioni FSL', 'Sottomodulo: convenzioni con le scuole, verifica delle iscrizioni, riepilogo per anno e valutazioni', 'fa-briefcase', 'fsl.php']] : [],
+    'orientamento' => $is_full_admin || ha_modulo($conn, (int)$u_id_curr, 'orientamento') ? [['Report per ambito', 'Terza missione e public engagement: eventi, ore, partecipanti e scuole per ambito e per anno, in Excel', 'fa-chart-column', 'report_ambiti.php']] : [],
+    'fsl'          => $puo_fsl_convenzioni ? [[$puo_fsl ? 'Pannello della Formazione Scuola Lavoro' : 'Convenzioni FSL', 'Per tutte le aree FSL: convenzioni con le scuole, verifica delle iscrizioni, riepilogo per anno e valutazioni', 'fa-briefcase', 'fsl.php']] : [],
     'calendari'    => [],
     // Referenti dei consigli: solo le sedute; Tutorato a chi ha il compito «Bandi» (o gestisce tutta la Didattica)
     'didattica'    => $puo_didattica ? array_values(array_filter([
@@ -79,7 +80,7 @@ $numeri_area = function (array $a) use ($conn, $is_full_admin, $u_id_curr): ?arr
     <p class="text-secondary small mb-4">Scegli il modulo: ognuno ha il suo menu e le sue funzioni, con anagrafi, moduli di iscrizione, sondaggi e scanner in comune.</p>
     <div class="row g-3">
         <?php foreach ($moduli_utente as $k): $s = MODULI_PORTALE[$k]; $col = $s['colore']; $aree_s = $aree_per_modulo[$k] ?? []; ?>
-        <div class="col-md-6 col-xl-3">
+        <div class="col-md-6 col-xl-4">
             <a class="ini-card p-4" href="inizio.php?sezione=<?php echo urlencode($k); ?>&amp;p_id=<?php echo (int)$filtro_p; ?>">
                 <div class="d-flex align-items-center gap-3 mb-3">
                     <span class="ini-ico" style="background: <?php echo $col; ?>1a; color: <?php echo $col; ?>;"><i class="fa <?php echo $s['icona']; ?>" aria-hidden="true"></i></span>
@@ -133,7 +134,7 @@ $numeri_area = function (array $a) use ($conn, $is_full_admin, $u_id_curr): ?arr
     <?php endif; ?>
 
     <?php if ($funz): ?>
-    <?php if ($aree_mod): ?><h2 class="h6 fw-bold text-secondary text-uppercase mb-2" style="letter-spacing:.05em;font-size:.75rem;"><?php echo $sez_sel === 'orientamento' ? 'Sottomodulo' : 'Funzioni'; ?></h2><?php endif; ?>
+    <?php if ($aree_mod): ?><h2 class="h6 fw-bold text-secondary text-uppercase mb-2" style="letter-spacing:.05em;font-size:.75rem;"><?php echo $sez_sel === 'fsl' ? 'Per tutte le aree FSL' : ($sez_sel === 'orientamento' ? 'Per tutte le aree' : 'Funzioni'); ?></h2><?php endif; ?>
     <div class="row g-3">
         <?php foreach ($funz as $f): ?>
         <div class="col-md-6 col-xl-4">
@@ -152,7 +153,7 @@ $numeri_area = function (array $a) use ($conn, $is_full_admin, $u_id_curr): ?arr
     <?php endif; ?>
 <?php endif; ?>
 
-<?php if ($is_full_admin && $pagine_disponibili && in_array($sez_sel, [null, 'orientamento', 'calendari'], true)): ?>
+<?php if ($is_full_admin && $pagine_disponibili && in_array($sez_sel, [null, 'orientamento', 'fsl', 'calendari'], true)): ?>
     <p class="small text-secondary mt-4 mb-0"><i class="fa fa-layer-group me-1" aria-hidden="true"></i>Per creare, nascondere o assegnare il tipo alle aree vai in <a href="aree.php?p_id=<?php echo (int)$filtro_p; ?>">Aree</a>.</p>
 <?php endif; ?>
 

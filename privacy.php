@@ -89,6 +89,7 @@ require_once 'header.php';
             : "per il tempo necessario alla gestione delle attività, al rilascio e alla verifica degli attestati e agli obblighi di documentazione dell'Ateneo."; ?></li>
         <li><strong>Lettere di incarico di tutorato</strong> (dati del vincitore, conferma con SPID/CIE, firme, registro delle attività): <?php echo $mesi_inc > 0 ? "$mesi_inc mesi dopo il protocollo restano solo nome, ore, compenso e numeri di protocollo; dati personali, PDF e registro vengono cancellati (gli originali firmati sono nel protocollo di Ateneo)." : "per il tempo necessario agli adempimenti amministrativi e contabili dell'incarico; gli originali firmati sono conservati nel protocollo di Ateneo."; ?></li>
         <li><strong>Convocazioni delle sedute dei consigli</strong> (link personali e motivi delle assenze giustificate): <?php echo $mesi_conv; ?> mesi dopo la seduta; le presenze restano nel verbale.</li>
+        <li><strong>Avvisi dei nuovi eventi</strong> (email e argomenti scelti): finché non ti cancelli dal link in ogni email o da <a href="avvisi.php">avvisi.php</a>; le iscrizioni non confermate si cancellano dopo 30 giorni.</li>
         <li><strong>Account</strong>: <?php echo $mesi_utenti > 0 ? "eliminati dopo $mesi_utenti mesi senza accessi." : "finché l'utente utilizza il servizio; su richiesta vengono eliminati."; ?></li>
         <li><strong>Copie di sicurezza</strong> (backup cifrati): 7 giorni sul server e <?php echo $giorni_nas; ?> giorni sull'archivio dell'Ateneo.</li>
     </ul>

@@ -247,6 +247,8 @@ if (isset($_POST['add_evento'])) {
     $ref_ev = leggi_referenti_post($ref_scartate);
     if ($ref_ev) salva_referenti_evento($conn, $ev_id, $ref_ev);
     salva_corso_evento($conn, $ev_id);
+    db_esegui($conn, "UPDATE eventi SET ambiti = ? WHERE id = ?", [ambiti_da_post($_POST, $page_cfg), (int)$ev_id]);
+    salva_seminario_evento($conn, (int)$ev_id, $_POST, $_FILES);
     if ($ref_scartate) $avviso_notif .= " Email dei referenti non valide ignorate: " . implode(", ", $ref_scartate) . ".";
 
     salva_attestati_classe_evento($conn, $ev_id, $att_classe);
@@ -324,6 +326,8 @@ if (isset($_POST['edit_evento'])) {
     $ref_ev = leggi_referenti_post($ref_scartate);
     salva_referenti_evento($conn, $ev_id, $ref_ev);
     salva_corso_evento($conn, $ev_id);
+    db_esegui($conn, "UPDATE eventi SET ambiti = ? WHERE id = ?", [ambiti_da_post($_POST, $page_cfg), (int)$ev_id]);
+    salva_seminario_evento($conn, (int)$ev_id, $_POST, $_FILES);
     if ($ref_scartate) $avviso_notif .= " Email dei referenti non valide ignorate: " . implode(", ", $ref_scartate) . ".";
     salva_attestati_classe_evento($conn, $ev_id, $att_classe);
     salva_insegnamento_evento($conn, $ev_id);
@@ -512,6 +516,34 @@ form:not(.ev-form-classe) .ev-t-riga2 { grid-template-columns: repeat(3, 1fr); }
                         <label for="evCorso" class="form-label small fw-bold">Corso di laurea / Struttura <span class="fw-normal text-muted">(facoltativo)</span></label>
                         <?php echo html_scelta_corso_scheda($conn, (string)($dett_f['corso_codice'] ?? ''), (string)($dett_f['struttura'] ?? ''), 'evCorso'); ?>
                     </div>
+                    <div class="col-12">
+                        <span class="form-label small fw-bold d-block mb-1">Ambiti <span class="fw-normal text-muted">(dove compare nell'agenda del sito; predefinito dell'area: <?php echo h(AMBITI_EVENTO[ambito_area($page_cfg)]['nome']); ?>)</span></span>
+                        <?php echo html_scelta_ambiti(ambiti_evento($ev ?: [], $page_cfg)); ?>
+                    </div>
+                    <div class="col-12">
+                        <details class="border rounded p-2" id="evSeminario"<?php echo !empty($ev) && (e_seminario($ev) || !empty($ev['link_streaming']) || !empty($ev['link_registrazione'])) ? ' open' : ''; ?>>
+                            <summary class="small fw-bold" style="cursor:pointer;"><i class="fa fa-chalkboard-user me-1 text-primary" aria-hidden="true"></i>Seminario: relatore, abstract, diretta, registrazione e slide <span class="fw-normal text-muted">(facoltativo)</span></summary>
+                            <div class="row g-2 mt-1">
+                                <div class="col-12"><?php echo html_ricerca_personale($conn, 'Relatore dall\'anagrafe'); ?></div>
+                                <input type="hidden" name="relatore_persona_id" id="evRelPid" value="<?php echo $v('relatore_persona_id'); ?>">
+                                <div class="col-md-6"><label for="evRel" class="form-label small fw-bold">Relatore</label><input type="text" name="relatore" id="evRel" class="form-control form-control-sm" value="<?php echo $v('relatore'); ?>" maxlength="255" placeholder="es. Prof.ssa Elena Mari"></div>
+                                <div class="col-md-6"><label for="evRelEnte" class="form-label small fw-bold">Ente / affiliazione</label><input type="text" name="relatore_ente" id="evRelEnte" class="form-control form-control-sm" value="<?php echo $v('relatore_ente'); ?>" maxlength="255" placeholder="es. CNR – Istituto di Scienze Marine"></div>
+                                <div class="col-12"><label for="evAbs" class="form-label small fw-bold">Abstract</label><textarea name="abstract" id="evAbs" class="form-control form-control-sm" rows="4" maxlength="5000"><?php echo $v('abstract'); ?></textarea></div>
+                                <div class="col-md-6"><label for="evLive" class="form-label small fw-bold">Link della diretta <span class="fw-normal text-muted">(Teams, Meet, YouTube…)</span></label><input type="url" name="link_streaming" id="evLive" class="form-control form-control-sm" value="<?php echo $v('link_streaming'); ?>" placeholder="https://"></div>
+                                <div class="col-md-6"><label for="evRec" class="form-label small fw-bold">Link della registrazione <span class="fw-normal text-muted">(dopo il seminario)</span></label><input type="url" name="link_registrazione" id="evRec" class="form-control form-control-sm" value="<?php echo $v('link_registrazione'); ?>" placeholder="https://"></div>
+                                <div class="col-md-6"><label for="evSlide" class="form-label small fw-bold">Slide (PDF)</label><input type="file" name="slide_pdf" id="evSlide" class="form-control form-control-sm" accept=".pdf,application/pdf">
+                                    <?php if (!empty($ev['slide_pdf'])): ?><div class="small mt-1"><a href="../<?php echo h($ev['slide_pdf']); ?>" target="_blank" rel="noopener">Slide attuali</a> · <label class="form-check-label"><input type="checkbox" class="form-check-input" name="elimina_slide" value="1"> togli</label></div><?php endif; ?></div>
+                                <div class="col-12 small text-secondary">Compaiono nella scheda dell'evento e nell'agenda; la diretta si vede fino alla fine dell'evento, poi la registrazione.</div>
+                            </div>
+                        </details>
+                    </div>
+                    <script>
+                    document.getElementById('evSeminario').addEventListener('persona-scelta', function (e) {
+                        var p = e.detail; document.getElementById('evRelPid').value = p.id; document.getElementById('evRel').value = p.nome || '';
+                        if (!document.getElementById('evRelEnte').value) document.getElementById('evRelEnte').value = p.struttura ? p.struttura + ' – Università della Calabria' : 'Università della Calabria';
+                    });
+                    document.getElementById('evRel').addEventListener('input', function () { document.getElementById('evRelPid').value = ''; });
+                    </script>
                     <div class="col-12">
                         <label for="evDescBreve" class="form-label small fw-bold">Descrizione breve <span class="fw-normal text-muted">(compare nelle card)</span></label>
                         <textarea name="descrizione_breve" id="evDescBreve" class="form-control form-control-sm editor-breve" rows="2" placeholder="Una o due frasi che invogliano ad aprire la scheda dell'evento"><?php echo $v('descrizione_breve'); ?></textarea>

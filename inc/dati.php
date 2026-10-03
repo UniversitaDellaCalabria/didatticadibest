@@ -422,7 +422,7 @@ if (!function_exists('get_kpi_statistiche')) {
              FROM turni t
              JOIN eventi e ON t.evento_id = e.id
              JOIN pagine_eventi pe ON e.pagina_id = pe.id
-             WHERE e.pagina_id = $p_id $sql_filtro_rbac AND t.max_posti < 9000"
+             WHERE e.pagina_id = $p_id $sql_filtro_rbac AND t.max_posti < " . (int)POSTI_SENZA_LIMITE
         );
         if ($res_cap && $row_cap = $res_cap->fetch_assoc()) {
             $kpi['capienza'] = (int)$row_cap['capienza_max'];
@@ -437,7 +437,7 @@ if (!function_exists('get_dati_grafico_eventi')) {
         $nomi   = []; $occupati = []; $capienza = [];
         $res = $conn->query(
             "SELECT e.id, e.titolo,
-               COALESCE((SELECT SUM(max_posti) FROM turni WHERE evento_id = e.id AND max_posti < 9000), 0) as cap_max
+               COALESCE((SELECT SUM(max_posti) FROM turni WHERE evento_id = e.id AND max_posti < " . (int)POSTI_SENZA_LIMITE . "), 0) as cap_max
              FROM eventi e
              JOIN pagine_eventi pe ON e.pagina_id = pe.id
              WHERE e.pagina_id = $p_id $sql_filtro_rbac
@@ -515,7 +515,7 @@ if (!function_exists('get_kpi_statistiche_v2')) {
              FROM turni t
              JOIN eventi e ON t.evento_id = e.id
              JOIN pagine_eventi pe ON e.pagina_id = pe.id
-             WHERE e.pagina_id = $p_id $sql_filtro_rbac AND t.max_posti < 9000"
+             WHERE e.pagina_id = $p_id $sql_filtro_rbac AND t.max_posti < " . (int)POSTI_SENZA_LIMITE
         );
         if ($res_cap && $row_cap = $res_cap->fetch_assoc()) {
             $kpi['capienza'] = (int)$row_cap['capienza_max'];

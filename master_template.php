@@ -667,14 +667,14 @@ if (!function_exists('renderCardUniversal')) {
             foreach ($ev['turni'] as $_bt) {
                 if (turno_concluso($_bt)) continue;
                 $badge_all_ended = false;
-                if ((int)$_bt['max_posti'] >= 9000) { $illimitato = true; continue; }
+                if ((int)$_bt['max_posti'] >= POSTI_SENZA_LIMITE) { $illimitato = true; continue; }
                 $_disp_bt = (int)$_bt['max_posti'] - getPostiOccupati($conn, $_bt['id']);
                 if ($_disp_bt <= 0 && !empty($_bt['abilita_lista_attesa'])) $badge_has_waitlist = true;
                 $posti_badge_disp += max(0, $_disp_bt);
             }
             if ($badge_all_ended) $badge_disp_html = '<span class="badge bg-secondary" style="font-size:0.8rem;">Concluso</span>';
             elseif ($illimitato) $badge_disp_html = '<span class="badge bg-success" style="font-size:0.8rem;">Posti disponibili</span>';
-            elseif ($posti_badge_disp > 0) $badge_disp_html = '<span class="badge bg-success" style="font-size:0.8rem;">' . $posti_badge_disp . ' ' . ($posti_badge_disp == 1 ? 'posto libero' : 'posti liberi') . '</span>';
+            elseif ($posti_badge_disp > 0) $badge_disp_html = '<span class="badge bg-success" style="font-size:0.8rem;">' . testo_posti_liberi((int)$posti_badge_disp) . '</span>';
             elseif ($badge_has_waitlist) $badge_disp_html = '<span class="badge bg-warning text-dark" style="font-size:0.8rem;">Lista d\'attesa</span>';
             else $badge_disp_html = '<span class="badge bg-danger" style="font-size:0.8rem;">Posti esauriti</span>';
         }
@@ -1279,7 +1279,7 @@ function evSetRating(btn) {
                             <?php foreach ($ip['edizioni'] as $ed):
                                 $liberi_ed = max(0, (int)$ed['t']['max_posti'] - (int)$ed['occ']);
                                 if ($sc_p) $txt_ed = $ed['libera'] ? 'Posto disponibile' : 'Già assegnata a una scuola';
-                                else $txt_ed = $ed['libera'] ? $liberi_ed . ($liberi_ed === 1 ? ' posto libero' : ' posti liberi') . ' su ' . (int)$ed['t']['max_posti'] : 'Posti esauriti';
+                                else $txt_ed = $ed['libera'] ? ((int)$ed['t']['max_posti'] >= POSTI_SENZA_LIMITE ? 'Posti disponibili' : testo_posti_liberi($liberi_ed) . ' su ' . (int)$ed['t']['max_posti']) : 'Posti esauriti';
                             ?>
                                 <div class="pj-posto d-block">
                                   <div class="d-flex align-items-center gap-3">
@@ -1296,7 +1296,7 @@ function evSetRating(btn) {
                                         <div class="<?php echo $piu_ed ? 'small text-secondary' : 'fw-bold'; ?>"><?php echo htmlspecialchars($txt_ed); ?></div>
                                         <?php if (!$ed['libera'] && !empty($ed['t']['abilita_lista_attesa'])): ?><div class="small text-secondary"><?php echo $ed['attesa'] > 0 ? $ed['attesa'] . ($sc_p ? ($ed['attesa'] === 1 ? ' scuola' : ' scuole') : ($ed['attesa'] === 1 ? ' persona' : ' persone')) . " in lista d'attesa" : "Lista d'attesa vuota"; ?></div><?php endif; ?>
                                         <?php if ($sc_p && !$piu_ed && $ed['libera']): ?><div class="small text-secondary">Il progetto accoglie una sola scuola.</div><?php endif; ?>
-                                        <?php if (!$sc_p && $ed['libera'] && (int)$ed['t']['max_posti'] > 0 && (int)$ed['t']['max_posti'] < 9000):
+                                        <?php if (!$sc_p && $ed['libera'] && (int)$ed['t']['max_posti'] > 0 && (int)$ed['t']['max_posti'] < POSTI_SENZA_LIMITE):
                                             $pct_ed = min(100, (int)round($ed['occ'] / max(1, (int)$ed['t']['max_posti']) * 100)); ?>
                                             <div class="progress mt-1" style="height: 6px;" role="progressbar" aria-label="Posti occupati" aria-valuenow="<?php echo $pct_ed; ?>" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar <?php echo $pct_ed >= 75 ? 'bg-warning' : 'bg-success'; ?>" style="width: <?php echo $pct_ed; ?>%;"></div></div>
                                         <?php endif; ?>
@@ -1361,7 +1361,7 @@ function evSetRating(btn) {
         $max = (int)$t['max_posti'];
         $concluso = turno_concluso($t);
         if (!$concluso) {
-            if ($max >= 9000) $illimitati_s = true; else $liberi_s += max(0, $max - $occ);
+            if ($max >= POSTI_SENZA_LIMITE) $illimitati_s = true; else $liberi_s += max(0, $max - $occ);
             if (!empty($t['data_turno']) && ($prossima_s === null || $t['data_turno'] < $prossima_s)) $prossima_s = $t['data_turno'];
         }
         $turni_s[] = ['t' => $t, 'occ' => $occ, 'max' => $max, 'liberi' => max(0, $max - $occ), 'concluso' => $concluso];
@@ -1440,6 +1440,8 @@ function evSetRating(btn) {
                 <?php if (!empty($ev_s['locandina_path']) && preg_match('/\.(jpg|jpeg|png|gif|webp)$/i', $ev_s['locandina_path'])): ?>
                     <img src="<?php echo htmlspecialchars($ev_s['locandina_path']); ?>" alt="" class="w-100 mb-4 shadow-sm" style="border-radius: 14px; max-height: 420px; object-fit: cover;">
                 <?php endif; ?>
+                <?php // Seminario: relatore, abstract, diretta (finché l'evento non è concluso), registrazione e slide
+                if (function_exists('html_seminario')) echo html_seminario($ev_s, !empty($ev_s['turni']) && !array_filter($ev_s['turni'], fn($t_x) => !turno_concluso($t_x))); ?>
                 <article class="ev-box p-4 mb-4">
                     <h2><i class="fa fa-book-open me-1" aria-hidden="true"></i>L'evento</h2>
                     <div class="ev-desc"><?php echo !empty($ev_s['descrizione']) ? $ev_s['descrizione'] : '<p class="text-muted">Descrizione in arrivo.</p>'; ?></div>
@@ -1458,7 +1460,7 @@ function evSetRating(btn) {
                             <?php foreach ($turni_s as $rs): $t = $rs['t'];
                                 $tf = $t + ['richiede_prenotazione' => $ev_s['richiede_prenotazione'], 'ruolo_accesso_id' => $ev_s['ruolo_accesso_id']];
                                 $mio_t = $mie_s[(int)$t['id']] ?? null;
-                                $pct = $rs['max'] > 0 && $rs['max'] < 9000 ? min(100, (int)round($rs['occ'] / $rs['max'] * 100)) : 0;
+                                $pct = $rs['max'] > 0 && $rs['max'] < POSTI_SENZA_LIMITE ? min(100, (int)round($rs['occ'] / $rs['max'] * 100)) : 0;
                             ?>
                                 <div class="ev-turno<?php echo $rs['concluso'] ? ' concluso' : ''; ?>">
                                     <div class="fw-bold">
@@ -1471,7 +1473,7 @@ function evSetRating(btn) {
                                     <?php $fin_t = $req_s ? finestra_prenotazione([$t]) : null; if ($fin_t): ?>
                                         <div class="mt-2"><span class="badge" style="font-size:.78rem; background:<?php echo $fin_t['bg']; ?>; color:<?php echo $fin_t['fg']; ?>;"><i class="fa <?php echo $fin_t['icona']; ?> me-1" aria-hidden="true"></i><?php echo htmlspecialchars($fin_t['testo']); ?></span></div>
                                     <?php endif; ?>
-                                    <?php if ($req_s && !$rs['concluso'] && $rs['max'] > 0 && $rs['max'] < 9000): ?>
+                                    <?php if ($req_s && !$rs['concluso'] && $rs['max'] > 0 && $rs['max'] < POSTI_SENZA_LIMITE): ?>
                                         <div class="d-flex align-items-center gap-2 mt-2">
                                             <div class="progress flex-grow-1" style="height: 6px;" role="progressbar" aria-label="Posti occupati" aria-valuenow="<?php echo $pct; ?>" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar <?php echo $pct >= 100 ? 'bg-danger' : ($pct >= 75 ? 'bg-warning' : 'bg-success'); ?>" style="width: <?php echo $pct; ?>%;"></div></div>
                                             <span class="small fw-bold text-nowrap <?php echo $rs['liberi'] > 0 ? 'text-success' : 'text-danger'; ?>"><?php echo $rs['liberi'] > 0 ? $rs['liberi'] . ' su ' . $rs['max'] : 'Completo'; ?></span>
@@ -1959,7 +1961,7 @@ function evSetRating(btn) {
                         $occ_ag    = $req_pren ? getPostiOccupati($conn, $t_ag['id']) : 0;
                         $max_ag    = max(0, (int)$t_ag['max_posti']);
                         $lib_ag    = max(0, $max_ag - $occ_ag);
-                        $illimitato = $max_ag >= 9000;
+                        $illimitato = $max_ag >= POSTI_SENZA_LIMITE;
                         $pct_ag    = ($max_ag > 0 && !$illimitato) ? min(100, (int)round($occ_ag / $max_ag * 100)) : 0;
                         $mio_stato = $mie_iscrizioni[(int)$t_ag['evento_id']][(int)$t_ag['id']] ?? null;
                         $cerca_ag  = mb_strtolower($t_ag['evento_titolo'] . ' ' . ($t_ag['nome_turno'] ?? '') . ' ' . ($t_ag['evento_luogo'] ?? '') . ' ' . $t_ag['categoria']);
@@ -2209,7 +2211,7 @@ function evSetRating(btn) {
                                                         </div>
                                                         <div class="d-flex justify-content-between mt-1" style="font-size: .75rem;">
                                                             <span class="text-muted"><?php echo $rt['occ']; ?>/<?php echo $rt['max']; ?> iscritti</span>
-                                                            <span class="fw-bold <?php echo $rt['disp'] > 0 ? 'text-success' : 'text-danger'; ?>"><?php echo $rt['disp'] > 0 ? $rt['disp'] . ($rt['disp'] === 1 ? ' posto libero' : ' posti liberi') : 'Completo'; ?></span>
+                                                            <span class="fw-bold <?php echo $rt['disp'] > 0 ? 'text-success' : 'text-danger'; ?>"><?php echo $rt['disp'] > 0 ? testo_posti_liberi((int)$rt['disp']) : 'Completo'; ?></span>
                                                         </div>
                                                     <?php endif; ?>
                                                 </div>
@@ -2399,7 +2401,7 @@ function evSetRating(btn) {
                                 <div class="small fw-semibold" style="color: #075985;"><i class="fa fa-up-right-from-square me-1" aria-hidden="true"></i>Prenotazioni sulla pagina <?php echo htmlspecialchars($dest_l['nome']); ?></div>
                             <?php elseif ($ip_l['t'] && in_array($st_l['codice'], ['aperte', 'attesa', 'arrivo'], true)):
                                 $n_ed_l = count($ip_l['edizioni']);
-                                if (!$ip_l['scuole']) $txt_disp = $ip_l['liberi'] > 0 ? $ip_l['liberi'] . ($ip_l['liberi'] === 1 ? ' posto libero' : ' posti liberi') : 'Posti esauriti' . ($ip_l['attesa'] ? ' · ' . $ip_l['attesa'] . ' in attesa' : '');
+                                if (!$ip_l['scuole']) $txt_disp = $ip_l['liberi'] > 0 ? testo_posti_liberi((int)$ip_l['liberi']) : 'Posti esauriti' . ($ip_l['attesa'] ? ' · ' . $ip_l['attesa'] . ' in attesa' : '');
                                 elseif ($ip_l['liberi'] > 0) $txt_disp = $n_ed_l > 1 ? $ip_l['liberi'] . ' ' . ($ip_l['liberi'] === 1 ? 'edizione disponibile' : 'edizioni disponibili') . ' su ' . $n_ed_l : 'Posto disponibile';
                                 else $txt_disp = ($n_ed_l > 1 ? 'Edizioni assegnate' : 'Assegnato') . ($ip_l['attesa'] ? ' · ' . $ip_l['attesa'] . ' in attesa' : '');
                             ?>

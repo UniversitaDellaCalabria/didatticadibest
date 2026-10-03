@@ -15,6 +15,22 @@ function admin_redirect($url) {
 }
 
 
+// ── POST: organizzazione proposta del sito (home e menu per pubblico) e ripristino ──
+if (isset($_POST['applica_organizzazione']) && $is_full_admin) {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    $n_menu = applica_organizzazione_proposta($conn, trim(($utente_admin['nome'] ?? '') . ' ' . ($utente_admin['cognome'] ?? '')), !empty($_POST['org_home']), !empty($_POST['org_menu']));
+    registra_log_audit($conn, "Organizzazione proposta applicata", ["Home" => !empty($_POST['org_home']) ? 'sì' : 'no', "Voci di menu" => $n_menu]);
+    flash_set("Organizzazione applicata" . ($n_menu ? " ($n_menu voci di menu)" : '') . ". Controlla il sito: se non ti convince, «Ripristina com'era» rimette home e menu precedenti.");
+    admin_redirect("testata.php?p_id=$filtro_p&sezione=widgets");
+}
+if (isset($_POST['ripristina_organizzazione']) && $is_full_admin) {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    $ok_r = ripristina_organizzazione($conn);
+    if ($ok_r) registra_log_audit($conn, "Organizzazione del sito ripristinata", []);
+    flash_set($ok_r ? "Home e menu ripristinati com'erano." : "Nessuna copia da ripristinare.", $ok_r ? 'success' : 'warning');
+    admin_redirect("testata.php?p_id=$filtro_p&sezione=widgets");
+}
+
 // ── POST: salva configurazione widget ────────────────────────────────────────
 if (isset($_POST['save_widgets_home'])) {
     csrf_verify($_POST['csrf_token'] ?? '');
@@ -26,6 +42,9 @@ if (isset($_POST['save_widgets_home'])) {
         'statistiche'     => isset($_POST['w_statistiche'])     ? 1 : 0,
         'mia_prenotazione'=> isset($_POST['w_mia_prenotazione']) ? 1 : 0,
         'ultimi_posti'    => isset($_POST['w_ultimi_posti'])    ? 1 : 0,
+        'percorsi'        => isset($_POST['w_percorsi'])        ? 1 : 0,
+        'agenda'          => isset($_POST['w_agenda'])          ? 1 : 0,
+        'scadenze'        => isset($_POST['w_scadenze'])        ? 1 : 0,
         'ordine'         => isset($_POST['ordine']) && is_array($_POST['ordine']) ? array_map('strval', $_POST['ordine']) : [],
         'aree_colonne'    => (int)($_POST['aree_colonne'] ?? 2),
         'aree_max'        => (int)($_POST['aree_max'] ?? 0),
@@ -403,6 +422,23 @@ $widgets_cur = get_widgets_home($cfg_w);
     <h5 class="fw-bold text-primary border-bottom pb-2 mb-4"><i class="fa fa-puzzle-piece me-2"></i>Widget Home Page</h5>
     <p class="text-secondary small mb-4">Scegli quali sezioni mostrare nella home pubblica e <strong>trascinale</strong> <i class="fa fa-grip-vertical"></i> per cambiarne l'ordine. Le modifiche sono visibili appena salvi.</p>
 
+    <?php if ($is_full_admin): $copia_org = ultima_copia_configurazione($conn); ?>
+    <div class="card border-0 shadow-sm mb-4" style="border-left:4px solid #047857 !important;"><div class="card-body">
+        <h6 class="fw-bold mb-1"><i class="fa fa-wand-magic-sparkles me-1 text-success" aria-hidden="true"></i>Organizzazione proposta: il sito per pubblico</h6>
+        <p class="small text-secondary mb-2">Home con <strong>Cosa cerchi?</strong> (futuri studenti e scuole, studenti, eventi e seminari, area riservata), <strong>agenda</strong> con gli ambiti e <strong>scadenze</strong> della modulistica; menu <strong>Home · Orientamento · Studenti · Eventi e seminari · Area riservata</strong> (le altre voci già presenti, es. Link utili, restano in fondo). Prima di applicarla viene salvata una copia: si torna indietro con un clic.</p>
+        <form method="POST" class="d-flex flex-wrap gap-3 align-items-center"><?php csrf_field(); ?>
+            <label class="form-check m-0"><input class="form-check-input" type="checkbox" name="org_home" value="1" checked> home</label>
+            <label class="form-check m-0"><input class="form-check-input" type="checkbox" name="org_menu" value="1" checked> menu</label>
+            <button type="submit" name="applica_organizzazione" value="1" class="btn btn-sm btn-success fw-bold" data-confirm="Applicare la nuova organizzazione di home e menu? Viene salvata una copia per tornare indietro."><i class="fa fa-check me-1" aria-hidden="true"></i>Applica</button>
+            <a class="btn btn-sm btn-outline-secondary" href="../orientamento.php" target="_blank" rel="noopener">Vedi la pagina Orientamento</a>
+            <a class="btn btn-sm btn-outline-secondary" href="../agenda.php" target="_blank" rel="noopener">Vedi l'agenda</a>
+        </form>
+        <?php if ($copia_org): ?>
+        <form method="POST" class="mt-2 small"><?php csrf_field(); ?>Copia del <?php echo date('d/m/Y H:i', strtotime($copia_org['creata_il'])); ?><?php echo $copia_org['autore'] !== '' ? ' (' . htmlspecialchars($copia_org['autore']) . ')' : ''; ?>:
+            <button type="submit" name="ripristina_organizzazione" value="1" class="btn btn-sm btn-link p-0 align-baseline" data-confirm="Rimettere home e menu com'erano prima?">ripristina com'era</button></form>
+        <?php endif; ?>
+    </div></div>
+    <?php endif; ?>
     <form method="POST">
         <?php csrf_field(); ?>
         <div class="row g-4 mb-4">
@@ -418,6 +454,9 @@ $widgets_cur = get_widgets_home($cfg_w);
                 'ultimi_posti'     => ['label' => 'Ultimi Posti', 'desc' => 'Fino a 4 eventi quasi pieni (≤10% posti liberi) o con iscrizioni che chiudono entro 48 ore.', 'icon' => 'fa-fire', 'col' => 'danger'],
                 'prossimi_eventi'  => ['label' => 'Prossimi Appuntamenti', 'desc' => 'Eventi futuri di tutte le aree, ordinati per data.', 'icon' => 'fa-calendar-day', 'col' => 'primary'],
                 'statistiche'     => ['label' => 'Numeri del Dipartimento', 'desc' => 'Contatori: eventi in programma, aree attive, iscrizioni confermate.', 'icon' => 'fa-chart-bar', 'col' => 'info'],
+                'percorsi'         => ['label' => 'Cosa cerchi?', 'desc' => 'Quattro riquadri per pubblico: futuri studenti e scuole, studenti, eventi e seminari, area riservata.', 'icon' => 'fa-signs-post', 'col' => 'success'],
+                'agenda'           => ['label' => 'Agenda', 'desc' => 'Prossimi appuntamenti di tutte le aree con i filtri per ambito (orientamento, ricerca, public engagement…).', 'icon' => 'fa-calendar-days', 'col' => 'primary'],
+                'scadenze'         => ['label' => 'Scadenze della didattica', 'desc' => 'Moduli online aperti con la data di chiusura (piani di studio, tesi…).', 'icon' => 'fa-hourglass-half', 'col' => 'success'],
             ];
             foreach ($widgets_cur['ordine'] as $key):
                 $def = $widget_defs[$key];

@@ -20,6 +20,13 @@ Ogni area ha un **tipo** (`pagine_eventi.tipo_area`: fsl, eventi, gruppi, calend
 
 ## Funzionalita
 
+- **Sito organizzato per pubblico** (Testata e home › Widget › «Organizzazione proposta», con copia di sicurezza e ripristino): home con **Cosa cerchi?** (futuri studenti e scuole, studenti, eventi e seminari, area riservata), **agenda** dei prossimi appuntamenti con gli ambiti e **scadenze** della modulistica; menu Home · Orientamento · Studenti · Eventi e seminari · Area riservata (le altre voci restano in fondo)
+- **Eventi e seminari con ambiti** (Orientamento, Ricerca, Public engagement, Didattica): ogni evento ne ha uno o più (predefinito dell'area in Impostazioni area); **agenda unica** `agenda.php` con filtri per ambito, «per le scuole» e ricerca, calendario `.ics` da aggiungere a Google/Outlook (`agenda_ics.php`); **vetrina** `orientamento.php` per futuri studenti e scuole
+- **Report per ambito** (pannello › Eventi e seminari › Report per ambito, `admin/report_ambiti.php`): per anno solare o accademico, eventi, incontri, ore, iscrizioni, partecipanti (per le classi il numero di studenti dichiarato), presenze e scuole raggiunte per ambito, andamento per mese, elenco degli eventi; **Excel** per la scheda della Terza missione e del public engagement
+- **Seminari**: nel modulo dell'evento relatore (dall'anagrafe o esterno, con ente), abstract, link della diretta, della registrazione e slide in PDF; compaiono nella scheda pubblica (la diretta fino alla fine dell'evento), nell'agenda, nella ricerca e nel calendario .ics
+- **Avvisi per email dei nuovi eventi** (`avvisi.php`): ci si iscrive scegliendo gli ambiti e/o le attività per le scuole, con conferma dal link (subito per chi è entrato con la stessa email); il cron manda a ogni iscritto un riepilogo con i nuovi eventi dei suoi argomenti, ogni evento una volta sola; link per cambiare argomenti o cancellarsi in ogni email
+- **Formazione Scuola Lavoro modulo a sé** nel pannello (prima sottomodulo dell'Orientamento): chi aveva il modulo Orientamento o il perimetro FSL la conserva; il modulo Orientamento si chiama ora «Eventi e seminari»
+- **Posti «senza limite»**: i turni con almeno `POSTI_SENZA_LIMITE` posti (1000) mostrano «Posti disponibili» invece di somme come «100.657 posti liberi»
 - **Ingresso nel pannello per macroarea**: chi gestisce più aree sceglie prima la sezione (Orientamento, Didattica, Calendari e risorse) e poi l'area, con card che riassumono i numeri di ciascuna (`admin/inizio.php`); "Cambia" riporta alla sezione dell'area corrente
 - **Calendari e risorse** (aree di tipo `calendario`): aule, laboratori e sportelli con orari settimanali (fino a due fasce al giorno), slot di durata scelta, più slot di seguito, preavviso minimo e giorni prenotabili, chi può prenotare (tutti, studenti, docenti, personale), approvazione facoltativa dei gestori, ripetizione settimanale (le settimane non disponibili vengono saltate e segnalate) e chiusure della risorsa o di tutta l'area. Pagina pubblica con la settimana degli slot liberi, controllo delle sovrapposizioni (anche con richieste contemporanee), email di conferma, approvazione, rifiuto, annullamento e promemoria del giorno prima, file .ics, prenotazioni nell'Area personale con annullamento; nel pannello agenda di oggi, prenotazioni con filtri, approvazione anche di tutta la serie ed export CSV (`admin/risorse.php`, `admin/prenotazioni_risorse.php`)
 - **Didattica – Sedute dei consigli dei corsi di studio** (`admin/didattica.php?tab=sedute`): i 5 consigli del Dipartimento sono già inseriti; l'Ufficio didattico sceglie uno o più **referenti** per consiglio (entrano nel pannello e vedono solo le sedute del loro consiglio), i referenti inseriscono **una volta sola i componenti** (docenti dall'anagrafe, rappresentanti a mano) con il gruppo del verbale; in ogni seduta si segna **presente / assente giustificato / assente ingiustificato**. Per ogni pratica in seduta: **esito** (approvata, con modifiche, respinta, rinviata), **convalide** (insegnamento indicato dallo studente → insegnamento del Dipartimento dall'anagrafe, convalida totale o parziale con CFU riconosciuti e da integrare calcolati) o **piano di studi** (in piano / fuori piano), delibera. Tutto finisce nel verbale Word (presenze per gruppo con il riepilogo, quadro delle convalide) e nell'Excel; «Applica gli esiti» chiude le pratiche e avvisa gli studenti
@@ -254,7 +261,7 @@ eventidibest-cms/
 ├── assets/             # Icone PWA
 ├── config.php          # Connessione DB, session, security headers, CSP
 ├── functions.php       # Carica le funzioni condivise da inc/ (nell'ordine giusto)
-├── inc/                # Funzioni per argomento: base, sezioni, aspetto, liste_attesa, sistema, dati, eventi_progetti, anagrafi, fsl, prenotazioni, attestati, risorse, didattica, catalogo_ateneo, pdf, tutorato, tutorato_registro, sedute, schema (bloccata al web); `db_righe()`/`db_riga()`/`db_valore()`/`db_esegui()` in base.php per le query preparate
+├── inc/                # Funzioni per argomento: base, sezioni, aspetto, liste_attesa, sistema, dati, eventi_progetti, anagrafi, fsl, prenotazioni, attestati, risorse, didattica, catalogo_ateneo, pdf, tutorato, tutorato_registro, sedute, agenda, organizzazione, seminari, avvisi, report_ambiti, schema (bloccata al web); `db_righe()`/`db_riga()`/`db_valore()`/`db_esegui()` in base.php per le query preparate
 ├── modelli_documenti/  # Modelli interni per i documenti precompilati (bloccata al web)
 ├── strumenti/          # verifica_sito.sh, prove_server.sh, ambiente locale (locale/) e prove automatiche (prove/); bloccata al web
 ├── valutazione_fsl.php # Scheda di valutazione della struttura ospitante (link personale del docente)
@@ -277,6 +284,9 @@ eventidibest-cms/
 ├── incarico.php        # Lettera di incarico: controllo e conferma dello studente con SPID/CIE (link personale)
 ├── firma_incarico.php  # Lettera di incarico: firma PAdES del docente e del direttore; dichiarazione di fine attività del docente
 ├── registro_tutorato.php # Registro delle attività di tutorato (tutor: segna le ore; docente: approva e conferma la fine)
+├── avvisi.php          # Avvisi per email dei nuovi eventi: iscrizione per ambito, conferma, cancellazione
+├── agenda.php          # Agenda unica di eventi e seminari con filtri per ambito; agenda_ics.php: lo stesso in .ics
+├── orientamento.php    # Vetrina dell'Orientamento: aree per futuri studenti, Formazione Scuola Lavoro, prossimi appuntamenti
 ├── giustifica.php      # Giustificazione dell'assenza da una seduta (link personale della convocazione)
 ├── firma_verbale.php   # Verbale della seduta: firma PAdES del segretario e del coordinatore (Aruba o PDF firmato)
 ├── cerca_insegnamenti.php # Catalogo di Ateneo per i campi Insegnamento dei moduli (JSON)
@@ -330,6 +340,8 @@ Il database e` composto da **23 tabelle**:
 | `ateneo_cds`, `ateneo_insegnamenti`, `ateneo_insegnamenti_scaricati` | Catalogo di Ateneo: corsi di studio per anno di offerta e insegnamenti scaricati quando servono |
 | `tutorato_bandi`, `tutorato_incarichi`, `tutorato_eventi` | Bandi di tutorato, lettere di incarico (dati, stato, conferma SPID/CIE, PDF, protocollo, fine attività, solleciti) e loro storico |
 | `tutorato_registro` | Registro delle attività del tutor (giorno, ore, attività, approvazione del docente) |
+| `avvisi_iscrizioni`, `avvisi_eventi` | Iscritti agli avvisi per email (argomenti, conferma) ed eventi già annunciati |
+| `copie_configurazione` | Copie di home e menu salvate prima di applicare l'organizzazione proposta (ripristino) |
 | `didattica_convocazioni` | Convocazioni delle sedute per email: link personale per giustificare l'assenza, motivo |
 
 ---

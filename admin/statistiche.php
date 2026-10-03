@@ -309,7 +309,7 @@ $render_table = function($rows, $label) {
         </thead>
         <tbody>
         <?php foreach ($rows as $st):
-            $is_libero = $st['max_posti'] >= 9000;
+            $is_libero = $st['max_posti'] >= POSTI_SENZA_LIMITE;
 
             if ($is_libero) {
                 $cap_label  = '<span class="badge bg-secondary">Libero</span>';

@@ -552,15 +552,20 @@ if (!defined('TIPI_AMBITO')) define('TIPI_AMBITO', [
     'fsl_convenzioni' => "Formazione Scuola Lavoro: solo convenzioni",
     'fsl_scuole'      => "Formazione Scuola Lavoro: solo anagrafe scuole",
     // Moduli interi (pagina_id 0): tutte le aree del modulo come "tutta l'area"; Orientamento comprende la FSL
-    'modulo_orientamento' => "Modulo Orientamento (tutte le aree e la Formazione Scuola Lavoro)",
+    'modulo_orientamento' => "Modulo Eventi e seminari (tutte le aree; comprende anche la Formazione Scuola Lavoro, come prima)",
+    'modulo_fsl'          => "Modulo Formazione Scuola Lavoro (aree FSL, convenzioni, verifica delle iscrizioni, valutazioni)",
     'modulo_calendari'    => "Modulo Prenotazioni e risorse (tutte le aree)",
     'modulo_didattica'    => "Modulo Didattica",
 ]);
 
 if (!function_exists('ha_modulo')) {
     // Abilitato al modulo intero
+    // La Formazione Scuola Lavoro era un sottomodulo dell'Orientamento: chi ha il modulo Orientamento o il perimetro «fsl»
+    // (tutta la FSL) ha anche il modulo FSL, così nessuno perde gli accessi con la separazione.
     function ha_modulo($conn, int $uid, string $modulo): bool {
-        return $modulo !== '' && ha_ambito($conn, $uid, 'modulo_' . $modulo);
+        if ($modulo === '') return false;
+        if ($modulo === 'fsl') return ha_ambito($conn, $uid, 'modulo_fsl') || ha_ambito($conn, $uid, 'modulo_orientamento') || ha_ambito($conn, $uid, 'fsl');
+        return ha_ambito($conn, $uid, 'modulo_' . $modulo);
     }
 }
 
@@ -599,7 +604,7 @@ if (!function_exists('sql_attivita_ambiti')) {
         $cond = [];
         if (ha_ambito($conn, $uid, 'progetti', $pagina_id)) $cond[] = "e.tipo = 'progetto'";
         if (ha_ambito($conn, $uid, 'eventi', $pagina_id)) $cond[] = "IFNULL(e.tipo, 'evento') <> 'progetto'";
-        if (ha_ambito($conn, $uid, 'fsl') || ha_ambito($conn, $uid, 'modulo_orientamento')) $cond[] = "e.id IN (SELECT evento_id FROM progetti_dettagli WHERE convenzione = 1)";
+        if (ha_modulo($conn, $uid, 'fsl')) $cond[] = "e.id IN (SELECT evento_id FROM progetti_dettagli WHERE convenzione = 1)";
         // Modulo intero a cui appartiene l'area: tutte le attività
         $r_p = $conn->query("SELECT * FROM pagine_eventi WHERE id = " . (int)$pagina_id);
         if ($r_p && ($pag = $r_p->fetch_assoc()) && area_nel_modulo_utente($conn, $uid, $pag)) $cond[] = "1 = 1";
@@ -626,11 +631,12 @@ if (!function_exists('aree_da_ambiti')) {
         foreach (ambiti_utente($conn, $uid) as $a) if (in_array($a['tipo'], ['progetti', 'eventi'], true) && $a['pagina_id'] > 0) $aree[$a['pagina_id']] = true;
         // Moduli interi: tutte le aree del modulo
         $moduli = array_filter(array_map(fn($a) => str_starts_with($a['tipo'], 'modulo_') ? substr($a['tipo'], 7) : null, ambiti_utente($conn, $uid)));
+        if (ha_modulo($conn, $uid, 'fsl')) $moduli[] = 'fsl';
         if ($moduli) {
             $r = $conn->query("SELECT * FROM pagine_eventi");
             while ($r && $x = $r->fetch_assoc()) if (in_array(modulo_di_area($x), $moduli, true)) $aree[(int)$x['id']] = true;
         }
-        if (ha_ambito($conn, $uid, 'fsl') || ha_ambito($conn, $uid, 'modulo_orientamento')) {
+        if (ha_modulo($conn, $uid, 'fsl')) {
             $r = $conn->query("SELECT DISTINCT e.pagina_id FROM eventi e JOIN progetti_dettagli pd ON pd.evento_id = e.id WHERE pd.convenzione = 1");
             while ($r && $x = $r->fetch_assoc()) $aree[(int)$x['pagina_id']] = true;
         }
@@ -646,11 +652,11 @@ if (!function_exists('ids_ambito_attivita')) {
         $e = $r ? $r->fetch_assoc() : null;
         if (!$e) return [];
         $tipo = $e['tipo'] === 'progetto' ? 'progetti' : 'eventi';
-        $cond = "(tipo = '$tipo' AND pagina_id = " . (int)$e['pagina_id'] . ")" . ($con_fsl && (int)$e['fsl'] === 1 ? " OR tipo IN ('fsl', 'modulo_orientamento')" : '');
+        $cond = "(tipo = '$tipo' AND pagina_id = " . (int)$e['pagina_id'] . ")" . ($con_fsl && (int)$e['fsl'] === 1 ? " OR tipo IN ('fsl', 'modulo_orientamento', 'modulo_fsl')" : '');
         // Con $con_fsl (perimetri ampi) anche chi ha il modulo intero dell'area
         if ($con_fsl && function_exists('modulo_di_area')) {
             $r_p = $conn->query("SELECT * FROM pagine_eventi WHERE id = " . (int)$e['pagina_id']);
-            if ($r_p && $pag = $r_p->fetch_assoc()) $cond .= " OR tipo = 'modulo_" . $conn->real_escape_string(modulo_di_area($pag)) . "'";
+            if ($r_p && $pag = $r_p->fetch_assoc()) $cond .= modulo_di_area($pag) === 'fsl' ? " OR tipo IN ('modulo_fsl', 'modulo_orientamento', 'fsl')" : " OR tipo = 'modulo_" . $conn->real_escape_string(modulo_di_area($pag)) . "'";
         }
         $ids = [];
         $r = @$conn->query("SELECT DISTINCT utente_id FROM abilitazioni_ambito WHERE $cond");

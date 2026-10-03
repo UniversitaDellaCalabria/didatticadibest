@@ -248,7 +248,7 @@ if (!function_exists('get_turni_ultimi_posti')) {
                 WHERE e.archiviato = 0 AND pe.visibile = 1 AND e.pagina_id IN ($in)
                   AND IFNULL(e.richiede_prenotazione, 1) = 1
                   AND IFNULL(e.tipo, 'evento') <> 'progetto'
-                  AND t.max_posti > 0 AND t.max_posti < 9000
+                  AND t.max_posti > 0 AND t.max_posti < " . (int)POSTI_SENZA_LIMITE . "
                   AND (t.data_apertura IS NULL OR t.data_apertura <= NOW())
                   AND (t.data_chiusura IS NULL OR t.data_chiusura >= NOW())
                   AND (t.data_turno IS NULL OR CONCAT(t.data_turno, ' ', COALESCE(t.orario_inizio, '23:59:59')) > NOW())
@@ -275,7 +275,7 @@ if (!function_exists('get_turni_ultimi_posti')) {
 if (!function_exists('get_riepilogo_posti')) {
     // Capienza e posti occupati dei turni ancora prenotabili, raggruppati per evento o per area.
     // $per = 'evento' | 'pagina'. Ritorna [id => ['capienza'=>, 'occupati'=>, 'liberi'=>]].
-    // Esclusi: eventi senza prenotazione, turni illimitati (>= 9000), conclusi o con iscrizioni chiuse.
+    // Esclusi: eventi senza prenotazione, turni senza limite (>= POSTI_SENZA_LIMITE), conclusi o con iscrizioni chiuse.
     function get_riepilogo_posti($conn, string $per, array $ids): array {
         $ids = array_filter(array_map('intval', $ids));
         if (!$ids) return [];
@@ -291,7 +291,7 @@ if (!function_exists('get_riepilogo_posti')) {
                 JOIN eventi e ON t.evento_id = e.id
                 WHERE $col IN ($in) AND e.archiviato = 0
                   AND IFNULL(e.richiede_prenotazione, 1) = 1
-                  AND t.max_posti > 0 AND t.max_posti < 9000
+                  AND t.max_posti > 0 AND t.max_posti < " . (int)POSTI_SENZA_LIMITE . "
                   AND (t.data_chiusura IS NULL OR t.data_chiusura >= NOW())
                   AND (t.data_turno IS NULL OR CONCAT(t.data_turno, ' ', COALESCE(t.orario_inizio, '23:59:59')) > NOW())
              ) x
@@ -314,7 +314,9 @@ if (!function_exists('widgets_home_default')) {
         return [
             'slideshow' => 1, 'mia_prenotazione' => 1, 'annunci' => 0, 'card_aree' => 1,
             'ultimi_posti' => 0, 'prossimi_eventi' => 1, 'statistiche' => 0,
-            'ordine'        => ['slideshow', 'mia_prenotazione', 'annunci', 'card_aree', 'ultimi_posti', 'prossimi_eventi', 'statistiche'],
+            // Widget dell'organizzazione per pubblico (inc/organizzazione.php): spenti finché non si accendono o si applica la proposta
+            'percorsi' => 0, 'agenda' => 0, 'scadenze' => 0,
+            'ordine'        => ['slideshow', 'percorsi', 'mia_prenotazione', 'annunci', 'agenda', 'scadenze', 'card_aree', 'ultimi_posti', 'prossimi_eventi', 'statistiche'],
             'aree_colonne'  => 2,         // 2 | 3 | 4 card per riga (desktop)
             'aree_max'      => 0,         // 0 = tutte; altrimenti le altre si aprono con "Mostra tutte"
             'eventi_num'    => 8,         // 4 | 8 | 12
@@ -364,6 +366,15 @@ if (!function_exists('get_widgets_home')) {
 // - Generico: ogni edizione ha i suoi posti, una persona per posto, come gli eventi.
 // =======================================================================
 if (!defined('CAMPO_PARTECIPANTI')) define('CAMPO_PARTECIPANTI', 'numero_partecipanti');
+// Turni con almeno tanti posti = senza un limite reale (es. 5000 per un evento online): niente contatore né barra,
+// solo «Posti disponibili». Prima la soglia era 9000 e le somme dei turni mostravano «100.000 posti liberi».
+if (!defined('POSTI_SENZA_LIMITE')) define('POSTI_SENZA_LIMITE', 1000);
+if (!function_exists('testo_posti_liberi')) {
+    function testo_posti_liberi(int $liberi): string {
+        if ($liberi >= POSTI_SENZA_LIMITE) return 'Posti disponibili';
+        return $liberi > 0 ? $liberi . ($liberi === 1 ? ' posto libero' : ' posti liberi') : '';
+    }
+}
 // Dopo quanti mesi dalla fine del progetto i nomi degli studenti vengono ridotti alle iniziali (cron_background.php)
 if (!defined('MESI_CONSERVAZIONE_STUDENTI')) define('MESI_CONSERVAZIONE_STUDENTI', 12);
 

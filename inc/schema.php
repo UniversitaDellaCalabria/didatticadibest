@@ -8,7 +8,7 @@
 // richiesta: quando aggiungi qualcosa qui, cambia anche il nome del marcatore.
 if (!function_exists('assicura_schema')) {
     function assicura_schema($conn) {
-        $marker = RADICE_SITO . '/cache/schema_v39.ok';
+        $marker = RADICE_SITO . '/cache/schema_v41.ok';
         if (is_file($marker)) return;
 
         // 1. Tabelle di servizio (prima create dalle singole pagine a ogni richiesta)
@@ -238,6 +238,21 @@ if (!function_exists('assicura_schema')) {
                 INDEX idx_incarico (incarico_id, data)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
             // v39: convocazioni delle sedute inviate ai componenti, con il link personale per giustificare l'assenza
+            // v41: avvisi per email dei nuovi eventi per ambito (iscrizione con conferma, link per cancellarsi)
+            'avvisi_iscrizioni' => "CREATE TABLE IF NOT EXISTS avvisi_iscrizioni (
+                id INT AUTO_INCREMENT PRIMARY KEY, email VARCHAR(150) NOT NULL, ambiti VARCHAR(120) NOT NULL DEFAULT '', scuole TINYINT(1) NOT NULL DEFAULT 0,
+                token VARCHAR(40) NOT NULL, utente_id INT DEFAULT NULL, creata_il DATETIME DEFAULT CURRENT_TIMESTAMP, confermata_il DATETIME DEFAULT NULL,
+                ultimo_invio_il DATETIME DEFAULT NULL, UNIQUE KEY uq_email (email), UNIQUE KEY uq_token (token)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            // v41: eventi già annunciati agli iscritti (al primo avvio si segnano tutti quelli esistenti, senza inviare)
+            'avvisi_eventi' => "CREATE TABLE IF NOT EXISTS avvisi_eventi (
+                evento_id INT PRIMARY KEY, annunciato_il DATETIME DEFAULT CURRENT_TIMESTAMP, destinatari INT NOT NULL DEFAULT 0
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            // v40: copie di sicurezza della home e del menu prima di applicare l'organizzazione proposta (si ripristinano)
+            'copie_configurazione' => "CREATE TABLE IF NOT EXISTS copie_configurazione (
+                id INT AUTO_INCREMENT PRIMARY KEY, tipo VARCHAR(20) NOT NULL, dati_json MEDIUMTEXT, autore VARCHAR(200) DEFAULT '',
+                creata_il DATETIME DEFAULT CURRENT_TIMESTAMP, INDEX idx_tipo (tipo)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
             'didattica_convocazioni' => "CREATE TABLE IF NOT EXISTS didattica_convocazioni (
                 id INT AUTO_INCREMENT PRIMARY KEY, seduta_id INT NOT NULL, componente_id INT NOT NULL, email VARCHAR(150) DEFAULT '', token VARCHAR(40) NOT NULL,
                 inviata_il DATETIME DEFAULT NULL, giustificata_il DATETIME DEFAULT NULL, motivo VARCHAR(500) DEFAULT '',
@@ -418,6 +433,16 @@ if (!function_exists('assicura_schema')) {
                 'valutazione_promemoria'  => "ADD COLUMN valutazione_promemoria TINYINT(1) NOT NULL DEFAULT 0",
             ],
             'eventi' => [
+                // v40: ambiti dell'evento (orientamento, ricerca, terza_missione, didattica), separati da virgola; '' = quello dell'area
+                'ambiti'                => "ADD COLUMN ambiti VARCHAR(120) NOT NULL DEFAULT ''",
+                // v41: seminari (relatore dall'anagrafe o esterno, abstract, diretta, registrazione e slide)
+                'relatore'              => "ADD COLUMN relatore VARCHAR(255) NOT NULL DEFAULT ''",
+                'relatore_ente'         => "ADD COLUMN relatore_ente VARCHAR(255) NOT NULL DEFAULT ''",
+                'relatore_persona_id'   => "ADD COLUMN relatore_persona_id VARCHAR(80) DEFAULT NULL",
+                'abstract'              => "ADD COLUMN abstract TEXT DEFAULT NULL",
+                'link_streaming'        => "ADD COLUMN link_streaming VARCHAR(500) NOT NULL DEFAULT ''",
+                'link_registrazione'    => "ADD COLUMN link_registrazione VARCHAR(500) NOT NULL DEFAULT ''",
+                'slide_pdf'             => "ADD COLUMN slide_pdf VARCHAR(255) DEFAULT NULL",
                 'abilita_presenze'      => "ADD COLUMN abilita_presenze TINYINT(1) NOT NULL DEFAULT 1",
                 'blocca_auto_archivio'  => "ADD COLUMN blocca_auto_archivio TINYINT(1) NOT NULL DEFAULT 0",
                 'permessi_gestori_json' => "ADD COLUMN permessi_gestori_json TEXT DEFAULT NULL",
@@ -464,6 +489,8 @@ if (!function_exists('assicura_schema')) {
                 'anonimizzato' => "ADD COLUMN anonimizzato TINYINT(1) NOT NULL DEFAULT 0 AFTER escluso",
             ],
             'pagine_eventi' => [
+                // v40: ambito predefinito degli eventi dell'area ('' = dal tipo di area)
+                'ambito'                => "ADD COLUMN ambito VARCHAR(30) NOT NULL DEFAULT ''",
                 'copertina_path'        => "ADD COLUMN copertina_path VARCHAR(255) DEFAULT NULL",
                 'mostra_in_home'        => "ADD COLUMN mostra_in_home TINYINT(1) NOT NULL DEFAULT 1",
                 'limite_iscrizioni'     => "ADD COLUMN limite_iscrizioni VARCHAR(20) NOT NULL DEFAULT 'nessuno'",

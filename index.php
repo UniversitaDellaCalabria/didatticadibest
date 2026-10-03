@@ -92,7 +92,7 @@ $barra_posti = function (?array $r, bool $compatta = false): string {
     if (!$r || $r['capienza'] <= 0) return '';
     $pct = min(100, (int)round($r['occupati'] / $r['capienza'] * 100));
     $cls = $pct >= 100 ? 'bg-danger' : ($pct >= 75 ? 'bg-warning' : 'bg-success');
-    $lib = $r['liberi'] > 0 ? $r['liberi'] . ($r['liberi'] === 1 ? ' posto libero' : ' posti liberi') : 'Completo';
+    $lib = $r['liberi'] > 0 ? testo_posti_liberi((int)$r['liberi']) : 'Completo';
     $h  = '<div class="mt-2"><div class="progress" style="height:6px;" role="progressbar" aria-label="Posti occupati: ' . $pct . '%" aria-valuenow="' . $pct . '" aria-valuemin="0" aria-valuemax="100">'
         . '<div class="progress-bar ' . $cls . '" style="width:' . $pct . '%;"></div></div>'
         . '<div class="d-flex justify-content-between mt-1" style="font-size:.72rem;">';
@@ -477,7 +477,7 @@ ob_start(); ?>
                 <div style="height:<?php echo $griglia ? 110 : 85; ?>px;background:url('<?php echo htmlspecialchars($ev['locandina_path']); ?>') center/cover;"></div>
                 <?php else: ?>
                 <div style="height:<?php echo $griglia ? 110 : 85; ?>px;background:linear-gradient(135deg,<?php echo $col1; ?>18 0%,<?php echo $col1; ?>38 100%);display:flex;align-items:center;justify-content:center;">
-                    <i class="fa fa-calendar-star" style="color:<?php echo $col1; ?>;opacity:.4;font-size:1.8rem;"></i>
+                    <i class="fa fa-calendar-days" style="color:<?php echo $col1; ?>;opacity:.45;font-size:1.8rem;" aria-hidden="true"></i>
                 </div>
                 <?php endif; ?>
                 <div class="p-3">
@@ -524,6 +524,92 @@ ob_start(); ?>
     </div>
 </div>
 <?php $blocchi['statistiche'] = ob_get_clean();
+endif;
+
+// ── COSA CERCHI? (percorsi per pubblico) ─────────────────────────────────────
+if (!empty($widgets['percorsi'])):
+$percorsi = [
+    ['Futuri studenti e scuole', 'Welcome Week, laboratori, open day e percorsi di Formazione Scuola Lavoro', 'fa-compass', '#0056B3', 'orientamento.php'],
+    ['Studenti', 'Modulistica e pratiche online, ricevimento e sportelli, tutorato', 'fa-graduation-cap', '#047857', 'modulistica.php'],
+    ['Eventi e seminari', 'Agenda di orientamento, seminari di ricerca e public engagement', 'fa-calendar-days', '#7c3aed', 'agenda.php'],
+    ['Area riservata', 'Le tue prenotazioni, attestati e pratiche; docenti e personale', 'fa-user-lock', '#334155', 'area_personale.php'],
+];
+ob_start(); ?>
+<style>
+.hp-percorso { display: flex; gap: 14px; align-items: flex-start; height: 100%; padding: 18px; border-radius: 14px; background: #fff; border: 1px solid #e2e8f0; text-decoration: none; transition: transform .2s, box-shadow .2s; border-top: 4px solid var(--c); }
+.hp-percorso:hover, .hp-percorso:focus { transform: translateY(-3px); box-shadow: 0 10px 22px rgba(0,0,0,.09); }
+.hp-percorso .ico { width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; flex-shrink: 0; font-size: 1.25rem; background: color-mix(in srgb, var(--c) 12%, white); color: var(--c); }
+.hp-percorso .tit { font-weight: 800; color: #0f172a; font-size: 1.05rem; }
+.hp-percorso .descr { color: #475569; font-size: .85rem; }
+</style>
+<div class="container my-4" style="max-width:1200px;">
+    <h2 class="h4 fw-bold mb-3">Cosa cerchi?</h2>
+    <div class="row g-3">
+        <?php foreach ($percorsi as [$tit_p, $descr_p, $ico_p, $col_p, $url_p]): ?>
+        <div class="col-sm-6 col-lg-3"><a class="hp-percorso" href="<?php echo $url_p; ?>" style="--c:<?php echo $col_p; ?>;">
+            <span class="ico"><i class="fa <?php echo $ico_p; ?>" aria-hidden="true"></i></span>
+            <span><span class="tit d-block"><?php echo htmlspecialchars($tit_p); ?></span><span class="descr d-block"><?php echo htmlspecialchars($descr_p); ?></span></span>
+        </a></div>
+        <?php endforeach; ?>
+    </div>
+</div>
+<?php $blocchi['percorsi'] = ob_get_clean();
+endif;
+
+// ── AGENDA (prossimi appuntamenti con gli ambiti) ────────────────────────────
+if (!empty($widgets['agenda']) && function_exists('eventi_agenda')):
+$ag_tutti = eventi_agenda($conn, ['solo_home' => true]);
+$ag_n = conta_ambiti_agenda($ag_tutti);
+$ag_ev = array_slice($ag_tutti, 0, (int)$widgets['eventi_num']);
+$ag_posti = get_riepilogo_posti($conn, 'evento', array_column($ag_ev, 'id'));
+if ($ag_ev):
+ob_start(); echo css_agenda(); ?>
+<div class="container my-4" style="max-width:1200px;">
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+        <h2 class="h4 fw-bold mb-0">Prossimi appuntamenti</h2>
+        <a class="ms-auto small fw-bold" href="agenda.php">Tutta l'agenda <i class="fa fa-arrow-right" aria-hidden="true"></i></a>
+    </div>
+    <nav class="ag-filtri mb-3" aria-label="Agenda per ambito">
+        <?php foreach (AMBITI_EVENTO as $k_a => $a_a): if (!$ag_n[$k_a]) continue; ?>
+            <a href="agenda.php?ambito=<?php echo $k_a; ?>"><i class="fa <?php echo $a_a['icona']; ?> me-1" style="color:<?php echo $a_a['colore']; ?>;" aria-hidden="true"></i><?php echo htmlspecialchars($a_a['nome']); ?><span class="n"><?php echo $ag_n[$k_a]; ?></span></a>
+        <?php endforeach; ?>
+        <?php if ($ag_n['scuole']): ?><a href="agenda.php?scuole=1"><i class="fa fa-school me-1" aria-hidden="true"></i>Per le scuole<span class="n"><?php echo $ag_n['scuole']; ?></span></a><?php endif; ?>
+    </nav>
+    <div class="row g-3">
+        <?php foreach (array_chunk($ag_ev, (int)ceil(count($ag_ev) / 2)) as $col_ev): ?>
+        <div class="col-lg-6"><div class="card border-0 shadow-sm overflow-hidden h-100" style="border-radius:12px;">
+            <?php foreach ($col_ev as $e_ag) echo html_voce_agenda($e_ag, $ag_posti[(int)$e_ag['id']] ?? null); ?>
+        </div></div>
+        <?php endforeach; ?>
+    </div>
+</div>
+<?php $blocchi['agenda'] = ob_get_clean();
+endif;
+endif;
+
+// ── SCADENZE DELLA DIDATTICA (moduli online con data di chiusura) ─────────────
+if (!empty($widgets['scadenze'])):
+$scad = db_righe($conn, "SELECT id, titolo, categoria, aperto_al FROM didattica_moduli WHERE attivo = 1 AND tipo = 'online' AND aperto_al IS NOT NULL AND aperto_al >= CURDATE()
+                         AND (aperto_dal IS NULL OR aperto_dal <= CURDATE()) ORDER BY aperto_al, titolo LIMIT 4");
+if ($scad):
+ob_start(); ?>
+<div class="container my-4" style="max-width:1200px;">
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+        <h2 class="h4 fw-bold mb-0"><i class="fa fa-hourglass-half me-2" style="color:#047857;" aria-hidden="true"></i>Scadenze per gli studenti</h2>
+        <a class="ms-auto small fw-bold" href="modulistica.php">Tutta la modulistica <i class="fa fa-arrow-right" aria-hidden="true"></i></a>
+    </div>
+    <div class="row g-3">
+        <?php foreach ($scad as $m_s): $gg_s = (int)floor((strtotime($m_s['aperto_al']) - strtotime(date('Y-m-d'))) / 86400); ?>
+        <div class="col-sm-6 col-lg-3"><a href="modulo.php?id=<?php echo (int)$m_s['id']; ?>" class="d-block h-100 p-3 bg-white border rounded-3 text-decoration-none" style="border-left:4px solid #047857 !important;">
+            <span class="d-block small text-secondary"><?php echo htmlspecialchars($m_s['categoria']); ?></span>
+            <span class="d-block fw-bold text-dark"><?php echo htmlspecialchars($m_s['titolo']); ?></span>
+            <span class="d-block small mt-1 <?php echo $gg_s <= 7 ? 'text-danger fw-bold' : 'text-secondary'; ?>"><i class="fa fa-clock me-1" aria-hidden="true"></i><?php echo $gg_s === 0 ? 'Chiude oggi' : 'Entro il ' . date('d/m/Y', strtotime($m_s['aperto_al'])) . ($gg_s <= 7 ? " · $gg_s giorni" : ''); ?></span>
+        </a></div>
+        <?php endforeach; ?>
+    </div>
+</div>
+<?php $blocchi['scadenze'] = ob_get_clean();
+endif;
 endif;
 
 // ── STAMPA NELL'ORDINE CONFIGURATO ────────────────────────────────────────────

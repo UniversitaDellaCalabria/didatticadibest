@@ -138,6 +138,9 @@ if (isset($_POST['save_pagina_config'])) {
     }
 
     $conn->query("UPDATE pagine_eventi SET titolo='$titolo', sottotitolo='$sottotitolo', colore_primario='$col_prim', colore_secondario='$col_sec', larghezza_contenitore='$larg_cont', layout_template='$tmpl', mostra_in_home=$mostra_home, limite_iscrizioni='$limite_isc' $conv_upd, num_colonne=$num_col, spazio_card=$spazio_c, mostra_sidebar=$m_sidebar, chiedi_matricola=$ch_matr, sidebar_titolo='$sb_titolo', sidebar_intervallo_date='$sb_date', sidebar_testo='$sb_testo', posizione_box_info='$pos_box_info', hero_descrizione='$hero_desc', box_info_html='$box_info', allegati_box_info='$allegati_box_info_final', allegati_sidebar='$allegati_sidebar_final', firma_nome='$firma_nome', firma_titolo='$firma_titolo', testo_attestato=$testo_att_sql $logo_att_query $banner_query $copertina_query WHERE id = $p_id");
+    // Ambito predefinito degli eventi dell'area (agenda del sito, vetrina Orientamento)
+    $amb_area = isset(AMBITI_EVENTO[$_POST['ambito'] ?? '']) ? $_POST['ambito'] : '';
+    db_esegui($conn, "UPDATE pagine_eventi SET ambito = ? WHERE id = ?", [$amb_area, (int)$p_id]);
     flash_set("Impostazioni Pagina salvate con successo!");
     admin_redirect("impostazioni_area.php?p_id=$p_id");
 }
@@ -199,6 +202,14 @@ if (isset($_POST['save_pagina_config'])) {
                         <label class="form-check-label small fw-bold" for="chkMostraHome">Mostra card e appuntamenti in home</label>
                     </div>
                     <small class="text-muted d-block mt-1">Se disattivato l'area non compare in home (né la card, né i prossimi appuntamenti) ma resta raggiungibile col suo link diretto.</small>
+                </div>
+                <div class="col-md-12">
+                    <label class="form-label small fw-bold" for="selAmbitoArea">Ambito degli eventi dell'area</label>
+                    <select class="form-select form-select-sm" name="ambito" id="selAmbitoArea" style="max-width:380px;">
+                        <option value="">Dal tipo di area (<?php echo htmlspecialchars(AMBITI_EVENTO[ambito_area(['tipo_area' => $page_cfg['tipo_area'] ?? ''])]['nome']); ?>)</option>
+                        <?php foreach (AMBITI_EVENTO as $k_a => $a_a): ?><option value="<?php echo $k_a; ?>"<?php echo ($page_cfg['ambito'] ?? '') === $k_a ? ' selected' : ''; ?>><?php echo htmlspecialchars($a_a['nome'] . ' – ' . $a_a['descr']); ?></option><?php endforeach; ?>
+                    </select>
+                    <small class="text-muted d-block mt-1">Vale per gli eventi senza ambiti propri: decide dove compaiono nell'agenda del sito (es. seminari di ricerca, public engagement). Ogni evento può sceglierne anche più d'uno.</small>
                 </div>
                 <div class="col-md-7">
                     <label class="form-label small fw-bold">Limite iscrizioni per persona</label>

@@ -177,6 +177,9 @@ if ($u_logged_header) {
         .header-search-box input::placeholder { color: rgba(255, 255, 255, 0.7); }
         .header-search-box button { background: transparent; border: none; color: #ffffff; padding: 8px 12px; cursor: pointer; }
         
+        /* Bootstrap Italia nasconde le caselle e le ridisegna solo nello schema <input> + <label for>: quelle messe dentro
+           l'etichetta (<label class="form-check"><input …> testo</label>) restavano invisibili. Qui tornano native. */
+        label.form-check [type=checkbox], label.form-check [type=radio] { position: static; opacity: 1; width: 1.1em; height: 1.1em; margin: 0 .45em 0 0; vertical-align: -2px; flex-shrink: 0; accent-color: #0056B3; }
         .dropdown-menu.agid-dropdown { border: 1px solid #e2e8f0; border-top: 4px solid #B30000; border-radius: 4px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); padding: 0; min-width: 220px; font-size: 0.9rem; }
         .agid-dropdown .list-item { padding: 10px 20px; color: #1e293b; text-decoration: none; display: block; font-weight: 600; transition: background 0.2s; }
         .agid-dropdown .list-item:hover, .agid-dropdown .list-item:focus { background-color: #f8f9fa; color: #B30000; outline: none; }

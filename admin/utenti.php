@@ -332,7 +332,7 @@ function html_perimetro(string $pref, array $p, string $titolo_area, array $even
         . '</div></fieldset></div>';
     // Moduli interi (tutte le aree del modulo, anche quelle create dopo)
     $o .= '<div class="col-12"><fieldset class="p-2 border rounded bg-white"><legend class="form-label small fw-bold mb-1 float-none w-auto px-1">Moduli interi (tutte le aree del modulo, anche quelle create dopo)</legend><div class="d-flex flex-wrap gap-3">';
-    foreach (['orientamento' => 'Orientamento (comprende la Formazione Scuola Lavoro)', 'calendari' => 'Prenotazioni e risorse', 'didattica' => 'Didattica'] as $k_m => $l_m) {
+    foreach (['orientamento' => 'Eventi e seminari (comprende anche la Formazione Scuola Lavoro)', 'calendari' => 'Prenotazioni e risorse', 'didattica' => 'Didattica'] as $k_m => $l_m) {
         $o .= '<div class="form-check"><input class="form-check-input" type="checkbox" name="moduli[]" value="' . $k_m . '" id="' . $pref . 'm_' . $k_m . '"' . $chk(in_array($k_m, $p['moduli'] ?? [], true)) . '><label class="form-check-label small" for="' . $pref . 'm_' . $k_m . '">' . $h($l_m) . '</label></div>';
     }
     $o .= '</div></fieldset></div></div>';

@@ -162,13 +162,13 @@ sezione("Macroaree e tipi di area");
 prova(tipo_area(['tipo_area' => 'fsl']) === 'fsl' && tipo_area(['tipo_area' => 'boh']) === '' && tipo_area([]) === '', "tipo dell'area (valido / sconosciuto / assente)");
 prova(sezione_area(['tipo_area' => 'gruppi']) === 'calendari' && sezione_area(['tipo_area' => 'eventi']) === 'orientamento' && sezione_area([]) === '', "macroarea dal tipo (gruppi in Prenotazioni e risorse)");
 $gr = raggruppa_aree_per_sezione([['id' => 1, 'tipo_area' => 'gruppi'], ['id' => 2, 'tipo_area' => 'fsl'], ['id' => 3, 'tipo_area' => ''], ['id' => 4, 'tipo_area' => 'eventi']]);
-prova(array_keys($gr) === ['orientamento', 'calendari', ''] && array_column($gr['orientamento'], 'id') === [2, 4], "aree raggruppate nell'ordine delle macroaree, non assegnate in fondo");
+prova(array_keys($gr) === ['orientamento', 'fsl', 'calendari', ''] && array_column($gr['orientamento'], 'id') === [4] && array_column($gr['fsl'], 'id') === [2], "aree raggruppate nell'ordine delle macroaree (FSL a sé), non assegnate in fondo");
 prova(str_contains(html_scelta_tipo_area('t', 'fsl'), 'value="fsl" selected') && str_contains(html_scelta_tipo_area('t', 'calendario'), 'value="calendario" selected'), "tendina del tipo (anche Calendari e risorse)");
 prova(sezione_area(['tipo_area' => 'calendario']) === 'calendari', "Calendari e risorse nella sua macroarea");
 
 sezione("Moduli");
-prova(modulo_di_area(['tipo_area' => '']) === 'orientamento' && modulo_di_area(['tipo_area' => 'fsl']) === 'orientamento' && modulo_di_area(['tipo_area' => 'gruppi']) === 'calendari' && modulo_di_area(['tipo_area' => 'calendario']) === 'calendari', "modulo dell'area (senza tipo: Orientamento)");
-prova(array_keys(MODULI_PORTALE) === ['orientamento', 'calendari', 'didattica', 'portale'] && PAGINE_MODULO['fsl.php'] === 'orientamento' && PAGINE_MODULO['utenti.php'] === 'portale', "moduli e pagine dei moduli");
+prova(modulo_di_area(['tipo_area' => '']) === 'orientamento' && modulo_di_area(['tipo_area' => 'fsl']) === 'fsl' && modulo_di_area(['tipo_area' => 'gruppi']) === 'calendari' && modulo_di_area(['tipo_area' => 'calendario']) === 'calendari', "modulo dell'area (senza tipo: Orientamento)");
+prova(array_keys(MODULI_PORTALE) === ['orientamento', 'fsl', 'calendari', 'didattica', 'portale'] && PAGINE_MODULO['fsl.php'] === 'fsl' && PAGINE_MODULO['utenti.php'] === 'portale' && MODULI_PORTALE['orientamento']['nome'] === 'Eventi e seminari', "moduli (Eventi e seminari, FSL a sé) e pagine dei moduli");
 $q("INSERT INTO utenti (id, codice_fiscale, nome, cognome, email, ruolo_id) VALUES (96, 'MODUL96XXXXXXXXX', 'Mara', 'Moduli', 'mara@unical.it', 4)");
 $q("UPDATE pagine_eventi SET tipo_area = 'fsl' WHERE id = 2");
 $q("UPDATE pagine_eventi SET tipo_area = 'calendario' WHERE id = 1");
@@ -177,6 +177,105 @@ $a81 = aree_da_ambiti($conn, 96);
 prova(in_array(2, $a81, true) && attivita_da_ambiti($conn, 96, 1) === [10], "modulo Orientamento: le sue aree; in Prenotazioni e risorse solo le attività FSL");
 prova(area_nel_modulo_utente($conn, 96, ['tipo_area' => 'fsl']) && !area_nel_modulo_utente($conn, 96, ['tipo_area' => 'calendario']), "area nel modulo dell'utente");
 prova(utente_gestisce_attivita($conn, 96, 20), "modulo intero: gestisce le attività delle sue aree");
+// Separazione della FSL: nessuno perde gli accessi (modulo Orientamento o perimetro «fsl» = anche modulo FSL)
+$q("INSERT INTO utenti (id, codice_fiscale, nome, cognome, email, ruolo_id) VALUES (95, 'FSLPRV95XXXXXXXX', 'Franca', 'Fsl', 'franca@unical.it', 4), (94, 'FSLPRV94XXXXXXXX', 'Fabio', 'Nuovo', 'fabio.fsl@unical.it', 4)");
+assegna_ambito($conn, 95, 'fsl'); assegna_ambito($conn, 94, 'modulo_fsl');
+prova(ha_modulo($conn, 96, 'fsl') && ha_modulo($conn, 95, 'fsl') && ha_modulo($conn, 94, 'fsl') && !ha_modulo($conn, 94, 'orientamento'), "modulo FSL: anche a chi aveva il modulo Orientamento o il perimetro FSL");
+prova(in_array(2, aree_da_ambiti($conn, 94), true) && area_nel_modulo_utente($conn, 94, ['tipo_area' => 'fsl']) && !area_nel_modulo_utente($conn, 94, ['tipo_area' => 'eventi']), "modulo FSL: le aree FSL, non gli eventi");
+prova(in_array(94, ids_ambito_attivita($conn, 20), true) && in_array(96, ids_ambito_attivita($conn, 20), true), "le attività dell'area FSL sono di chi ha il modulo FSL o Orientamento");
+$q("UPDATE pagine_eventi SET tipo_area = '' WHERE id IN (1, 2)");
+
+sezione("Ambiti degli eventi e agenda unica");
+prova(ambito_area(['tipo_area' => 'fsl']) === 'orientamento' && ambito_area(['tipo_area' => 'gruppi']) === 'didattica' && ambito_area(['tipo_area' => 'eventi', 'ambito' => 'ricerca']) === 'ricerca' && ambito_area([]) === 'orientamento', "ambito predefinito dell'area (scelto o dal tipo)");
+prova(ambiti_evento(['ambiti' => ''], ['ambito' => 'ricerca']) === ['ricerca'] && ambiti_evento(['ambiti' => 'terza_missione,boh,orientamento'], []) === ['orientamento', 'terza_missione'], "ambiti dell'evento (propri o dell'area, valori sconosciuti ignorati)");
+prova(ambiti_da_post(['ambiti' => ['orientamento']], ['tipo_area' => 'eventi']) === '' && ambiti_da_post(['ambiti' => ['ricerca', 'terza_missione']], []) === 'ricerca,terza_missione', "ambiti dal modulo: uguali all'area = vuoto");
+prova(testo_posti_liberi(5000) === 'Posti disponibili' && testo_posti_liberi(1) === '1 posto libero' && testo_posti_liberi(12) === '12 posti liberi' && testo_posti_liberi(0) === '', "posti: oltre la soglia «Posti disponibili», non il numero");
+$q("UPDATE pagine_eventi SET tipo_area = 'eventi', visibile = 1 WHERE id = 1");
+$q("UPDATE pagine_eventi SET tipo_area = 'fsl', visibile = 1 WHERE id = 2");
+$q("INSERT INTO pagine_eventi (id, titolo, slug, tipo_area, ambito, visibile) VALUES (3, 'Seminari', 'seminari', 'eventi', 'ricerca', 1)");
+$q("INSERT INTO eventi (id, pagina_id, titolo, tipo, luogo, ambiti) VALUES (30, 3, 'Microbiomi marini', 'evento', 'Aula Magna', ''), (31, 3, 'Notte dei ricercatori', 'evento', 'Piazza', 'terza_missione,orientamento'), (32, 3, 'Seminario riservato', 'evento', '', '')");
+$q("UPDATE eventi SET ruolo_accesso_id = 3 WHERE id = 32");
+$q("INSERT INTO turni (id, evento_id, nome_turno, data_turno, orario_inizio, orario_fine, max_posti) VALUES (300, 30, 'Unico', '" . $giorni(5) . "', '15:00:00', '17:00:00', 5000), (310, 31, 'Sera', '" . $giorni(7) . "', '18:00:00', NULL, 40), (320, 32, 'Unico', '" . $giorni(6) . "', NULL, NULL, 10), (311, 31, 'Passato', '" . $giorni(-3) . "', NULL, NULL, 40)");
+$ag = eventi_agenda($conn);
+prova(array_column($ag, 'id') === ['30', '31', '10', '20'] || array_map('intval', array_column($ag, 'id')) === [30, 31, 10, 20], "agenda: eventi futuri di tutte le aree in ordine di data, senza quelli riservati, «da definire» in fondo", json_encode(array_column($ag, 'id')));
+prova($ag[0]['ambiti'] === ['ricerca'] && $ag[1]['ambiti'] === ['orientamento', 'terza_missione'] && $ag[3]['per_scuole'] && !$ag[0]['per_scuole'] && $ag[3]['prossima_data'] === null && $ag[0]['url'] === 'seminari.php?evento=30', "agenda: ambiti, attività per le scuole, link");
+$id_f = fn(array $f) => array_map('intval', array_column(eventi_agenda($conn, $f), 'id'));
+prova($id_f(['ambito' => 'ricerca']) === [30] && $id_f(['ambito' => 'orientamento']) === [31, 10, 20] && $id_f(['scuole' => true]) === [10, 20] && $id_f(['q' => 'notte']) === [31] && $id_f(['limite' => 2]) === [30, 31], "agenda: filtri per ambito, per le scuole, ricerca e limite");
+prova(conta_ambiti_agenda($ag)['orientamento'] === 3 && conta_ambiti_agenda($ag)['ricerca'] === 1 && conta_ambiti_agenda($ag)['scuole'] === 2 && conta_ambiti_agenda($ag)[''] === 4, "agenda: conteggi per i filtri");
+prova(!isset(get_riepilogo_posti($conn, 'evento', [30])[30]) && (get_riepilogo_posti($conn, 'evento', [31])[31]['capienza'] ?? 0) === 40, "posti: i turni «senza limite» non fanno somme enormi");
+$ics = ics_agenda($conn, eventi_agenda($conn, ['ambito' => 'ricerca']), 'Prova');
+prova(str_starts_with($ics, 'BEGIN:VCALENDAR') && substr_count($ics, 'BEGIN:VEVENT') === 1 && str_contains($ics, 'SUMMARY:Microbiomi marini') && str_contains($ics, 'DTSTART;TZID=Europe/Rome:' . str_replace('-', '', $giorni(5)) . 'T150000') && str_contains($ics, 'CATEGORIES:Ricerca'), "calendario .ics dell'agenda per ambito");
+prova(str_contains(html_voce_agenda($ag[0], ['capienza' => 10, 'liberi' => 3, 'occupati' => 7]), '3 posti liberi') && str_contains(html_voce_agenda($ag[3]), 'Per le scuole'), "voce dell'agenda con posti e «per le scuole»");
+// Organizzazione proposta: home e menu per pubblico, con copia di sicurezza e ripristino
+$q("INSERT IGNORE INTO configurazione_portale (id) VALUES (1)");
+$q("DELETE FROM menu_voci");
+$q("INSERT INTO menu_voci (id, genitore_id, etichetta, url, ordine) VALUES (1, 0, 'Home', 'index.php', 1), (2, 0, 'Openlab', 'openlab.php', 2), (3, 0, 'Archivio', '#', 3), (4, 3, 'Archivio Openlab', 'openlab_archivio.php', 1), (5, 0, 'Link Utili', '#', 4), (6, 5, 'Portale Unical', 'https://www.unical.it', 1)");
+prova(array_column(voci_menu_da_tenere($conn), 'etichetta') === ['Link Utili'], "menu: si tengono solo le voci che la proposta non comprende");
+$n_menu = applica_organizzazione_proposta($conn, 'Prova');
+$top = array_column(db_righe($conn, "SELECT etichetta FROM menu_voci WHERE genitore_id = 0 ORDER BY ordine"), 'etichetta');
+$wh = get_widgets_home(['widgets_home' => db_valore($conn, "SELECT widgets_home FROM configurazione_portale WHERE id = 1")]);
+prova($n_menu > 10 && $top === ['Home', 'Orientamento', 'Studenti', 'Eventi e seminari', 'Area riservata', 'Link Utili'] && db_valore($conn, "SELECT COUNT(*) FROM menu_voci WHERE genitore_id = 5") == 1, "menu proposto: per pubblico, Link utili in fondo con le sue voci", json_encode($top));
+prova($wh['percorsi'] === 1 && $wh['agenda'] === 1 && $wh['scadenze'] === 1 && $wh['prossimi_eventi'] === 0 && array_slice($wh['ordine'], 0, 4) === ['slideshow', 'annunci', 'mia_prenotazione', 'percorsi'], "home proposta: Cosa cerchi?, agenda e scadenze");
+prova((bool)db_valore($conn, "SELECT COUNT(*) FROM menu_voci WHERE url = 'agenda.php?ambito=ricerca'") && (bool)db_valore($conn, "SELECT COUNT(*) FROM menu_voci WHERE url = 'seminari_archivio.php'"), "menu proposto: agenda per ambito e archivi delle aree");
+prova(ripristina_organizzazione($conn) && array_column(db_righe($conn, "SELECT etichetta FROM menu_voci WHERE genitore_id = 0 ORDER BY ordine"), 'etichetta') === ['Home', 'Openlab', 'Archivio', 'Link Utili'] && get_widgets_home(['widgets_home' => db_valore($conn, "SELECT widgets_home FROM configurazione_portale WHERE id = 1")])['agenda'] === 0
+      && !ripristina_organizzazione($conn), "ripristino: home e menu com'erano (una volta)");
+
+sezione("Seminari: relatore, abstract, diretta, registrazione");
+salva_seminario_evento($conn, 30, ['relatore' => 'Prof.ssa Elena Mari', 'relatore_ente' => 'CNR', 'abstract' => "<b>Testo</b> riga\nseconda", 'link_streaming' => 'javascript:alert(1)',
+                                    'link_registrazione' => 'https://video.unical.it/x', 'relatore_persona_id' => 'inesistente']);
+$s30 = db_riga($conn, "SELECT * FROM eventi WHERE id = 30");
+prova($s30['relatore'] === 'Prof.ssa Elena Mari' && $s30['abstract'] === "Testo riga\nseconda" && $s30['link_streaming'] === '' && $s30['relatore_persona_id'] === null && e_seminario($s30), "seminario salvato: abstract senza HTML, solo link http(s), relatore dall'anagrafe verificato");
+$hs = html_seminario($s30);
+prova(str_contains($hs, 'Prof.ssa Elena Mari') && str_contains($hs, 'CNR') && str_contains($hs, 'Testo riga<br') && str_contains($hs, 'Registrazione') && !str_contains($hs, 'Segui in diretta'), "scheda: relatore, abstract e registrazione");
+$q("UPDATE eventi SET link_streaming = 'https://teams.example.org/live' WHERE id = 30");
+$s30 = db_riga($conn, "SELECT * FROM eventi WHERE id = 30");
+prova(str_contains(html_seminario($s30), 'Segui in diretta') && !str_contains(html_seminario($s30, true), 'Segui in diretta') && html_seminario(['relatore' => '', 'abstract' => '']) === '', "diretta solo finché l'evento non è concluso; niente riquadro senza dati");
+$ag_m = eventi_agenda($conn, ['q' => 'mari']);
+prova(array_map('intval', array_column($ag_m, 'id')) === [30] && str_contains(html_voce_agenda($ag_m[0]), 'Prof.ssa Elena Mari (CNR)') && str_contains(ics_agenda($conn, $ag_m, 'x'), 'DESCRIPTION:Relatore: Prof.ssa Elena Mari (CNR)\\nDiretta: https://teams.example.org/live'), "agenda e .ics con il relatore (anche nella ricerca)");
+
+sezione("Avvisi per email dei nuovi eventi");
+prova(iscrivi_avvisi($conn, 'non-email', ['ricerca'], false)[1] !== null && iscrivi_avvisi($conn, 'a@b.it', [], false)[1] !== null, "iscrizione: email valida e almeno un argomento");
+$EMAIL = [];
+[$m_av, $e_av] = iscrivi_avvisi($conn, 'Lia@Example.org', ['ricerca', 'boh'], false);
+$lia = db_riga($conn, "SELECT * FROM avvisi_iscrizioni WHERE email = 'lia@example.org'");
+prova($e_av === null && $lia && $lia['ambiti'] === 'ricerca' && $lia['confermata_il'] === null && ($EMAIL[0]['a'] ?? '') === 'lia@example.org' && str_contains($EMAIL[0]['corpo'], 'avvisi.php?conferma=' . $lia['token']), "iscrizione con conferma per email");
+$EMAIL = [];
+prova(iscrivi_avvisi($conn, 'rita.ref@unical.it', ['orientamento'], true, ['id' => 96, 'email' => 'Rita.Ref@unical.it'])[1] === null && $EMAIL === [] && db_valore($conn, "SELECT confermata_il FROM avvisi_iscrizioni WHERE email = 'rita.ref@unical.it'") !== null, "chi è entrato con la stessa email è confermato subito");
+prova(invia_avvisi_eventi($conn) === 0 && (int)db_valore($conn, "SELECT COUNT(*) FROM avvisi_eventi WHERE evento_id IN (30, 31, 10, 20)") === 4, "primo avvio: gli eventi già pubblicati non si annunciano");
+prova(conferma_avvisi($conn, $lia['token']) && !conferma_avvisi($conn, str_repeat('f', 40)), "conferma dal link");
+$q("INSERT INTO eventi (id, pagina_id, titolo, tipo, luogo) VALUES (33, 3, 'Genomica delle piante', 'evento', 'Aula 7'), (34, 2, 'Laboratorio per le classi', 'progetto', '')");
+$q("INSERT INTO turni (id, evento_id, nome_turno, data_turno, orario_inizio, max_posti) VALUES (330, 33, 'Unico', '" . $giorni(40) . "', '10:00:00', 50), (340, 34, 'Ed. 1', '" . $giorni(41) . "', NULL, 1)");
+$EMAIL = [];
+prova(invia_avvisi_eventi($conn) === 2 && count($EMAIL) === 2, "nuovi eventi: un riepilogo per iscritto interessato", json_encode(array_column($EMAIL, 'oggetto')));
+$m_lia = array_values(array_filter($EMAIL, fn($e) => $e['a'] === 'lia@example.org'))[0] ?? [];
+$m_rit = array_values(array_filter($EMAIL, fn($e) => $e['a'] === 'rita.ref@unical.it'))[0] ?? [];
+prova(($m_lia['oggetto'] ?? '') === 'Nuovo evento: Genomica delle piante' && str_contains($m_lia['corpo'] ?? '', 'avvisi.php?t=' . $lia['token']) && !str_contains($m_lia['corpo'] ?? '', 'Laboratorio per le classi')
+      && str_contains($m_rit['corpo'] ?? '', 'Laboratorio per le classi') && !str_contains($m_rit['corpo'] ?? '', 'Genomica'), "ognuno riceve solo gli eventi dei suoi argomenti, con il link per cancellarsi");
+$EMAIL = [];
+prova(invia_avvisi_eventi($conn) === 0 && $EMAIL === [] && (int)db_valore($conn, "SELECT destinatari FROM avvisi_eventi WHERE evento_id = 33") === 1, "ogni evento si annuncia una volta sola");
+$q("INSERT INTO avvisi_iscrizioni (email, ambiti, token, creata_il) VALUES ('vecchia@example.org', 'ricerca', '" . str_repeat('e', 40) . "', NOW() - INTERVAL 40 DAY)");
+invia_avvisi_eventi($conn);
+$n_av = conta_iscritti_avvisi($conn);
+prova(!db_valore($conn, "SELECT id FROM avvisi_iscrizioni WHERE email = 'vecchia@example.org'") && $n_av[''] === 2 && $n_av['ricerca'] === 1 && $n_av['scuole'] === 1, "iscrizioni mai confermate cancellate dopo 30 giorni; conteggi per argomento");
+prova(cancella_avvisi($conn, $lia['token']) && !iscrizione_avvisi_per_token($conn, $lia['token']), "cancellazione dal link");
+$q("DELETE FROM turni WHERE evento_id IN (33, 34)"); $q("DELETE FROM eventi WHERE id IN (33, 34)"); $q("DELETE FROM avvisi_iscrizioni"); $q("DELETE FROM avvisi_eventi");
+
+sezione("Report per ambito (Terza missione)");
+prova(periodo_report('2026') === ['2026-01-01', '2026-12-31'] && periodo_report('2025/2026') === ['2025-10-01', '2026-09-30'] && periodo_report('2025/2027') === [date('Y') . '-01-01', date('Y') . '-12-31'], "periodo: anno solare o accademico");
+$q("INSERT INTO prenotazioni (turno_id, codice_prenotazione, stato, num_posti, nome, cognome, email, presente, scuola_codice, dati_custom_json) VALUES
+    (310, 'RPT1', 'confermata', 1, 'Docente', 'Uno', 'd1@example.org', 1, 'CSPS00001A', '{\"numero_partecipanti\":\"25\"}'),
+    (310, 'RPT2', 'confermata', 1, 'Mario', 'Rossi', 'm@example.org', 0, NULL, NULL),
+    (310, 'RPT3', 'annullata', 1, 'Anna', 'Bianchi', 'a@example.org', 0, NULL, NULL)");
+$rp = dati_report_ambiti($conn, $giorni(4), $giorni(8));
+$rp31 = array_values(array_filter($rp['eventi'], fn($e) => $e['id'] === 31))[0] ?? [];
+prova(count($rp['eventi']) === 3 && $rp['ambiti']['ricerca']['eventi'] === 2 && (float)$rp['ambiti']['ricerca']['ore'] === 2.0 && $rp['ambiti']['orientamento']['eventi'] === 1 && $rp['ambiti']['terza_missione']['partecipanti'] === 26, "report: eventi e ore per ambito", json_encode($rp['ambiti']));
+prova(($rp31['iscrizioni'] ?? 0) === 2 && ($rp31['partecipanti'] ?? 0) === 26 && ($rp31['presenze'] ?? 0) === 25 && ($rp31['scuole'] ?? 0) === 1 && $rp['totale']['eventi'] === 3 && $rp['totale']['scuole'] === 1, "report: partecipanti dichiarati per le classi, presenze, scuole; annullate escluse; totale senza doppioni");
+prova(array_sum(array_map('array_sum', $rp['mesi'])) === 4 && $rp30_rel = (array_values(array_filter($rp['eventi'], fn($e) => $e['id'] === 30))[0]['relatore'] ?? '') === 'Prof.ssa Elena Mari (CNR)', "report: per mese e relatore");
+$xr = excel_report_ambiti($rp, 'prova'); $xr_ok = false;
+if ($xr && ($z = new ZipArchive())->open($xr) === true) { $wb = (string)$z->getFromName('xl/workbook.xml'); $tutto = ''; for ($i = 0; $i < $z->numFiles; $i++) $tutto .= (string)$z->getFromIndex($i); $xr_ok = substr_count($wb, '<sheet ') === 3 && str_contains($tutto, 'Public engagement') && str_contains($tutto, 'Notte dei ricercatori'); $z->close(); } @unlink((string)$xr);
+prova($xr_ok, "report in Excel: riepilogo, eventi, per mese");
+$q("DELETE FROM prenotazioni WHERE codice_prenotazione LIKE 'RPT%'");
+$q("DELETE FROM menu_voci"); $q("DELETE FROM turni WHERE evento_id IN (30, 31, 32)"); $q("DELETE FROM eventi WHERE id IN (30, 31, 32)"); $q("DELETE FROM pagine_eventi WHERE id = 3");
 $q("UPDATE pagine_eventi SET tipo_area = '' WHERE id IN (1, 2)");
 
 sezione("Vista a calendario delle risorse");
@@ -846,7 +945,7 @@ if (getenv('PROVE_SOLO_FUNZIONI') || !function_exists('curl_init') || $http('/ev
     echo "\n(ambiente locale spento: prove delle pagine saltate — avvia bash strumenti/locale/avvia.sh)\n";
 } else {
     sezione("Pagine dell'ambiente locale ($BASE)");
-    foreach (['/eventi/' => 200, '/eventi/privacy.php' => 200, '/eventi/fsl.php' => 200, '/eventi/openlab' => 200, '/eventi/verifica_attestato.php' => 200,
+    foreach (['/eventi/' => 200, '/eventi/privacy.php' => 200, '/eventi/agenda.php' => 200, '/eventi/agenda.php?ambito=ricerca' => 200, '/eventi/orientamento.php' => 200, '/eventi/avvisi.php' => 200, '/eventi/avvisi.php?ambito=ricerca' => 200, '/eventi/agenda_ics.php?ambito=orientamento' => 200, '/eventi/fsl.php' => 200, '/eventi/openlab' => 200, '/eventi/verifica_attestato.php' => 200,
               '/eventi/assets/modelli/Convenzione_FSL_DiBEST.doc' => 200, '/eventi/assets/modelli/Allegato_A_FSL_DiBEST.doc' => 200, '/eventi/.env.locale' => 403, '/eventi/config.php' => 403,
               '/eventi/cache/' => 403, '/eventi/uploads/convenzioni/' => 403, '/eventi/modelli_documenti/convenzione_precompilabile.docx' => 403,
               '/eventi/strumenti/prove/esegui.php' => 403, '/eventi/inc/base.php' => 403, '/eventi/cron_background.php' => 403] as $u => $atteso) {
@@ -923,7 +1022,8 @@ if (getenv('PROVE_SOLO_FUNZIONI') || !function_exists('curl_init') || $http('/ev
     $c_loc = (int)($loc->query("SELECT MIN(id) n FROM didattica_consigli")->fetch_assoc()['n'] ?? 0);
     $pagine_d = [];
     foreach (['didattica.php?tab=sedute', "didattica.php?tab=sedute&consiglio=$c_loc", "didattica.php?tab=sedute&nuova=1&consiglio_id=$c_loc", 'didattica.php?tab=moduli&nuovo=1', 'didattica.php?tab=pratiche&carico=seguite',
-              'tutorato.php', 'tutorato.php?nuovo_bando=1'] as $pag_x) $pagine_d[] = $pag_x;
+              'tutorato.php', 'tutorato.php?nuovo_bando=1', 'report_ambiti.php', 'report_ambiti.php?anno=2025/2026', 'inizio.php?sezione=fsl', 'testata.php?sezione=widgets'] as $pag_x) $pagine_d[] = $pag_x;
+    prova(str_starts_with($http('/eventi/admin/report_ambiti.php?esporta=xlsx', null, $jar)['corpo'], 'PK'), "report per ambito in Excel dal pannello");
     $s_loc = (int)($loc->query("SELECT MIN(id) n FROM didattica_sedute")->fetch_assoc()['n'] ?? 0); $i_loc = (int)($loc->query("SELECT MIN(id) n FROM tutorato_incarichi")->fetch_assoc()['n'] ?? 0);
     if ($s_loc) $pagine_d[] = "didattica.php?tab=sedute&id=$s_loc";
     if ($i_loc) {
@@ -944,6 +1044,7 @@ if (getenv('PROVE_SOLO_FUNZIONI') || !function_exists('curl_init') || $http('/ev
         prova($r['codice'] === 200 && str_contains($r['corpo'], $testo), "link personale non valido: $u");
     }
     prova(in_array($http('/eventi/uploads/verbali/')['codice'], [403, 404], true), "verbali firmati non raggiungibili dal web");
+    prova(str_starts_with($http('/eventi/agenda_ics.php')['corpo'], 'BEGIN:VCALENDAR'), "calendario .ics dell'agenda");
     prova($http('/eventi/uploads/incarichi/')['codice'] === 403 && $http('/eventi/modelli_documenti/lettera_incarico_tutorato.docx')['codice'] === 403, "lettere di incarico e modello Word non raggiungibili dal web");
     @unlink($jar); @unlink($jar2);
 }

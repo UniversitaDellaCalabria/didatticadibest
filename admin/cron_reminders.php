@@ -64,6 +64,9 @@ if (function_exists('promemoria_pratiche_ferme')) $inviati += promemoria_pratich
 // 5. Tutorato: promemoria del registro delle attività ai tutor e ai docenti, solleciti delle firme ferme (lettere e fine attività)
 if (function_exists('promemoria_tutorato')) $inviati += promemoria_tutorato($conn);
 
+// 7. Avvisi per email dei nuovi eventi agli iscritti (un riepilogo per iscritto, ogni evento annunciato una volta)
+if (function_exists('invia_avvisi_eventi')) $inviati += invia_avvisi_eventi($conn);
+
 // 6. Sedute: solleciti delle firme del verbale (segretario e coordinatore)
 if (function_exists('solleciti_verbali')) $inviati += solleciti_verbali($conn);
 

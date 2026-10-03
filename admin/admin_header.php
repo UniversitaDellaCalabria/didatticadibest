@@ -164,7 +164,7 @@ if ($filtro_p > 0) {
 // Le vecchie abilitazioni con solo alcune sezioni (eventi, iscritti…) valgono ora per tutto il perimetro.
 // ==============================================================================
 $uid_rbac = (int)$u_id_curr;
-$puo_fsl             = $is_full_admin || ha_ambito($conn, $uid_rbac, 'fsl') || ha_modulo($conn, $uid_rbac, 'orientamento');
+$puo_fsl             = $is_full_admin || ha_modulo($conn, $uid_rbac, 'fsl'); // modulo FSL, perimetro «fsl» o modulo Orientamento (come prima)
 $puo_fsl_convenzioni = $puo_fsl || ha_ambito($conn, $uid_rbac, 'fsl_convenzioni');
 $puo_fsl_scuole      = $puo_fsl || ha_ambito($conn, $uid_rbac, 'fsl_scuole');
 $puo_didattica_tutto = $is_full_admin || ha_modulo($conn, $uid_rbac, 'didattica') || utente_operatore_ufficio($conn, $utente_admin);
@@ -216,7 +216,7 @@ if (!$is_full_admin && !$pagine_disponibili && in_array(basename($_SERVER['PHP_S
 // ==============================================================================
 $moduli_utente = [];
 foreach ($pagine_disponibili as $p_m) $moduli_utente[modulo_di_area($p_m)] = true;
-if ($puo_fsl_convenzioni) $moduli_utente['orientamento'] = true;
+if ($puo_fsl_convenzioni) $moduli_utente['fsl'] = true;
 if ($puo_didattica) $moduli_utente['didattica'] = true;
 if ($is_full_admin || $puo_fsl_scuole) $moduli_utente['portale'] = true;
 $moduli_utente = array_values(array_filter(array_keys(MODULI_PORTALE), fn($k) => isset($moduli_utente[$k])));
@@ -364,7 +364,7 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
                 </li>
                 <?php endif; ?>
 
-                <?php if (in_array($modulo_corrente, ['orientamento', 'calendari', ''], true) && ($is_full_admin || count($pagine_disponibili) > 1)): // un gestore con una sola area non ha nulla da scegliere ?>
+                <?php if (in_array($modulo_corrente, ['orientamento', 'fsl', 'calendari', ''], true) && ($is_full_admin || count($pagine_disponibili) > 1)): // un gestore con una sola area non ha nulla da scegliere ?>
                 <li class="nav-item mb-1">
                     <a class="nav-link w-100 <?php echo in_array($current_page, ['aree.php'], true) ? 'active' : ''; ?>" href="aree.php?p_id=<?php echo $filtro_p; ?>">
                         <i class="fa fa-layer-group me-2 text-center" style="width:20px;" aria-hidden="true"></i> Aree
@@ -373,7 +373,7 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
                 </li>
                 <?php endif; ?>
 
-                <?php if ($filtro_p > 0 && $page_cfg && in_array($modulo_corrente, ['orientamento', 'calendari'], true) && modulo_di_area($page_cfg) === $modulo_corrente): $col_side = colore_valido($page_cfg['colore_primario'] ?? '', '#0056B3'); ?>
+                <?php if ($filtro_p > 0 && $page_cfg && in_array($modulo_corrente, ['orientamento', 'fsl', 'calendari'], true) && modulo_di_area($page_cfg) === $modulo_corrente): $col_side = colore_valido($page_cfg['colore_primario'] ?? '', '#0056B3'); ?>
                 <!-- ── Area corrente: tutto ciò che riguarda l'area ── -->
                 <li class="nav-item mt-2 mb-2">
                     <div class="side-area px-3 py-2 rounded" style="border-left:4px solid <?php echo $col_side; ?>;">
@@ -429,9 +429,14 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
                 <?php if ($can_manage_settings) $voce_menu(['impostazioni_area.php'], 'impostazioni_area.php', 'fa-paint-brush', 'Impostazioni area'); ?>
                 <?php endif; // fine area corrente ?>
 
-                <?php if ($modulo_corrente === 'orientamento' && $puo_fsl_convenzioni): ?>
-                    <!-- ── Sottomodulo Formazione Scuola Lavoro (vale per tutte le aree FSL) ── -->
-                    <li class="nav-item mt-3 mb-1"><div class="text-secondary small fw-bold px-3 text-uppercase" style="font-size:.66rem;letter-spacing:.06em;">Sottomodulo</div></li>
+                <?php if ($modulo_corrente === 'orientamento' && ($is_full_admin || ha_modulo($conn, $uid_rbac, 'orientamento'))): ?>
+                    <!-- ── Modulo Eventi e seminari: report per ambito di tutte le aree ── -->
+                    <li class="nav-item mt-3 mb-1"><div class="text-secondary small fw-bold px-3 text-uppercase" style="font-size:.66rem;letter-spacing:.06em;">Tutte le aree</div></li>
+                    <?php $voce_menu(['report_ambiti.php'], 'report_ambiti.php', 'fa-chart-column', 'Report per ambito'); ?>
+                <?php endif; ?>
+                <?php if ($modulo_corrente === 'fsl' && $puo_fsl_convenzioni): ?>
+                    <!-- ── Modulo Formazione Scuola Lavoro: pannello comune a tutte le aree FSL ── -->
+                    <li class="nav-item mt-3 mb-1"><div class="text-secondary small fw-bold px-3 text-uppercase" style="font-size:.66rem;letter-spacing:.06em;">Tutte le aree FSL</div></li>
                     <?php $voce_menu(['fsl.php', 'convenzione_file.php'], 'fsl.php', 'fa-briefcase', $puo_fsl ? 'Formazione Scuola Lavoro' : 'Convenzioni FSL'); ?>
                 <?php endif; ?>
 
@@ -504,7 +509,7 @@ $unread_count = $conn->query($unread_sql)->fetch_assoc()['total_unread'] ?? 0;
     <div id="page-content-wrapper">
         <nav class="navbar navbar-light bg-white border-bottom shadow-sm px-3 py-2 d-flex justify-content-between flex-nowrap gap-2 sticky-top" style="z-index: 998;">
             <button class="btn btn-dark d-lg-none flex-shrink-0" id="sidebarToggle"><i class="fa fa-bars"></i> Menu</button>
-            <?php if ($modulo_corrente !== '' && !in_array($modulo_corrente, ['orientamento', 'calendari'], true) || ($page_cfg && $modulo_corrente !== '' && modulo_di_area($page_cfg) !== $modulo_corrente)): $m_top = MODULI_PORTALE[$modulo_corrente]; ?>
+            <?php if ($modulo_corrente !== '' && !in_array($modulo_corrente, ['orientamento', 'fsl', 'calendari'], true) || ($page_cfg && $modulo_corrente !== '' && modulo_di_area($page_cfg) !== $modulo_corrente)): $m_top = MODULI_PORTALE[$modulo_corrente]; ?>
                 <a href="inizio.php?sezione=<?php echo urlencode($modulo_corrente); ?>&amp;p_id=<?php echo $filtro_p; ?>" class="area-top text-decoration-none d-flex align-items-center gap-2" title="Modulo su cui stai lavorando" style="border-color: <?php echo $m_top['colore']; ?>;">
                     <i class="fa <?php echo $m_top['icona']; ?>" style="color: <?php echo $m_top['colore']; ?>;" aria-hidden="true"></i>
                     <span class="d-none d-sm-inline text-secondary" style="font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;">Modulo</span>
