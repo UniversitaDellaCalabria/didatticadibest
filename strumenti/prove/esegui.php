@@ -219,6 +219,16 @@ prova($wh['percorsi'] === 1 && $wh['agenda'] === 1 && $wh['scadenze'] === 1 && $
 prova((bool)db_valore($conn, "SELECT COUNT(*) FROM menu_voci WHERE url = 'agenda.php?ambito=ricerca'") && (bool)db_valore($conn, "SELECT COUNT(*) FROM menu_voci WHERE url = 'seminari_archivio.php'"), "menu proposto: agenda per ambito e archivi delle aree");
 prova(ripristina_organizzazione($conn) && array_column(db_righe($conn, "SELECT etichetta FROM menu_voci WHERE genitore_id = 0 ORDER BY ordine"), 'etichetta') === ['Home', 'Openlab', 'Archivio', 'Link Utili'] && get_widgets_home(['widgets_home' => db_valore($conn, "SELECT widgets_home FROM configurazione_portale WHERE id = 1")])['agenda'] === 0
       && !ripristina_organizzazione($conn), "ripristino: home e menu com'erano (una volta)");
+// Menu proposto creato nascosto: il sito non cambia finché non si mostra
+$vis_top = fn() => array_column(db_righe($conn, "SELECT etichetta FROM menu_voci WHERE genitore_id = 0 AND visibile = 1 ORDER BY ordine, id"), 'etichetta');
+$n_nasc = crea_menu_proposto_nascosto($conn, 'Prova');
+prova($n_nasc > 10 && $vis_top() === ['Home', 'Openlab', 'Archivio', 'Link Utili'] && count(voci_menu_proposto($conn)) === 5 && crea_menu_proposto_nascosto($conn) === 0, "voci del menu proposto create nascoste (Home riusata), una volta sola; il menu visibile non cambia");
+prova((int)db_valore($conn, "SELECT COUNT(*) FROM menu_voci WHERE genitore_id = 0 AND url = 'index.php'") === 1 && (int)db_valore($conn, "SELECT COUNT(*) FROM menu_voci WHERE genitore_id = 0 AND visibile = 0") === 4, "nessuna Home doppia; quattro voci nuove nascoste");
+prova(mostra_menu_proposto($conn, 'Prova') && $vis_top() === ['Home', 'Orientamento', 'Studenti', 'Eventi e seminari', 'Area riservata', 'Link Utili'] && (int)db_valore($conn, "SELECT COUNT(*) FROM menu_voci WHERE etichetta IN ('Openlab', 'Archivio') AND visibile = 0") === 2, "mostra: voci proposte visibili, quelle comprese nascoste (non cancellate), Link utili in fondo");
+prova(ripristina_organizzazione($conn) && $vis_top() === ['Home', 'Openlab', 'Archivio', 'Link Utili'], "ripristino dopo «mostra»: il menu di prima");
+applica_organizzazione_proposta($conn, 'Prova');
+prova(array_column(db_righe($conn, "SELECT etichetta FROM menu_voci WHERE genitore_id = 0 ORDER BY ordine"), 'etichetta') === ['Home', 'Orientamento', 'Studenti', 'Eventi e seminari', 'Area riservata', 'Link Utili'] && !voci_menu_proposto($conn), "«Applica» dopo le voci nascoste: nessun doppione");
+ripristina_organizzazione($conn); $q("DELETE FROM copie_configurazione");
 
 sezione("Seminari: relatore, abstract, diretta, registrazione");
 salva_seminario_evento($conn, 30, ['relatore' => 'Prof.ssa Elena Mari', 'relatore_ente' => 'CNR', 'abstract' => "<b>Testo</b> riga\nseconda", 'link_streaming' => 'javascript:alert(1)',

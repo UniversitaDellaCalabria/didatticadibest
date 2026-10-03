@@ -23,6 +23,20 @@ if (isset($_POST['applica_organizzazione']) && $is_full_admin) {
     flash_set("Organizzazione applicata" . ($n_menu ? " ($n_menu voci di menu)" : '') . ". Controlla il sito: se non ti convince, «Ripristina com'era» rimette home e menu precedenti.");
     admin_redirect("testata.php?p_id=$filtro_p&sezione=widgets");
 }
+if ((isset($_POST['crea_menu_nascosto']) || isset($_POST['mostra_menu_proposto'])) && $is_full_admin) {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    $autore_m = trim(($utente_admin['nome'] ?? '') . ' ' . ($utente_admin['cognome'] ?? ''));
+    if (isset($_POST['crea_menu_nascosto'])) {
+        $n_m = crea_menu_proposto_nascosto($conn, $autore_m);
+        if ($n_m) registra_log_audit($conn, "Menu proposto creato nascosto", ["Voci" => $n_m]);
+        flash_set($n_m ? "Create $n_m voci del menu proposto, nascoste: il sito non cambia. Le vedi in Menu del sito; quando vuoi, «Mostra il menu proposto»." : "Le voci del menu proposto sono già state create.", $n_m ? 'success' : 'warning');
+    } else {
+        $ok_m = mostra_menu_proposto($conn, $autore_m);
+        if ($ok_m) registra_log_audit($conn, "Menu proposto mostrato", []);
+        flash_set($ok_m ? "Menu proposto visibile; le voci che comprende sono nascoste (non cancellate). «Ripristina com'era» lo rimette come prima." : "Crea prima le voci del menu proposto.", $ok_m ? 'success' : 'warning');
+    }
+    admin_redirect("testata.php?p_id=$filtro_p&sezione=widgets");
+}
 if (isset($_POST['ripristina_organizzazione']) && $is_full_admin) {
     csrf_verify($_POST['csrf_token'] ?? '');
     $ok_r = ripristina_organizzazione($conn);
@@ -433,6 +447,19 @@ $widgets_cur = get_widgets_home($cfg_w);
             <a class="btn btn-sm btn-outline-secondary" href="../orientamento.php" target="_blank" rel="noopener">Vedi la pagina Orientamento</a>
             <a class="btn btn-sm btn-outline-secondary" href="../agenda.php" target="_blank" rel="noopener">Vedi l'agenda</a>
         </form>
+        <div class="border-top mt-3 pt-2">
+            <?php $voci_prop = voci_menu_proposto($conn); ?>
+            <div class="small fw-bold mb-1">Solo il menu, per gradi</div>
+            <form method="POST" class="d-flex flex-wrap gap-2 align-items-center small"><?php csrf_field(); ?>
+                <?php if (!$voci_prop): ?>
+                    <span class="text-secondary">Crea le voci del menu proposto <strong>nascoste</strong>: il sito non cambia finché non le mostri.</span>
+                    <button type="submit" name="crea_menu_nascosto" value="1" class="btn btn-sm btn-outline-success fw-bold"><i class="fa fa-eye-slash me-1" aria-hidden="true"></i>Crea le voci nascoste</button>
+                <?php else: ?>
+                    <span class="text-secondary"><i class="fa fa-check text-success me-1" aria-hidden="true"></i>Voci del menu proposto create (<?php echo (int)db_valore($conn, "SELECT COUNT(*) FROM menu_voci WHERE id IN (" . implode(',', $voci_prop) . ") AND visibile = 1"); ?> di <?php echo count($voci_prop); ?> visibili). Puoi mostrarle una per una da <a href="menu.php?p_id=<?php echo (int)$filtro_p; ?>">Menu del sito</a> o tutte insieme:</span>
+                    <button type="submit" name="mostra_menu_proposto" value="1" class="btn btn-sm btn-success fw-bold" data-confirm="Mostrare il menu proposto? Le voci attuali che comprende (aree, archivio) vengono nascoste, non cancellate; si torna indietro con «ripristina com'era»."><i class="fa fa-eye me-1" aria-hidden="true"></i>Mostra il menu proposto</button>
+                <?php endif; ?>
+            </form>
+        </div>
         <?php if ($copia_org): ?>
         <form method="POST" class="mt-2 small"><?php csrf_field(); ?>Copia del <?php echo date('d/m/Y H:i', strtotime($copia_org['creata_il'])); ?><?php echo $copia_org['autore'] !== '' ? ' (' . htmlspecialchars($copia_org['autore']) . ')' : ''; ?>:
             <button type="submit" name="ripristina_organizzazione" value="1" class="btn btn-sm btn-link p-0 align-baseline" data-confirm="Rimettere home e menu com'erano prima?">ripristina com'era</button></form>
