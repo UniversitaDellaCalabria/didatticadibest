@@ -1,0 +1,109 @@
+<?php
+// =========================================================================
+// Fase 4: Autenticazione e variabili ruolo centralizzate in middleware.php
+// $u_id, $u_ruolo, $is_full_admin, $is_gestore, $user_info
+// =========================================================================
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+error_reporting(E_ALL);
+
+require_once __DIR__ . '/middleware.php';
+
+
+// CONTROLLO ACCESSO (Solo Admin o Gestori)
+require_admin_or_gestore(); // helper definito in middleware.php
+
+$code = isset($_GET['code']) ? trim($_GET['code']) : '';
+
+// Senza codice (apertura diretta della pagina) si usa lo scanner integrato nell'admin.
+// Questa pagina resta solo come destinazione dei QR dei biglietti letti con la fotocamera del telefono.
+if ($code === '') { header("Location: admin/scanner.php"); exit; }
+$msg_esito = "";
+$esito_classe = "";
+
+// SE È STATO SCANSIONATO UN CODICE, ELABORA IL CHECK-IN
+if (!empty($code)) {
+    $p = get_prenotazione_per_checkin_admin($conn, $code);
+
+    if ($p !== null) {
+        
+        // ==========================================
+        // VERIFICA "PARAOCCHI" (RBAC) SULL'EVENTO
+        // ==========================================
+        // Amministratori e chiunque gestisca l'attività (tutta l'area, l'attività, tutti i progetti/eventi dell'area, FSL)
+        $is_authorized = $is_full_admin || utente_gestisce_attivita($conn, (int)$u_id, (int)($p['evento_id'] ?? 0));
+
+        if (!$is_authorized) {
+            $esito_classe = "alert-danger";
+            $msg_esito = "❌ <strong>ACCESSO NEGATO</strong><br>Non hai i permessi per gestire il check-in dell'evento: <br><em>" . htmlspecialchars($p['evento_titolo']) . "</em>.";
+        } elseif ($p['stato'] !== 'confermata') {
+            $esito_classe = "alert-danger";
+            $msg_esito = "❌ <strong>INGRESSO NEGATO</strong><br>La prenotazione non è confermata (Stato: " . htmlspecialchars((string)$p['stato']) . ").";
+        } elseif ($p['presente'] == 1) {
+            $esito_classe = "alert-warning";
+            $msg_esito = "⚠️ <strong>GIÀ REGISTRATO</strong><br>Questo biglietto è già stato scansionato in precedenza.";
+        } else {
+            // Aggiorna come presente
+            \App\Core\App::get(\App\Iscrizioni\ServizioCheckin::class)->registraPresenza((int)$p['id']);
+            invia_email_attestato_se_concluso($conn, $p['id']);
+            $esito_classe = "alert-success";
+            $msg_esito = "✅ <strong>INGRESSO CONSENTITO</strong><br>Utente: <strong>" . htmlspecialchars($p['nome'] . ' ' . $p['cognome']) . "</strong><br>Evento: " . htmlspecialchars($p['evento_titolo']);
+        }
+    } else {
+        $esito_classe = "alert-danger";
+        $msg_esito = "❌ <strong>ERRORE CRITICO</strong><br>Biglietto non trovato o codice non valido!";
+    }
+}
+?>
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scanner Ingressi - Didattica DiBEST</title>
+    <link href="<?php echo url_vendor('jsdelivr/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css'); ?>" rel="stylesheet">
+    <link rel="stylesheet" href="<?php echo url_vendor('cdnjs/ajax/libs/font-awesome/6.4.0/css/all.min.css'); ?>">
+    <?php echo script_libreria('html5-qrcode'); ?>
+    <style> body { background-color: #f1f5f9; } #reader { width: 100%; border: 3px dashed #0d6efd; border-radius: 12px; overflow: hidden; } </style>
+</head>
+<body>
+    <div class="container py-4" style="max-width: 500px;">
+        <h3 class="fw-bold text-primary text-center mb-4"><i class="fa fa-qrcode me-2"></i> Scanner Ingressi</h3>
+
+        <?php if (!empty($msg_esito)): ?>
+            <div class="alert <?php echo $esito_classe; ?> text-center p-4 shadow-sm border-0 rounded-4 mb-4">
+                <div class="fs-5"><?php echo $msg_esito; ?></div>
+            </div>
+            <div class="text-center">
+                <a href="admin/scanner.php" class="btn btn-primary btn-lg fw-bold px-5 py-3 shadow-sm rounded-pill w-100">
+                    <i class="fa fa-camera me-2"></i> Nuova Scansione
+                </a>
+            </div>
+        <?php else: ?>
+            <div class="card shadow-sm border-0 rounded-4 p-3 mb-4">
+                <p class="text-center fw-bold text-secondary mb-3">Inquadra il QR Code sul biglietto dello studente</p>
+                <div id="reader"></div>
+            </div>
+            
+            <div class="text-center mt-3">
+                <a href="admin/index.php" class="btn btn-outline-secondary fw-bold rounded-pill"><i class="fa fa-arrow-left me-1"></i> Torna ad Admin</a>
+            </div>
+
+            <script>
+                function onScanSuccess(decodedText, decodedResult) {
+                    // Mai aprire il contenuto del QR (potrebbe essere un link qualsiasi o "javascript:"):
+                    // si estrae solo il codice prenotazione e si ricarica questa pagina con quel codice.
+                    var codice = '';
+                    try { codice = new URL(decodedText).searchParams.get('code') || ''; } catch (e) { codice = decodedText; }
+                    codice = (codice || '').trim();
+                    if (!/^[A-Za-z0-9-]{4,40}$/.test(codice)) { alert('QR non riconosciuto: non è un biglietto del portale.'); return; }
+                    html5QrcodeScanner.clear(); // Ferma la fotocamera
+                    window.location.href = 'checkin.php?code=' + encodeURIComponent(codice);
+                }
+                let html5QrcodeScanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: {width: 250, height: 250} }, false);
+                html5QrcodeScanner.render(onScanSuccess);
+            </script>
+        <?php endif; ?>
+    </div>
+</body>
+</html>

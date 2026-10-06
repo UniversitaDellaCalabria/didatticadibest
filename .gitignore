@@ -1,0 +1,43 @@
+# Credenziali e configurazioni sensibili
+.env
+.env.locale
+
+# Ambiente locale di prova (strumenti/locale)
+strumenti/locale/www/
+
+# Cache runtime (file generati automaticamente)
+# Tutto il contenuto di cache/ tranne i file che servono alla cartella stessa
+cache/*
+!cache/.gitkeep
+!cache/.htaccess
+
+# Uploads utenti (non versionare file caricati)
+uploads/*
+!uploads/.gitkeep
+uploads/allegati_prenotazioni/*
+!uploads/allegati_prenotazioni/.gitkeep
+
+# File di debug (non pubblicare)
+debug_saml.php
+
+# IDE e OS
+.idea/
+.vscode/
+*.DS_Store
+Thumbs.db
+desktop.ini
+Desktop.ini
+
+# PHP
+*.log
+php_errors.log
+
+# Composer (se aggiunto in futuro)
+/vendor/
+composer.lock
+.claude/
+
+# Pacchetti per il caricamento sul server
+*.tgz
+.php-cs-fixer.cache
+.phpunit.result.cache

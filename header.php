@@ -1,0 +1,559 @@
+<?php
+// header.php - Versione AGID ANTI-CRASH, SYNC GLOBALE E ANTI-ITP MOBILE
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+ini_set('display_startup_errors', 0);
+error_reporting(E_ALL);
+
+global $conn;
+
+// config.php apre la sessione con cookie params corretti (SameSite, Secure, HttpOnly)
+if (!isset($conn) || !($conn instanceof mysqli)) {
+    if (file_exists(__DIR__ . '/config.php')) { require_once __DIR__ . '/config.php'; }
+    else { die("Errore critico: File config.php mancante!"); }
+}
+
+if (session_status() === PHP_SESSION_NONE) { session_start(); }
+
+if (file_exists(__DIR__ . '/functions.php')) {
+    require_once __DIR__ . '/functions.php';
+    $pagina_corrente = basename($_SERVER['PHP_SELF']);
+    if (function_exists('sync_sso_user') && $pagina_corrente !== 'logout-success.php' && $pagina_corrente !== 'esci.php') {
+        sync_sso_user($conn);
+    }
+}
+
+// Fase 3: lettura da cache locale invece di interrogare il DB ad ogni caricamento pagina
+// (vedi get_configurazione_portale in functions.php). Fallback alla query diretta se
+// functions.php non risultasse incluso per qualche motivo.
+$cfg_portale_header = [];
+if (isset($conn) && $conn instanceof mysqli) {
+    $cfg_portale_header = get_configurazione_portale($conn);
+}
+
+$favicon_url = !empty($cfg_portale_header['favicon_path']) ? $cfg_portale_header['favicon_path'] : 'https://www.unical.it/favicon.ico';
+$logo_url = !empty($cfg_portale_header['logo_path']) ? $cfg_portale_header['logo_path'] : '';
+$logo_mobile_url = !empty($cfg_portale_header['logo_mobile_path']) ? $cfg_portale_header['logo_mobile_path'] : '';
+$titolo_portale = !empty($cfg_portale_header['nome_portale']) ? $cfg_portale_header['nome_portale'] : 'Didattica DiBEST';
+$sottotitolo_portale = !empty($cfg_portale_header['sottotitolo_portale']) ? $cfg_portale_header['sottotitolo_portale'] : 'Portale Eventi e Laboratori Dipartimentali';
+
+$u_logged_header = !empty($_SESSION['utente_id']);
+$u_ruolo_header = isset($_SESSION['utente_ruolo_id']) ? (int)$_SESSION['utente_ruolo_id'] : 5;
+$u_sec_roles_header = !empty($_SESSION['utente_ruoli_secondari']) ? explode(',', $_SESSION['utente_ruoli_secondari']) : [];
+$is_admin_header = ($u_ruolo_header === 1 || $u_ruolo_header === 2 || in_array('1', $u_sec_roles_header) || in_array('2', $u_sec_roles_header));
+
+// --- TRAMPOLINO CHECK-IN NATIVO PHP (IMMUNE AI BLOCCHI SMARTPHONE) ---
+if ($u_logged_header && !empty($_COOKIE['qrc_t'])) {
+    $qr_t = (int)$_COOKIE['qrc_t'];
+    $qr_k = $_COOKIE['qrc_k'] ?? '';
+    
+    // Distruggiamo subito il cookie così lo legge solo UNA volta
+    setcookie('qrc_t', '', time() - 3600, '/');
+    setcookie('qrc_k', '', time() - 3600, '/');
+    unset($_COOKIE['qrc_t']);
+    unset($_COOKIE['qrc_k']);
+    
+    $pagina_corrente = basename($_SERVER['PHP_SELF']);
+    if ($pagina_corrente !== 'self_checkin.php' && $pagina_corrente !== 'esci.php') {
+        header("Location: self_checkin.php?t=" . $qr_t . "&k=" . urlencode($qr_k));
+        exit;
+    }
+}
+// -----------------------------------------------------------------------
+
+$nome_visualizzato = 'Il mio profilo';
+if ($u_logged_header) {
+    $u_id_safe = (int)$_SESSION['utente_id'];
+    $riga_utente_header = \App\Core\App::get(\App\Auth\UtenteRepository::class)->perId($u_id_safe);
+    if ($riga_utente_header) {
+        $nome_visualizzato = trim($riga_utente_header['nome'] . ' ' . $riga_utente_header['cognome']);
+    }
+}
+?>
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title><?php echo htmlspecialchars(isset($page_cfg['titolo']) ? $page_cfg['titolo'] . ' - ' . $titolo_portale : $titolo_portale); ?></title>
+    
+    <!-- PWA / App Mobile -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#B30000">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="assets/icon-192.png">
+    
+    <link rel="icon" type="image/x-icon" href="<?php echo htmlspecialchars($favicon_url); ?>">
+    <link href="<?php echo url_vendor('fonts/titillium-lora.css'); ?>" rel="stylesheet">
+    <link rel="stylesheet" href="<?php echo url_vendor('jsdelivr/npm/bootstrap-italia@2.8.3/dist/css/bootstrap-italia.min.css'); ?>">
+    <link rel="stylesheet" href="<?php echo url_vendor('cdnjs/ajax/libs/font-awesome/6.4.0/css/all.min.css'); ?>">
+
+    <style>
+        html { transition: font-size 0.2s ease; }
+        body { font-family: 'Titillium Web', sans-serif; background-color: #ffffff !important; }
+        
+        :root {
+            --bs-light: #f8f9fa !important;
+            --bs-light-rgb: 248, 249, 250 !important;
+            --bs-warning: #fd7e14 !important;
+            --bs-warning-rgb: 253, 126, 20 !important;
+        }
+        .bg-light, .alert-light { background-color: #f8f9fa !important; border-color: #e2e8f0 !important; }
+        .bg-warning, .badge.bg-warning, .text-bg-warning { background-color: #fd7e14 !important; color: #ffffff !important; }
+        .text-warning { color: #fd7e14 !important; }
+        .accordion-button { background-color: #f8f9fa !important; color: #1e293b !important; }
+        .accordion-button:not(.collapsed) { background-color: #e9ecef !important; color: #B30000 !important; box-shadow: inset 0 -1px 0 rgba(0,0,0,.125) !important; }
+        .accordion-item { border-color: #e2e8f0 !important; background-color: #ffffff !important; }
+        .card-header { background-color: #f8f9fa !important; border-bottom: 1px solid #e2e8f0 !important; }
+        .list-group-item-light { background-color: #f8f9fa !important; }
+
+        .skip-link { position: absolute; top: -100px; left: 0; background: #000000; color: #ffff00; padding: 12px; z-index: 9999; font-weight: bold; text-decoration: none; border-bottom-right-radius: 8px; transition: top 0.2s; }
+        .skip-link:focus { top: 0; outline: 3px solid #ffff00; }
+
+        .top-bar-istituzionale { background-color: #333333; color: #ffffff; padding: 6px 0; font-size: 0.85rem; border-bottom: 2px solid #B30000; position: relative; z-index: 1100; }
+        .top-bar-istituzionale a { color: #ffffff; text-decoration: none; transition: opacity 0.2s; }
+        .top-bar-istituzionale a:hover { opacity: 0.8; }
+        
+        .a11y-btn { background: transparent; border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 2px 10px; border-radius: 4px; font-weight: bold; transition: all 0.2s; cursor: pointer; }
+        .a11y-btn:hover, .a11y-btn:focus { background: #ffffff; color: #333333; outline: none; }
+
+        .top-bar-btn, .top-bar-istituzionale a.top-bar-btn { background-color: #ffffff !important; color: #B30000 !important; border: 1px solid #ffffff !important; border-radius: 4px; padding: 5px 15px; font-weight: bold; text-decoration: none !important; transition: all 0.2s; font-size: 0.85rem; display: inline-block; }
+        .top-bar-btn:hover, .top-bar-istituzionale a.top-bar-btn:hover { background-color: #B30000 !important; color: #ffffff !important; border-color: #B30000 !important; }
+
+        .it-header-center-wrapper { background-color: #B30000 !important; border-bottom: 1px solid #7a0000; padding: 15px 0; }
+        .it-brand-title { color: #ffffff !important; font-size: 2.2rem !important; font-weight: 700 !important; line-height: 1.1; letter-spacing: -0.5px; }
+        .it-brand-tagline { color: #ffffff !important; font-size: 1.15rem !important; font-weight: 400 !important; opacity: 0.95; margin-top: 2px; }
+
+        /* Logo nell'intestazione (caricato in Configurazione Globale → Testata).
+           Computer: logo | nome del portale con sotto il sottotitolo. Telefono: logo mobile | nome
+           (senza logo mobile: logo principale ridotto e sotto il nome). !important: Bootstrap Italia centra il link */
+        .it-brand-wrapper a.brand-logo-link { display: flex; flex-direction: row !important; align-items: center !important; gap: 22px; }
+        .brand-logo-principale { height: 84px; width: auto; max-width: 100%; object-fit: contain; display: block; }
+        .brand-logo-mobile { display: none; height: 46px; width: auto; object-fit: contain; }
+        .brand-logo-link.solo-mobile .brand-logo-mobile { display: block; height: 64px; }
+        .brand-testi { display: flex; flex-direction: column; gap: 4px; border-left: 1px solid rgba(255,255,255,.7); padding-left: 22px; }
+        .brand-nome { color: #ffffff; font-weight: 700; font-size: 2rem; line-height: 1.05; letter-spacing: -0.3px; white-space: nowrap; }
+        /* Con il logo la fascia rossa segue l'altezza del contenuto (Bootstrap Italia la fissa a 80/120 px) */
+        .it-header-center-wrapper.con-logo { height: auto !important; }
+        .brand-tagline { color: #ffffff; opacity: .95; font-size: 1.05rem; line-height: 1.25; }
+        @media (max-width: 1199.98px) {
+            /* Schermi intermedi: niente sottotitolo, altrimenti si sovrappone alla ricerca */
+            .brand-tagline { display: none; }
+            .brand-logo-principale { height: 70px; }
+            .brand-nome { font-size: 1.7rem; }
+        }
+        @media (max-width: 991.98px) {
+            .brand-logo-principale { height: 58px; }
+            .brand-nome { font-size: 1.45rem; }
+            .it-brand-wrapper a.brand-logo-link { gap: 16px; }
+            .brand-testi { padding-left: 16px; }
+            .con-logo .header-search-box input { width: 140px; }
+        }
+        @media (max-width: 767.98px) {
+            .it-brand-wrapper a.brand-logo-link { gap: 12px; }
+            .brand-tagline { display: none; }
+            .brand-testi { padding-left: 12px; }
+            .brand-nome { font-size: 1.35rem; }
+            /* Con il logo mobile: simbolo | nome, come unical.it */
+            .brand-logo-link.con-logo-mobile .brand-logo-principale { display: none; }
+            .brand-logo-link.con-logo-mobile .brand-logo-mobile { display: block; height: 46px; }
+            /* Senza logo mobile: logo principale ridotto e sotto il nome */
+            .it-brand-wrapper a.brand-logo-link:not(.con-logo-mobile) { flex-direction: column !important; align-items: flex-start !important; gap: 8px; }
+            .brand-logo-link:not(.con-logo-mobile) .brand-logo-principale { height: auto; max-height: 52px; }
+            .brand-logo-link:not(.con-logo-mobile) .brand-testi { border-left: 0; padding-left: 0; }
+        }
+        
+        .header-search-box { background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 4px; overflow: hidden; display: flex; align-items: center; transition: all 0.3s; }
+        .header-search-box:focus-within { background: rgba(255, 255, 255, 0.25); border-color: #ffffff; box-shadow: 0 0 0 0.2rem rgba(255,255,255,0.25); }
+        .header-search-box input { background: transparent; border: none; color: #ffffff; padding: 8px 12px; font-size: 0.95rem; width: 180px; outline: none; box-shadow: none; }
+        .header-search-box input::placeholder { color: rgba(255, 255, 255, 0.7); }
+        .header-search-box button { background: transparent; border: none; color: #ffffff; padding: 8px 12px; cursor: pointer; }
+        
+        /* Bootstrap Italia nasconde le caselle e le ridisegna solo nello schema <input> + <label for>: quelle messe dentro
+           l'etichetta (<label class="form-check"><input …> testo</label>) restavano invisibili. Qui tornano native. */
+        label.form-check [type=checkbox], label.form-check [type=radio] { position: static; opacity: 1; width: 1.1em; height: 1.1em; margin: 0 .45em 0 0; vertical-align: -2px; flex-shrink: 0; accent-color: #0056B3; }
+        .dropdown-menu.agid-dropdown { border: 1px solid #e2e8f0; border-top: 4px solid #B30000; border-radius: 4px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); padding: 0; min-width: 220px; font-size: 0.9rem; }
+        .agid-dropdown .list-item { padding: 10px 20px; color: #1e293b; text-decoration: none; display: block; font-weight: 600; transition: background 0.2s; }
+        .agid-dropdown .list-item:hover, .agid-dropdown .list-item:focus { background-color: #f8f9fa; color: #B30000; outline: none; }
+        
+        @media all and (min-width: 992px) {
+            .navbar { position: relative; }
+            .navbar .megamenu-li { position: static; }
+            .navbar .megamenu { width: 100%; left: 0; right: 0; top: 100%; margin-top: 0; border-radius: 0 0 8px 8px; padding: 1.5rem; box-shadow: 0 10px 30px rgba(0,0,0,0.08) !important; border: 1px solid #e2e8f0 !important; border-top: 4px solid #B30000 !important; }
+            .hover-dropdown:hover > .dropdown-menu { display: block; }
+        }
+        .megamenu-header { color: #0f172a !important; font-weight: 700; font-size: 1.1rem; margin-bottom: 12px; display: block; text-decoration: none; }
+        .megamenu-header:hover, .megamenu-header:focus { color: #B30000 !important; }
+        .megamenu-link { color: #475569 !important; font-size: 0.95rem; text-decoration: none; display: block; padding: 5px 0; transition: color 0.2s; }
+        .megamenu-link:hover, .megamenu-link:focus { color: #B30000 !important; text-decoration: underline; }
+
+        body.high-contrast { background-color: #000000 !important; color: #ffff00 !important; }
+        body.high-contrast * { background-color: transparent !important; color: #ffff00 !important; border-color: #ffff00 !important; }
+        body.high-contrast a, body.high-contrast .nav-link, body.high-contrast .btn-primary { color: #00ffff !important; text-decoration: underline !important; }
+        body.high-contrast .it-header-center-wrapper, body.high-contrast .top-bar-istituzionale, body.high-contrast nav, body.high-contrast .card { background-color: #000000 !important; border: 1px solid #ffff00 !important; }
+        body.high-contrast img { filter: grayscale(100%) contrast(150%); border: 2px solid #ffff00; }
+        body.high-contrast .badge { border: 1px solid #ffff00; }
+
+        /* ── MOBILE SIDEBAR ─────────────────────────────────────── */
+        #mobileNav {
+            position: fixed; top: 0; left: 0;
+            width: 280px; height: 100%;
+            background: #1e293b;
+            z-index: 1100;
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
+            display: flex; flex-direction: column;
+            overflow-y: auto;
+        }
+        #mobileNav.active {
+            transform: translateX(0);
+            box-shadow: 6px 0 24px rgba(0,0,0,0.45);
+        }
+        #mobileNavOverlay {
+            display: none; position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 1050;
+        }
+        #mobileNavOverlay.active { display: block; }
+
+        .mob-nav-header {
+            background: #B30000; padding: 1rem;
+            display: flex; align-items: center;
+            justify-content: space-between; flex-shrink: 0;
+        }
+        .mob-nav-title  { color: #fff; font-weight: 700; font-size: 1rem; }
+        .mob-nav-sub    { color: rgba(255,255,255,0.65); font-size: 0.75rem; }
+        #mobileNavClose { background: transparent; border: none; color: #fff; font-size: 1.4rem; line-height: 1; padding: 0; }
+
+        .mob-nav-body   { padding: 1rem; flex: 1; }
+        .mob-nav-search { margin-bottom: 1rem; }
+
+        .mob-nav-label {
+            text-transform: uppercase; font-size: 0.68rem; font-weight: 700;
+            color: rgba(255,255,255,0.35); letter-spacing: 0.08em;
+            padding: 0.25rem 0; border-bottom: 1px solid rgba(255,255,255,0.08);
+            margin-bottom: 0.4rem;
+        }
+        .mob-nav-group-label {
+            font-size: 0.72rem; font-weight: 700;
+            color: rgba(255,255,255,0.45); text-transform: uppercase;
+            padding: 0.55rem 0 0.2rem; letter-spacing: 0.05em;
+        }
+        .mob-nav-link {
+            display: block; padding: 0.5rem 0.25rem;
+            color: #cbd5e1 !important; text-decoration: none;
+            font-size: 0.93rem;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            transition: color 0.15s, padding-left 0.15s;
+        }
+        .mob-nav-link:hover { color: #fff !important; padding-left: 0.5rem; }
+        .mob-nav-user {
+            color: #fff; font-weight: 600; font-size: 0.88rem;
+            padding: 0.45rem 0; border-bottom: 1px solid rgba(255,255,255,0.12);
+            margin-bottom: 0.4rem;
+        }
+
+        /* ── Accessibilità (verifica axe/Lighthouse del 25/09/2026) ── */
+        /* In Bootstrap Italia bg-warning è arancione (#fd7e14) e .badge forza il bianco:
+           il testo scuro richiesto con text-dark va imposto, altrimenti contrasto 2.6:1 */
+        .bg-warning.text-dark, .badge.bg-warning, .badge.bg-info.text-dark { color: #1F2937 !important; }
+        /* Focus da tastiera sempre ben visibile (anche su card-link e pulsanti colorati) */
+        a:focus-visible, button:focus-visible, .btn:focus-visible, [tabindex]:focus-visible,
+        .form-check-input:focus-visible, summary:focus-visible {
+            outline: 3px solid #FFBF47 !important; outline-offset: 2px !important; box-shadow: 0 0 0 5px #1F2937 !important;
+        }
+        a:focus-visible .card { box-shadow: 0 0 0 3px #FFBF47 !important; }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; scroll-behavior: auto !important; }
+        }
+    </style>
+</head>
+<body>
+
+<a href="#main-content" class="skip-link">Salta al contenuto principale</a>
+
+<script>
+    (function() {
+        let isHighContrast = localStorage.getItem('hc_dibest') === 'true';
+        let zoomLevel = parseInt(localStorage.getItem('zoom_dibest'));
+        if (isHighContrast) document.body.classList.add('high-contrast');
+        if (zoomLevel) document.documentElement.style.fontSize = zoomLevel + '%';
+    })();
+    // Listener a livello top-level: pageshow bfcache funziona anche se DOMContentLoaded
+    // non ri-scatta quando la pagina viene ripristinata dalla cache del browser.
+    window.addEventListener('pageshow', function(e) {
+        if (e.persisted) window.location.reload();
+    });
+</script>
+
+<div class="top-bar-istituzionale d-none d-lg-block" role="region" aria-label="Barra istituzionale e strumenti di accessibilità">
+    <div class="container">
+        <div class="d-flex justify-content-between align-items-center">
+            
+            <div class="d-flex align-items-center gap-4">
+                <a href="https://dibest.unical.it" target="_blank" class="fw-bold" aria-label="Sito ufficiale Dipartimento DiBEST">
+                    <i class="fa fa-university me-1" aria-hidden="true"></i> UNICAL - Dipartimento di Biologia, Ecologia e Scienze della Terra
+                </a>
+                
+                <div class="d-flex align-items-center gap-1 border-start ps-3 border-secondary" role="group" aria-label="Strumenti di accessibilità visiva">
+                    <button class="a11y-btn" id="btnZoomIn" title="Ingrandisci testo" aria-label="Ingrandisci testo">A+</button>
+                    <button class="a11y-btn" id="btnZoomOut" title="Riduci testo" aria-label="Riduci testo">A-</button>
+                    <button class="a11y-btn ms-2" id="btnContrast" title="Attiva/Disattiva Alto Contrasto" aria-label="Attiva Alto Contrasto"><i class="fa fa-adjust" aria-hidden="true"></i></button>
+                </div>
+            </div>
+            
+            <div class="d-flex align-items-center gap-2">
+                <?php if ($u_logged_header): ?>
+                    <div class="dropdown">
+                        <button class="top-bar-btn dropdown-toggle d-flex align-items-center" type="button" id="userTopDropdown" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Menu utente">
+                            <i class="fa fa-user-circle me-1" aria-hidden="true"></i> <?php echo htmlspecialchars($nome_visualizzato); ?>
+                            <i class="fa fa-chevron-down ms-2" style="font-size: 0.7rem;" aria-hidden="true"></i>
+                        </button>
+                        <div class="dropdown-menu dropdown-menu-end agid-dropdown" aria-labelledby="userTopDropdown">
+                            <ul class="list-unstyled m-0 p-0">
+                                <li><a class="list-item" href="area_personale.php"><i class="fa fa-id-card text-primary me-2" aria-hidden="true"></i> Area Personale</a></li>
+                                <?php if ($is_admin_header): ?>
+                                    <li><a class="list-item" href="admin/index.php"><i class="fa fa-cogs text-danger me-2" aria-hidden="true"></i> Pannello Gestori</a></li>
+                                    <li><a class="list-item" href="admin/scanner.php"><i class="fa fa-qrcode text-success me-2" aria-hidden="true"></i> Scanner Check-in</a></li>
+                                <?php endif; ?>
+                                <li><div class="divider" aria-hidden="true"></div></li>
+                                <li><a class="list-item text-danger" href="esci.php"><i class="fa fa-sign-out-alt me-2" aria-hidden="true"></i> Esci</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                <?php else: ?>
+                    <a href="saml_login.php" class="top-bar-btn">
+                        <i class="fa fa-sign-in-alt me-1" aria-hidden="true"></i> Accedi
+                    </a>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+
+<header class="it-header-wrapper" style="position: relative; z-index: 1050;" role="banner">
+    <div class="it-header-center-wrapper<?php echo ($logo_url !== '' || $logo_mobile_url !== '') ? ' con-logo' : ''; ?>">
+        <div class="container">
+            <div class="row">
+                <div class="col-12">
+                    <div class="it-header-center-content-wrapper align-items-center">
+                        <div class="it-brand-wrapper">
+                            <?php if ($logo_url !== '' || $logo_mobile_url !== ''): ?>
+                                <!-- Computer: logo principale e sotto il nome del portale. Telefono: logo mobile accanto al nome
+                                     (senza logo mobile, il logo principale ridotto) -->
+                                <a href="index.php" class="brand-logo-link text-decoration-none<?php echo $logo_mobile_url !== '' ? ' con-logo-mobile' : ''; ?><?php echo ($logo_url === '' && $logo_mobile_url !== '') ? ' solo-mobile' : ''; ?>" aria-label="Home page <?php echo htmlspecialchars($titolo_portale); ?>">
+                                    <?php if ($logo_url !== ''): ?><img src="<?php echo htmlspecialchars($logo_url); ?>" alt="" class="brand-logo-principale"><?php endif; ?>
+                                    <?php if ($logo_mobile_url !== ''): ?><img src="<?php echo htmlspecialchars($logo_mobile_url); ?>" alt="" class="brand-logo-mobile"><?php endif; ?>
+                                    <span class="brand-testi" aria-hidden="true">
+                                        <span class="brand-nome"><?php echo htmlspecialchars($titolo_portale); ?></span>
+                                        <?php if ($sottotitolo_portale !== ''): ?><span class="brand-tagline"><?php echo htmlspecialchars($sottotitolo_portale); ?></span><?php endif; ?>
+                                    </span>
+                                </a>
+                            <?php else: ?>
+                            <a href="index.php" class="text-decoration-none d-flex align-items-center" aria-label="Home page <?php echo htmlspecialchars($titolo_portale); ?>">
+                                <div class="it-brand-text">
+                                    <div class="it-brand-title" aria-hidden="true"><?php echo htmlspecialchars($titolo_portale); ?></div>
+                                    <div class="it-brand-tagline d-none d-md-block" aria-hidden="true"><?php echo htmlspecialchars($sottotitolo_portale); ?></div>
+                                </div>
+                            </a>
+                            <?php endif; ?>
+                        </div>
+                        
+                        <div class="it-right-zone">
+                            <div class="it-search-wrapper d-flex align-items-center">
+                                <form action="ricerca.php" method="GET" class="header-search-box d-none d-md-flex" role="search">
+                                    <input type="text" name="q" placeholder="Cerca eventi, aule..." aria-label="Cerca nel portale" required>
+                                    <button type="submit" aria-label="Avvia ricerca"><i class="fa fa-search" aria-hidden="true"></i></button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+<!-- ============================================================ -->
+<!-- MOBILE SIDEBAR (slides from left, only mobile/tablet) -->
+<!-- ============================================================ -->
+<div id="mobileNav" aria-label="Menu mobile" role="navigation">
+    <div class="mob-nav-header">
+        <div>
+            <div class="mob-nav-title"><?php echo htmlspecialchars($titolo_portale); ?></div>
+            <div class="mob-nav-sub">Menu di navigazione</div>
+        </div>
+        <button id="mobileNavClose" aria-label="Chiudi menu"><i class="fa fa-times" aria-hidden="true"></i></button>
+    </div>
+    <div class="mob-nav-body">
+        <form action="ricerca.php" method="GET" class="mob-nav-search" role="search">
+            <div class="input-group">
+                <input type="text" name="q" class="form-control" placeholder="Cerca eventi..." required aria-label="Cerca nel portale">
+                <button class="btn btn-danger" type="submit" aria-label="Avvia ricerca"><i class="fa fa-search" aria-hidden="true"></i></button>
+            </div>
+        </form>
+
+        <div class="mob-nav-label">Navigazione</div>
+        <?php
+        // Menu del sito (App\Portale\ServizioMenu): voci e sottovoci che questo visitatore può vedere
+        $menu_voci_header = (isset($conn) && $conn instanceof mysqli)
+            ? \App\Core\App::get(\App\Portale\ServizioMenu::class)->menuPrincipale(\App\Portale\Visitatore::daSessione($_SESSION))
+            : [];
+        foreach ($menu_voci_header as $mob_m):
+            if ($mob_m->conSottovoci):
+        ?>
+                <div class="mob-nav-group-label"><?php echo htmlspecialchars($mob_m->etichetta); ?></div>
+                <?php foreach ($mob_m->figli as $mob_sub):
+                    $mob_href_s = (!empty($mob_sub->url) && $mob_sub->url !== '#') ? htmlspecialchars($mob_sub->url) : '#';
+                    $mob_tgt_s  = $mob_sub->target();
+                ?>
+                    <a href="<?php echo $mob_href_s; ?>" <?php echo $mob_tgt_s; ?> class="mob-nav-link ps-3">
+                        <i class="fa fa-chevron-right me-2" style="font-size:.65rem;color:#B30000;" aria-hidden="true"></i><?php echo htmlspecialchars($mob_sub->etichetta); ?>
+                    </a>
+                <?php endforeach; ?>
+        <?php else: ?>
+                <a href="<?php echo htmlspecialchars($mob_m->url); ?>" <?php echo $mob_m->target(); ?> class="mob-nav-link"><?php echo htmlspecialchars($mob_m->etichetta); ?></a>
+        <?php
+            endif;
+        endforeach; ?>
+
+        <div class="mob-nav-label mt-3">Accessibilità</div>
+        <div class="d-flex gap-2 mb-3">
+            <button class="btn btn-outline-light btn-sm flex-fill" id="btnZoomInMob" aria-label="Ingrandisci testo">A+</button>
+            <button class="btn btn-outline-light btn-sm flex-fill" id="btnZoomOutMob" aria-label="Riduci testo">A-</button>
+            <button class="btn btn-outline-light btn-sm flex-fill" id="btnContrastMob" aria-label="Attiva Alto Contrasto"><i class="fa fa-adjust" aria-hidden="true"></i></button>
+        </div>
+
+        <div class="mob-nav-label">Account</div>
+        <?php if ($u_logged_header): ?>
+            <div class="mob-nav-user"><i class="fa fa-user-circle me-2" aria-hidden="true"></i><?php echo htmlspecialchars($nome_visualizzato); ?></div>
+            <a href="area_personale.php" class="mob-nav-link"><i class="fa fa-id-card me-2" style="color:#60a5fa;" aria-hidden="true"></i> Area Personale</a>
+            <?php if ($is_admin_header): ?>
+                <a href="admin/index.php" class="mob-nav-link"><i class="fa fa-cogs me-2" style="color:#f59e0b;" aria-hidden="true"></i> Pannello Gestori</a>
+                <a href="admin/scanner.php" class="mob-nav-link"><i class="fa fa-qrcode me-2" style="color:#34d399;" aria-hidden="true"></i> Scanner Check-in</a>
+            <?php endif; ?>
+            <a href="esci.php" class="mob-nav-link" style="color:#f87171;font-weight:bold;"><i class="fa fa-sign-out-alt me-2" aria-hidden="true"></i> Esci</a>
+        <?php else: ?>
+            <a href="saml_login.php" class="mob-nav-link" style="font-weight:bold;"><i class="fa fa-sign-in-alt me-2" style="color:#34d399;" aria-hidden="true"></i> Accedi con SSO</a>
+        <?php endif; ?>
+    </div>
+</div>
+<div id="mobileNavOverlay"></div>
+
+<!-- ============================================================ -->
+<!-- BARRA DI NAVIGAZIONE PRINCIPALE -->
+<!-- ============================================================ -->
+<div class="shadow-sm" style="background-color: #ffffff !important; border-bottom: 1px solid #e2e8f0; position: relative; z-index: 999;">
+    <div class="container" style="position: relative;">
+        <nav class="navbar navbar-expand-lg px-0 py-1" aria-label="Menu principale" style="background-color: #ffffff !important; position: static;">
+
+            <!-- Pulsante hamburger solo mobile: apre il sidebar -->
+            <button class="border-0 bg-transparent shadow-none w-100 text-start py-2 d-lg-none" type="button" id="mobileNavToggle" aria-label="Apri menu di navigazione">
+                <div class="d-flex align-items-center" style="color: #000000 !important;">
+                    <i class="fa fa-bars fs-3 me-2" aria-hidden="true"></i>
+                    <span class="fs-6" style="font-weight: 400 !important;">Menu di Navigazione</span>
+                </div>
+            </button>
+
+            <div class="collapse navbar-collapse" id="mainNavbar">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0 w-100 py-2 py-lg-0">
+                    <?php
+                    foreach ($menu_voci_header as $voce_menu):
+                        $m_id = $voce_menu->id;
+                        $target = $voce_menu->target();
+                        if ($voce_menu->conSottovoci):
+                    ?>
+                                        <li class="nav-item dropdown hover-dropdown megamenu-li">
+                                            <a class="nav-link px-lg-3" href="#" id="drop<?php echo $m_id; ?>" role="button" data-bs-toggle="dropdown" aria-expanded="false" style="color: #000000 !important; font-weight: 400 !important;">
+                                                <?php echo htmlspecialchars($voce_menu->etichetta); ?> <i class="fa fa-chevron-down ms-1" style="font-size: 0.7rem; color: #B30000;" aria-hidden="true"></i>
+                                            </a>
+                                            <div class="dropdown-menu megamenu bg-white" aria-labelledby="drop<?php echo $m_id; ?>">
+                                                <div class="row g-4">
+                                                    <?php foreach ($voce_menu->figli as $sub):
+                                                        $target_sub = $sub->target();
+                                                        $header_url = htmlspecialchars($sub->urlOppure('javascript:void(0);'));
+                                                    ?>
+                                                        <div class="col-md-6 col-lg-3 mb-3">
+                                                            <a href="<?php echo $header_url; ?>" <?php echo $target_sub; ?> class="megamenu-header pb-2 mb-2" style="border-bottom: 1px solid #e2e8f0;">
+                                                                <?php echo htmlspecialchars($sub->etichetta); ?>
+                                                            </a>
+                                                            <?php if ($sub->conSottovoci): ?>
+                                                                <ul class="list-unstyled m-0 p-0">
+                                                                    <?php foreach ($sub->figli as $subsub):
+                                                                        $target_subsub = $subsub->target();
+                                                                    ?>
+                                                                        <li>
+                                                                            <a href="<?php echo htmlspecialchars($subsub->url); ?>" <?php echo $target_subsub; ?> class="megamenu-link">
+                                                                                <?php echo htmlspecialchars($subsub->etichetta); ?>
+                                                                            </a>
+                                                                        </li>
+                                                                    <?php endforeach; ?>
+                                                                </ul>
+                                                            <?php endif; ?>
+                                                        </div>
+                                                    <?php endforeach; ?>
+                                                </div>
+                                            </div>
+                                        </li>
+                                    <?php else: ?>
+                                        <li class="nav-item">
+                                            <a class="nav-link px-lg-3" href="<?php echo htmlspecialchars($voce_menu->url); ?>" <?php echo $target; ?> style="color: #000000 !important; font-weight: 400 !important;"><?php echo htmlspecialchars($voce_menu->etichetta); ?></a>
+                                        </li>
+                                    <?php endif; ?>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+        </nav>
+    </div>
+</div>
+
+<main id="main-content" class="container-fluid py-4" style="min-height: 60vh;">
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    let zoomLevel = parseInt(localStorage.getItem('zoom_dibest')) || 100;
+    let isHighContrast = localStorage.getItem('hc_dibest') === 'true';
+
+    function updateA11y() {
+        if(isHighContrast) document.body.classList.add('high-contrast');
+        else document.body.classList.remove('high-contrast');
+        
+        document.documentElement.style.fontSize = zoomLevel + '%';
+        
+        localStorage.setItem('zoom_dibest', zoomLevel);
+        localStorage.setItem('hc_dibest', isHighContrast);
+    }
+
+    const toggleContrast = () => { isHighContrast = !isHighContrast; updateA11y(); };
+    document.getElementById('btnContrast')?.addEventListener('click', toggleContrast);
+    document.getElementById('btnContrastMob')?.addEventListener('click', toggleContrast);
+
+    const zoomIn = () => { if (zoomLevel < 150) { zoomLevel += 10; updateA11y(); } };
+    document.getElementById('btnZoomIn')?.addEventListener('click', zoomIn);
+    document.getElementById('btnZoomInMob')?.addEventListener('click', zoomIn);
+
+    const zoomOut = () => { if (zoomLevel > 90) { zoomLevel -= 10; updateA11y(); } };
+    document.getElementById('btnZoomOut')?.addEventListener('click', zoomOut);
+    document.getElementById('btnZoomOutMob')?.addEventListener('click', zoomOut);
+
+    // Mobile sidebar
+    const mobileNav     = document.getElementById('mobileNav');
+    const mobileOverlay = document.getElementById('mobileNavOverlay');
+    function openMobileNav() {
+        mobileNav?.classList.add('active');
+        mobileOverlay?.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+    function closeMobileNav() {
+        mobileNav?.classList.remove('active');
+        mobileOverlay?.classList.remove('active');
+        document.body.style.overflow = '';
+    }
+    document.getElementById('mobileNavToggle')?.addEventListener('click', openMobileNav);
+    document.getElementById('mobileNavClose')?.addEventListener('click', closeMobileNav);
+    mobileOverlay?.addEventListener('click', closeMobileNav);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMobileNav(); });
+
+});
+</script>

@@ -1,0 +1,230 @@
+<?php
+// scuole.php - Anagrafe delle scuole (solo amministratori): caricamento del file open data del Ministero
+// dell'Istruzione (CSV o ZIP), stato dell'anagrafe, prova della ricerca, abbinamento delle scuole scritte
+// a mano nelle iscrizioni passate (così report e statistiche contano ogni scuola una volta sola).
+// Le convenzioni con le scuole sono in fsl.php (pannello Formazione Scuola Lavoro).
+require_once 'admin_header.php';
+
+if (!$puo_fsl_scuole) nega_accesso(); // amministratori e abilitati alla FSL o all'anagrafe scuole
+
+function admin_redirect($url) { echo "<script>window.location.replace(" . json_encode($url) . ");</script>"; exit; }
+
+$scuole_servizio = \App\Core\App::get(\App\Anagrafi\ServizioScuole::class);
+// Regioni selezionabili all'importazione: nome => inizio del nome nel file del Ministero
+const REGIONI_SCUOLE = \App\Anagrafi\ServizioScuole::REGIONI;
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    if (isset($_POST['importa'])) {
+        $esito = $scuole_servizio->importa($_FILES['file_scuole'] ?? [], ($_POST['tipo_file'] ?? 'statali') === 'paritarie' ? 0 : 1, array_values(array_intersect(REGIONI_SCUOLE, (array)($_POST['regioni'] ?? []))));
+        if (is_array($esito)) {
+            [$n_nuove, $n_agg, $n_inv, $n_scar, $n_fuori] = $esito;
+            registra_log_audit($conn, "Aggiornamento anagrafe scuole", ["Nuove" => $n_nuove, "Aggiornate" => $n_agg, "Invariate" => $n_inv, "Scartate" => $n_scar]);
+            flash_set("Anagrafe aggiornata: $n_nuove scuole nuove, $n_agg aggiornate, $n_inv già presenti e invariate."
+                      . ($n_scar ? " $n_scar righe scartate perché incomplete o non valide." : '') . ($n_fuori ? " $n_fuori scuole delle regioni non scelte saltate." : ''), $n_scar ? 'warning' : 'success');
+        } else flash_set($esito, 'danger');
+    }
+    // Tiene solo le scuole della Calabria; quelle di altre regioni già scelte in un'iscrizione o in un profilo restano
+    if (isset($_POST['solo_calabria_pulisci'])) {
+        [$n_del, $con_usate] = $scuole_servizio->tieniSoloCalabria();
+        registra_log_audit($conn, "Anagrafe scuole: tenute solo quelle della Calabria", ["Cancellate" => $n_del]);
+        flash_set("Tolte $n_del scuole di altre regioni. Restano le scuole della Calabria" . ($con_usate ? " e quelle già scelte nelle iscrizioni." : "."));
+    }
+    if (isset($_POST['abbina'])) {
+        [$esito_ab, $testo_ab, $s_ab] = $scuole_servizio->abbina((string)($_POST['codice'] ?? ''), (string)($_POST['chiave'] ?? ''));
+        if ($esito_ab === 'scuola') flash_set("Codice meccanografico non trovato nell'anagrafe.", 'danger');
+        elseif ($esito_ab === 'gruppo') flash_set("Questo nome non è più da abbinare.", 'warning');
+        else {
+            registra_log_audit($conn, "Abbinamento scuola", ["Testo" => $testo_ab, "Codice" => $s_ab['codice'], "Iscrizioni" => $s_ab['iscrizioni']]);
+            flash_set("\"" . $testo_ab . "\" abbinata a " . etichetta_scuola($s_ab) . " (" . $s_ab['iscrizioni'] . " iscrizioni).");
+        }
+    }
+    $anc = isset($_POST['abbina']) ? 'abbina' : 'carica';
+    admin_redirect("scuole.php?p_id=$filtro_p&r=" . time() . "#" . $anc);
+}
+
+// Scuole già in anagrafe per regione (chiave: inizio del nome, come REGIONI_SCUOLE)
+$per_regione = $scuole_servizio->perRegione();
+$stato = $scuole_servizio->stato();
+$gruppi = $scuole_servizio->daAbbinare();
+$con_codice = $scuole_servizio->iscrizioniConCodice();
+// Scuole collegate: per ogni scuola i docenti che l'hanno indicata (iscrizioni e profilo) e le attività
+$collegate = $scuole_servizio->collegate();
+$h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+?>
+<style>
+.scu-sez { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1.25rem; margin-bottom:1rem; box-shadow:0 1px 4px rgba(0,0,0,.04); scroll-margin-top: 80px; }
+.scu-sez h2 { font-size:.8rem; text-transform:uppercase; letter-spacing:.06em; font-weight:800; color:#1e293b; margin-bottom:1rem; }
+.scu-num { font-size:1.6rem; font-weight:800; color:#0f172a; line-height:1; }
+</style>
+
+<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+    <h4 class="fw-bold text-dark mb-0"><i class="fa fa-school me-2" style="color:#0891b2;" aria-hidden="true"></i>Anagrafe scuole</h4>
+</div>
+<p class="text-secondary small">Elenco ufficiale delle scuole italiane (open data del Ministero dell'Istruzione). Nei moduli di iscrizione il campo di tipo <strong>"Scuola (anagrafe del Ministero)"</strong> cerca qui mentre il docente scrive: ogni iscrizione viene collegata al codice meccanografico e report e statistiche contano ogni scuola una volta sola.</p>
+
+<section class="scu-sez">
+    <h2><i class="fa fa-database me-1" aria-hidden="true"></i>Stato</h2>
+    <?php if ((int)$stato['tot'] === 0): ?>
+        <div class="alert alert-warning mb-0"><i class="fa fa-triangle-exclamation me-1" aria-hidden="true"></i>L'anagrafe è vuota: carica il file del Ministero qui sotto. Finché è vuota il campo "Scuola" funziona come un normale campo di testo.</div>
+    <?php else: ?>
+        <div class="row g-3 text-center text-md-start">
+            <div class="col-6 col-md-3"><div class="scu-num"><?php echo number_format((int)$stato['tot'], 0, ',', '.'); ?></div><div class="small text-secondary">scuole in anagrafe</div></div>
+            <div class="col-6 col-md-3"><div class="scu-num"><?php echo number_format((int)$stato['calabria'], 0, ',', '.'); ?></div><div class="small text-secondary">in Calabria</div></div>
+            <div class="col-6 col-md-3"><div class="scu-num"><?php echo number_format((int)$stato['statali'], 0, ',', '.'); ?> / <?php echo number_format((int)$stato['paritarie'], 0, ',', '.'); ?></div><div class="small text-secondary">statali / paritarie</div></div>
+            <div class="col-6 col-md-3"><div class="scu-num"><?php echo $con_codice; ?></div><div class="small text-secondary">iscrizioni collegate a una scuola</div></div>
+        </div>
+        <p class="small text-secondary mt-3 mb-0">Ultimo aggiornamento: <?php echo $stato['agg'] ? date('d/m/Y H:i', strtotime($stato['agg'])) : '—'; ?><?php if (!empty($stato['anno'])): ?> · dati dell'anno scolastico <?php echo $h($stato['anno']); ?><?php endif; ?></p>
+        <?php if ((int)$stato['tot'] > (int)$stato['calabria']): ?>
+            <form method="POST" class="mt-2 mb-0">
+                <?php csrf_field(); ?>
+                <button type="submit" name="solo_calabria_pulisci" value="1" class="btn btn-sm btn-outline-danger fw-bold" data-confirm="Togliere le <?php echo number_format((int)$stato['tot'] - (int)$stato['calabria'], 0, ',', '.'); ?> scuole delle altre regioni? Restano quelle della Calabria e quelle già scelte in un'iscrizione."><i class="fa fa-filter me-1" aria-hidden="true"></i>Tieni solo le scuole della Calabria</button>
+            </form>
+        <?php endif; ?>
+    <?php endif; ?>
+</section>
+
+<div class="row g-3">
+    <div class="col-lg-6">
+        <section class="scu-sez h-100" id="carica">
+            <h2><i class="fa fa-upload me-1" aria-hidden="true"></i>Carica o aggiorna l'anagrafe</h2>
+            <ol class="small ps-3">
+                <li>Apri il portale Open Data del Ministero dell'Istruzione (<a href="https://dati.istruzione.it/opendata/" target="_blank" rel="noopener">dati.istruzione.it/opendata</a>), sezione <strong>Scuole</strong>.</li>
+                <li>Scarica in formato CSV l'<strong>Anagrafe scuole statali</strong> dell'anno scolastico in corso e caricala qui. Poi, se vuoi, fai lo stesso con l'<strong>Anagrafe scuole paritarie</strong>.</li>
+                <li>Ripeti una volta l'anno, a inizio anno scolastico: le scuole già presenti vengono aggiornate, nessuna iscrizione cambia.</li>
+            </ol>
+            <form method="POST" enctype="multipart/form-data">
+                <?php csrf_field(); ?>
+                <div class="mb-2">
+                    <label class="form-label small fw-bold d-block">Il file contiene</label>
+                    <div class="form-check form-check-inline"><input class="form-check-input" type="radio" name="tipo_file" id="tfS" value="statali" checked><label class="form-check-label small" for="tfS">scuole statali</label></div>
+                    <div class="form-check form-check-inline"><input class="form-check-input" type="radio" name="tipo_file" id="tfP" value="paritarie"><label class="form-check-label small" for="tfP">scuole paritarie</label></div>
+                    <fieldset class="mt-2">
+                        <legend class="form-label small fw-bold mb-1">Regioni da importare</legend>
+                        <div class="d-flex flex-wrap gap-1 mb-1">
+                            <?php foreach (REGIONI_SCUOLE as $reg_nome => $reg_pref): $reg_id = 'reg' . $reg_pref; ?>
+                                <input type="checkbox" class="btn-check" name="regioni[]" value="<?php echo $h($reg_pref); ?>" id="<?php echo $reg_id; ?>" <?php echo $reg_pref === 'CALABRIA' ? 'checked' : ''; ?> autocomplete="off">
+                                <label class="btn btn-sm btn-outline-secondary py-0 px-2" for="<?php echo $reg_id; ?>"><?php echo $h($reg_nome); ?><?php if (!empty($per_regione[$reg_pref])): ?> <span class="badge bg-light text-dark"><?php echo number_format($per_regione[$reg_pref], 0, ',', '.'); ?></span><?php endif; ?></label>
+                            <?php endforeach; ?>
+                        </div>
+                        <div class="form-text">Il file del Ministero è nazionale: si importano solo le regioni scelte (nessuna = tutta Italia). Puoi aggiungerne altre in seguito ricaricando lo stesso file: le scuole già presenti vengono solo aggiornate. Il numero indica le scuole già in anagrafe.</div>
+                    </fieldset>
+                </div>
+                <label for="fileScuole" class="form-label small fw-bold">File CSV (anche compresso in ZIP)</label>
+                <input type="file" name="file_scuole" id="fileScuole" class="form-control form-control-sm mb-2" accept=".csv,.zip,.txt" required>
+                <div class="form-text mb-2">Limite di caricamento del server: <?php echo $h(ini_get('upload_max_filesize')); ?>. Se il CSV è più grande, comprimilo in ZIP. L'importazione può richiedere qualche decina di secondi.</div>
+                <button type="submit" name="importa" value="1" class="btn btn-primary btn-sm fw-bold"><i class="fa fa-file-import me-1" aria-hidden="true"></i>Importa</button>
+            </form>
+        </section>
+    </div>
+    <div class="col-lg-6">
+        <section class="scu-sez h-100">
+            <h2><i class="fa fa-magnifying-glass me-1" aria-hidden="true"></i>Prova la ricerca</h2>
+            <p class="small text-secondary">È la stessa casella che vede il docente nel modulo di iscrizione. Prova con il nome, il comune o il codice meccanografico.</p>
+            <div id="provaScuola"><?php echo html_campo_scuola('prova_ricerca'); ?></div>
+        </section>
+    </div>
+</div>
+
+<section class="scu-sez" id="collegate">
+    <h2><i class="fa fa-chalkboard-user me-1" aria-hidden="true"></i>Scuole collegate e docenti di riferimento (<?php echo count($collegate); ?>)</h2>
+    <?php if (!$collegate): ?>
+        <p class="text-muted small mb-0">Ancora nessuna: compaiono qui le scuole scelte dall'anagrafe nelle iscrizioni.</p>
+    <?php else: ?>
+        <p class="small text-secondary">Ogni iscrizione resta collegata alla scuola scelta, anche se il docente in seguito ne indica un'altra. <span class="badge bg-light text-dark border">profilo</span> = scuola proposta al docente nelle prossime iscrizioni (l'ultima indicata).</p>
+        <div class="d-flex flex-wrap gap-2 mb-2">
+            <input type="search" id="cercaCollegate" class="form-control form-control-sm" style="max-width:320px;" placeholder="Cerca scuola, comune o docente" aria-label="Cerca tra le scuole collegate">
+            <button type="button" class="btn btn-sm btn-outline-secondary fw-bold" id="csvCollegate"><i class="fa fa-file-csv me-1" aria-hidden="true"></i>Scarica CSV</button>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle" id="tabCollegate">
+                <thead class="table-light small"><tr><th>Scuola</th><th>Docenti di riferimento</th><th class="text-center">Iscrizioni</th><th>Attività</th><th>Ultima</th></tr></thead>
+                <tbody>
+                <?php foreach ($collegate as $cod => $c): $s = scuola_per_codice($conn, $cod); ?>
+                    <tr>
+                        <td><div class="fw-semibold"><?php echo $h($s ? etichetta_scuola($s) : $cod); ?></div><div class="small text-secondary"><span class="font-monospace"><?php echo $h($cod); ?></span><?php if ($s): ?> · <?php echo $h(maiuscole_scuola((string)$s['tipo'])); ?><?php if ($s['provincia'] !== ''): ?> (<?php echo $h(maiuscole_scuola($s['provincia'])); ?>)<?php endif; ?><?php endif; ?></div></td>
+                        <td class="small">
+                            <?php foreach ($c['docenti'] ?? [] as $d): ?>
+                                <div><?php echo $h($d['nome']); ?><?php if ($d['email'] !== ''): ?> · <a href="mailto:<?php echo $h($d['email']); ?>"><?php echo $h($d['email']); ?></a><?php endif; ?><?php if (!empty($d['profilo'])): ?> <span class="badge bg-light text-dark border">profilo</span><?php endif; ?></div>
+                            <?php endforeach; ?>
+                        </td>
+                        <td class="text-center"><?php echo (int)($c['iscrizioni'] ?? 0); ?></td>
+                        <td class="small"><?php echo $h(implode(', ', array_keys($c['attivita'] ?? []))); ?></td>
+                        <td class="small text-nowrap"><?php echo !empty($c['ultima']) ? date('d/m/Y', strtotime($c['ultima'])) : '—'; ?></td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <script>
+        (function () {
+            var tab = document.getElementById('tabCollegate');
+            document.getElementById('cercaCollegate').addEventListener('input', function () {
+                var q = this.value.toLowerCase().trim();
+                tab.querySelectorAll('tbody tr').forEach(function (tr) { tr.style.display = !q || tr.textContent.toLowerCase().indexOf(q) !== -1 ? '' : 'none'; });
+            });
+            // CSV delle righe visibili (separatore ; per Excel in italiano)
+            document.getElementById('csvCollegate').addEventListener('click', function () {
+                var righe = [['Codice', 'Scuola', 'Docenti', 'Iscrizioni', 'Attività', 'Ultima']];
+                tab.querySelectorAll('tbody tr').forEach(function (tr) {
+                    if (tr.style.display === 'none') return;
+                    var td = tr.children;
+                    righe.push([td[0].querySelector('.font-monospace').textContent, td[0].querySelector('.fw-semibold').textContent,
+                                Array.prototype.map.call(td[1].children, function (d) { return d.textContent.replace(/\s+/g, ' ').trim(); }).join(' | '),
+                                td[2].textContent.trim(), td[3].textContent.trim(), td[4].textContent.trim()]);
+                });
+                var csv = '﻿' + righe.map(function (r) { return r.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(';'); }).join('\r\n');
+                var a = document.createElement('a');
+                a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+                a.download = 'scuole_collegate.csv'; document.body.appendChild(a); a.click(); a.remove();
+            });
+        })();
+        </script>
+    <?php endif; ?>
+</section>
+
+<section class="scu-sez" id="convenzioni">
+    <h2><i class="fa fa-file-signature me-1" aria-hidden="true"></i>Convenzioni con le scuole</h2>
+    <p class="small text-secondary mb-2">Registro delle convenzioni, verifica delle iscrizioni alle attività FSL, riepilogo per anno scolastico e schede di valutazione sono nel pannello dedicato.</p>
+    <a href="fsl.php?p_id=<?php echo $filtro_p; ?>&tab=convenzioni" class="btn btn-sm btn-outline-danger fw-bold"><i class="fa fa-briefcase me-1" aria-hidden="true"></i>Apri Formazione Scuola Lavoro</a>
+</section>
+
+<section class="scu-sez mt-3" id="abbina">
+    <h2><i class="fa fa-link me-1" aria-hidden="true"></i>Scuole scritte a mano da abbinare (<?php echo count($gruppi); ?>)</h2>
+    <?php if (!$gruppi): ?>
+        <p class="text-muted small mb-0">Nessuna: tutte le iscrizioni con una scuola sono collegate all'anagrafe.</p>
+    <?php elseif ((int)$stato['tot'] === 0): ?>
+        <p class="text-muted small mb-0">Carica prima l'anagrafe: poi qui trovi i suggerimenti per collegare le <?php echo count($gruppi); ?> scuole scritte a mano.</p>
+    <?php else: ?>
+        <p class="small text-secondary">Nomi di scuole scritti a mano nelle iscrizioni (prima del campo con ricerca o con "non è in elenco"). Scegli la scuola giusta: tutte le iscrizioni con quel nome vengono collegate. Il testo originale resta nelle iscrizioni.</p>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+                <thead class="table-light small"><tr><th>Scritto nelle iscrizioni</th><th class="text-center">Iscrizioni</th><th>Scuola dell'anagrafe</th><th></th></tr></thead>
+                <tbody>
+                <?php foreach (array_slice($gruppi, 0, 20, true) as $chiave => $g): $sugg = $scuole_servizio->suggerisci($g['testo']); ?>
+                    <tr>
+                        <td class="fw-semibold"><?php echo $h($g['testo']); ?></td>
+                        <td class="text-center"><?php echo count($g['ids']); ?></td>
+                        <td colspan="2">
+                            <form method="POST" class="d-flex flex-wrap gap-2 align-items-center m-0">
+                                <?php csrf_field(); ?>
+                                <input type="hidden" name="chiave" value="<?php echo $h($chiave); ?>">
+                                <label class="visually-hidden" for="abb<?php echo md5($chiave); ?>">Scuola per <?php echo $h($g['testo']); ?></label>
+                                <select name="codice" id="abb<?php echo md5($chiave); ?>" class="form-select form-select-sm" style="max-width: 460px;" required>
+                                    <?php if (!$sugg): ?><option value="">Nessun suggerimento: cerca il codice nella casella di prova</option><?php endif; ?>
+                                    <?php foreach ($sugg as $sg): ?><option value="<?php echo $h($sg['codice']); ?>"><?php echo $h($sg['nome'] . ' · ' . $sg['tipo'] . ' · ' . $sg['codice']); ?></option><?php endforeach; ?>
+                                </select>
+                                <input type="text" name="codice_manuale" class="form-control form-control-sm font-monospace" style="max-width: 140px;" placeholder="o codice" maxlength="10" pattern="[A-Za-z0-9]{10}" title="Codice meccanografico di 10 caratteri" oninput="var s=this.form.codice; if (this.value.length===10) { var o=s.querySelector('option[data-manuale]') || s.appendChild(document.createElement('option')); o.dataset.manuale='1'; o.value=this.value.toUpperCase(); o.textContent='Codice ' + this.value.toUpperCase(); s.value=o.value; }">
+                                <button type="submit" name="abbina" value="1" class="btn btn-sm btn-success fw-bold"><i class="fa fa-link me-1" aria-hidden="true"></i>Abbina</button>
+                            </form>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php if (count($gruppi) > 20): ?><p class="small text-secondary mb-0">Mostrati i primi 20 (quelli con più iscrizioni): gli altri compaiono man mano.</p><?php endif; ?>
+    <?php endif; ?>
+</section>
+
+<?php require_once 'admin_footer.php'; ?>

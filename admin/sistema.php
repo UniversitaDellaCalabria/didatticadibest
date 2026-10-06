@@ -1,0 +1,373 @@
+<?php
+// sistema.php - Configurazione Sistema Email, SMTP e Promemoria
+require_once 'admin_header.php';
+
+// Controllo Permessi RBAC (Solo Full Admin)
+if (!$is_full_admin) {
+    echo "<div class='alert alert-danger fw-bold shadow-sm m-4'><i class='fa fa-ban me-2'></i> Accesso negato. Questa sezione è riservata agli amministratori globali del sistema.</div>";
+    require_once 'admin_footer.php';
+    exit;
+}
+
+function admin_redirect($url) {
+    echo "<script>window.location.replace('$url');</script>";
+    exit;
+}
+
+// ==============================================================================
+// BLOCCO ELABORAZIONE AZIONI BACKEND (GET / POST)
+// ==============================================================================
+
+// 1. ESECUZIONE MANUALE PROMEMORIA (CRON)
+if (isset($_POST['run_reminders_manual'])) {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    if (function_exists('registra_log_audit')) registra_log_audit($conn, "Esecuzione Manuale Promemoria Email", ["Finestra_Ore" => 72]);
+    admin_redirect("cron_reminders.php?manual=1");
+}
+
+// 1b. EMAIL DI PROVA: verifica la configurazione SMTP mostrando l'errore esatto del server
+if (isset($_POST['invia_email_test'])) {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    $dest_test = trim($_POST['email_test'] ?? '');
+    $ok_test = inviaNotificaEmail($dest_test, "Email di prova - Didattica DiBEST", "<p>Questa è un'email di prova inviata dal pannello <strong>Sistema Email</strong> il " . date('d/m/Y H:i') . ".</p><p>Se la ricevi, la configurazione SMTP funziona.</p>", $conn);
+    if ($ok_test) flash_set("Email di prova accettata dal server per " . $dest_test . ". Se non arriva entro qualche minuto controlla lo spam.");
+    else flash_set("Invio fallito: " . ($GLOBALS['ultimo_errore_email'] ?: 'errore sconosciuto'), 'danger');
+    admin_redirect("sistema.php?p_id=$filtro_p&r=" . time() . "#log-email");
+}
+
+// 1c. RIEPILOGO SETTIMANALE DELLE EMAIL: invio immediato agli amministratori
+if (isset($_POST['invia_report_email'])) {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    $esito_rep = invia_report_email_settimanale($conn, true);
+    if ($esito_rep === true) flash_set("Riepilogo inviato agli amministratori: " . implode(', ', email_amministratori($conn)) . ".");
+    else flash_set("Riepilogo non inviato: " . $esito_rep, 'danger');
+    admin_redirect("sistema.php?p_id=$filtro_p&r=" . time() . "#log-email");
+}
+
+// 1d. CONTROLLO DEL SITO: esecuzione immediata (senza email: i risultati si vedono qui)
+if (isset($_POST['controlla_sito'])) {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    $st_c = esegui_controllo_sito($conn, false);
+    flash_set($st_c['problemi'] ? "Controllo completato: " . $st_c['problemi'] . " problemi, vedi sotto." : "Controllo completato: tutto a posto.", $st_c['problemi'] ? 'warning' : 'success');
+    admin_redirect("sistema.php?p_id=$filtro_p&r=" . time() . "#controllo");
+}
+
+// 2. SALVATAGGIO CONFIGURAZIONI SMTP E TEMPLATE
+if (isset($_POST['save_system_settings'])) {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    $modelli = [];
+    foreach (\App\Sistema\ImpostazioniSistemaRepository::CAMPI_TESTO as $campo_t) $modelli[$campo_t] = (string)($_POST[$campo_t] ?? '');
+    $from_e = $conn->real_escape_string($_POST['smtp_from_email'] ?? '');
+    \App\Core\App::get(\App\Sistema\ImpostazioniSistemaRepository::class)->salva(
+        (string)($_POST['smtp_host'] ?? ''), (int)($_POST['smtp_port'] ?? 587), (string)($_POST['smtp_username'] ?? ''),
+        (string)($_POST['smtp_password'] ?? ''), (string)($_POST['smtp_secure'] ?? 'tls'), (string)($_POST['smtp_from_email'] ?? ''),
+        (string)($_POST['smtp_from_name'] ?? ''), $modelli);
+
+    if (function_exists('registra_log_audit')) registra_log_audit($conn, "Aggiornamento Impostazioni Sistema/SMTP e Template", ["Mittente" => $from_e]);
+    
+    flash_set("Impostazioni SMTP e Template Email salvati con successo!");
+    admin_redirect("sistema.php?p_id=$filtro_p");
+}
+?>
+
+<!-- FRONT-END DELLA PAGINA -->
+<?php schede_sistema('sistema.php'); ?>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="fw-bold text-dark m-0"><i class="fa fa-envelope text-primary me-2"></i> Sistema Email & Promemoria</h4>
+    
+    <form method="POST" action="" class="m-0 text-end">
+        <?php csrf_field(); ?>
+        <button type="submit" name="run_reminders_manual" class="btn btn-warning fw-bold shadow-sm text-dark" data-confirm="Vuoi inviare ora i promemoria a tutti gli utenti con eventi programmati nelle prossime 72 ore? L\'operazione potrebbe richiedere alcuni secondi.">
+            <i class="fa fa-paper-plane me-1"></i> Invia Promemoria Ora (Eventi prossime 72h)
+        </button>
+    </form>
+</div>
+
+<div class="card shadow-sm border-0 p-4">
+    <form method="POST">
+        <?php csrf_field(); ?>
+        <h5 class="fw-bold text-primary border-bottom pb-2 mb-4"><i class="fa fa-cogs me-1"></i> Configurazione Server SMTP e Template Notifiche</h5>
+        
+        <div class="row g-3 mb-4 bg-light p-3 border rounded">
+            <div class="col-md-4">
+                <label class="form-label small fw-bold">Host SMTP</label>
+                <input type="text" name="smtp_host" class="form-control" value="<?php echo htmlspecialchars($sys['smtp_host'] ?? 'smtpservizi.unical.it'); ?>" required>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small fw-bold">Porta SMTP</label>
+                <input type="number" name="smtp_port" class="form-control" value="<?php echo (int)($sys['smtp_port'] ?? 587); ?>" required>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-bold">Cifratura</label>
+                <select name="smtp_secure" class="form-select">
+                    <option value="tls" <?php echo ($sys['smtp_secure'] ?? '') == 'tls' ? 'selected' : ''; ?>>TLS</option>
+                    <option value="ssl" <?php echo ($sys['smtp_secure'] ?? '') == 'ssl' ? 'selected' : ''; ?>>SSL</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small fw-bold">Username SMTP</label>
+                <input type="text" name="smtp_username" class="form-control" value="<?php echo htmlspecialchars($sys['smtp_username'] ?? ''); ?>">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small fw-bold">Password SMTP</label>
+                <input type="password" name="smtp_password" class="form-control" value="<?php echo htmlspecialchars($sys['smtp_password'] ?? ''); ?>">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small fw-bold">Email Mittente (Da)</label>
+                <input type="email" name="smtp_from_email" class="form-control" value="<?php echo htmlspecialchars($sys['smtp_from_email'] ?? 'noreply.eventi@unical.it'); ?>" required>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small fw-bold">Nome Mittente (Visualizzato)</label>
+                <input type="text" name="smtp_from_name" class="form-control" value="<?php echo htmlspecialchars($sys['smtp_from_name'] ?? 'Didattica DiBEST - Unical'); ?>" required>
+            </div>
+        </div>
+
+        <div class="alert alert-info border-info mb-4 shadow-sm">
+            <h6 class="fw-bold m-0 mb-2"><i class="fa fa-code me-1"></i> Segnaposto Dinamici Utilizzabili nei Template Email:</h6>
+            <span class="badge bg-white text-dark border font-monospace me-1 mb-1">{NOME}</span>
+            <span class="badge bg-white text-dark border font-monospace me-1 mb-1">{COGNOME}</span>
+            <span class="badge bg-white text-dark border font-monospace me-1 mb-1">{MATRICOLA}</span>
+            <span class="badge bg-white text-dark border font-monospace me-1 mb-1">{TITOLO_EVENTO}</span>
+            <span class="badge bg-white text-dark border font-monospace me-1 mb-1">{DATA_TURNO}</span>
+            <span class="badge bg-white text-dark border font-monospace me-1 mb-1">{ORARIO_TURNO}</span>
+            <span class="badge bg-white text-dark border font-monospace me-1 mb-1">{LUOGO}</span>
+            <span class="badge bg-white text-dark border font-monospace me-1 mb-1">{CODICE_PRENOTAZIONE}</span>
+            <span class="badge bg-white text-dark border font-monospace me-1 mb-1">{LINK_RICEVUTA}</span>
+            <span class="badge bg-white text-dark border font-monospace me-1 mb-1">{LINK_AREA_PERSONALE}</span>
+        </div>
+
+        <div class="row g-4">
+            <!-- 1. Email Conferma -->
+            <div class="col-md-6">
+                <div class="border p-4 rounded bg-white h-100 shadow-sm border-success" style="border-top-width: 4px !important;">
+                    <h6 class="fw-bold text-success border-bottom pb-2 mb-3">📩 1. Conferma Prenotazione Utente</h6>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Oggetto Email</label>
+                        <input type="text" name="email_conferma_oggetto" class="form-control form-control-sm fw-bold" value="<?php echo htmlspecialchars($sys['email_conferma_oggetto'] ?? 'Conferma Prenotazione Eventi'); ?>" required>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small fw-bold">Corpo Email (HTML)</label>
+                        <textarea name="email_conferma_corpo" class="form-control editor-html" rows="4"><?php echo htmlspecialchars($sys['email_conferma_corpo'] ?? "<p>Gentile <strong>{NOME} {COGNOME}</strong>,</p><p>La tua prenotazione per l'evento <strong>{TITOLO_EVENTO}</strong> è stata confermata con successo!</p><p><strong>Dettagli:</strong><br>📅 Data: {DATA_TURNO}<br>🕒 Orario: {ORARIO_TURNO}<br>📍 Luogo: {LUOGO}<br>🎟️ Codice Prenotazione: <strong>{CODICE_PRENOTAZIONE}</strong></p><p>Ti aspettiamo!</p>"); ?></textarea>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 2. Email Annullamento Admin -->
+            <div class="col-md-6">
+                <div class="border p-4 rounded bg-white h-100 shadow-sm border-danger" style="border-top-width: 4px !important;">
+                    <h6 class="fw-bold text-danger border-bottom pb-2 mb-3">🚫 2. Annullamento da Amministrazione</h6>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Oggetto Email</label>
+                        <input type="text" name="email_canc_admin_oggetto" class="form-control form-control-sm fw-bold" value="<?php echo htmlspecialchars($sys['email_canc_admin_oggetto'] ?? 'Annullamento Prenotazione Evento'); ?>" required>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small fw-bold">Corpo Email (HTML)</label>
+                        <textarea name="email_canc_admin_corpo" class="form-control editor-html" rows="4"><?php echo htmlspecialchars($sys['email_canc_admin_corpo'] ?? "<p>Gentile <strong>{NOME} {COGNOME}</strong>,</p><p>Ti informiamo che la tua prenotazione per l'evento <strong>{TITOLO_EVENTO}</strong> del {DATA_TURNO} è stata annullata dall'amministrazione.</p>"); ?></textarea>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 3. Email Annullamento Utente -->
+            <div class="col-md-6">
+                <div class="border p-4 rounded bg-white h-100 shadow-sm border-warning" style="border-top-width: 4px !important;">
+                    <h6 class="fw-bold text-warning border-bottom pb-2 mb-3 text-dark">🗑️ 3. Conferma Cancellazione (da Utente)</h6>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Oggetto Email</label>
+                        <input type="text" name="email_canc_utente_oggetto" class="form-control form-control-sm fw-bold" value="<?php echo htmlspecialchars($sys['email_canc_utente_oggetto'] ?? 'Cancellazione Prenotazione Evento'); ?>" required>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small fw-bold">Corpo Email (HTML)</label>
+                        <textarea name="email_canc_utente_corpo" class="form-control editor-html" rows="4"><?php echo htmlspecialchars($sys['email_canc_utente_corpo'] ?? "<p>Gentile <strong>{NOME} {COGNOME}</strong>,</p><p>La tua prenotazione per l'evento <strong>{TITOLO_EVENTO}</strong> è stata cancellata correttamente come richiesto.</p>"); ?></textarea>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 4. Email Promemoria -->
+            <div class="col-md-6">
+                <div class="border p-4 rounded bg-white h-100 shadow-sm border-primary" style="border-top-width: 4px !important;">
+                    <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">⏰ 4. Promemoria / Reminder Automatico</h6>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Oggetto Email</label>
+                        <input type="text" name="email_reminder_oggetto" class="form-control form-control-sm fw-bold" value="<?php echo htmlspecialchars($sys['email_reminder_oggetto'] ?? 'Promemoria Evento Imminente'); ?>" required>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small fw-bold">Corpo Email (HTML)</label>
+                        <textarea name="email_reminder_corpo" class="form-control editor-html" rows="4"><?php echo htmlspecialchars($sys['email_reminder_corpo'] ?? "<p>Gentile <strong>{NOME} {COGNOME}</strong>,</p><p>Ti ricordiamo che l'evento <strong>{TITOLO_EVENTO}</strong> si terrà a breve il {DATA_TURNO} alle {ORARIO_TURNO}.</p><p style='color:red;'>Se non potrai partecipare, annulla la prenotazione dall'Area Personale per cedere il posto ad altri.</p>"); ?></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. Email Attestato Disponibile (NUOVO) -->
+            <div class="col-md-6">
+                <div class="border p-4 rounded bg-white h-100 shadow-sm border-info" style="border-top-width: 4px !important;">
+                    <h6 class="fw-bold text-info border-bottom pb-2 mb-3">🎓 5. Attestato Disponibile (Post-Evento)</h6>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Oggetto Email</label>
+                        <input type="text" name="email_attestato_oggetto" class="form-control form-control-sm fw-bold" value="<?php echo htmlspecialchars($sys['email_attestato_oggetto'] ?? 'Il tuo Attestato di Partecipazione è pronto'); ?>" required>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small fw-bold">Corpo Email (HTML)</label>
+                        <textarea name="email_attestato_corpo" class="form-control editor-html" rows="4"><?php echo htmlspecialchars($sys['email_attestato_corpo'] ?? "<p>Gentile <strong>{NOME} {COGNOME}</strong>,</p><p>Grazie per aver partecipato all'evento <strong>{TITOLO_EVENTO}</strong>.</p><p>Ti informiamo che il tuo Attestato di Partecipazione è stato generato ed è ora disponibile per il download.</p><p>Puoi scaricarlo accedendo alla tua {LINK_AREA_PERSONALE}.</p>"); ?></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 6. Email Sondaggio (NUOVO) -->
+            <div class="col-md-6">
+                <div class="border p-4 rounded bg-white h-100 shadow-sm border-secondary" style="border-top-width: 4px !important;">
+                    <h6 class="fw-bold text-secondary border-bottom pb-2 mb-3">📊 6. Richiesta Feedback / Sondaggio (Post-Evento)</h6>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Oggetto Email</label>
+                        <input type="text" name="email_sondaggio_oggetto" class="form-control form-control-sm fw-bold" value="<?php echo htmlspecialchars($sys['email_sondaggio_oggetto'] ?? 'Aiutaci a migliorare: lascia il tuo feedback'); ?>" required>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small fw-bold">Corpo Email (HTML)</label>
+                        <textarea name="email_sondaggio_corpo" class="form-control editor-html" rows="4"><?php echo htmlspecialchars($sys['email_sondaggio_corpo'] ?? "<p>Gentile <strong>{NOME} {COGNOME}</strong>,</p><p>Speriamo che l'evento <strong>{TITOLO_EVENTO}</strong> sia stato di tuo gradimento.</p><p>Per aiutarci a migliorare la qualità delle nostre iniziative, ti chiediamo di dedicare 2 minuti per compilare il nostro questionario di valutazione anonimo.</p><p>Clicca sul link seguente per accedere al sondaggio: <br><a href='#'>[INSERISCI QUI IL LINK AL TUO MODULO GOOGLE O MS FORMS]</a></p>"); ?></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-end mt-4 pt-3 border-top">
+            <button type="submit" name="save_system_settings" onclick="tinymce.triggerSave();" class="btn btn-primary fw-bold px-4 py-3 shadow-sm">
+                <i class="fa fa-save me-1"></i> Salva Impostazioni SMTP e Template
+            </button>
+        </div>
+    </form>
+</div>
+
+<?php
+// Registro invii (tabella creata al primo invio da registra_log_email())
+$log_email = \App\Core\App::get(\App\Sistema\LogEmailRepository::class)->ultimi(100);
+$stat_email = \App\Core\App::get(\App\Sistema\LogEmailRepository::class)->esitiSettimana();
+$email_admin = (string)(\App\Core\App::get(\App\Auth\UtenteRepository::class)->emailDiUtente((int)$u_id_curr) ?? '');
+?>
+<div class="card shadow-sm border-0 p-4 mt-4" id="log-email">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 border-bottom pb-3 mb-3">
+        <h5 class="fw-bold text-primary m-0"><i class="fa fa-list-alt me-1"></i> Verifica invio email</h5>
+        <form method="POST" class="d-flex gap-2 m-0">
+            <?php csrf_field(); ?>
+            <input type="email" name="email_test" class="form-control form-control-sm" style="min-width:240px" placeholder="destinatario@unical.it" value="<?php echo htmlspecialchars($email_admin); ?>" required>
+            <button type="submit" name="invia_email_test" class="btn btn-outline-primary btn-sm fw-bold text-nowrap"><i class="fa fa-paper-plane me-1"></i> Invia email di prova</button>
+        </form>
+        <form method="POST" class="m-0">
+            <?php csrf_field(); ?>
+            <button type="submit" name="invia_report_email" class="btn btn-outline-secondary btn-sm fw-bold text-nowrap" title="Ogni lunedì parte in automatico agli amministratori"><i class="fa fa-chart-simple me-1"></i> Invia ora il riepilogo settimanale</button>
+        </form>
+    </div>
+    <p class="small text-muted mb-3">
+        Ultimi 7 giorni: <span class="badge bg-success"><?php echo $stat_email['ok']; ?> accettate</span>
+        <span class="badge bg-danger"><?php echo $stat_email['ko']; ?> fallite</span>.
+        "Accettata" significa che il server SMTP ha preso in carico il messaggio; se non arriva, il problema è a valle (spam, filtri della casella).
+    </p>
+    <?php if (empty($log_email)): ?>
+        <div class="text-muted small">Nessun invio registrato finora.</div>
+    <?php else: ?>
+        <div class="table-responsive" style="max-height:420px; overflow-y:auto;">
+            <table class="table table-sm table-hover align-middle small m-0">
+                <thead class="table-light" style="position:sticky; top:0;"><tr><th>Data</th><th>Destinatario</th><th>Oggetto</th><th>Esito</th></tr></thead>
+                <tbody>
+                <?php foreach ($log_email as $l): ?>
+                    <tr>
+                        <td class="text-nowrap"><?php echo date('d/m/Y H:i', strtotime($l['created_at'])); ?></td>
+                        <td><?php echo htmlspecialchars($l['destinatario']); ?></td>
+                        <td><?php echo htmlspecialchars($l['oggetto']); ?></td>
+                        <td>
+                            <?php if ((int)$l['esito'] === 1): ?>
+                                <span class="badge bg-success">Inviata</span><?php if ($l['canale'] === 'mail()'): ?> <span class="badge bg-warning text-dark" title="<?php echo htmlspecialchars($l['errore'] ?? ''); ?>">via mail()</span><?php endif; ?>
+                            <?php else: ?>
+                                <span class="badge bg-danger">Fallita</span> <span class="text-danger"><?php echo htmlspecialchars($l['errore'] ?? ''); ?></span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    <?php endif; ?>
+</div>
+
+<?php
+// ---------------------------------------------------------------------
+// BACKUP: stato dell'ultima esecuzione e configurazione (file .env del server)
+// ---------------------------------------------------------------------
+$bk = stato_backup();
+$cfg_bk = [
+    'NAS (BACKUP_NAS_PATH)' => env_valore('BACKUP_NAS_PATH') ?? '— non configurato',
+    'Conservazione sul NAS' => (int)(env_valore('BACKUP_NAS_GIORNI') ?? 30) . ' giorni',
+    'Copia via email (BACKUP_EMAIL)' => env_valore('BACKUP_EMAIL') ?? '— non configurata',
+    'Frequenza email' => env_valore('BACKUP_EMAIL_FREQUENZA') ?? 'settimanale (il lunedì)',
+    'Password della copia cifrata' => env_valore('BACKUP_PASSWORD') !== null ? (strlen(env_valore('BACKUP_PASSWORD')) >= 12 ? 'impostata' : 'troppo corta (servono 12 caratteri)') : '— non impostata',
+    'Cifratura della copia via email' => (function () {
+        // Prova reale su un file temporaneo: la costante AES può esserci anche con una libreria zip senza cifratura
+        $tmp = tempnam(sys_get_temp_dir(), 'bk'); file_put_contents($tmp, 'prova');
+        $zip_ok = cifra_zip_aes($tmp, $tmp . '.zip', 'prova-cifratura-123', $err_z); @unlink($tmp . '.zip');
+        $ssl_ok = !$zip_ok && cifra_openssl_aes($tmp, $tmp . '.enc', 'prova-cifratura-123', $err_s); @unlink($tmp . '.enc'); @unlink($tmp);
+        return $zip_ok ? 'ZIP AES-256 (si apre con 7-Zip)' : ($ssl_ok ? 'OpenSSL AES-256 (lo ZIP cifrato non è disponibile su questo server)' : 'NON disponibile');
+    })(),
+];
+$icona_bk = fn($ok) => $ok === false ? '<i class="fa fa-circle-xmark text-danger me-1"></i>' : ($ok ? '<i class="fa fa-circle-check text-success me-1"></i>' : '<i class="fa fa-circle-info text-secondary me-1"></i>');
+?>
+<div class="card shadow-sm border-0 p-4 mt-4" id="backup">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 border-bottom pb-3 mb-3">
+        <h5 class="fw-bold text-primary m-0"><i class="fa fa-database me-1"></i> Backup</h5>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="cron_backup.php" target="_blank" class="btn btn-outline-primary btn-sm fw-bold" data-confirm="Eseguire ora il backup completo? Può richiedere qualche minuto."><i class="fa fa-play me-1"></i> Esegui backup ora</a>
+            <a href="cron_backup.php?email=1" target="_blank" class="btn btn-outline-secondary btn-sm fw-bold" data-confirm="Eseguire il backup e inviare subito la copia cifrata del database via email?"><i class="fa fa-envelope me-1"></i> Backup + invio email</a>
+        </div>
+    </div>
+    <div class="row g-4">
+        <div class="col-lg-7">
+            <?php if (!$bk): ?>
+                <div class="alert alert-warning small mb-0"><i class="fa fa-triangle-exclamation me-1"></i> Nessun backup registrato. Pianifica <code>admin/cron_backup.php</code> ogni notte (vedi README) oppure avvialo con il pulsante.</div>
+            <?php else: ?>
+                <div class="mb-2">
+                    <span class="badge <?php echo !empty($bk['ok']) ? 'bg-success' : 'bg-warning text-dark'; ?> fs-6"><?php echo !empty($bk['ok']) ? 'Ultimo backup riuscito' : 'Ultimo backup con problemi'; ?></span>
+                    <span class="small text-muted ms-2"><?php echo date('d/m/Y H:i', strtotime($bk['data'])); ?></span>
+                    <?php if (strtotime($bk['data']) < time() - 2 * 86400): ?><span class="badge bg-danger ms-1">più di 2 giorni fa: il cron è attivo?</span><?php endif; ?>
+                </div>
+                <ul class="list-unstyled small mb-0">
+                    <?php foreach (($bk['righe'] ?? []) as [$ok_r, $msg_r]): ?>
+                        <li class="mb-1"><?php echo $icona_bk($ok_r); ?><?php echo htmlspecialchars($msg_r); ?></li>
+                    <?php endforeach; ?>
+                    <li class="mb-1"><?php echo $icona_bk(!empty($bk['ultima_email']) ? true : null); ?>Ultima copia via email: <?php echo !empty($bk['ultima_email']) ? date('d/m/Y H:i', strtotime($bk['ultima_email'])) : 'mai'; ?></li>
+                </ul>
+            <?php endif; ?>
+        </div>
+        <div class="col-lg-5">
+            <table class="table table-sm small mb-2">
+                <?php foreach ($cfg_bk as $k_bk => $v_bk): ?>
+                    <tr><th class="fw-semibold text-secondary" style="width:48%;"><?php echo htmlspecialchars($k_bk); ?></th><td><?php echo htmlspecialchars($v_bk); ?></td></tr>
+                <?php endforeach; ?>
+            </table>
+            <div class="form-text">Questi valori si impostano nel file <code>.env</code> del server (non dal pannello, per sicurezza). Il database via email parte solo cifrato.</div>
+        </div>
+    </div>
+</div>
+
+<?php $ctrl = is_file(dirname(__DIR__) . '/cache/controllo_sito.json') ? (json_decode((string)file_get_contents(dirname(__DIR__) . '/cache/controllo_sito.json'), true) ?: []) : []; ?>
+<div class="card shadow-sm border-0 p-4 mt-4" id="controllo">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 border-bottom pb-3 mb-3">
+        <h5 class="fw-bold text-primary m-0"><i class="fa fa-heart-pulse me-1"></i> Controllo del sito</h5>
+        <form method="POST" class="m-0">
+            <?php csrf_field(); ?>
+            <button type="submit" name="controlla_sito" value="1" class="btn btn-outline-primary btn-sm fw-bold" data-attesa="Controllo in corso…"><i class="fa fa-stethoscope me-1"></i> Controlla ora</button>
+        </form>
+    </div>
+    <p class="small text-secondary">Ogni notte il cron controlla database, cartelle, spazio su disco, backup, email non partite, pagine pubbliche e file riservati. Se qualcosa non va gli amministratori ricevono un'email (al massimo una al giorno per gli stessi problemi) e un'altra quando torna tutto a posto.</p>
+    <?php if (!$ctrl): ?>
+        <div class="alert alert-secondary small mb-0">Nessun controllo eseguito finora: premi <strong>Controlla ora</strong>.</div>
+    <?php else: ?>
+        <div class="mb-2">
+            <span class="badge <?php echo empty($ctrl['problemi']) ? 'bg-success' : 'bg-danger'; ?> fs-6"><?php echo empty($ctrl['problemi']) ? 'Tutto a posto' : (int)$ctrl['problemi'] . ' problemi'; ?></span>
+            <span class="small text-muted ms-2">Ultimo controllo: <?php echo date('d/m/Y H:i', strtotime($ctrl['data'])); ?></span>
+        </div>
+        <ul class="list-unstyled small mb-0">
+            <?php foreach (($ctrl['esiti'] ?? []) as $e_c): ?>
+                <li class="mb-1"><?php echo $icona_bk($e_c['ok']); ?><?php echo htmlspecialchars($e_c['voce']); ?></li>
+            <?php endforeach; ?>
+        </ul>
+    <?php endif; ?>
+</div>
+
+<?php require_once 'admin_footer.php'; ?>

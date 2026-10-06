@@ -1,0 +1,23 @@
+# PHPStan sul codice delle classi (src/). Non è una dipendenza del progetto: si scarica il file phpstan.phar da
+# https://github.com/phpstan/phpstan/releases e si lancia, dalla cartella del progetto: php phpstan.phar analyse
+parameters:
+    level: 8
+    paths:
+        - src
+    bootstrapFiles:
+        - vendor/autoload.php
+    # funzioni e costanti globali di inc/ (le facciate chiamate dalle classi di src/) e della configurazione
+    scanFiles:
+        - config.php
+        - functions.php
+    scanDirectories:
+        - inc
+    ignoreErrors:
+        # Tipo dei valori negli array (array<string, mixed> invece di forme precise): da precisare man mano che si tocca il codice
+        - identifier: missingType.iterableValue
+        # Libreria SimpleSAMLphp: sta nel server, non in vendor/ del progetto
+        - message: '#SimpleSAML#'
+          identifier: class.notFound
+        # TIPI_AREA (config.php) oggi ha tutti i tipi disponibili: il controllo resta per quando se ne aggiunge uno «in arrivo»
+        - message: '#Negated boolean expression is always false#'
+          path: src/Portale/Vista/Sezioni.php

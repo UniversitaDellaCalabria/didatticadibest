@@ -1,0 +1,121 @@
+<?php
+// didattica.php - Modulo Didattica (Ufficio didattico):
+// - Pratiche: elenco con filtri, dettaglio, stato, messaggi, istruttoria (campi dell'ufficio, seduta, delibera), Excel e Word;
+// - Sedute e verbali: sedute del Consiglio con o.d.g. e presenze, pratiche assegnate, verbale in Word ed Excel;
+// - Moduli e documenti: documenti da scaricare e moduli online (campi guidati dalle anagrafi, tabelle, campi dell'ufficio,
+//   come compaiono nel verbale), con modelli pronti;
+// - Ufficio e ricevimento: operatori scelti dall'anagrafe di Ateneo con i loro compiti, sportello di ricevimento dell'ufficio.
+// Pagine pubbliche: modulistica.php, modulo.php, pratiche.php.
+// Ogni scheda sta in un suo file (didattica_pratiche.php, didattica_sedute.php, didattica_moduli.php, didattica_ufficio.php,
+// didattica_statistiche.php) con le sue azioni e la sua pagina; questo file prepara i dati comuni e le include.
+require_once 'admin_header.php';
+define('DIDATTICA_PANNELLO', true);
+const SCHEDE_DIDATTICA = ['pratiche', 'sedute', 'moduli', 'ufficio', 'statistiche'];
+
+if (!$puo_didattica) nega_accesso();
+function admin_redirect($url) { echo "<script>window.location.replace(" . json_encode($url) . ");</script>"; exit; }
+$h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+$tab = in_array($_GET['tab'] ?? '', SCHEDE_DIDATTICA, true) ? $_GET['tab'] : 'pratiche';
+$base = "didattica.php?p_id=" . (int)$filtro_p;
+$uid = (int)$u_id_curr;
+$ids_post = fn() => array_values(array_filter(array_map('intval', (array)($_POST['ids'] ?? []))));
+$autore_nome = nome_autore_ufficio($conn, $utente_admin);
+$io_operatore = operatore_ufficio($conn, 0, $utente_admin);
+// Referenti dei consigli (senza gli altri permessi della Didattica): solo le sedute dei loro consigli
+$solo_ref = !$puo_didattica_tutto;
+if ($solo_ref) { $tab = 'sedute'; $autore_nome = trim(($utente_admin['nome'] ?? '') . ' ' . ($utente_admin['cognome'] ?? '')) . ' · Referente del consiglio'; }
+$consigli = consigli_didattica($conn);
+$puo_consiglio = fn(int $cid) => $puo_didattica_tutto || in_array($cid, $consigli_referente, true);
+$puo_seduta = fn(?array $s) => $s && ($puo_didattica_tutto || in_array((int)$s['consiglio_id'], $consigli_referente, true));
+
+// ==============================================================================
+// AZIONI
+// ==============================================================================
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    // I referenti dei consigli fanno solo le azioni delle sedute (ognuna controlla anche il consiglio)
+    if ($solo_ref && !array_intersect(array_keys($_POST), ['salva_seduta', 'elimina_seduta', 'assegna_seduta', 'salva_presenze', 'salva_decisioni', 'applica_esiti', 'aggiungi_persona_consiglio', 'togli_persona_consiglio', 'salva_qualifiche', 'importa_componenti', 'invia_convocazione', 'invia_verbale_firma', 'carica_verbale_firmato'])) nega_accesso();
+
+    $fase = 'azioni';
+    foreach (SCHEDE_DIDATTICA as $scheda) require __DIR__ . '/didattica_' . $scheda . '.php';
+}
+
+// ==============================================================================
+// DATI
+// ==============================================================================
+$moduli = \App\Core\App::per($conn)->get(\App\Didattica\ModuloRepository::class)->elenco();
+$categorie = array_values(array_unique(array_column($moduli, 'categoria')));
+$n_aperte = \App\Core\App::per($conn)->get(\App\Didattica\PraticaRepository::class)->contaAperte();
+$sedute = \App\Core\App::per($conn)->get(\App\Didattica\SedutaRepository::class)->elenco($solo_ref ? $consigli_referente : null);
+$sedute_future = array_values(array_filter($sedute, fn($s) => !$s['data'] || $s['data'] >= date('Y-m-d', strtotime('-60 days'))));
+$operatori = operatori_ufficio($conn);
+
+// Filtri dell'elenco delle pratiche (servono anche per l'esportazione)
+$f_stato = isset(STATI_PRATICA[$_GET['stato'] ?? '']) ? $_GET['stato'] : (in_array($_GET['stato'] ?? '', ['tutte', 'aperte'], true) ? $_GET['stato'] : 'aperte');
+$f_mod = (int)($_GET['modulo'] ?? 0); $f_q = mb_substr(trim((string)($_GET['q'] ?? '')), 0, 80);
+$f_sed = (string)($_GET['seduta'] ?? '');
+$f_car = in_array($_GET['carico'] ?? '', ['me', 'smistare', 'seguite', 'ufficio'], true) ? $_GET['carico'] : '';
+$f_dal = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['dal'] ?? '')) ? $_GET['dal'] : '';
+$f_al = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['al'] ?? '')) ? $_GET['al'] : '';
+$elenco_pratiche = fn() => \App\Core\App::per($conn)->get(\App\Didattica\PraticaRepository::class)->elenco($f_stato, $f_mod, $f_sed, $f_car, $f_dal, $f_al, $f_q, $io_operatore);
+
+// ── Verbale in PDF (da firmare o firmato in PAdES) ──
+if (($_GET['esporta'] ?? '') === 'verbale_pdf' && $tab === 'sedute') {
+    $seduta_exp = seduta_didattica($conn, (int)($_GET['id'] ?? 0));
+    if (!$puo_seduta($seduta_exp) || !($f = percorso_verbale_pdf($seduta_exp))) nega_accesso();
+    while (ob_get_level() > 0) ob_end_clean();
+    header('Content-Type: application/pdf'); header('X-Content-Type-Options: nosniff'); header('Content-Length: ' . filesize($f));
+    header('Content-Disposition: attachment; filename="Verbale_' . ($seduta_exp['data'] ? date('d_m_Y', strtotime($seduta_exp['data'])) : 'seduta') . ($seduta_exp['verbale_stato'] === 'firmato' ? '_firmato' : '') . '.pdf"');
+    readfile($f); exit;
+}
+// ── Esportazioni (Excel e Word): scartano la pagina già prodotta dall'intestazione ──
+if (isset($_GET['esporta']) && in_array($_GET['esporta'], ['xlsx', 'docx'], true)) {
+    $seduta_exp = $tab === 'sedute' ? seduta_didattica($conn, (int)($_GET['id'] ?? 0)) : null;
+    if ($solo_ref && !$puo_seduta($seduta_exp)) nega_accesso();
+    if ($seduta_exp) $ids = \App\Core\App::per($conn)->get(\App\Didattica\SedutaRepository::class)->idPratiche((int)$seduta_exp['id']);
+    elseif (!empty($_GET['ids'])) $ids = array_map('intval', explode(',', (string)$_GET['ids']));
+    else $ids = array_column($elenco_pratiche(), 'id');
+    $pr_exp = pratiche_per_esportazione($conn, $ids);
+    $nome_f = ($seduta_exp ? 'Verbale_' . ($seduta_exp['data'] ? date('d_m_Y', strtotime($seduta_exp['data'])) : 'seduta') : 'Pratiche_' . date('d_m_Y'));
+    $file = $_GET['esporta'] === 'xlsx' ? genera_excel_pratiche($conn, $pr_exp) : genera_verbale_pratiche($conn, $seduta_exp, $pr_exp);
+    if ($file) {
+        registra_log_audit($conn, "Pratiche esportate", ["Formato" => $_GET['esporta'], "Pratiche" => count($pr_exp)]);
+        invia_file_scaricabile($file, ($_GET['esporta'] === 'xlsx' ? str_replace('Verbale_', 'Pratiche_seduta_', $nome_f) : $nome_f) . '.' . $_GET['esporta'],
+            $_GET['esporta'] === 'xlsx' ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    }
+    flash_set("Esportazione non riuscita (manca l'estensione ZIP di PHP).", 'danger');
+}
+?>
+<style>
+.dd-ev { border-left: 3px solid #e2e8f0; padding: 4px 0 10px 14px; position: relative; }
+.dd-ev::before { content: ''; position: absolute; left: -7px; top: 6px; width: 11px; height: 11px; border-radius: 50%; background: #94a3b8; }
+.dd-ev.uff::before { background: #047857; } .dd-ev.stu::before { background: #0056B3; }
+.dd-campo { display: grid; grid-template-columns: 2fr 1.4fr 2fr auto auto 1.6fr 34px 34px; gap: .4rem; align-items: center; margin-bottom: .4rem; padding: .3rem; border-radius: 6px; }
+.dd-campo.dd-testa { margin-bottom: 0; padding-bottom: 0; }
+.dd-logica { grid-column: 1 / -1; background: #fff7ed; border: 1px dashed #fdba74; border-radius: 6px; padding: .5rem; }
+.dd-col-riga { display: grid; grid-template-columns: 2fr 1.6fr 2fr 30px; gap: .3rem; margin-bottom: .25rem; }
+.dd-campo.uff { background: #ecfdf5; }
+@media (max-width: 991.98px) { .dd-campo { grid-template-columns: 1fr 1fr; } }
+.dd-preset { border: 1px dashed #94a3b8; border-radius: 10px; padding: .6rem .8rem; background: #f8fafc; }
+</style>
+
+<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+    <h4 class="fw-bold text-dark mb-0"><i class="fa fa-folder-open me-2" style="color:#047857;" aria-hidden="true"></i>Didattica · Ufficio didattico</h4>
+    <a href="../modulistica.php" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary"><i class="fa fa-up-right-from-square me-1" aria-hidden="true"></i>Pagina pubblica della modulistica</a>
+</div>
+<ul class="nav nav-pills gap-1 mb-3" style="--bs-nav-pills-link-active-bg:#047857;">
+    <?php foreach (['pratiche' => ['fa-inbox', 'Pratiche' . ($n_aperte ? " <span class='badge bg-warning text-dark'>$n_aperte aperte</span>" : '')],
+                    'sedute' => ['fa-gavel', 'Sedute e verbali (' . count($sedute) . ')'],
+                    'moduli' => ['fa-file-lines', 'Moduli e documenti (' . count($moduli) . ')'],
+                    'ufficio' => ['fa-people-group', 'Ufficio e ricevimento'],
+                    'statistiche' => ['fa-chart-column', 'Statistiche']] as $k => [$ico, $txt]): ?>
+        <?php if ($solo_ref && $k !== 'sedute') continue; ?>
+        <li class="nav-item"><a class="nav-link fw-bold<?php echo $tab === $k ? ' active' : ' bg-light text-dark'; ?>" href="<?php echo $base; ?>&amp;tab=<?php echo $k; ?>"><i class="fa <?php echo $ico; ?> me-1" aria-hidden="true"></i><?php echo $txt; ?></a></li>
+    <?php endforeach; ?>
+    <?php if ($puo_tutorato): ?><li class="nav-item"><a class="nav-link fw-bold bg-light text-dark" href="tutorato.php?p_id=<?php echo (int)$filtro_p; ?>"><i class="fa fa-user-graduate me-1" aria-hidden="true"></i>Tutorato · lettere di incarico</a></li><?php endif; ?>
+</ul>
+
+<?php
+$fase = 'vista';
+require __DIR__ . '/didattica_' . $tab . '.php';
+require_once 'admin_footer.php';

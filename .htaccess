@@ -1,0 +1,58 @@
+Options -Indexes -MultiViews
+
+<Files "config.php">
+    Require all denied
+</Files>
+<Files "functions.php">
+    Require all denied
+</Files>
+<FilesMatch "^\.env">
+    Require all denied
+</FilesMatch>
+# Composer e PHPUnit (migrazione a classi, vedi MIGRATION_PLAN.md): configurazioni non pubbliche
+<FilesMatch "^(composer\.(json|lock)|phpunit\.xml(\.dist)?)$">
+    Require all denied
+</FilesMatch>
+
+# Blocca l'accesso diretto a file di backup/temporanei che possono contenere
+# codice sorgente o credenziali (es. index.php.save, functions.php.save)
+<FilesMatch "\.(save|bak|old|orig|swp|sql|log)(\.\d+)?$">
+    Require all denied
+</FilesMatch>
+
+RewriteEngine On
+# Librerie di Composer (vendor/, solo in sviluppo): mai raggiungibili dal web (src/ e tests/ hanno il loro .htaccess)
+RewriteRule (^|/)vendor/ - [F,L]
+# Nessun RewriteBase: le regole valgono qualunque sia la cartella del portale (/didattica, /eventi…)
+
+# =========================================================================
+# 0. SCUDO CARTELLA ADMIN: Lascia funzionare il backend normalmente!
+# =========================================================================
+# Se la richiesta è dentro admin/ e omette il .php, glielo aggiunge
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME}\.php -f
+RewriteRule ^(admin/.*)$ $1.php [NC,QSA,L]
+
+# Se la richiesta è dentro admin/, fermati qui e non leggere le regole sotto
+RewriteRule ^admin(/|$) - [NC,L]
+# =========================================================================
+
+# 1. SE IL FILE O LA CARTELLA ESISTE FISICAMENTE, FERMATI QUI E CARICALO
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# 3. SE MANCA L'ESTENSIONE MA IL FILE PHP ESISTE (Es: /area_personale)
+RewriteCond %{REQUEST_FILENAME}\.php -f
+RewriteRule ^(.*)$ $1.php [QSA,L]
+
+# 4. MOTORE DINAMICO CON .PHP
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^([a-zA-Z0-9_-]+)\.php$ area.php?slug=$1 [QSA,L]
+
+# (Opzionale) Manteniamo attiva anche la versione senza estensione
+# nel caso qualcuno avesse salvato il link vecchio
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^([a-zA-Z0-9_-]+)/?$ area.php?slug=$1 [QSA,L]

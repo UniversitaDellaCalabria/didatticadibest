@@ -1,0 +1,669 @@
+<!doctype html>
+<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Piano di migrazione OOP</title><style>
+:root { --rosso:#b30000; --testo:#1e293b; --tenue:#64748b; --bordo:#cbd5e1; --fondo:#f1f5f9; }
+* { box-sizing: border-box; }
+body { font-family: "DejaVu Sans", "Segoe UI", Arial, sans-serif; color: var(--testo); background: #fff; font-size: 10pt; line-height: 1.45; margin: 0; }
+.pagina { max-width: 190mm; margin: 0 auto; padding: 10mm 0; }
+header.copertina { border-bottom: 3px solid var(--rosso); padding-bottom: 6mm; margin-bottom: 6mm; }
+header.copertina .ente { color: var(--rosso); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; font-size: 9pt; }
+header.copertina h1 { font-size: 19pt; margin: 2mm 0 1mm; line-height: 1.2; }
+header.copertina .meta { color: var(--tenue); font-size: 9pt; }
+h2 { color: var(--rosso); font-size: 14pt; margin: 9mm 0 3mm; padding-bottom: 1mm; border-bottom: 1px solid var(--bordo); break-after: avoid; }
+h3 { font-size: 11.5pt; margin: 6mm 0 2mm; break-after: avoid; }
+p, li { orphans: 3; widows: 3; }
+blockquote { margin: 0 0 4mm; padding: 2mm 4mm; background: #fef2f2; border-left: 4px solid var(--rosso); }
+blockquote p { margin: 1mm 0; }
+code { font-family: "DejaVu Sans Mono", Consolas, monospace; font-size: 8.4pt; background: var(--fondo); padding: 0 1mm; border-radius: 2px; }
+pre { background: var(--fondo); border: 1px solid var(--bordo); border-radius: 3px; padding: 3mm; font-size: 8pt; line-height: 1.35; white-space: pre-wrap; word-break: break-word; break-inside: avoid; }
+pre code { background: none; padding: 0; font-size: inherit; }
+table { width: 100%; border-collapse: collapse; margin: 3mm 0 5mm; font-size: 8.4pt; }
+th, td { border: 1px solid var(--bordo); padding: 1.4mm 2mm; vertical-align: top; text-align: left; }
+th { background: var(--fondo); }
+tr { break-inside: avoid; }
+td code { word-break: break-word; }
+@page { size: A4; margin: 14mm 12mm 16mm; }
+@media print { .pagina { padding: 0; max-width: none; } a { color: inherit; text-decoration: none; } }
+</style></head>
+<body><div class="pagina">
+<header class="copertina"><div class="ente">Università della Calabria · Dipartimento di Biologia, Ecologia e Scienze della Terra</div>
+<h1>MIGRATION_PLAN.md — Didattica DiBEST: da PHP procedurale a OOP (pattern Strangler Fig)</h1><div class="meta">Portale Didattica DiBEST · ramo <code>feature/refactoring-oop</code> · versione del 05/10/2026</div></header>
+<blockquote>
+<p>Ramo di lavoro: <code>feature/refactoring-oop</code>. Documento di analisi e pianificazione: <strong>nessun file sorgente è stato modificato</strong>.
+Regola d'oro dell'intero percorso: <strong>ogni step va in produzione da solo e il sito continua a funzionare come prima</strong> (stessi URL, stesse pagine, stesso database, stesse email, stessi PDF).</p>
+</blockquote>
+<hr />
+<h2 id="stato-di-avanzamento">STATO DI AVANZAMENTO</h2>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Stato</th>
+<th>Note</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0 — Rete di sicurezza e inventario</td>
+<td><strong>fatto</strong></td>
+<td><code>strumenti/inventario_oop.php</code> (funzioni procedurali/facciate per file, query nelle pagine, classi in <code>src/</code>, versione PHP ed estensioni)</td>
+</tr>
+<tr>
+<td>1 — Composer, autoload, bootstrap</td>
+<td><strong>fatto</strong></td>
+<td><code>composer.json</code>, <code>src/autoload.php</code> (autoload PSR-4 senza Composer, usato sul server), <code>src/bootstrap.php</code> agganciato in <code>functions.php</code>; <code>PdfSemplice</code>/<code>TtfSemplice</code> → <code>App\Infrastructure\Pdf\Documento</code>/<code>TrueType</code> con alias</td>
+</tr>
+<tr>
+<td>2 — Core</td>
+<td><strong>fatto</strong></td>
+<td><code>App\Core\Database</code>, <code>Config</code>, <code>Container</code>, <code>App</code> (ponte per il legacy); <code>db_query/db_righe/db_riga/db_valore/db_esegui</code> sono facciate; 462 prove + 10 test PHPUnit verdi</td>
+</tr>
+<tr>
+<td>3 — Infrastruttura condivisa</td>
+<td>da fare</td>
+<td>prossimo step</td>
+</tr>
+</tbody>
+</table>
+<h3 id="decisioni-prese-durante-limplementazione-aggiornano-le-sezioni-1-e-2">Decisioni prese durante l'implementazione (aggiornano le sezioni 1 e 2)</h3>
+<ul>
+<li><strong>Aggancio in <code>functions.php</code>, non in <code>config.php</code></strong>: <code>functions.php</code> è incluso da tutte le pagine, dai cron e dalle prove automatiche (che non caricano <code>config.php</code>), quindi le classi sono disponibili ovunque. Il container si avvia appena esiste la connessione <code>$conn</code>.</li>
+<li><strong>Sul server non si carica <code>vendor/</code></strong>: <code>src/autoload.php</code> (15 righe) carica le classi <code>App\</code> da <code>src/</code> senza Composer. <code>vendor/</code> resta solo in sviluppo (PHPUnit, PHP-CS-Fixer) ed è escluso da git; se per errore finisse sul server è comunque bloccato dal <code>.htaccess</code>. Niente controllo di piattaforma di Composer (<code>platform-check: false</code>): nessun rischio di pagina bianca per la versione di PHP.</li>
+<li><strong>Compatibilità PHP 8.0</strong> finché non si conosce la versione del server (Step 0 sul server: <code>php strumenti/inventario_oop.php</code>): niente <code>enum</code> né <code>readonly</code> per ora; con PHP ≥ 8.1 si introducono negli step dei moduli. PHPUnit 9.6 (compatibile con 8.0).</li>
+<li><strong>Errori silenziosi conservati</strong>: le facciate <code>db_*</code> restituiscono <code>false</code>, <code>[]</code>, <code>null</code>, <code>-1</code> come prima (il sito usa <code>mysqli_report(OFF)</code>). Le eccezioni di dominio arrivano con i Service dei moduli.</li>
+</ul>
+<h3 id="comandi-di-sviluppo">Comandi di sviluppo</h3>
+<ul>
+<li><code>composer install</code> (una volta) · <code>composer test</code> (PHPUnit + prove del portale) · <code>composer cs</code> (stile PSR-12 su <code>src/</code> e <code>tests/</code>) · <code>composer inventario</code>.</li>
+<li>Sul server, dopo il caricamento: le stesse verifiche di sempre (<code>strumenti/prove_server.sh</code>, <code>strumenti/verifica_sito.sh</code>).</li>
+</ul>
+<hr />
+<h2 id="0-fotografia-dello-stato-attuale">0. FOTOGRAFIA DELLO STATO ATTUALE</h2>
+<table>
+<thead>
+<tr>
+<th>Elemento</th>
+<th>Situazione</th>
+<th>Impatto sulla migrazione</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Dimensioni</td>
+<td>≈ 27.000 righe in 100 pagine PHP (52 pubbliche, 48 in <code>admin/</code>) + 11.300 righe in 27 file <code>inc/</code> (484 funzioni)</td>
+<td>Troppo grande per una riscrittura: serve sostituzione incrementale</td>
+</tr>
+<tr>
+<td>Bootstrap</td>
+<td><code>config.php</code> (sessione, header di sicurezza, lettura <code>.env</code>, connessione <code>$conn</code>), <code>functions.php</code> (carica <code>inc/*.php</code> in ordine fisso, poi <code>assicura_schema()</code>), <code>middleware.php</code> (SSO, <code>$user_info</code>, ruoli)</td>
+<td>Punto unico in cui agganciare l'autoloader senza toccare le pagine</td>
+</tr>
+<tr>
+<td>Database</td>
+<td><code>mysqli</code> con <code>mysqli_report(OFF)</code>; 535 chiamate <code>-&gt;query()</code>, 246 <code>-&gt;prepare()</code>, 175 chiamate agli helper <code>db_query/db_righe/db_riga/db_valore/db_esegui</code> (<code>inc/base.php</code>)</td>
+<td>Gli helper sono già un "mini-repository": diventano la prima facciata verso la classe <code>Database</code></td>
+</tr>
+<tr>
+<td>Tabelle</td>
+<td>circa 56 tabelle (<code>database/schema.sql</code> + quelle create da <code>inc/schema.php</code>)</td>
+<td>Ogni aggregato ha già tabelle ben riconoscibili: i Repository si ricavano direttamente</td>
+</tr>
+<tr>
+<td>Stato globale</td>
+<td><code>$conn</code> passato quasi sempre come primo parametro (solo 6 <code>global</code> in tutto il codice); <code>$user_info</code>, <code>$u_id</code>, <code>$is_full_admin</code>, <code>$utente_admin</code>, <code>$filtro_p</code> creati dal middleware / dagli header</td>
+<td>Situazione favorevole: la Dependency Injection si può introdurre senza caccia ai <code>global</code></td>
+</tr>
+<tr>
+<td>Logica e HTML</td>
+<td>Pagine "a scheda": in alto le azioni POST (redirect + exit), sotto l'HTML; molte funzioni <code>inc/</code> restituiscono HTML (<code>html_*</code>)</td>
+<td>Separare per gradi: prima query (Repository), poi regole (Service), per ultimo le viste</td>
+</tr>
+<tr>
+<td>Schema</td>
+<td><code>inc/schema.php</code> → <code>assicura_schema()</code> con marcatore <code>cache/schema_vNN.ok</code> (oggi v43)</td>
+<td>Va mantenuto; più avanti diventa un sistema di migrazioni a classi</td>
+</tr>
+<tr>
+<td>Prove</td>
+<td><code>strumenti/prove/esegui.php</code>: 450 prove (funzioni su DB usa-e-getta + pagine dell'ambiente locale); <code>strumenti/prove_server.sh</code>, <code>strumenti/verifica_sito.sh</code></td>
+<td><strong>È la rete di sicurezza</strong>: ogni step deve lasciarle tutte verdi</td>
+</tr>
+<tr>
+<td>Rilascio</td>
+<td>Upload manuale dei file su XAMPP (<code>/opt/lampp</code>), nessun Composer sul server, nessuna CI</td>
+<td>L'autoload deve funzionare <strong>senza</strong> eseguire Composer in produzione</td>
+</tr>
+<tr>
+<td>Classi esistenti</td>
+<td>Solo <code>PdfSemplice</code> e <code>TtfSemplice</code> (<code>inc/pdf.php</code>)</td>
+<td>Primi candidati naturali a spostarsi in <code>src/</code></td>
+</tr>
+</tbody>
+</table>
+<p>Moduli funzionali (dai file <code>inc/</code> e dalle schede <code>admin/</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Area</th>
+<th>File procedurali attuali</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Fondamenta</td>
+<td><code>base</code> (utenti, SSO, permessi, CSRF, rate limit, email, helper DB), <code>sistema</code>, <code>dati</code> (log, audit, backup), <code>schema</code>, <code>esporta</code>, <code>pdf</code></td>
+</tr>
+<tr>
+<td>Portale</td>
+<td><code>sezioni</code>, <code>aspetto</code>, <code>organizzazione</code> (testata, menu, home, widget)</td>
+</tr>
+<tr>
+<td>Eventi</td>
+<td><code>eventi_progetti</code>, <code>agenda</code>, <code>seminari</code>, <code>avvisi</code>, <code>report_ambiti</code></td>
+</tr>
+<tr>
+<td>Iscrizioni</td>
+<td><code>prenotazioni</code>, <code>liste_attesa</code>, <code>attestati</code></td>
+</tr>
+<tr>
+<td>Risorse e aule</td>
+<td><code>risorse</code>, <code>calendario_risorse</code></td>
+</tr>
+<tr>
+<td>Anagrafi</td>
+<td><code>anagrafi</code>, <code>catalogo_ateneo</code></td>
+</tr>
+<tr>
+<td>FSL</td>
+<td><code>fsl</code> (scuole, convenzioni, valutazioni)</td>
+</tr>
+<tr>
+<td>Tutorato</td>
+<td><code>tutorato</code>, <code>tutorato_registro</code></td>
+</tr>
+<tr>
+<td>Didattica</td>
+<td><code>didattica</code> (moduli, pratiche, uffici, iter), <code>convalide</code> (protocollo, PDF/A, segreteria), <code>sedute</code> (consigli, verbali, firme)</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="1-setup-psr-4-e-composer">1. SETUP PSR-4 E COMPOSER</h2>
+<h3 id="11-tecnologia-scelta">1.1 Tecnologia scelta</h3>
+<ul>
+<li><strong>PHP ≥ 8.1</strong> (enum, proprietà <code>readonly</code>, <code>match</code>, tipi union). Primo controllo dello Step 0: versione PHP di <code>/opt/lampp/bin/php</code>. Se il server fosse fermo a 8.0 si rinuncia a enum/readonly finché non si aggiorna XAMPP, il resto del piano non cambia.</li>
+<li><strong>Composer</strong> solo sulle macchine di sviluppo. In produzione non serve eseguirlo: si carica la cartella <code>vendor/</code> generata (inizialmente contiene <strong>solo</strong> l'autoloader di Composer, zero librerie).</li>
+<li><strong>Nessun framework</strong> (Laravel/Symfony): imporrebbero una riscrittura e un cambio di modello di rilascio. Si adottano i loro principi (PSR-4, DI, Repository/Service) con codice nostro, piccolo e leggibile.</li>
+<li>Strumenti di qualità <strong>solo in sviluppo</strong> (<code>require-dev</code>, mai caricati sul server): PHPUnit (test di <code>src/</code>), PHPStan (analisi statica, livello crescente), PHP-CS-Fixer (stile PSR-12 solo su <code>src/</code> e <code>tests/</code>).</li>
+</ul>
+<h3 id="12-struttura-delle-cartelle">1.2 Struttura delle cartelle</h3>
+<pre><code>/                       (pagine legacy: restano dove sono, stessi URL)
+├── composer.json
+├── composer.lock
+├── vendor/             (generato: autoload ottimizzato; caricato sul server; protetto da .htaccess)
+├── src/                (codice OOP, namespace App\ ; protetto da .htaccess)
+│   ├── bootstrap.php   (crea il Container e registra i servizi; incluso da config.php)
+│   ├── Core/           (Config, Database, Container, Session, Clock, Http\Request, Http\Response, Csrf)
+│   ├── Infrastructure/ (Mail, Audit, Storage, Pdf, Docx, Xlsx, Logger)
+│   ├── Auth/           (Utente corrente, sincronizzazione SSO, politiche di accesso)
+│   ├── Portale/        (Testata, Menu, Home, Organizzazione)
+│   ├── Eventi/         (Area, Evento, Turno, Agenda, Seminari, Avvisi, Report)
+│   ├── Iscrizioni/     (Prenotazione, ListaAttesa, Attestato)
+│   ├── Risorse/        (Risorsa, PrenotazioneRisorsa, Calendario)
+│   ├── Anagrafi/       (Persona, Docente, CorsoStudio, Insegnamento, CatalogoAteneo, Scuola)
+│   ├── Fsl/            (Convenzione, Valutazione)
+│   ├── Tutorato/       (Incarico, Registro, Firme)
+│   ├── Didattica/      (Moduli, Pratiche, Uffici, Iter, Protocollo, Convalide, Sedute, Consigli)
+│   └── Legacy/         (adattatori temporanei verso funzioni non ancora migrate)
+├── tests/              (PHPUnit: Unit/ e Integration/; protetto da .htaccess)
+├── inc/                (procedurale: si svuota modulo per modulo, le funzioni diventano facciate)
+└── strumenti/prove/esegui.php   (prove esistenti: restano e crescono)
+</code></pre>
+<h3 id="13-composerjson-da-creare-allo-step-1">1.3 <code>composer.json</code> (da creare allo Step 1)</h3>
+<pre><code class="language-json">{
+    &quot;name&quot;: &quot;dibest/didattica&quot;,
+    &quot;description&quot;: &quot;Portale Didattica DiBEST&quot;,
+    &quot;type&quot;: &quot;project&quot;,
+    &quot;require&quot;: {
+        &quot;php&quot;: &quot;&gt;=8.1&quot;,
+        &quot;ext-mysqli&quot;: &quot;*&quot;,
+        &quot;ext-mbstring&quot;: &quot;*&quot;,
+        &quot;ext-json&quot;: &quot;*&quot;
+    },
+    &quot;require-dev&quot;: {
+        &quot;phpunit/phpunit&quot;: &quot;^10.5&quot;,
+        &quot;phpstan/phpstan&quot;: &quot;^1.11&quot;,
+        &quot;friendsofphp/php-cs-fixer&quot;: &quot;^3.50&quot;
+    },
+    &quot;autoload&quot;: {
+        &quot;psr-4&quot;: { &quot;App\\&quot;: &quot;src/&quot; }
+    },
+    &quot;autoload-dev&quot;: {
+        &quot;psr-4&quot;: { &quot;Tests\\&quot;: &quot;tests/&quot; }
+    },
+    &quot;config&quot;: {
+        &quot;optimize-autoloader&quot;: true,
+        &quot;platform&quot;: { &quot;php&quot;: &quot;8.1.0&quot; },
+        &quot;sort-packages&quot;: true
+    },
+    &quot;scripts&quot;: {
+        &quot;test&quot;: [&quot;phpunit&quot;, &quot;php strumenti/prove/esegui.php&quot;],
+        &quot;stan&quot;: &quot;phpstan analyse src --level=5&quot;,
+        &quot;cs&quot;: &quot;php-cs-fixer fix src tests --rules=@PSR12&quot;,
+        &quot;build&quot;: &quot;composer install --no-dev --classmap-authoritative&quot;
+    }
+}
+</code></pre>
+<ul>
+<li><code>platform.php</code> blocca le dipendenze alla versione del server, così ciò che funziona in sviluppo funziona anche lì.</li>
+<li>Prima di ogni rilascio: <code>composer build</code> → <code>vendor/</code> contiene solo l'autoload (nessuna libreria di sviluppo). <code>vendor/</code> <strong>va versionato</strong> sul ramo di rilascio (o caricato insieme ai file), perché sul server Composer non c'è.</li>
+</ul>
+<h3 id="14-aggancio-senza-rompere-nulla">1.4 Aggancio senza rompere nulla</h3>
+<p>Una sola riga in <code>config.php</code>, subito dopo la creazione di <code>$conn</code>:</p>
+<pre><code class="language-php">// Autoload delle classi App\ (src/) e servizi condivisi; se manca vendor/ il sito continua in modalità solo procedurale
+if (is_file(__DIR__ . '/vendor/autoload.php')) require_once __DIR__ . '/src/bootstrap.php';
+</code></pre>
+<p><code>src/bootstrap.php</code> include <code>vendor/autoload.php</code>, crea il Container e registra la <code>Database</code> <strong>attorno alla stessa <code>$conn</code></strong> (nessuna seconda connessione). Se il file manca, il sito si comporta esattamente come oggi: è il paracadute del primo rilascio.</p>
+<h3 id="15-sicurezza-delle-nuove-cartelle">1.5 Sicurezza delle nuove cartelle</h3>
+<p><code>src/</code>, <code>vendor/</code>, <code>tests/</code> non devono mai essere raggiungibili dal web (come oggi <code>inc/</code>): in ognuna un <code>.htaccess</code> con <code>Require all denied</code>, più <code>composer.json</code>/<code>composer.lock</code> aggiunti al blocco <code>FilesMatch</code> del <code>.htaccess</code> principale. Le prove esistenti verificano già i 403 su <code>inc/</code>: si estendono alle nuove cartelle.</p>
+<h3 id="16-convenzioni-di-codice">1.6 Convenzioni di codice</h3>
+<ul>
+<li><code>declare(strict_types=1);</code> in ogni file di <code>src/</code>.</li>
+<li><strong>Linguaggio di dominio in italiano</strong> (come il codice e le tabelle attuali: <code>Pratica</code>, <code>Seduta</code>, <code>Ufficio</code>, metodi <code>trovaPerId</code>, <code>assegna</code>), <strong>ruoli tecnici in inglese</strong> (<code>Repository</code>, <code>Service</code>, <code>Controller</code>) per restare riconoscibili a chiunque conosca i pattern.</li>
+<li>Una classe per file, nome file = nome classe, PSR-12.</li>
+<li>Nessun <code>echo</code>/<code>header()</code>/<code>exit</code> dentro Repository e Service: solo valori di ritorno ed eccezioni di dominio.</li>
+<li>Le classi non leggono <code>$_GET</code>, <code>$_POST</code>, <code>$_SESSION</code>, <code>$_SERVER</code> direttamente: li ricevono (Request, Session, CurrentUser).</li>
+</ul>
+<hr />
+<h2 id="2-core-database-isolation">2. CORE &amp; DATABASE ISOLATION</h2>
+<h3 id="21-obiettivo">2.1 Obiettivo</h3>
+<p>Un'unica classe <code>App\Core\Database</code> iniettata nei costruttori dei Repository al posto di <code>$conn</code> passato a mano o letto con <code>global</code>. Le funzioni procedurali continuano a ricevere <code>$conn</code> finché non vengono migrate.</p>
+<h3 id="22-classe-appcoredatabase-sopra-mysqli-non-pdo">2.2 Classe <code>App\Core\Database</code> (sopra mysqli, non PDO)</h3>
+<p>Si resta su <strong>mysqli</strong> nella prima fase: stesso driver, stessi tipi restituiti, stesso <code>SET time_zone</code> e charset, stesso comportamento di <code>mysqli_report(OFF)</code>. Passare a PDO in un secondo momento sarà un cambio interno alla classe, invisibile al resto del codice.</p>
+<pre><code class="language-php">namespace App\Core;
+
+final class Database
+{
+    public function __construct(private \mysqli $conn) {}
+
+    /** @return list&lt;array&lt;string,mixed&gt;&gt; */
+    public function righe(string $sql, array $parametri = []): array;   // = db_righe()
+    public function riga(string $sql, array $parametri = []): ?array;   // = db_riga()
+    public function valore(string $sql, array $parametri = []): mixed;  // = db_valore()
+    public function esegui(string $sql, array $parametri = []): int;    // = db_esegui(): righe toccate
+    public function inserisci(string $sql, array $parametri = []): int; // restituisce l'id inserito, letto SUBITO
+    public function transazione(callable $lavoro): mixed;               // begin/commit/rollback (FOR UPDATE delle prenotazioni)
+    public function mysqli(): \mysqli;                                   // uscita di emergenza per il codice legacy
+}
+</code></pre>
+<p>Note dalla codebase:
+- <code>inserisci()</code> risolve il problema noto per cui <code>$conn-&gt;insert_id</code> viene azzerato da un <code>UPDATE</code> successivo (oggi si ripiega su <code>SELECT MAX(id)</code>).
+- Tipi dei parametri ricavati come oggi negli helper (<code>i</code>/<code>d</code>/<code>s</code>, <code>null</code> gestito).
+- Errori: oggi la maggior parte delle query fallisce in silenzio (<code>@$conn-&gt;query</code>). La classe registra sempre l'errore in <code>error_log</code> con la query (senza i valori dei parametri) e lancia <code>DatabaseException</code> <strong>solo</strong> nei metodi nuovi; le facciate legacy mantengono il comportamento silenzioso finché il chiamante non è migrato.</p>
+<h3 id="23-facciate-gli-helper-esistenti-delegano-alla-classe">2.3 Facciate: gli helper esistenti delegano alla classe</h3>
+<p>In <code>inc/base.php</code> gli helper restano con la stessa firma, ma il corpo diventa:</p>
+<pre><code class="language-php">function db_righe($conn, string $sql, array $par = []): array {
+    return \App\Core\App::db($conn)-&gt;righe($sql, $par);
+}
+</code></pre>
+<p>Così 175 punti del codice passano subito dalla nuova classe senza essere toccati, e la classe viene collaudata dalle 450 prove esistenti.</p>
+<h3 id="24-container-dependency-injection">2.4 Container (Dependency Injection)</h3>
+<ul>
+<li><code>App\Core\Container</code>: container minimale scritto in casa (registrazione <code>set(id, factory)</code>, <code>get(id)</code> con istanze condivise, autowiring per costruttori con classi tipizzate). Circa 80 righe, nessuna dipendenza. Se in futuro servisse di più si sostituisce con <code>php-di/php-di</code> senza cambiare le classi, perché queste ricevono le dipendenze nel costruttore e non conoscono il container.</li>
+<li><code>src/bootstrap.php</code> registra: <code>Config</code>, <code>Database</code> (sulla <code>$conn</code> di <code>config.php</code>), <code>Session</code>, <code>Clock</code>, <code>Mailer</code>, <code>AuditLog</code>, <code>Storage</code>, e poi Repository e Service man mano che nascono.</li>
+<li><code>App\Core\App</code> è un <strong>ponte statico usato solo dal codice legacy</strong> (<code>App::get(PraticaService::class)</code>, <code>App::db($conn)</code>). Le classi in <code>src/</code> non lo usano mai: ricevono tutto dal costruttore. Quando l'ultima facciata sparisce, sparisce anche il ponte.</li>
+</ul>
+<h3 id="25-sostituzione-delle-variabili-globali-e-superglobali">2.5 Sostituzione delle variabili globali e superglobali</h3>
+<table>
+<thead>
+<tr>
+<th>Oggi</th>
+<th>Domani</th>
+<th>Come si arriva</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>$conn</code> (in <code>config.php</code>, parametro di quasi tutte le funzioni)</td>
+<td><code>Database</code> iniettata</td>
+<td>Facciate (2.3); le nuove classi non vedono più <code>$conn</code></td>
+</tr>
+<tr>
+<td><code>.env</code> letto in <code>config.php</code>, costanti sparse (<code>URL_SITO</code>, <code>POSTI_SENZA_LIMITE</code>, <code>DIR_*</code>…)</td>
+<td><code>App\Core\Config</code> (sola lettura)</td>
+<td>Si legge lo stesso file; le costanti restano definite per il legacy e Config le espone tipizzate</td>
+</tr>
+<tr>
+<td><code>$_SESSION['utente_id']</code>, <code>utente_ruolo_id</code>, <code>auth_meta</code>…</td>
+<td><code>App\Core\Session</code> + <code>App\Auth\UtenteCorrente</code></td>
+<td><code>middleware.php</code> costruisce <code>UtenteCorrente</code> e continua a creare <code>$user_info</code>, <code>$u_id</code>, <code>$is_full_admin</code> per le pagine non migrate</td>
+</tr>
+<tr>
+<td><code>$_GET/$_POST/$_FILES/$_SERVER</code> dentro funzioni (<code>leggi_risposte_modulo</code>, <code>crea_pratica</code> legge IP e sessione)</td>
+<td><code>App\Core\Http\Request</code> passata ai Controller; i Service ricevono dati già validati (DTO)</td>
+<td>Modulo per modulo</td>
+</tr>
+<tr>
+<td><code>date()</code>, <code>time()</code> sparsi (scadenze, promemoria, conservazione dati)</td>
+<td><code>App\Core\Clock</code></td>
+<td>Permette test deterministici di promemoria e scadenze</td>
+</tr>
+<tr>
+<td><code>inviaNotificaEmail()</code> chiamata ovunque</td>
+<td><code>App\Infrastructure\Mail\Mailer</code> (interfaccia)</td>
+<td>La funzione resta e delega; nei test un <code>MailerFinto</code> (le prove oggi la ridefiniscono)</td>
+</tr>
+<tr>
+<td><code>static $cache</code> dentro le funzioni (<code>uffici_didattica</code>, <code>scelte_anagrafe_didattica</code>…)</td>
+<td>Cache nei Repository, con <code>svuota()</code> esplicito</td>
+<td>Elimina i casi di dati "vecchi" come quello emerso sugli uffici appena creati</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="3-domain-driven-design">3. DOMAIN DRIVEN DESIGN</h2>
+<h3 id="31-strati-e-responsabilita">3.1 Strati e responsabilità</h3>
+<pre><code>Pagina legacy / Controller  →  Service (regole, transazioni, eventi)  →  Repository (SQL)  →  Database
+                                       ↓                                        ↑
+                               Infrastructure (Mail, Pdf, Storage, Audit)   Model / Value Object
+</code></pre>
+<ul>
+<li><strong>Model (Entity)</strong>: oggetto con identità e stato del dominio (<code>Pratica</code>, <code>Seduta</code>). Costruito dal Repository (<code>daRiga(array)</code>), espone metodi di dominio (<code>$pratica-&gt;eConclusa()</code>, <code>$pratica-&gt;richiedeBollo()</code>), non contiene SQL.</li>
+<li><strong>Value Object</strong>: immutabili, confrontati per valore: <code>CodiceFiscale</code>, <code>Email</code>, <code>AnnoAccademico</code> (<code>"2025/2026"</code>), <code>Protocollo</code> (numero + data), <code>Cfu</code>, <code>IntervalloDate</code>.</li>
+<li><strong>Enum</strong> (PHP 8.1) al posto delle costanti array: <code>StatoPratica</code> (oggi <code>STATI_PRATICA</code>), <code>EsitoSeduta</code>, <code>EsitoConvalida</code>, <code>TipoUfficio</code> (<code>protocollo</code>, <code>cdl</code>, <code>segreteria</code>), <code>StatoPrenotazione</code>, <code>MetodoAccesso</code> (SPID, CIE, Ateneo), <code>StatoVerbale</code>. Ogni enum offre <code>etichetta()</code> e <code>colore()</code> per le viste: le costanti attuali restano come alias finché servono.</li>
+<li><strong>Repository</strong>: tutto e solo l'SQL di un aggregato. Restituiscono Model/array tipizzati, accettano criteri espliciti (<code>cercaPerFiltri(FiltriPratiche $f)</code>). Uno per aggregato.</li>
+<li><strong>Service (Application Service)</strong>: un caso d'uso per metodo (<code>registraProtocollo</code>, <code>inviaAllaSegreteria</code>), apre la transazione, coordina Repository e Infrastructure, scrive l'audit, lancia eccezioni di dominio (<code>PraticaNonTrovata</code>, <code>ProtocolloNonValido</code>). È l'unico posto delle regole di business.</li>
+<li><strong>Domain Service / Policy</strong>: regole riusabili senza stato: <code>PoliticaAccessoPratica</code> (oggi <code>utente_vede_pratica</code>), <code>CalcoloPostiDisponibili</code> (oggi <code>getPostiOccupati</code>, definita in <code>config.php</code>, + soglia <code>POSTI_SENZA_LIMITE</code>), <code>RisolutoreIter</code> (oggi <code>iter_modulo</code> con <code>@cdl</code>/<code>@segreteria</code>).</li>
+<li><strong>Presenter/View helper</strong>: le funzioni <code>html_*</code> diventano classi di presentazione in <code>src/&lt;Modulo&gt;/Vista/</code> (stesso HTML, prima) e solo alla fine, eventualmente, template.</li>
+</ul>
+<h3 id="32-entita-principali-per-contesto-bounded-context">3.2 Entità principali per contesto (bounded context)</h3>
+<table>
+<thead>
+<tr>
+<th>Contesto</th>
+<th>Entità / aggregati</th>
+<th>Tabelle principali</th>
+<th>Repository</th>
+<th>Service</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Auth &amp; Utenti</strong></td>
+<td><code>Utente</code>, <code>Ruolo</code>, <code>Abilitazione</code>, <code>UtenteCorrente</code>, <code>MetadatiAccesso</code></td>
+<td><code>utenti</code>, <code>ruoli</code>, <code>abilitazioni_ambito</code>, <code>abilitazioni_attesa</code>, <code>log_accessi</code>, <code>rate_limit_attempts</code></td>
+<td><code>UtenteRepository</code>, <code>AbilitazioneRepository</code></td>
+<td><code>SincronizzazioneSso</code>, <code>ServizioPermessi</code> (oggi <code>ha_modulo</code>, <code>utente_ha_abilitazioni</code>, <code>utente_gestisce_didattica</code>)</td>
+</tr>
+<tr>
+<td><strong>Portale</strong></td>
+<td><code>VoceMenu</code>, <code>Slide</code>, <code>ConfigurazionePortale</code>, <code>OrganizzazioneHome</code></td>
+<td><code>menu_voci</code>, <code>slide_home</code>, <code>configurazione_portale</code>, <code>copie_configurazione</code>, <code>impostazioni_sistema</code></td>
+<td><code>MenuRepository</code>, <code>ConfigurazioneRepository</code></td>
+<td><code>ServizioOrganizzazione</code> (proposta, backup, ripristino)</td>
+</tr>
+<tr>
+<td><strong>Eventi</strong></td>
+<td><code>Area</code> (<code>pagine_eventi</code>), <code>Evento</code>, <code>Turno</code>, <code>Seminario</code>, <code>IscrizioneAvvisi</code></td>
+<td><code>pagine_eventi</code>, <code>eventi</code>, <code>turni</code>, <code>progetti_dettagli</code>, <code>sottocategorie</code>, <code>avvisi_eventi</code>, <code>avvisi_iscrizioni</code></td>
+<td><code>AreaRepository</code>, <code>EventoRepository</code>, <code>TurnoRepository</code>, <code>AvvisoRepository</code></td>
+<td><code>ServizioAgenda</code>, <code>ServizioAvvisi</code>, <code>ReportAmbiti</code></td>
+</tr>
+<tr>
+<td><strong>Iscrizioni</strong></td>
+<td><code>Prenotazione</code>, <code>ListaAttesa</code>, <code>Attestato</code>, <code>Sondaggio</code></td>
+<td><code>prenotazioni</code> (stati, lista d'attesa, presenze e attestati), <code>partecipanti_prenotazione</code>, <code>messaggi_prenotazioni</code>, <code>campi_form</code>, <code>sondaggi</code>, <code>sondaggi_domande</code>, <code>sondaggi_risposte</code></td>
+<td><code>PrenotazioneRepository</code>, <code>AttestatoRepository</code></td>
+<td><code>ServizioPrenotazioni</code> (con <code>FOR UPDATE</code> anti-overbooking), <code>ServizioListaAttesa</code>, <code>ServizioAttestati</code>, <code>ServizioSondaggi</code></td>
+</tr>
+<tr>
+<td><strong>Risorse</strong></td>
+<td><code>Risorsa</code>, <code>PrenotazioneRisorsa</code>, <code>Sportello</code></td>
+<td><code>risorse</code>, <code>risorse_orari</code>, <code>risorse_chiusure</code>, <code>prenotazioni_risorse</code></td>
+<td><code>RisorsaRepository</code></td>
+<td><code>ServizioCalendarioRisorse</code></td>
+</tr>
+<tr>
+<td><strong>Anagrafi</strong></td>
+<td><code>Persona</code>, <code>Docente</code>, <code>CorsoStudio</code>, <code>Insegnamento</code>, <code>Scuola</code>, <code>CorsoCatalogo</code></td>
+<td><code>personale_ateneo</code>, <code>personale_modifiche</code>, <code>anagrafe_strutture</code>, <code>corsi_studio</code>, <code>insegnamenti</code>, <code>scuole</code>, <code>ateneo_cds</code>, <code>ateneo_insegnamenti</code>, <code>ateneo_insegnamenti_scaricati</code></td>
+<td><code>PersonaRepository</code>, <code>CorsoRepository</code>, <code>InsegnamentoRepository</code>, <code>CatalogoAteneoRepository</code></td>
+<td><code>SincronizzazioneAnagrafe</code>, <code>ClientApiAteneo</code></td>
+</tr>
+<tr>
+<td><strong>FSL</strong></td>
+<td><code>Convenzione</code>, <code>ConvenzioneCompilata</code>, <code>ValutazioneFsl</code></td>
+<td><code>convenzioni_scuole</code>, <code>convenzioni_compilate</code>, <code>valutazioni_fsl</code></td>
+<td><code>ConvenzioneRepository</code></td>
+<td><code>ServizioConvenzioni</code> (documenti Word, PAdES)</td>
+</tr>
+<tr>
+<td><strong>Tutorato</strong></td>
+<td><code>Bando</code>, <code>Incarico</code>, <code>AttivitaRegistro</code>, <code>Firma</code></td>
+<td><code>tutorato_bandi</code>, <code>tutorato_incarichi</code>, <code>tutorato_eventi</code>, <code>tutorato_registro</code></td>
+<td><code>IncaricoRepository</code>, <code>RegistroRepository</code></td>
+<td><code>ServizioIncarichi</code>, <code>ServizioFirmePades</code>, <code>ServizioRegistro</code></td>
+</tr>
+<tr>
+<td><strong>Didattica – Pratiche</strong></td>
+<td><code>Modulo</code> (con <code>Campo</code>, <code>ColonnaTabella</code>, <code>Condizione</code>), <code>Pratica</code>, <code>EventoPratica</code>, <code>Risposta</code>, <code>DecisioniConvalida</code>, <code>RigaConvalida</code></td>
+<td><code>didattica_moduli</code>, <code>pratiche</code>, <code>pratiche_eventi</code>, <code>pratiche_operatori</code></td>
+<td><code>ModuloRepository</code>, <code>PraticaRepository</code>, <code>EventoPraticaRepository</code></td>
+<td><code>ServizioInvioPratica</code>, <code>ServizioIter</code>, <code>ServizioProtocollo</code>, <code>ServizioConvalide</code>, <code>ServizioSegreteria</code>, <code>GeneratoreDomandaPdfa</code></td>
+</tr>
+<tr>
+<td><strong>Didattica – Uffici</strong></td>
+<td><code>Ufficio</code> (con <code>TipoUfficio</code>), <code>Operatore</code></td>
+<td><code>didattica_uffici</code>, <code>ufficio_didattica</code></td>
+<td><code>UfficioRepository</code>, <code>OperatoreRepository</code></td>
+<td><code>ServizioSmistamento</code></td>
+</tr>
+<tr>
+<td><strong>Didattica – Organi</strong></td>
+<td><code>Consiglio</code>, <code>ComponenteConsiglio</code>, <code>Seduta</code>, <code>Presenza</code>, <code>Convocazione</code>, <code>Verbale</code></td>
+<td><code>didattica_consigli</code>, <code>didattica_consigli_persone</code>, <code>didattica_sedute</code>, <code>didattica_sedute_presenze</code>, <code>didattica_convocazioni</code></td>
+<td><code>ConsiglioRepository</code>, <code>SedutaRepository</code></td>
+<td><code>ServizioSedute</code>, <code>ServizioVerbale</code> (Word, PAdES), <code>ServizioEstratti</code></td>
+</tr>
+<tr>
+<td><strong>Infrastruttura</strong></td>
+<td>—</td>
+<td><code>log_email</code>, <code>log_attivita</code>, <code>template_email</code></td>
+<td>—</td>
+<td><code>Mailer</code>, <code>AuditLog</code>, <code>Storage</code> (uploads protetti), <code>Pdf</code> (oggi <code>PdfSemplice</code> PDF/A), <code>Docx</code>, <code>Xlsx</code>, <code>Logger</code></td>
+</tr>
+</tbody>
+</table>
+<p>Esempio di confine dai casi recenti: oggi <code>registra_protocollo_pratica()</code> legge la pratica, aggiorna protocollo e bollo, scrive due eventi, risolve l'ufficio del corso, assegna e manda email. Domani:</p>
+<pre><code class="language-php">final class ServizioProtocollo
+{
+    public function __construct(
+        private PraticaRepository $pratiche,
+        private ModuloRepository $moduli,
+        private EventoPraticaRepository $eventi,
+        private RisolutoreIter $iter,
+        private ServizioSmistamento $smistamento,
+        private Clock $orologio,
+    ) {}
+
+    public function registra(int $praticaId, Protocollo $protocollo, bool $bolloVerificato, Autore $autore): EsitoProtocollo
+    {
+        // regole: data non futura, bollo obbligatorio se il modulo lo richiede, passo successivo dell'iter
+    }
+}
+</code></pre>
+<p>e la funzione legacy diventa una facciata di 3 righe che converte parametri e risultato nel formato di oggi <code>[errore|null, messaggio]</code>.</p>
+<h3 id="33-regole-che-restano-invariate">3.3 Regole che restano invariate</h3>
+<ul>
+<li>Lo schema del database non cambia per effetto del refactoring (le tabelle si rinominano solo se serve davvero, mai insieme a una migrazione di codice).</li>
+<li>Gli URL non cambiano. Le pagine diventano "controller sottili" restando file <code>.php</code> agli stessi indirizzi; un front controller con router è facoltativo e solo alla fine (Step 15).</li>
+<li>I testi visibili all'utente, le email e i PDF devono risultare identici prima e dopo ogni step (vedi prove di caratterizzazione).</li>
+</ul>
+<hr />
+<h2 id="4-roadmap-a-step-incrementali">4. ROADMAP A STEP INCREMENTALI</h2>
+<h3 id="come-si-lavora-in-ogni-step-vale-per-tutti">Come si lavora in ogni step (vale per tutti)</h3>
+<ol>
+<li><strong>Prove di caratterizzazione prima di toccare il codice</strong>: si fissano in <code>strumenti/prove/esegui.php</code> (o in <code>tests/Integration</code>) gli output attuali delle funzioni del modulo: righe del DB, HTML significativo, email intercettate, PDF (testo estratto e conformità veraPDF dove serve).</li>
+<li><strong>Nuove classi in <code>src/</code></strong> + test unitari PHPUnit.</li>
+<li><strong>Le funzioni legacy diventano facciate</strong> con la stessa firma e lo stesso risultato. Nessuna pagina viene toccata in questa fase.</li>
+<li><strong>Pagine/schede del modulo</strong> convertite in controller sottili (azioni POST → Service; vista che usa Repository/Presenter).</li>
+<li><strong>Verifica</strong>: <code>composer test</code> (PHPUnit + 450 prove esistenti), PHPStan sul nuovo codice, giro manuale delle pagine del modulo in locale (<code>strumenti/locale</code>).</li>
+<li><strong>Rilascio</strong>: un PR dal ramo dello step verso <code>main</code>, elenco esatto dei file da caricare, <code>prove_server.sh</code> e <code>verifica_sito.sh</code> dopo l'upload.</li>
+<li><strong>Rollback</strong>: ricaricare i file della versione precedente (le facciate fanno sì che nessuno step richieda modifiche al database; se uno step le richiede, sono solo additive e retrocompatibili).</li>
+<li>Le facciate si eliminano <strong>solo</strong> quando nessun file le chiama più (verifica con <code>grep</code> e PHPStan), in uno step di pulizia separato.</li>
+</ol>
+<p>Ramificazione: <code>feature/refactoring-oop</code> è il ramo di coordinamento (questo piano, <code>composer.json</code>, Core). Ogni step lavora su <code>feature/refactoring-oop/step-NN-nome</code> e va in <code>main</code> (e quindi in produzione) appena verde, così la distanza dal codice in produzione resta piccola e le nuove funzionalità continuano a entrare normalmente.</p>
+<hr />
+<h3 id="step-0-rete-di-sicurezza-e-inventario-nessun-cambio-in-produzione">STEP 0 — Rete di sicurezza e inventario (nessun cambio in produzione)</h3>
+<ul>
+<li>Verifica della versione PHP ed estensioni sul server (<code>prove_server.sh</code> già le elenca); decisione 8.1+ o 8.0.</li>
+<li>Inventario automatico delle funzioni <code>inc/</code> e dei loro chiamanti (script in <code>strumenti/</code>) per misurare l'avanzamento: "funzioni procedurali rimaste / facciate / migrate".</li>
+<li>Prove di caratterizzazione aggiuntive sulle parti meno coperte: prenotazione completa con lista d'attesa, generazione attestati, menu e home, esportazioni Excel/Word.</li>
+<li><strong>Fine step</strong>: piano approvato, prove verdi, nessun file di produzione modificato.</li>
+</ul>
+<h3 id="step-1-composer-autoload-psr-4-e-bootstrap-le-fondamenta-zero-cambi-di-comportamento">STEP 1 — Composer, autoload PSR-4 e bootstrap (le fondamenta, zero cambi di comportamento)</h3>
+<ul>
+<li><code>composer.json</code>, <code>vendor/</code> generato con <code>composer build</code>, <code>src/bootstrap.php</code>, <code>.htaccess</code> di protezione per <code>src/</code>, <code>vendor/</code>, <code>tests/</code>.</li>
+<li>Riga di aggancio condizionale in <code>config.php</code> (1.4).</li>
+<li>Prima classe spostata come prova del meccanismo: <code>PdfSemplice</code> / <code>TtfSemplice</code> → <code>App\Infrastructure\Pdf\Documento</code> e <code>\TrueType</code>, con <code>class_alias</code> in <code>inc/pdf.php</code> per i nomi vecchi.</li>
+<li>Prove: 403 su <code>src/</code>, <code>vendor/</code>, <code>tests/</code>, <code>composer.json</code>; PDF generati identici (stesse pagine, veraPDF conforme).</li>
+<li><strong>Rilascio</strong>: <code>composer.json</code>, <code>composer.lock</code>, <code>vendor/</code>, <code>src/</code>, <code>.htaccess</code> nuovi, <code>config.php</code>, <code>inc/pdf.php</code>.</li>
+</ul>
+<h3 id="step-2-core-config-database-container-session-clock">STEP 2 — Core: Config, Database, Container, Session, Clock</h3>
+<ul>
+<li>Classi del paragrafo 2; helper <code>db_*</code> di <code>inc/base.php</code> trasformati in facciate.</li>
+<li><code>Config</code> legge lo stesso <code>.env</code> / <code>.env.locale</code> con la stessa logica di <code>config.php</code> (che continua a funzionare per il legacy).</li>
+<li>Le prove esistenti girano sopra la nuova <code>Database</code> senza modifiche: è la verifica principale.</li>
+<li><strong>Rilascio</strong>: <code>src/Core/*</code>, <code>src/bootstrap.php</code>, <code>inc/base.php</code>.</li>
+</ul>
+<h3 id="step-3-infrastruttura-condivisa-mailer-auditlog-storage-logger-documenti">STEP 3 — Infrastruttura condivisa: Mailer, AuditLog, Storage, Logger, documenti</h3>
+<ul>
+<li><code>inviaNotificaEmail()</code> → <code>Mailer</code> (client SMTP attuale spostato in classe, stesso registro <code>log_email</code>); <code>registra_log_audit()</code> (<code>inc/sistema.php</code>, tabella <code>log_attivita</code>) → <code>AuditLog</code>; upload protetti (<code>secure_upload</code>, cartelle con <code>.htaccess</code> automatico, <code>allegato_pratica.php</code>) → <code>Storage</code>; Word/Excel (<code>docx_*</code>, <code>xlsx_crea</code>) → <code>Infrastructure\Documenti</code>.</li>
+<li>Tutte le funzioni restano come facciate: nessuna pagina cambia.</li>
+<li><strong>Perché qui</strong>: ogni modulo successivo ne ha bisogno; migrarli prima evita di toccare due volte gli stessi file.</li>
+</ul>
+<h3 id="step-4-modulo-pilota-avvisi-periferico-piccolo-completo">STEP 4 — Modulo pilota: Avvisi (periferico, piccolo, completo)</h3>
+<ul>
+<li><code>inc/avvisi.php</code> (7 funzioni) + <code>avvisi.php</code>: <code>AvvisoRepository</code>, <code>ServizioAvvisi</code>, enum degli ambiti, controller sottile per la pagina.</li>
+<li>È il <strong>modello di riferimento</strong> per tutti gli step successivi: struttura delle cartelle, test, facciate, controller, elenco file di rilascio. Si sceglie un modulo periferico come pilota proprio perché un errore qui non tocca login, prenotazioni o pratiche.</li>
+<li><strong>Fine step</strong>: pagina avvisi identica, email di avviso identiche, documento "come migrare un modulo" aggiunto in fondo a questo piano con le lezioni apprese.</li>
+</ul>
+<h3 id="step-5-autenticazione-utente-corrente-e-permessi">STEP 5 — Autenticazione, utente corrente e permessi</h3>
+<ul>
+<li><code>UtenteCorrente</code> costruito dal <code>middleware.php</code> (che continua a esporre <code>$user_info</code>, <code>$u_id</code>, <code>$is_full_admin</code>, <code>$is_gestore</code> per le pagine non migrate); <code>ServizioPermessi</code> per <code>ha_modulo</code>, <code>utente_ha_abilitazioni</code>, <code>utente_gestisce_didattica</code>, <code>require_admin_or_gestore</code>; <code>MetadatiAccesso</code> (SPID/CIE/Ateneo) per <code>auth_meta</code>.</li>
+<li><code>saml_login.php</code> e <code>sync_sso_user()</code>: il codice SimpleSAML <strong>si sposta senza cambiare logica</strong> in <code>SincronizzazioneSso</code>, con prove sul percorso locale <code>__accesso</code> e controllo manuale del login reale in un orario di basso traffico.</li>
+<li>CSRF (<code>csrf_field</code>/<code>csrf_verify</code>, <code>inc/sistema.php</code>) e rate limit (<code>check_rate_limit</code>, <code>inc/base.php</code>) → <code>Core\Csrf</code>, <code>Core\RateLimiter</code>.</li>
+<li><strong>Perché dopo il pilota</strong>: è il punto più critico del sito; ci si arriva con Core, infrastruttura e procedura già collaudati.</li>
+</ul>
+<h3 id="step-6-portale-testata-menu-home-organizzazione-proposta">STEP 6 — Portale: testata, menu, home, organizzazione proposta</h3>
+<ul>
+<li><code>inc/sezioni.php</code>, <code>aspetto.php</code>, <code>organizzazione.php</code> → <code>Portale\*</code>; <code>header.php</code> diventa un presenter (la recente regressione del menu dovuta a una variabile <code>$m</code> riusata nell'header è esattamente il tipo di errore che le variabili locali delle classi eliminano).</li>
+<li>Prova da aggiungere prima: confronto dell'HTML del menu per utente anonimo e amministratore.</li>
+</ul>
+<h3 id="step-7-anagrafi-e-catalogo-di-ateneo-sola-lettura-molto-usati">STEP 7 — Anagrafi e catalogo di Ateneo (sola lettura, molto usati)</h3>
+<ul>
+<li><code>anagrafi.php</code>, <code>catalogo_ateneo.php</code>, <code>cerca_insegnamenti.php</code>, <code>cerca_scuole.php</code>, <code>cerca_personale.php</code>: Repository e <code>ClientApiAteneo</code> (chiamate HTTP alle API di Ateneo isolate e simulabili nei test).</li>
+<li>Servono a Eventi, FSL, Tutorato e Didattica: migrarli presto semplifica tutto il resto.</li>
+</ul>
+<h3 id="step-8-eventi-aree-eventi-turni-agenda-seminari-report-per-ambito">STEP 8 — Eventi: aree, eventi, turni, agenda, seminari, report per ambito</h3>
+<ul>
+<li><code>eventi_progetti.php</code>, <code>agenda.php</code>, <code>seminari.php</code>, <code>report_ambiti.php</code>, pagine <code>area.php</code>, <code>agenda.php</code>, <code>agenda_ics.php</code>, schede admin eventi/progetti.</li>
+</ul>
+<h3 id="step-9-iscrizioni-prenotazioni-liste-dattesa-check-in-attestati-sondaggi">STEP 9 — Iscrizioni: prenotazioni, liste d'attesa, check-in, attestati, sondaggi</h3>
+<ul>
+<li>Cuore del portale e unico punto con concorrenza (<code>getPostiOccupati(..., FOR UPDATE)</code>): <code>ServizioPrenotazioni::prenota()</code> dentro <code>Database::transazione()</code>, con prova di concorrenza (due prenotazioni parallele sull'ultimo posto) da aggiungere prima di migrare.</li>
+<li>Cron (<code>cron_attestati.php</code>, <code>cron_background.php</code>, <code>admin/cron_reminders.php</code>) come comandi che chiamano i Service.</li>
+</ul>
+<h3 id="step-10-risorse-aule-e-sportelli-di-ricevimento">STEP 10 — Risorse, aule e sportelli di ricevimento</h3>
+<ul>
+<li><code>risorse.php</code>, <code>calendario_risorse.php</code>, <code>prenotazioni_risorse</code>, <code>ricevimento.php</code>, <code>risorsa_ics.php</code>.</li>
+</ul>
+<h3 id="step-11-fsl">STEP 11 — FSL</h3>
+<ul>
+<li><code>fsl.php</code> (convenzioni compilate online, documenti Word, firme PAdES, valutazioni).</li>
+</ul>
+<h3 id="step-12-tutorato">STEP 12 — Tutorato</h3>
+<ul>
+<li><code>tutorato.php</code>, <code>tutorato_registro.php</code>, <code>incarico.php</code>, <code>firma_incarico.php</code>, <code>registro_tutorato.php</code>: <code>ServizioFirmePades</code> condiviso poi da Sedute (verbali) — firma remota Aruba isolata dietro un'interfaccia <code>FirmaRemota</code> (simulabile nei test).</li>
+</ul>
+<h3 id="step-13-didattica-uffici-moduli-pratiche-iter-protocollo-convalide-segreteria">STEP 13 — Didattica: uffici, moduli, pratiche, iter, protocollo, convalide, segreteria</h3>
+<ul>
+<li>Il modulo più grande (<code>didattica.php</code> 80 funzioni + <code>convalide.php</code> 20) e il più ricco di regole. Si divide in sotto-step rilasciabili:</li>
+<li>13a <code>Uffici</code> e <code>Operatori</code> (+ <code>TipoUfficio</code>, risoluzione ufficio del corso);</li>
+<li>13b <code>Modulo</code> e campi (costruttore, logica condizionale, colonne tipizzate, lettura delle risposte: oggi <code>campi_modulo</code>, <code>leggi_risposte_modulo</code>);</li>
+<li>13c <code>Pratica</code> e iter (<code>crea_pratica</code>, <code>assegna_pratica</code>, stati, eventi, email);</li>
+<li>13d Protocollo, marca da bollo, domanda PDF/A (<code>GeneratoreDomandaPdfa</code>), invio alla segreteria;</li>
+<li>13e Convalide e piano di studi (<code>DecisioniConvalida</code>, frasi per verbale ed estratto).</li>
+<li>Le schede <code>admin/didattica_*.php</code> diventano controller sottili; <code>modulo.php</code>, <code>pratiche.php</code>, <code>allegato_pratica.php</code> idem.</li>
+<li>Il flusso protocollo → ufficio del corso → segreteria diventa configurazione del <code>Modulo</code> gestita dal <code>ServizioIter</code>: è la base generica per tutte le pratiche future richieste.</li>
+</ul>
+<h3 id="step-14-sedute-consigli-e-verbali">STEP 14 — Sedute, consigli e verbali</h3>
+<ul>
+<li><code>sedute.php</code> e parte di <code>didattica.php</code> (consigli, presenze, convocazioni, decisioni in seduta, verbale Word, estratti PDF/A, firma PAdES segretario → coordinatore).</li>
+</ul>
+<h3 id="step-15-schema-cron-pulizia-e-facoltativo-front-controller">STEP 15 — Schema, cron, pulizia e (facoltativo) front controller</h3>
+<ul>
+<li><code>assicura_schema()</code> → <code>App\Core\Migrazioni</code> con una classe per versione (v44, v45…), stesso marcatore in <code>cache/</code>, stessa idempotenza.</li>
+<li>Eliminazione delle facciate non più chiamate, di <code>App\Core\App</code> (ponte statico) dove possibile, delle costanti array sostituite dagli enum.</li>
+<li>Facoltativo: <code>public/index.php</code> con router e template (Twig o PHP puro) mantenendo gli stessi URL tramite le regole del <code>.htaccess</code> esistente; si valuta solo quando tutte le pagine sono già controller sottili.</li>
+<li>PHPStan portato al livello 8 su tutto <code>src/</code>.</li>
+</ul>
+<hr />
+<h3 id="ordine-e-dipendenze-in-sintesi">Ordine e dipendenze in sintesi</h3>
+<pre><code>0 Rete di sicurezza
+└─ 1 Composer/autoload ─ 2 Core (DB, Config, DI) ─ 3 Infrastruttura (Mail, Audit, Storage, Documenti)
+                                                     ├─ 4 Avvisi (pilota)
+                                                     ├─ 5 Auth &amp; permessi
+                                                     ├─ 6 Portale
+                                                     └─ 7 Anagrafi ─┬─ 8 Eventi ─ 9 Iscrizioni ─ 10 Risorse
+                                                                    ├─ 11 FSL
+                                                                    ├─ 12 Tutorato ─┐
+                                                                    └─ 13 Didattica ─┴─ 14 Sedute
+                                                                                          └─ 15 Pulizia e migrazioni
+</code></pre>
+<p>Gli step 8–14 dipendono solo da 1–7 e possono essere riordinati in base alle priorità del Dipartimento (es. Didattica prima di Eventi se arrivano nuove pratiche da gestire).</p>
+<h3 id="criteri-di-step-completato">Criteri di "step completato"</h3>
+<ul>
+<li>Tutte le prove esistenti verdi + nuovi test PHPUnit del modulo verdi.</li>
+<li>PHPStan senza errori sul nuovo codice al livello concordato.</li>
+<li>Nessuna query SQL nelle pagine del modulo né nei Service (solo nei Repository).</li>
+<li>Funzioni legacy del modulo ridotte a facciate (o rimosse se senza chiamanti).</li>
+<li>Pagine e PDF verificati a mano in locale; elenco file di rilascio pronto.</li>
+<li>Dopo l'upload: <code>prove_server.sh</code> e <code>verifica_sito.sh</code> verdi.</li>
+</ul>
+<h3 id="rischi-principali-e-contromisure">Rischi principali e contromisure</h3>
+<table>
+<thead>
+<tr>
+<th>Rischio</th>
+<th>Contromisura</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>vendor/</code> mancante o incompleto in produzione</td>
+<td>Aggancio condizionale (1.4) nel primo rilascio; dal secondo step <code>prove_server.sh</code> controlla la presenza dell'autoload</td>
+</tr>
+<tr>
+<td>Differenze sottili di comportamento (tipi restituiti da mysqli, stringhe vs interi, errori silenziosi)</td>
+<td>Stesso driver mysqli; facciate con risultato identico; prove di caratterizzazione prima di ogni step</td>
+</tr>
+<tr>
+<td>Login SSO/SAML rotto</td>
+<td>Step 5 dopo il pilota, logica spostata senza modifiche, prova reale in orario di basso traffico, rollback immediato dei soli file dello step</td>
+</tr>
+<tr>
+<td>Overbooking delle prenotazioni</td>
+<td>Transazione e <code>FOR UPDATE</code> conservati in <code>ServizioPrenotazioni</code>; prova di concorrenza dedicata</td>
+</tr>
+<tr>
+<td>Lavoro in parallelo con nuove funzionalità</td>
+<td>Step brevi che vanno in <code>main</code> appena verdi; nuove funzionalità scritte direttamente come classi in <code>src/</code> per i moduli già migrati</td>
+</tr>
+<tr>
+<td>Deriva del piano</td>
+<td>Inventario automatico (Step 0) aggiornato a ogni step: numero di funzioni procedurali rimaste per modulo</td>
+</tr>
+</tbody>
+</table>
+</div></body></html>
