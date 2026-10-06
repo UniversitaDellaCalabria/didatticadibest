@@ -19,6 +19,10 @@ Options -Indexes -MultiViews
 <FilesMatch "\.(save|bak|old|orig|swp|sql|log)(\.\d+)?$">
     Require all denied
 </FilesMatch>
+# Archivi (es. aggiornamento.tgz caricato per gli aggiornamenti: contiene il codice) e documenti interni (README, piano di migrazione)
+<FilesMatch "\.(tgz|tar|gz|zip|7z|rar|md)$">
+    Require all denied
+</FilesMatch>
 
 RewriteEngine On
 # Librerie di Composer (vendor/, solo in sviluppo): mai raggiungibili dal web (src/ e tests/ hanno il loro .htaccess)

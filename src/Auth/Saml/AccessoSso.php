@@ -211,6 +211,8 @@ final class AccessoSso
      */
     private function apriSessione(array $uInfo, array $metaAccesso): void
     {
+        // Nuovo id di sessione prima di scrivere l'utente: un cookie di sessione impostato in anticipo da altri non diventa valido
+        $this->sessione->rigenera();
         $this->sessione->scrivi('utente_id', (int) $uInfo['id']);
         $this->sessione->scrivi('utente_cf', $uInfo['codice_fiscale']);
         $this->sessione->scrivi('utente_nome', trim($uInfo['nome'] . ' ' . $uInfo['cognome']));

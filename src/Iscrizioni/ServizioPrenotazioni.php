@@ -149,6 +149,8 @@ final class ServizioPrenotazioni
             }
             $bloccante = $this->vincoli->iscrizioneVincolata($limiteIsc, (int) $t['pagina_id'], (int) $t['evento_id'], (int) ($r->utenteId ?? 0), $email, $r->matricola);
             if ($bloccante) {
+                $this->rilascia($blocco);
+
                 return new EsitoPrenotazione("{$ritorno}status=limite&ev=" . urlencode((string) $bloccante['evento_titolo']));
             }
         }
@@ -231,9 +233,12 @@ final class ServizioPrenotazioni
                 return [$id, $stato];
             });
         } catch (PostiEsauriti) {
+            $this->rilascia($blocco);
+
             return new EsitoPrenotazione("{$ritorno}status=full");
         } catch (Throwable $e) {
             error_log("[Prenotazione][turno_id=$turnoId] Transazione fallita: " . $e->getMessage());
+            $this->rilascia($blocco);
 
             return new EsitoPrenotazione("{$ritorno}status=error");
         }

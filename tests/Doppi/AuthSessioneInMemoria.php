@@ -26,4 +26,12 @@ final class AuthSessioneInMemoria implements Sessione
     {
         unset($this->dati[$chiave]);
     }
+
+    /** Quante volte l'id di sessione è stato rigenerato (per verificare che l'accesso lo faccia). */
+    public int $rigenerazioni = 0;
+
+    public function rigenera(): void
+    {
+        $this->rigenerazioni++;
+    }
 }

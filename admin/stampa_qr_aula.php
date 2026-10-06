@@ -9,16 +9,6 @@ if ($t_id === 0) {
     exit;
 }
 
-
-// Ruota token
-if (isset($_GET['rotate']) && $_GET['rotate'] == 1) {
-    $new_token = bin2hex(random_bytes(16));
-    $conn->query("UPDATE turni SET token_checkin = '$new_token' WHERE id = $t_id");
-    flash_set("QR Code aggiornato con successo!");
-    echo "<script>window.location.replace('stampa_qr_aula.php?t_id=$t_id');</script>";
-    exit;
-}
-
 $sql_t = "SELECT t.*, e.titolo, e.luogo, e.pagina_id FROM turni t JOIN eventi e ON t.evento_id = e.id WHERE t.id = $t_id";
 $res_t = $conn->query($sql_t);
 if (!$res_t || $res_t->num_rows === 0) {
@@ -27,6 +17,19 @@ if (!$res_t || $res_t->num_rows === 0) {
     exit;
 }
 $turno = $res_t->fetch_assoc();
+
+// Il QR del check-in (e il suo codice) lo vede solo chi gestisce l'attività: con il codice ci si registra presenti
+if (!$is_full_admin && !utente_gestisce_attivita($conn, (int)$u_id_curr, (int)$turno['evento_id'])) nega_accesso();
+
+// Ruota token (con il token CSRF: il link non può essere aperto da un'altra pagina)
+if (isset($_GET['rotate']) && $_GET['rotate'] == 1) {
+    csrf_verify($_GET['csrf'] ?? '');
+    $new_token = bin2hex(random_bytes(16));
+    $conn->query("UPDATE turni SET token_checkin = '$new_token' WHERE id = $t_id");
+    flash_set("QR Code aggiornato con successo!");
+    echo "<script>window.location.replace('stampa_qr_aula.php?t_id=$t_id');</script>";
+    exit;
+}
 
 if (empty($turno['token_checkin'])) {
     $turno['token_checkin'] = bin2hex(random_bytes(16));
@@ -99,7 +102,7 @@ if ($res_cfg && $row_cfg = $res_cfg->fetch_assoc()) {
             <i class="fa fa-arrow-left me-1"></i> Torna agli Iscritti
         </a>
         <div class="d-flex gap-2">
-            <a href="?t_id=<?php echo $t_id; ?>&rotate=1" class="btn btn-warning fw-bold text-dark shadow-sm" data-confirm="Sicuro? Il QR Code attuale smetterà di funzionare.">
+            <a href="?t_id=<?php echo $t_id; ?>&amp;rotate=1&amp;csrf=<?php echo urlencode(csrf_token()); ?>" class="btn btn-warning fw-bold text-dark shadow-sm" data-confirm="Sicuro? Il QR Code attuale smetterà di funzionare.">
                 <i class="fa fa-sync me-1"></i> Ruota QR Code
             </a>
             <button onclick="window.print();" class="btn btn-primary fw-bold shadow-sm" style="background-color: #B30000; border-color: #B30000;">

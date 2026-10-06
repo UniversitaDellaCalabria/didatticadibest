@@ -16,4 +16,7 @@ interface Sessione
     public function scrivi(string $chiave, mixed $valore): void;
 
     public function togli(string $chiave): void;
+
+    /** Nuovo identificativo di sessione (con gli stessi dati) all'accesso: un id impostato prima da altri non vale più. */
+    public function rigenera(): void;
 }

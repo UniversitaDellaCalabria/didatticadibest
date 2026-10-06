@@ -25,4 +25,12 @@ final class SessioneNativa implements Sessione
     {
         unset($_SESSION[$chiave]);
     }
+
+    /** Protezione dalla session fixation: all'accesso l'id della sessione cambia (i dati restano, il vecchio id si cancella). */
+    public function rigenera(): void
+    {
+        if (session_status() === PHP_SESSION_ACTIVE && !headers_sent()) {
+            session_regenerate_id(true);
+        }
+    }
 }

@@ -172,6 +172,9 @@ abstract class TutoratoBase extends DatabaseDiProva
         $c->istanza(Database::class, $this->db);
         $c->istanza(Mailer::class, $this->mailer);
         $c->istanza(Orologio::class, new OrologioFisso('2026-10-05 12:00:00'));
+        // Anche NOW() del database all'ora dell'orologio fisso: i servizi confrontano le date scritte con NOW() (promemoria,
+        // solleciti) con l'orologio, e senza questo i test cambiano esito a seconda del giorno in cui si eseguono
+        $this->db->comando("SET timestamp = UNIX_TIMESTAMP('2026-10-05 12:00:00')");
         $c->istanza(Sito::class, new Sito($radice, 'https://portale.test/eventi'));
         $c->istanza(IndirizzoClient::class, $this->client);
         $c->istanza(VerificaFirme::class, new FirmeFinte());
@@ -194,6 +197,7 @@ abstract class TutoratoBase extends DatabaseDiProva
         }
         @rmdir($dir);
         @unlink($this->envFile);
+        $this->db->comando('SET timestamp = DEFAULT');
     }
 
     /**

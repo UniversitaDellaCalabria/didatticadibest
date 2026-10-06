@@ -381,4 +381,3 @@ if ($fase === 'azioni') {
     })();
     </script>
     <?php endif; ?>
-
