@@ -472,7 +472,9 @@ function printModalPrenotazione($t, $col_primaria, $utente_logged, $val_nome, $v
                         </div>
                         <?php endif; ?>
                         <?php // Attività FSL: riquadro evidente sui documenti da caricare dopo la prenotazione (elenco studenti e autorizzazione)
-                        $box_doc_m = \App\Core\App::get(\App\Fsl\ServizioDocumentiClasse::class)->avvisoModulo($t['dett_progetto'] ?? null, (bool)$is_progetto, $t['data_turno'] ?? null);
+                        // L'avviso è solo informativo: se non si può costruire (es. file del server non allineati) la prenotazione deve funzionare lo stesso
+                        try { $box_doc_m = \App\Core\App::get(\App\Fsl\ServizioDocumentiClasse::class)->avvisoModulo($t['dett_progetto'] ?? null, (bool)$is_progetto, $t['data_turno'] ?? null); }
+                        catch (\Throwable $e_doc) { error_log('[Prenotazione] avviso documenti FSL non disponibile: ' . $e_doc->getMessage()); $box_doc_m = ''; }
                         if ($box_doc_m !== ''): echo $box_doc_m;
                         elseif (!$is_progetto && $classe_m): ?>
                         <div class="alert alert-info border border-2 border-info shadow-sm mb-3" role="note" style="font-size:1.05rem;line-height:1.45;border-left-width:8px !important;">
