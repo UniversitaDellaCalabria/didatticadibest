@@ -19,12 +19,13 @@ final class DocumentoConvenzione
      * $attivita = una riga per attività (TITOLO, DESCRIZIONE, STUDENTI, PERIODO, DURATA, TUTOR_DIBEST, TUTOR_SCUOLA): il blocco
      * dell'Allegato A ("Titolo corso" … riga tratteggiata) si ripete per ogni attività. $logo = immagine della scuola in testa.
      * I campi compilati perdono l'evidenziazione gialla; quelli vuoti restano evidenziati con il testo originale.
+     * $senzaAllegato = nella Convenzione si toglie la pagina dell'Allegato A (la scuola lo riceve a parte, in PDF, con la scheda completa di ogni attività).
      * Ritorna il percorso del file temporaneo (da cancellare dopo l'uso) o null se il modello manca.
      *
      * @param array<string, mixed> $scuola
      * @param list<array<string, mixed>> $attivita
      */
-    public function genera(string $doc, array $scuola, array $attivita, ?string $logo = null, string $protocollo = ''): ?string
+    public function genera(string $doc, array $scuola, array $attivita, ?string $logo = null, string $protocollo = '', bool $senzaAllegato = false): ?string
     {
         $modello = $this->sito->radice() . '/modelli_documenti/' . ($doc === 'allegato' ? 'allegato_a' : 'convenzione') . '_precompilabile.docx';
         if (!is_file($modello) || !class_exists('ZipArchive')) {
@@ -58,8 +59,11 @@ final class DocumentoConvenzione
             }
             return $xml;
         };
+        if ($senzaAllegato && $doc !== 'allegato') {
+            $xml = $this->senzaAllegato($xml);
+        }
         // Blocco dell'Allegato A ripetuto per ogni attività
-        if (preg_match_all('#<w:p\b(?:(?!<w:p\b).)*?</w:p>#s', $xml, $mm, PREG_OFFSET_CAPTURE)) {
+        if (!($senzaAllegato && $doc !== 'allegato') && preg_match_all('#<w:p\b(?:(?!<w:p\b).)*?</w:p>#s', $xml, $mm, PREG_OFFSET_CAPTURE)) {
             $ini = $fin = null;
             foreach ($mm[0] as [$p, $pos]) {
                 if ($ini === null && str_contains($p, '{{TITOLO}}')) {
@@ -151,5 +155,31 @@ final class DocumentoConvenzione
         $zip->addFromString('word/document.xml', $xml);
         $zip->close();
         return $tmp;
+    }
+
+    /** Toglie dalla Convenzione la pagina dell'Allegato A (dal titolo «Allegato_A» alla fine) e i paragrafi vuoti che la precedono. */
+    private function senzaAllegato(string $xml): string
+    {
+        if (!preg_match_all('#<w:p\b(?:(?!<w:p\b).)*?</w:p>#s', $xml, $mm, PREG_OFFSET_CAPTURE)) {
+            return $xml;
+        }
+        foreach ($mm[0] as [$p, $pos]) {
+            if (trim(html_entity_decode(strip_tags($p), ENT_QUOTES | ENT_XML1, 'UTF-8')) !== 'Allegato_A') {
+                continue;
+            }
+            $fine = strrpos($xml, '<w:sectPr');
+            if ($fine === false || $fine < $pos) {
+                return $xml;
+            }
+            $prima = substr($xml, 0, $pos);
+            // paragrafi vuoti (anche con interruzione di pagina) subito prima del titolo; i cambi di sezione restano
+            while (preg_match('#<w:p\b(?:(?!<w:p\b).)*?</w:p>\s*$#s', $prima, $u) && !str_contains($u[0], '<w:sectPr') && !preg_match('#<w:t[ >]#', $u[0])) {
+                $prima = substr($prima, 0, -strlen($u[0]));
+            }
+
+            return $prima . substr($xml, $fine);
+        }
+
+        return $xml;
     }
 }

@@ -219,7 +219,7 @@ final class DocumentiEValutazioniTest extends FslBase
 
         $senza = $o->salva($cc, $ctx, ['denominazione' => ' ', 'cf' => '123', 'dir_cf' => 'abc', 'pec' => 'no', 'email' => 'no'], null);
         $this->assertSame([
-            "Indica la denominazione dell'istituzione scolastica.", "Il codice fiscale dell'istituto ha 11 cifre.", 'Indica il Dirigente Scolastico.',
+            "Indica la denominazione dell'istituzione scolastica.", "Il codice fiscale dell'istituto ha 11 cifre.",
             'Il codice fiscale del Dirigente ha 16 caratteri.', 'La PEC della scuola non è valida.', "L'email di riferimento non è valida.", "Scegli almeno un'attività per l'Allegato A.",
         ], $senza['errori']);
         $this->assertSame('ABC', $senza['s']['dir_cf']);

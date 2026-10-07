@@ -204,7 +204,7 @@ if (isset($_POST['salva_progetto'])) {
         $d,
         ['referenti_json' => $ref_json, 'info_json' => $info_json, 'moduli_json' => $mod_json, 'obiettivi' => $obiettivi, 'conoscenze' => $conoscenze, 'competenze' => $competenze,
          'per_scuole' => $per_scuole, 'attestati' => $attestati],
-        (string)($_POST['corso_codice'] ?? ''), $destinazione, $edizioni, $lista_attesa, $approvazione, $convenzione
+        (array)($_POST['corsi_codici'] ?? ($_POST['corso_codice'] ?? '')), $destinazione, $edizioni, $lista_attesa, $approvazione, $convenzione
     );
     $ev_id = $esito['evento'];
     $edizioni_non_tolte = $esito['non_tolte'];
@@ -335,7 +335,7 @@ if ($mostra_form):
                     </div>
                     <div class="col-md-7">
                         <label for="pjStruttura" class="form-label small fw-bold">Corso di laurea / Struttura</label>
-                        <?php echo html_scelta_corso_scheda($conn, (string)($dp['corso_codice'] ?? ''), (string)($dp['struttura'] ?? ''), 'pjStruttura'); ?>
+                        <?php echo html_scelta_corso_scheda($conn, $dp ?? null, 'pjStruttura'); ?>
                     </div>
                     <div class="col-md-5">
                         <label for="pjLuogo" class="form-label small fw-bold">Sede</label>

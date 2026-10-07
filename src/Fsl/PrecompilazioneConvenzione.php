@@ -101,14 +101,22 @@ final class PrecompilazioneConvenzione
     /**
      * Per la convenzione online: attività FSL prenotate dalla scuola (dalla prenotazione $prenotazioneId e, se la scuola è
      * dell'anagrafe, tutte le sue prenotazioni FSL attive non concluse) e attività FSL ancora prenotabili.
+     * $altreDaIncludere = altre prenotazioni da mettere tra quelle prenotate (le scelte della compilazione, per le scuole fuori anagrafe).
      *
+     * @param list<int> $altreDaIncludere
      * @return array{0: array<int, array<string, string|null>>, 1: array<int, array<string, mixed>>} [prenotate, prenotabili]
      */
-    public function attivitaScuola(int $prenotazioneId, ?string $codiceScuola): array
+    public function attivitaScuola(int $prenotazioneId, ?string $codiceScuola, array $altreDaIncludere = []): array
     {
         $sc = strtoupper(trim((string) $codiceScuola));
         $prenotate = [];
-        foreach ($this->prenotazioni->idPrenotateDallaScuola($prenotazioneId, $sc) as $id) {
+        $ids = $this->prenotazioni->idPrenotateDallaScuola($prenotazioneId, $sc);
+        foreach ($altreDaIncludere as $altra) {
+            if ((int) $altra > 0 && !in_array((int) $altra, $ids, true)) {
+                $ids[] = (int) $altra;
+            }
+        }
+        foreach ($ids as $id) {
             if ($p = $this->prenotazioni->dati($id)) {
                 $prenotate[$id] = $p;
             }

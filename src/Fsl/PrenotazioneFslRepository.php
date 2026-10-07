@@ -43,6 +43,16 @@ final class PrenotazioneFslRepository
     }
 
     /**
+     * Titolo, sede, descrizioni e tipo dell'evento (per la scheda dell'Allegato A); [] se l'evento non c'è.
+     *
+     * @return array<string, string|null>
+     */
+    public function schedaEvento(int $eventoId): array
+    {
+        return Righe::riga($this->db->riga('SELECT titolo, luogo, descrizione, descrizione_breve, tipo FROM eventi WHERE id = ?', [$eventoId])) ?? [];
+    }
+
+    /**
      * Prenotazione (id, scuola, email) con il codice, se l'attività è FSL e la prenotazione non è annullata, rifiutata o scaduta.
      *
      * @return array<string, mixed>|null

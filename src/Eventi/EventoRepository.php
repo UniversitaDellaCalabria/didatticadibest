@@ -443,12 +443,13 @@ final class EventoRepository
         return $this->db->riga('SELECT 1 FROM progetti_dettagli WHERE evento_id = ?', [$eventoId]) !== null;
     }
 
-    public function salvaCorso(int $eventoId, string $struttura, ?string $corsoCodice): void
+    /** @param list<string> $corsiCodici tutti i corsi scelti (corso_codice è il primo) */
+    public function salvaCorso(int $eventoId, string $struttura, ?string $corsoCodice, array $corsiCodici = []): void
     {
         $this->db->esegui(
-            'INSERT INTO progetti_dettagli (evento_id, struttura, corso_codice, updated_at) VALUES (?, ?, ?, NOW())
-             ON DUPLICATE KEY UPDATE struttura = VALUES(struttura), corso_codice = VALUES(corso_codice), updated_at = NOW()',
-            [$eventoId, $struttura, $corsoCodice]
+            'INSERT INTO progetti_dettagli (evento_id, struttura, corso_codice, corsi_codici, updated_at) VALUES (?, ?, ?, ?, NOW())
+             ON DUPLICATE KEY UPDATE struttura = VALUES(struttura), corso_codice = VALUES(corso_codice), corsi_codici = VALUES(corsi_codici), updated_at = NOW()',
+            [$eventoId, $struttura, $corsoCodice, $corsiCodici ? implode(',', $corsiCodici) : null]
         );
     }
 

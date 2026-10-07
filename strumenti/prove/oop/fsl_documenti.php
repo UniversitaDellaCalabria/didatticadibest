@@ -88,7 +88,7 @@ prova(str_contains($avv, 'elenco degli studenti') && str_contains($avv, 'autoriz
 prova($doc_srv->avvisoPrenotazione(['convenzione' => 0, 'per_scuole' => 1], true, 'FS-NUOVO', null, true) === '' && $doc_srv->avvisoPrenotazione(null, false, 'X', null, true) === '', "nessun avviso per le attività non FSL");
 $mod = $doc_srv->avvisoModulo(['convenzione' => 1, 'per_scuole' => 1, 'data_inizio' => $giorni(40)], true, null);
 prova(str_contains($mod, 'Dopo la prenotazione dovrai caricare due documenti') && str_contains($mod, 'elenco degli studenti') && str_contains($mod, 'autorizzazione della scuola') && str_contains($mod, date('d/m/Y', strtotime($giorni(33))))
-    && str_contains($mod, 'border:2px solid') && $doc_srv->avvisoModulo(['convenzione' => 0, 'per_scuole' => 1], true, null) === '' && $doc_srv->avvisoModulo(null, false, null) === '', "riquadro nel modulo di prenotazione: evidente, solo per le attività FSL");
+    && str_contains($mod, 'border:1px solid #0d6efd;border-left-width:6px') && $doc_srv->avvisoModulo(['convenzione' => 0, 'per_scuole' => 1], true, null) === '' && $doc_srv->avvisoModulo(null, false, null) === '', "riquadro nel modulo di prenotazione: evidente, solo per le attività FSL");
 prova(str_contains($doc_srv->avvisoPerCodice('FS-DOC987'), 'Elenco degli studenti e autorizzazione della scuola') && $doc_srv->avvisoPerCodice('FS-DOC988') === '' && $doc_srv->avvisoPerCodice('NON-ESISTE') === '', "avviso nella pagina di conferma: solo per prenotazioni FSL attive");
 prova(AppDoc::per($conn)->get(\App\Iscrizioni\RegoleFsl::class)->avvisoDocumentiClasse(['convenzione' => 1, 'per_scuole' => 1, 'data_inizio' => $giorni(40)], true, 'FS-NUOVO', null) === $avv, "RegoleFsl serve l'avviso al modulo Iscrizioni");
 

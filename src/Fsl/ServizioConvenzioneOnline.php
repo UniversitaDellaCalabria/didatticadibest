@@ -28,7 +28,8 @@ final class ServizioConvenzioneOnline
         private ServizioScuole $scuole,
         private Upload $upload,
         private Mailer $mailer,
-        private Sito $sito
+        private Sito $sito,
+        private AllegatoAPdf $allegatoPdf
     ) {
     }
 
@@ -48,7 +49,7 @@ final class ServizioConvenzioneOnline
         if (!$pr) {
             return null;
         }
-        $cc = $this->compilate->ultimaDellaPrenotazione((int) $pr['id']);
+        $cc = $this->compilate->ultimaDellaPrenotazione((int) $pr['id']) ?: $this->compilate->cheContiene((int) $pr['id']);
         if (!$cc) {
             $cc = $this->compilate->crea(bin2hex(random_bytes(16)), $pr['scuola_codice'] ?: null, (int) $pr['id'], (string) $pr['email']);
         }
@@ -70,8 +71,10 @@ final class ServizioConvenzioneOnline
             return null;
         }
         $cfg = $this->modelli->dati($p0);
-        [$prenotate, $prenotabili] = $this->precompilazione->attivitaScuola((int) $cc['prenotazione_id'], $cc['scuola_codice']);
         $dati = json_decode((string) $cc['dati_json'], true) ?: [];
+        // Le prenotazioni già scelte restano nell'elenco anche se la scuola non è dell'anagrafe (programma FSL: più prenotazioni insieme)
+        $scelte = array_values(array_filter(array_map(static fn ($a): int => (int) ($a['pr'] ?? 0), (array) ($dati['attivita'] ?? []))));
+        [$prenotate, $prenotabili] = $this->precompilazione->attivitaScuola((int) $cc['prenotazione_id'], $cc['scuola_codice'], $scelte);
         // Valori proposti: dall'anagrafe delle scuole e dalla prenotazione
         $base = $this->precompilazione->dati($p0);
         $anagrafe = !empty($cc['scuola_codice']) ? $this->scuole->perCodice($cc['scuola_codice']) : null;
@@ -93,32 +96,66 @@ final class ServizioConvenzioneOnline
      */
     public function scarica(string $doc, array $cc, array $ctx): ?array
     {
-        $doc = $doc === 'allegato' ? 'allegato' : 'convenzione';
-        [$scuola, $att] = $this->datiDocumenti($ctx['dati'], $ctx['prenotate'], $ctx['prenotabili']);
+        // 'convenzione' = Word con l'Allegato A in fondo; 'convenzione_sola' = Word senza Allegato A; 'allegato' = Allegato A in Word;
+        // 'allegato_pdf' = Allegato A in PDF con la scheda completa di ogni attività (da firmare in PAdES)
+        $doc = in_array($doc, ['allegato', 'allegato_pdf', 'convenzione_sola'], true) ? $doc : 'convenzione';
         $radice = $this->sito->radice();
         $logo = $cc['logo'] && is_file($radice . '/' . $cc['logo']) ? $radice . '/' . $cc['logo'] : null;
         $prot = trim((string) ($cc['protocollo'] ?? '') . (!empty($cc['protocollo_data']) ? ' del ' . date('d/m/Y', strtotime($cc['protocollo_data'])) : ''));
-        $file = $this->documenti->genera($doc, $scuola, $att, $logo, (string) ($cc['protocollo'] ?? '') !== '' ? $prot : '');
-        if (!$file) {
-            return null;
+        $prot = (string) ($cc['protocollo'] ?? '') !== '' ? $prot : '';
+        $s = $ctx['s'];
+        $sigla = preg_replace('/[^A-Za-z0-9]+/', '_', (string) ($s['codice'] ?: $s['denominazione']));
+        if ($doc === 'allegato_pdf') {
+            $pdf = $this->allegatoPdf->genera($s, $this->vociAllegato($ctx['dati'], $ctx['prenotate'], $ctx['prenotabili']), $logo, $prot);
+            $file = tempnam(sys_get_temp_dir(), 'all') . '.pdf';
+            if (file_put_contents($file, $pdf) === false) {
+                return null;
+            }
+            $nome = 'Allegato_A_FSL_' . $sigla . '.pdf';
+        } else {
+            [$scuola, $att] = $this->datiDocumenti($ctx['dati'], $ctx['prenotate'], $ctx['prenotabili']);
+            $file = $this->documenti->genera($doc === 'convenzione_sola' ? 'convenzione' : $doc, $scuola, $att, $logo, $prot, $doc === 'convenzione_sola');
+            if (!$file) {
+                return null;
+            }
+            $nome = ($doc === 'allegato' ? 'Allegato_A_FSL_' : 'Convenzione_FSL_') . $sigla . '.docx';
         }
         $this->compilate->segnaScaricata((int) $cc['id']);
-        $s = $ctx['s'];
 
-        return ['file' => $file, 'nome' => ($doc === 'allegato' ? 'Allegato_A_FSL_' : 'Convenzione_FSL_') . preg_replace('/[^A-Za-z0-9]+/', '_', (string) ($s['codice'] ?: $s['denominazione'])) . '.docx'];
+        return ['file' => $file, 'nome' => $nome];
     }
 
     /**
-     * Salva il modulo: controlla i dati, carica o toglie il logo e, alla prima compilazione, manda l'email con il link per riprendere.
-     * Ritorna gli errori da mostrare (vuoto = salvato) e i valori inseriti, da riproporre nel modulo.
+     * Le attività scelte per l'Allegato A in PDF: prenotazione (o attività ancora da prenotare) con studenti e docente referente.
      *
-     * @param array<string, mixed> $cc
-     * @param array<string, mixed> $ctx risultato di contesto()
+     * @param array<string, mixed> $dati
+     * @param array<int, array<string, string|null>> $prenotate
+     * @param array<int, array<string, mixed>> $prenotabili
+     * @return list<array{p: array<string, mixed>, studenti: int, tutor: string}>
+     */
+    private function vociAllegato(array $dati, array $prenotate, array $prenotabili): array
+    {
+        $voci = [];
+        foreach ($dati['attivita'] ?? [] as $a) {
+            $p = !empty($a['pr']) ? ($prenotate[(int) $a['pr']] ?? null) : ($prenotabili[(int) ($a['ev'] ?? 0)] ?? null);
+            if ($p) {
+                $voci[] = ['p' => $p, 'studenti' => (int) ($a['studenti'] ?? 0), 'tutor' => (string) preg_replace('/^(\s*(prof(\.ssa|essoressa|essore)?|dott(\.ssa|oressa|ore)?)\.?\s*\/?)+/i', '', (string) ($a['tutor'] ?? ''))];
+            }
+        }
+
+        return $voci;
+    }
+
+    /**
+     * Controlla i dati dell'istituto e del Dirigente e carica o toglie il logo (PNG o JPG fino a 2 MB, in una cartella non raggiungibile dal web).
+     * Solo la denominazione è obbligatoria: chi non conosce gli altri dati li lascia vuoti e nel documento restano da completare a mano.
+     * Ritorna gli errori, i valori ripuliti e il percorso del logo da salvare (null = nessun logo).
+     *
      * @param array<string, mixed> $post
      * @param array<string, mixed>|null $fileLogo elemento $_FILES['logo']
-     * @return array{errori: list<string>, s: array<string, mixed>}
+     * @return array{errori: list<string>, s: array<string, string>, logo: string|null}
      */
-    public function salva(array $cc, array $ctx, array $post, ?array $fileLogo): array
+    public function validaScuola(array $post, ?array $fileLogo, ?string $logoAttuale): array
     {
         $in = static fn (string $k, int $max = 255): string => mb_substr(trim((string) ($post[$k] ?? '')), 0, $max);
         $s = [
@@ -134,9 +171,6 @@ final class ServizioConvenzioneOnline
         if ($s['cf'] !== '' && !preg_match('/^(\d{11}|[A-Z0-9]{16})$/', $s['cf'])) {
             $errori[] = "Il codice fiscale dell'istituto ha 11 cifre.";
         }
-        if ($s['dirigente'] === '') {
-            $errori[] = 'Indica il Dirigente Scolastico.';
-        }
         if ($s['dir_cf'] !== '' && !preg_match('/^[A-Z0-9]{16}$/', $s['dir_cf'])) {
             $errori[] = 'Il codice fiscale del Dirigente ha 16 caratteri.';
         }
@@ -146,23 +180,7 @@ final class ServizioConvenzioneOnline
         if ($s['email'] !== '' && !filter_var($s['email'], FILTER_VALIDATE_EMAIL)) {
             $errori[] = "L'email di riferimento non è valida.";
         }
-        $att = [];
-        foreach ((array) ($post['att'] ?? []) as $k => $a) {
-            if (empty($a['scelta'])) {
-                continue;
-            }
-            $voce = ['studenti' => max(0, min(500, (int) ($a['studenti'] ?? 0))), 'tutor' => mb_substr(trim((string) ($a['tutor'] ?? '')), 0, 150)];
-            if (str_starts_with((string) $k, 'pr') && isset($ctx['prenotate'][(int) substr((string) $k, 2)])) {
-                $att[] = ['pr' => (int) substr((string) $k, 2)] + $voce;
-            } elseif (str_starts_with((string) $k, 'ev') && isset($ctx['prenotabili'][(int) substr((string) $k, 2)])) {
-                $att[] = ['ev' => (int) substr((string) $k, 2)] + $voce;
-            }
-        }
-        if (!$att) {
-            $errori[] = "Scegli almeno un'attività per l'Allegato A.";
-        }
-        // Logo della scuola (facoltativo): PNG o JPG fino a 2 MB, in una cartella non raggiungibile dal web
-        $logo = $cc['logo'];
+        $logo = $logoAttuale;
         if (!empty($post['togli_logo'])) {
             $logo = null;
         }
@@ -180,11 +198,67 @@ final class ServizioConvenzioneOnline
                 }
             }
         }
+
+        return ['errori' => $errori, 's' => $s, 'logo' => $logo];
+    }
+
+    /**
+     * Apre la compilazione della convenzione per le prenotazioni fatte insieme dal programma FSL: dati della scuola e del Dirigente, logo e
+     * attività dell'Allegato A già scelte (le prenotazioni, con studenti e docente referente). Il link personale è quello dell'email riepilogativa.
+     *
+     * @param array<string, string> $scuola risultato di validaScuola()
+     * @param list<array{pr: int, studenti: int, tutor: string}> $attivita
+     * @param string $convenzione 'si' (già stipulata), 'no' (da stipulare) o 'rinnovo' (quella registrata non copre il periodo)
+     * @return array<string, string|null>|null la riga di convenzioni_compilate
+     */
+    public function creaDaProgramma(array $scuola, ?string $logo, array $attivita, int $prenotazioneId, ?string $codiceScuola, string $email, string $convenzione): ?array
+    {
+        $cc = $this->compilate->crea(bin2hex(random_bytes(16)), $codiceScuola ?: null, $prenotazioneId, $email);
+        if (!$cc) {
+            return null;
+        }
+        $json = json_encode(['scuola' => $scuola, 'attivita' => $attivita, 'origine' => 'programma', 'convenzione' => $convenzione], JSON_UNESCAPED_UNICODE);
+        $this->compilate->salvaDati((int) $cc['id'], (string) $json, $logo, $email);
+
+        return $this->compilate->perToken((string) $cc['token']);
+    }
+
+    /**
+     * Salva il modulo: controlla i dati, carica o toglie il logo e, alla prima compilazione, manda l'email con il link per riprendere.
+     * Ritorna gli errori da mostrare (vuoto = salvato) e i valori inseriti, da riproporre nel modulo.
+     *
+     * @param array<string, mixed> $cc
+     * @param array<string, mixed> $ctx risultato di contesto()
+     * @param array<string, mixed> $post
+     * @param array<string, mixed>|null $fileLogo elemento $_FILES['logo']
+     * @return array{errori: list<string>, s: array<string, mixed>}
+     */
+    public function salva(array $cc, array $ctx, array $post, ?array $fileLogo): array
+    {
+        $v = $this->validaScuola($post, $fileLogo, $cc['logo'] ?: null);
+        $s = $v['s'];
+        $errori = $v['errori'];
+        $att = [];
+        foreach ((array) ($post['att'] ?? []) as $k => $a) {
+            if (empty($a['scelta'])) {
+                continue;
+            }
+            $voce = ['studenti' => max(0, min(500, (int) ($a['studenti'] ?? 0))), 'tutor' => mb_substr(trim((string) ($a['tutor'] ?? '')), 0, 150)];
+            if (str_starts_with((string) $k, 'pr') && isset($ctx['prenotate'][(int) substr((string) $k, 2)])) {
+                $att[] = ['pr' => (int) substr((string) $k, 2)] + $voce;
+            } elseif (str_starts_with((string) $k, 'ev') && isset($ctx['prenotabili'][(int) substr((string) $k, 2)])) {
+                $att[] = ['ev' => (int) substr((string) $k, 2)] + $voce;
+            }
+        }
+        if (!$att) {
+            $errori[] = "Scegli almeno un'attività per l'Allegato A.";
+        }
+        $logo = $v['logo'];
         if ($errori) {
             return ['errori' => $errori, 's' => $s];
         }
         $prima = empty($cc['dati_json']);
-        $json = json_encode(['scuola' => $s, 'attivita' => $att], JSON_UNESCAPED_UNICODE);
+        $json = json_encode(array_diff_key($ctx['dati'], ['scuola' => 1, 'attivita' => 1]) + ['scuola' => $s, 'attivita' => $att], JSON_UNESCAPED_UNICODE);
         $email = $s['email'] ?: (string) $cc['email'];
         $this->compilate->salvaDati((int) $cc['id'], (string) $json, $logo, $email);
         if ($cc['logo'] && $cc['logo'] !== $logo && is_file($this->sito->radice() . '/' . $cc['logo'])) {
@@ -196,6 +270,37 @@ final class ServizioConvenzioneOnline
         }
 
         return ['errori' => [], 's' => $s];
+    }
+
+    /**
+     * Le convenzioni e gli Allegati A delle prenotazioni della persona (Area personale): per ognuna il link personale, lo stato della convenzione
+     * e le attività dell'Allegato A con lo stato di ogni prenotazione. Chi ha più compilazioni le vede tutte, dalla più recente.
+     *
+     * @param list<int> $prenotazioniIds prenotazioni della persona
+     * @return list<array{token: string, scuola: string, convenzione: string, aggiornata: string, protocollo: string, attivita: list<array{titolo: string, turno: string, codice: string, stato: string, mia: bool}>}>
+     */
+    public function dellePrenotazioni(array $prenotazioniIds): array
+    {
+        $mie = array_map('intval', $prenotazioniIds);
+        $out = [];
+        foreach ($this->compilate->perPrenotazioni($prenotazioniIds) as $cc) {
+            $dati = json_decode((string) ($cc['dati_json'] ?? ''), true) ?: [];
+            $ids = array_values(array_unique(array_merge([(int) $cc['prenotazione_id']], array_map(static fn ($a): int => (int) ($a['pr'] ?? 0), (array) ($dati['attivita'] ?? [])))));
+            $attivita = [];
+            foreach (array_filter($ids) as $id) {
+                if ($p = $this->prenotazioni->dati($id)) {
+                    $attivita[] = ['titolo' => (string) $p['evento_titolo'], 'turno' => trim((string) ($p['nome_turno'] ?? '')), 'codice' => (string) $p['codice_prenotazione'],
+                        'stato' => (string) ($p['stato'] ?? 'confermata'), 'mia' => in_array($id, $mie, true)];
+                }
+            }
+            $out[] = [
+                'token' => (string) $cc['token'], 'scuola' => (string) (($dati['scuola']['denominazione'] ?? '') ?: 'Scuola'),
+                'convenzione' => (string) ($dati['convenzione'] ?? ''), 'aggiornata' => (string) ($cc['aggiornata_il'] ?? ''), 'protocollo' => (string) ($cc['protocollo'] ?? ''),
+                'attivita' => $attivita,
+            ];
+        }
+
+        return $out;
     }
 
     /** Protocollo assegnato dal Dipartimento a una compilazione online: compare nei documenti Word generati. */

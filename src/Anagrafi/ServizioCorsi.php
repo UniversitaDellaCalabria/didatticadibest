@@ -51,6 +51,28 @@ final class ServizioCorsi
         return $this->visibili = $out;
     }
 
+    /**
+     * I corsi di studio di un'attività (scheda progetti_dettagli): quelli di corsi_codici, altrimenti il solo corso_codice delle schede più vecchie.
+     *
+     * @param array<string, mixed>|null $scheda
+     * @return list<array<string, mixed>>
+     */
+    public function corsiDi(?array $scheda): array
+    {
+        $codici = array_filter(array_map('trim', explode(',', (string) ($scheda['corsi_codici'] ?? ''))), static fn (string $c): bool => $c !== '');
+        if (!$codici && !empty($scheda['corso_codice'])) {
+            $codici = [(string) $scheda['corso_codice']];
+        }
+        $out = [];
+        foreach ($codici as $c) {
+            if ($corso = $this->corso($c)) {
+                $out[] = $corso;
+            }
+        }
+
+        return $out;
+    }
+
     /** @return array<string, mixed>|null */
     public function corso(?string $codice): ?array
     {

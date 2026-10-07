@@ -137,16 +137,24 @@ final class ServizioEventi
     /** Corso di laurea / struttura di un evento normale (campi struttura e corso_codice del modulo), nella scheda progetti_dettagli. */
     public function salvaCorso(int $eventoId, array $post): void
     {
-        if (!isset($post['struttura']) && !isset($post['corso_codice'])) {
+        if (!isset($post['struttura']) && !isset($post['corso_codice']) && !isset($post['corsi_codici'])) {
             return;
         }
         $testo = mb_substr(trim((string) ($post['struttura'] ?? '')), 0, 255);
-        $corso = $this->anagrafe->corsoStudio((string) ($post['corso_codice'] ?? ''));
-        $cod = $corso['codice'] ?? null;
-        if ($testo === '' && $cod === null && !$this->eventi->haScheda($eventoId)) {
+        // Più corsi di studio (corsi_codici[]); un solo codice in corso_codice vale come elenco di uno
+        $scelti = isset($post['corsi_codici']) ? (array) $post['corsi_codici'] : [(string) ($post['corso_codice'] ?? '')];
+        $codici = [];
+        foreach ($scelti as $c) {
+            $corso = $this->anagrafe->corsoStudio(trim((string) $c));
+            if ($corso && !in_array($corso['codice'], $codici, true)) {
+                $codici[] = (string) $corso['codice'];
+            }
+        }
+        $codici = array_slice($codici, 0, 12);
+        if ($testo === '' && !$codici && !$this->eventi->haScheda($eventoId)) {
             return;
         }
-        $this->eventi->salvaCorso($eventoId, $testo, $cod);
+        $this->eventi->salvaCorso($eventoId, $testo, $codici[0] ?? null, $codici);
     }
 
     /** @param list<string> $colonne */

@@ -192,6 +192,14 @@ $pos_attesa = get_posizioni_lista_attesa($conn, array_column(
 $all_pr_ids     = array_merge(array_column($prenotazioni_attive, 'id'), array_column($prenotazioni_passate, 'id'));
 $messaggi_per_pr = get_messaggi_per_prenotazioni($conn, $all_pr_ids);
 
+// Programma FSL: attività scelte e non ancora prenotate, e documenti (Allegato A, Convenzione) delle prenotazioni FSL già fatte
+$fsl_documenti = []; $fsl_programma = 0; $fsl_in_programma = [];
+try {
+    $fsl_documenti = \App\Core\App::per($conn)->get(\App\Fsl\ServizioConvenzioneOnline::class)->dellePrenotazioni(array_map('intval', $all_pr_ids));
+    $fsl_programma = \App\Core\App::get(\App\Fsl\ServizioProgrammaFsl::class)->conta();
+    if ($fsl_programma) $fsl_in_programma = \App\Core\App::get(\App\Fsl\ServizioProgrammaFsl::class)->elenco();
+} catch (\Throwable $e_fsl) { error_log('[Area personale] programma FSL non disponibile: ' . $e_fsl->getMessage()); }
+
 // Stats rapide per l'header
 $all_pr_merged = array_merge($prenotazioni_attive, $prenotazioni_passate);
 $stat_presenze  = 0;
@@ -406,6 +414,13 @@ require_once 'header.php';
                 <i class="fa fa-history me-1"></i> Storico & Attestati (<?php echo count($prenotazioni_passate); ?>)
             </button>
         </li>
+        <?php if ($fsl_documenti || $fsl_programma): ?>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-pill fw-bold" id="pills-fsl-tab" data-bs-toggle="pill" data-bs-target="#pills-fsl" type="button" role="tab">
+                <i class="fa fa-clipboard-list me-1"></i> Programma FSL<?php echo $fsl_programma ? ' (' . $fsl_programma . ')' : ''; ?>
+            </button>
+        </li>
+        <?php endif; ?>
         <li class="nav-item" role="presentation">
             <button class="nav-link rounded-pill fw-bold" id="pills-sondaggi-tab" data-bs-toggle="pill" data-bs-target="#pills-sondaggi" type="button" role="tab">
                 <i class="fa fa-poll me-1"></i> Sondaggi
@@ -836,6 +851,49 @@ require_once 'header.php';
             <?php endif; ?>
         </div>
 
+        <!-- TAB: PROGRAMMA FSL (attività da prenotare, Allegato A e Convenzione) -->
+        <?php if ($fsl_documenti || $fsl_programma): ?>
+        <div class="tab-pane fade" id="pills-fsl" role="tabpanel" tabindex="0">
+            <?php if ($fsl_programma): ?>
+                <div class="card border-0 shadow-sm rounded-4 mb-4" style="border-left:5px solid #B30000 !important;"><div class="card-body">
+                    <h2 class="h5 fw-bold"><i class="fa fa-clipboard-list me-1" style="color:#B30000;" aria-hidden="true"></i>Il programma in preparazione (<?php echo (int)$fsl_programma; ?>)</h2>
+                    <p class="small text-secondary mb-2">Attività scelte e <strong>non ancora prenotate</strong>: i posti si assegnano alla conferma.</p>
+                    <ul class="mb-3"><?php foreach ($fsl_in_programma as $v): ?><li><strong><?php echo htmlspecialchars($v['titolo']); ?></strong><?php echo $v['turno'] !== '' ? ' – ' . htmlspecialchars($v['turno']) : ''; ?><?php echo $v['nota'] !== '' ? ' <span class="text-danger small">(' . htmlspecialchars($v['nota']) . ')</span>' : ''; ?></li><?php endforeach; ?></ul>
+                    <a href="programma_fsl.php" class="btn fw-bold text-white" style="background:#B30000;"><i class="fa fa-arrow-right me-1" aria-hidden="true"></i>Apri il programma e prenota</a>
+                </div></div>
+            <?php endif; ?>
+
+            <?php if (!$fsl_documenti): ?>
+                <div class="alert alert-light border text-center text-muted p-4 rounded-4"><i class="fa fa-file-signature fs-3 d-block mb-2 opacity-50"></i>Quando prenoterai le attività dal programma, qui troverai sempre l'<strong>Allegato A</strong> (PDF) e la <strong>Convenzione</strong> (Word) già compilati.</div>
+            <?php endif; ?>
+            <?php
+            $stati_fsl = ['confermata' => ['Confermata', 'success'], 'da_approvare' => ['In attesa', 'info'], 'in_attesa' => ["Lista d'attesa", 'warning'], 'richiesta_conferma' => ['Posto disponibile', 'warning'],
+                          'annullata' => ['Annullata', 'secondary'], 'rifiutata' => ['Rifiutata', 'secondary'], 'scaduta' => ['Scaduta', 'secondary']];
+            foreach ($fsl_documenti as $d_fsl): $tk_fsl = htmlspecialchars($d_fsl['token']); ?>
+                <div class="card border-0 shadow-sm rounded-4 mb-3"><div class="card-body">
+                    <div class="d-flex flex-wrap justify-content-between gap-2 mb-2">
+                        <h2 class="h5 fw-bold mb-0"><i class="fa fa-school me-1 text-secondary" aria-hidden="true"></i><?php echo htmlspecialchars($d_fsl['scuola']); ?></h2>
+                        <?php if ($d_fsl['protocollo'] !== ''): ?><span class="badge bg-light text-dark border">Prot. <?php echo htmlspecialchars($d_fsl['protocollo']); ?></span><?php endif; ?>
+                    </div>
+                    <ul class="list-unstyled small mb-3">
+                        <?php foreach ($d_fsl['attivita'] as $a_fsl): [$et_fsl, $col_fsl] = $stati_fsl[$a_fsl['stato']] ?? [$a_fsl['stato'], 'secondary']; ?>
+                            <li class="mb-1"><span class="badge bg-<?php echo $col_fsl; ?><?php echo $col_fsl === 'warning' ? ' text-dark' : ''; ?> me-1"><?php echo htmlspecialchars($et_fsl); ?></span>
+                                <strong><?php echo htmlspecialchars($a_fsl['titolo']); ?></strong><?php echo $a_fsl['turno'] !== '' ? ' – ' . htmlspecialchars($a_fsl['turno']) : ''; ?>
+                                <span class="font-monospace text-secondary ms-1"><?php echo htmlspecialchars($a_fsl['codice']); ?></span></li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <div class="d-flex flex-wrap gap-2">
+                        <a class="btn btn-success btn-sm fw-bold" href="convenzione_online.php?t=<?php echo $tk_fsl; ?>&amp;scarica=allegato_pdf"><i class="fa fa-file-pdf me-1" aria-hidden="true"></i>Allegato A (PDF)</a>
+                        <a class="btn <?php echo $d_fsl['convenzione'] === 'si' ? 'btn-outline-success' : 'btn-success'; ?> btn-sm fw-bold" href="convenzione_online.php?t=<?php echo $tk_fsl; ?>&amp;scarica=convenzione_sola"><i class="fa fa-file-word me-1" aria-hidden="true"></i>Convenzione (Word)</a>
+                        <a class="btn btn-outline-secondary btn-sm fw-bold" href="convenzione_online.php?t=<?php echo $tk_fsl; ?>"><i class="fa fa-pen me-1" aria-hidden="true"></i>Correggi i dati, logo e attività</a>
+                    </div>
+                    <?php if ($d_fsl['convenzione'] === 'si'): ?><p class="small text-secondary mt-2 mb-0">La scuola ha già la convenzione con il Dipartimento: serve solo l'Allegato A.</p>
+                    <?php else: ?><p class="small text-secondary mt-2 mb-0">Dopo la firma digitale PAdES del Dirigente, la scuola invia i documenti via PEC al Dipartimento.</p><?php endif; ?>
+                </div></div>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+
         <!-- TAB 4: PROFILO -->
         <div class="tab-pane fade" id="pills-profilo" role="tabpanel" tabindex="0">
             <?php $ruoli_label = [1=>'Amministratore',2=>'Gestore',3=>'Studente',4=>'Dipendente',5=>'Esterno']; ?>
@@ -998,7 +1056,7 @@ function apriFinestraAnnulla(btn) {
 // Auto-scroll alla tab storico se si ritorna dopo un'azione
 (function(){
     var hash = window.location.hash;
-    var tabMap = { '#storico': 'pills-passate-tab', '#sondaggi': 'pills-sondaggi-tab', '#profilo': 'pills-profilo-tab' };
+    var tabMap = { '#storico': 'pills-passate-tab', '#sondaggi': 'pills-sondaggi-tab', '#profilo': 'pills-profilo-tab', '#programma-fsl': 'pills-fsl-tab' };
     if (tabMap[hash]) {
         var t = document.getElementById(tabMap[hash]);
         if (t) { bootstrap.Tab.getOrCreateInstance(t).show(); }

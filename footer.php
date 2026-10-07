@@ -90,7 +90,7 @@ if (isset($conn) && $conn instanceof mysqli) {
 
 <script src="<?php echo url_vendor('jsdelivr/npm/bootstrap-italia@2.8.3/dist/js/bootstrap-italia.bundle.min.js'); ?>" integrity="sha384-Uf9ZvEEEoRYjUlBeVUHMbjfQKOtjQKqCfLchDholmnW8vcgVNn8kkh6yne+cfW6v" crossorigin="anonymous"></script>
 <?php if (!empty($GLOBALS['usa_campo_scuola'])): // campo "Scuola" con ricerca nell'anagrafe ?>
-<script src="<?php echo htmlspecialchars(rtrim((string)parse_url(url_base_sito(), PHP_URL_PATH), '/')); ?>/assets/js/campo-scuola.js?v=3"></script>
+<script src="<?php echo htmlspecialchars(rtrim((string)parse_url(url_base_sito(), PHP_URL_PATH), '/')); ?>/assets/js/campo-scuola.js?v=4"></script>
 <?php endif; ?>
 
 <!-- Fase 4: Registrazione Service Worker PWA (Stale-While-Revalidate + Cache-First + fallback offline) -->

@@ -17,7 +17,7 @@
         if (cacheLuoghi[url]) return Promise.resolve(cacheLuoghi[url]);
         return fetch(url, { credentials: 'same-origin' })
             .then(function (r) { return r.ok ? r.json() : []; })
-            .then(function (r) { r = Array.isArray(r) ? r : []; if (url.indexOf('elenco=') > -1) cacheLuoghi[url] = r; return r; })
+            .then(function (r) { r = Array.isArray(r) ? r : []; if (url.indexOf('elenco=') > -1 && r.length) cacheLuoghi[url] = r; return r; })
             .catch(function () { return []; });
     }
 
@@ -30,6 +30,7 @@
         var ep = box.dataset.endpoint, uid = inp.id || ('scu' + Math.random().toString(36).slice(2));
         var manuale = inp.value.trim() !== '' && !cod.value;
         var voci = [], attiva = -1, timer = null, richiesta = 0, aperto = false;
+        var senzaRegioni = false;   // l'anagrafe non ha le regioni: province e comuni si elencano comunque, senza passare dalla regione
 
         // ── Finestra guidata ──
         // Finestra sovrapposta (fixed) con sfondo: dentro la finestra di prenotazione si aggancia al .modal,
@@ -91,14 +92,15 @@
         }
         function caricaRegioni() {
             return json(ep + '?elenco=regioni').then(function (r) {
+                senzaRegioni = !r.length;
                 var pre = selReg.value || (r.some(function (x) { return x.valore === 'CALABRIA'; }) ? 'CALABRIA' : '');
-                riempi(selReg, r, 'Tutte le regioni', pre);
+                riempi(selReg, r, senzaRegioni ? 'Regione non indicata' : 'Tutte le regioni', pre);
                 return caricaProvince();
             });
         }
         function caricaProvince() {
             riempi(selCom, [], 'Scegli prima la provincia', '');
-            if (!selReg.value) { riempi(selPro, [], 'Scegli prima la regione', ''); return Promise.resolve(); }
+            if (!selReg.value && !senzaRegioni) { riempi(selPro, [], 'Scegli prima la regione', ''); return Promise.resolve(); }
             return json(ep + '?elenco=province&regione=' + encodeURIComponent(selReg.value)).then(function (r) {
                 riempi(selPro, r, 'Tutte le province', '');
             });

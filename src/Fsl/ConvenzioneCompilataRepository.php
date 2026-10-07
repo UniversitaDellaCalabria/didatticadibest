@@ -31,6 +31,38 @@ final class ConvenzioneCompilataRepository
     }
 
     /**
+     * La compilazione che ha l'attività prenotata tra quelle dell'Allegato A (programma FSL: una compilazione per più prenotazioni).
+     *
+     * @return array<string, string|null>|null
+     */
+    public function cheContiene(int $prenotazioneId): ?array
+    {
+        return Righe::riga($this->db->riga('SELECT * FROM convenzioni_compilate WHERE dati_json LIKE ? ORDER BY id DESC LIMIT 1', ['%"pr":' . $prenotazioneId . ',%']));
+    }
+
+    /**
+     * Le compilazioni che riguardano le prenotazioni indicate (la prima prenotazione della compilazione oppure una di quelle dell'Allegato A), dalla più recente.
+     *
+     * @param list<int> $prenotazioniIds
+     * @return list<array<string, string|null>>
+     */
+    public function perPrenotazioni(array $prenotazioniIds): array
+    {
+        $ids = array_slice(array_values(array_unique(array_filter(array_map('intval', $prenotazioniIds)))), 0, 300);
+        if (!$ids) {
+            return [];
+        }
+        $where = ['prenotazione_id IN (' . implode(',', $ids) . ')'];
+        $par = [];
+        foreach ($ids as $id) {
+            $where[] = 'dati_json LIKE ?';
+            $par[] = '%"pr":' . $id . ',%';
+        }
+
+        return Righe::testo($this->db->righe('SELECT * FROM convenzioni_compilate WHERE ' . implode(' OR ', $where) . ' ORDER BY id DESC LIMIT 50', $par));
+    }
+
+    /**
      * Apre la compilazione di una prenotazione con un link personale nuovo.
      *
      * @return array<string, string|null>|null la riga appena creata

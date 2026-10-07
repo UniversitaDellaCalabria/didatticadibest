@@ -13,6 +13,12 @@ header('X-Robots-Tag: noindex');
 if (!check_rate_limit($conn, 'cerca_scuole', 400, 300)) { http_response_code(429); echo '[]'; exit; }
 $par = fn(string $k) => mb_substr(trim((string)($_GET[$k] ?? '')), 0, 80);
 
+// ?dettaglio=CODICE → dati della scuola per precompilare il modulo della convenzione (istituto, codice, comune, indirizzo)
+if (isset($_GET['dettaglio'])) {
+    echo json_encode(\App\Core\App::per($conn)->get(\App\Anagrafi\ServizioScuole::class)->perConvenzione($par('dettaglio')) ?? new stdClass(), JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 if (isset($_GET['elenco'])) {
     echo json_encode(luoghi_scuole($conn, $par('elenco'), $par('regione'), $par('provincia')), JSON_UNESCAPED_UNICODE);
     exit;

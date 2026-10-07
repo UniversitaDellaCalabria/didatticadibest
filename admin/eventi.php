@@ -440,7 +440,7 @@ form:not(.ev-form-classe) .ev-t-riga2 { grid-template-columns: repeat(3, 1fr); }
                     </div>
                     <div class="col-12">
                         <label for="evCorso" class="form-label small fw-bold">Corso di laurea / Struttura <span class="fw-normal text-muted">(facoltativo)</span></label>
-                        <?php echo html_scelta_corso_scheda($conn, (string)($dett_f['corso_codice'] ?? ''), (string)($dett_f['struttura'] ?? ''), 'evCorso'); ?>
+                        <?php echo html_scelta_corso_scheda($conn, $dett_f ?? null, 'evCorso'); ?>
                     </div>
                     <div class="col-12">
                         <span class="form-label small fw-bold d-block mb-1">Ambiti <span class="fw-normal text-muted">(dove compare nell'agenda del sito; predefinito dell'area: <?php echo h(AMBITI_EVENTO[ambito_area($page_cfg)]['nome']); ?>)</span></span>

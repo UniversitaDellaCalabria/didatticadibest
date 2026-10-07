@@ -14,6 +14,8 @@ final readonly class RichiestaPrenotazione
      * @param array<string, mixed> $files file allegati ($_FILES)
      * @param list<string> $ruoliSecondari ruoli secondari dell'utente connesso
      * @param string $baseLink indirizzo della cartella del portale usato nei link delle email (protocollo, host e cartella della richiesta)
+     * @param bool $senzaEmailPersona non manda l'email di conferma a chi prenota (la manda chi ha raccolto più prenotazioni insieme: programma FSL)
+     * @param bool $controlliPubbliciGiaFatti anti-robot e limite per indirizzo IP già controllati una volta per tutte le prenotazioni (programma FSL)
      */
     public function __construct(
         public array $pagina,
@@ -31,6 +33,8 @@ final readonly class RichiestaPrenotazione
         public array $files,
         public string $ip,
         public string $baseLink,
+        public bool $senzaEmailPersona = false,
+        public bool $controlliPubbliciGiaFatti = false,
     ) {
     }
 

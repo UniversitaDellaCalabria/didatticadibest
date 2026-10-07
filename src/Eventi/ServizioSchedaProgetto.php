@@ -27,7 +27,7 @@ final class ServizioSchedaProgetto
      * @param list<array<string, mixed>> $edizioni id, nome, posti, apertura, chiusura, min, max
      * @return array{evento: int, non_tolte: list<string>} id del progetto e edizioni che non si sono potute eliminare perché hanno iscritti
      */
-    public function salva(int $paginaId, int $eventoId, array $evento, array $d, array $json, string $corsoCodice, ?string $destinazione, array $edizioni, int $listaAttesa, int $approvazione, int $convenzione): array
+    public function salva(int $paginaId, int $eventoId, array $evento, array $d, array $json, string|array $corsoCodice, ?string $destinazione, array $edizioni, int $listaAttesa, int $approvazione, int $convenzione): array
     {
         return $this->db->transazione(function () use ($paginaId, $eventoId, $evento, $d, $json, $corsoCodice, $destinazione, $edizioni, $listaAttesa, $approvazione, $convenzione): array {
             if ($eventoId === 0) {
@@ -37,8 +37,7 @@ final class ServizioSchedaProgetto
             }
             $this->progetti->salvaScheda($eventoId, $d, $json);
             // Corso di studio scelto dall'anagrafe (link alla pagina del corso nella scheda pubblica)
-            $corso = $this->anagrafe->corsoStudio($corsoCodice);
-            $this->progetti->impostaCorso($eventoId, $corso['codice'] ?? null);
+            $this->progetti->impostaCorsi($eventoId, $this->codiciCorsi($corsoCodice));
             $this->progetti->impostaDestinazione($eventoId, $destinazione);
             $this->progetti->impostaConvenzione($eventoId, $convenzione);
             // Edizioni = turni di iscrizione (solo progetti senza rimando)
@@ -47,5 +46,24 @@ final class ServizioSchedaProgetto
 
             return ['evento' => $eventoId, 'non_tolte' => $nonTolte];
         });
+    }
+
+    /**
+     * Codici dei corsi scelti, validati con l'anagrafe, senza doppioni (al massimo 12).
+     *
+     * @param string|list<string> $scelti un codice o l'elenco dei codici
+     * @return list<string>
+     */
+    private function codiciCorsi(string|array $scelti): array
+    {
+        $out = [];
+        foreach ((array) $scelti as $c) {
+            $corso = $this->anagrafe->corsoStudio(trim((string) $c));
+            if ($corso && !in_array($corso['codice'], $out, true)) {
+                $out[] = (string) $corso['codice'];
+            }
+        }
+
+        return array_slice($out, 0, 12);
     }
 }

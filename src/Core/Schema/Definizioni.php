@@ -523,6 +523,8 @@ final class Definizioni
             'dedicata_scuole' => "ADD COLUMN dedicata_scuole TINYINT(1) NOT NULL DEFAULT 0",
             // v31: insegnamento dell'anagrafe da cui nasce l'attività (aree "Gruppi degli insegnamenti")
             'insegnamento_id' => "ADD COLUMN insegnamento_id INT DEFAULT NULL",
+            // v46: più corsi di studio per attività (codici separati da virgola; corso_codice resta il primo)
+            'corsi_codici' => "ADD COLUMN corsi_codici TEXT DEFAULT NULL",
         ],
         // v12: nomi degli studenti ridotti alle iniziali dopo il periodo di conservazione (i codici restano verificabili)
         // v27: file della convenzione e dell'Allegato A, docenti di riferimento indicati nell'Allegato A

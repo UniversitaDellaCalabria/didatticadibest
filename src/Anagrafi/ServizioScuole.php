@@ -100,6 +100,29 @@ final class ServizioScuole
     }
 
     /**
+     * I dati della scuola per la convenzione: istituto principale (se la sede è una succursale), codice meccanografico, comune con provincia,
+     * indirizzo con CAP. Null se il codice non è nell'anagrafe.
+     *
+     * @return array{denominazione: string, codice: string, comune: string, indirizzo: string}|null
+     */
+    public function perConvenzione(?string $codice): ?array
+    {
+        $s = $this->perCodice($codice);
+        if (!$s) {
+            return null;
+        }
+        $ist = !empty($s['istituto_codice']) ? $this->perCodice((string) $s['istituto_codice']) : null;
+        $sede = $ist ?: $s;
+
+        return [
+            'denominazione' => Testi::maiuscoleScuola((string) ($s['istituto_denominazione'] ?: $s['denominazione'])),
+            'codice' => (string) ($s['istituto_codice'] ?: $s['codice']),
+            'comune' => Testi::maiuscoleScuola((string) $sede['comune']) . (!empty($sede['provincia']) ? ' (' . Testi::maiuscoleScuola((string) $sede['provincia']) . ')' : ''),
+            'indirizzo' => !empty($sede['indirizzo']) ? Testi::maiuscoleScuola((string) $sede['indirizzo']) . (!empty($sede['cap']) ? ', ' . $sede['cap'] : '') : '',
+        ];
+    }
+
+    /**
      * Regioni, province di una regione o comuni di una provincia, con il numero di scuole:
      * [['valore' => 'COSENZA', 'nome' => 'Cosenza', 'n' => 412], …]
      *
@@ -112,7 +135,8 @@ final class ServizioScuole
             return [];
         }
         $filtri = [];
-        if ($campo !== 'regione') {
+        // Senza regione (dati importati senza) le province e i comuni si elencano comunque
+        if ($campo !== 'regione' && trim($regione) !== '') {
             $filtri['regione'] = mb_strtoupper($regione);
         }
         if ($campo === 'comune') {

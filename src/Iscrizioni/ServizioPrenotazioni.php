@@ -74,7 +74,7 @@ final class ServizioPrenotazioni
         }
 
         // Prenotazione pubblica (senza accesso): trappola per i robot, domanda di controllo e limite per indirizzo IP
-        if (!$r->connesso()) {
+        if (!$r->connesso() && !$r->controlliPubbliciGiaFatti) {
             $errCaptcha = null;
             if (trim((string) ($post['sito_web'] ?? '')) !== '') {
                 $errCaptcha = 'Prenotazione non registrata: riprova.';
@@ -363,7 +363,10 @@ final class ServizioPrenotazioni
                     . "<p><a href='" . htmlspecialchars($linkElenco) . "' style='background:#198754; color:#fff; padding:10px 18px; text-decoration:none; border-radius:6px; font-weight:bold;'>Inserisci l'elenco degli studenti</a></p>";
         }
         $colore = $this->colori->delTurno($turnoId);
-        $this->mailer->invia($r->email, str_replace($cerca, $sostituisci, (string) $oggetto), str_replace($cerca, $sostituisci, $corpo), $colore);
+        // Programma FSL: una sola email riepilogativa per tutte le attività, mandata da chi le ha raccolte
+        if (!$r->senzaEmailPersona) {
+            $this->mailer->invia($r->email, str_replace($cerca, $sostituisci, (string) $oggetto), str_replace($cerca, $sostituisci, $corpo), $colore);
+        }
 
         // Gestori dell'area/evento con notifiche attive + indirizzi aggiuntivi dell'evento:
         // ognuno riceve la propria email con il riepilogo completo (campi aggiuntivi compresi)

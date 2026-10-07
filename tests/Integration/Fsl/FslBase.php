@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Integration\Fsl;
 
+use App\Anagrafi\ClientApiAteneo;
 use App\Core\Container;
 use App\Core\Database;
 use App\Core\Orologio;
@@ -11,6 +12,7 @@ use App\Core\Sito;
 use App\Infrastructure\Mail\Mailer;
 use App\Infrastructure\Pdf\VerificaFirme;
 use App\Iscrizioni\RegistroOperazioni;
+use Tests\Doppi\AnagrafiClientApiFinto;
 use Tests\Doppi\IscrizioniRegistroFinto;
 use Tests\Doppi\MailerFinto;
 use Tests\Doppi\OrologioFisso;
@@ -63,6 +65,8 @@ abstract class FslBase extends DatabaseDiProva
         $c->istanza(Container::class, $c);
         $c->istanza(Database::class, $this->db);
         $c->istanza(Mailer::class, $this->mailer);
+        // I corsi di studio (scheda dell'Allegato A) si leggono con le API di Ateneo: nei test nessuna rete
+        $c->istanza(ClientApiAteneo::class, new AnagrafiClientApiFinto());
         $c->istanza(Orologio::class, new OrologioFisso('2026-10-05 12:00:00'));
         $c->istanza(Sito::class, new Sito($this->radice, 'https://portale.test/eventi'));
         $c->istanza(RegistroOperazioni::class, new IscrizioniRegistroFinto());

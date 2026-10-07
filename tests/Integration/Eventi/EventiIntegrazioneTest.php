@@ -63,7 +63,7 @@ final class EventiIntegrazioneTest extends DatabaseDiProva
             'progetti_dettagli' => "CREATE TABLE progetti_dettagli (evento_id INT PRIMARY KEY, struttura VARCHAR(255) DEFAULT '', data_inizio DATE NULL, data_fine DATE NULL, periodo_note VARCHAR(255) DEFAULT '', destinatari VARCHAR(255) DEFAULT '',
                 modalita VARCHAR(100) DEFAULT '', ore_totali INT NULL, incontri_previsti INT NULL, min_studenti INT NULL, max_studenti INT NULL, referenti_json TEXT NULL, info_extra_json TEXT NULL, moduli_json TEXT NULL,
                 obiettivi TEXT NULL, conoscenze TEXT NULL, competenze TEXT NULL, per_scuole TINYINT DEFAULT 1, attestati TINYINT DEFAULT 0, convenzione TINYINT DEFAULT 0, dedicata_scuole TINYINT DEFAULT 0,
-                corso_codice VARCHAR(20) NULL, destinazione VARCHAR(300) NULL, insegnamento_id INT NULL, updated_at DATETIME NULL)",
+                corso_codice VARCHAR(20) NULL, corsi_codici TEXT NULL, destinazione VARCHAR(300) NULL, insegnamento_id INT NULL, updated_at DATETIME NULL)",
             'sondaggi' => 'CREATE TABLE sondaggi (id INT AUTO_INCREMENT PRIMARY KEY, evento_id INT, attivo TINYINT DEFAULT 1, titolo VARCHAR(150) DEFAULT \'\')',
             'sondaggi_domande' => 'CREATE TABLE sondaggi_domande (id INT AUTO_INCREMENT PRIMARY KEY, sondaggio_id INT, testo VARCHAR(255) DEFAULT \'\', condizione_json TEXT NULL)',
             'sondaggi_risposte' => 'CREATE TABLE sondaggi_risposte (id INT AUTO_INCREMENT PRIMARY KEY, sondaggio_id INT, domanda_id INT NULL)',

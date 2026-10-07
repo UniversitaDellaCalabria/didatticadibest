@@ -43,7 +43,21 @@ $trovato = false; foreach ($cv['Laurea'] ?? [] as $c) if ($c['codice'] === 'ZZ00
 prova($trovato && !array_filter($cv, fn($g) => array_filter($g, fn($c) => $c['codice'] === 'ZZ002')), "corsi_studio_visibili(): solo visibili, per tipo");
 prova(corso_studio($conn, 'ZZ001')['regdid_id'] == 4242 && url_corso_studio(corso_studio($conn, 'ZZ001')) === 'https://www.unical.it/storage/cds/4242/' && nome_scheda_corso(['tipo' => 'L', 'nome' => 'Biologia']) === 'Corso di laurea in Biologia', "corso_studio(), url_corso_studio(), nome_scheda_corso()");
 prova(html_corso_pubblico($conn, ['struttura' => '', 'corso_codice' => 'ZZ001']) !== '' && str_contains(html_corso_pubblico($conn, ['struttura' => 'Il corso', 'corso_codice' => 'ZZ001']), 'storage/cds/4242') && html_corso_pubblico($conn, ['struttura' => '']) === '', "html_corso_pubblico()");
-prova(str_contains(html_campo_corso($conn, 'corso', 'Corso prova anagrafi (Laurea)'), 'selected') && str_contains(html_scelta_corso_scheda($conn, 'ZZ001', 'testo'), 'name="corso_codice"'), "html_campo_corso() e html_scelta_corso_scheda()");
+prova(str_contains(html_campo_corso($conn, 'corso', 'Corso prova anagrafi (Laurea)'), 'selected') && str_contains(html_scelta_corso_scheda($conn, ['corso_codice' => 'ZZ001', 'struttura' => 'testo']), 'name="corsi_codici[]" value="ZZ001"'), "html_campo_corso() e html_scelta_corso_scheda()");
+// Più corsi di studio per attività
+$sc_corsi = html_scelta_corso_scheda($conn, ['corsi_codici' => 'ZZ001,ZZ002', 'corso_codice' => 'ZZ001', 'struttura' => 'Altra struttura'], 'provaCorsi');
+prova(substr_count($sc_corsi, 'name="corsi_codici[]"') === 3 && str_contains($sc_corsi, 'value="ZZ002"') && str_contains($sc_corsi, 'Corso di laurea magistrale in Corso nascosto') && str_contains($sc_corsi, 'value="Altra struttura"') && str_contains($sc_corsi, 'Aggiungi corso'),
+    "scheda dell'attività: più corsi di studio scelti (anche uno non più tra i visibili) e il testo libero a parte");
+prova(!str_contains(html_scelta_corso_scheda($conn, ['corso_codice' => 'ZZ001', 'struttura' => 'Corso di laurea in Corso prova anagrafi']), 'value="Corso di laurea in Corso prova anagrafi"'), "scheda dell'attività: il vecchio testo uguale al nome del corso non si ripete");
+$pub_corsi = html_corso_pubblico($conn, ['struttura' => '', 'corsi_codici' => 'ZZ001,ZZ002', 'corso_codice' => 'ZZ001']);
+prova(str_contains($pub_corsi, 'Corso di laurea in Corso prova anagrafi') && str_contains($pub_corsi, 'storage/cds/4242') && str_contains($pub_corsi, 'Corso di laurea magistrale in Corso nascosto'), "scheda pubblica: ogni corso scelto, con il link alla sua pagina");
+$pub_testo = html_corso_pubblico($conn, ['struttura' => 'Dipartimento DiBEST', 'corsi_codici' => 'ZZ001', 'corso_codice' => 'ZZ001']);
+prova(str_starts_with($pub_testo, 'Dipartimento DiBEST') && str_contains($pub_testo, 'Corso di laurea in Corso prova anagrafi'), "scheda pubblica: il testo della struttura e poi i corsi");
+$q("DELETE FROM progetti_dettagli WHERE evento_id = 98999");
+App\Core\App::per($conn)->get(App\Eventi\ServizioEventi::class)->salvaCorso(98999, ['struttura' => '', 'corsi_codici' => ['ZZ002', 'ZZ001', 'ZZ002', 'XX999']]);
+$riga_corsi = $conn->query("SELECT corso_codice, corsi_codici FROM progetti_dettagli WHERE evento_id = 98999")->fetch_assoc();
+prova($riga_corsi['corso_codice'] === 'ZZ002' && $riga_corsi['corsi_codici'] === 'ZZ002,ZZ001', "salvataggio dei corsi dell'attività: elenco validato, senza doppioni né codici sconosciuti", json_encode($riga_corsi));
+$q("DELETE FROM progetti_dettagli WHERE evento_id = 98999");
 
 $q("INSERT INTO insegnamenti (id, nome, cds_nome, cds_cod, anno_accademico, coorte, anno_corso, presente, partizione, cfu, ssd_cod, docente, semestre) VALUES (9901, 'Insegnamento prova', 'Corso prova anagrafi', 'ZZ001', 2025, 2025, 1, 1, '', 6, 'BIO/01', 'Rossi', 'Primo')");
 prova(insegnamento($conn, 9901)['nome'] === 'Insegnamento prova' && insegnamento($conn, 0) === null && isset(insegnamenti_per_corso($conn, 2025)['Corso prova anagrafi']), "insegnamento() e insegnamenti_per_corso()");

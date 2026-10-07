@@ -38,7 +38,7 @@ if (!$ctx) $nega("La prenotazione collegata non esiste più.");
 // ── Documenti: genera e scarica ──
 if (isset($_GET['scarica']) && $dati) {
     $doc_pronto = $conv_online->scarica((string)$_GET['scarica'], $cc, $ctx);
-    if ($doc_pronto) invia_file_scaricabile($doc_pronto['file'], $doc_pronto['nome'], 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    if ($doc_pronto) invia_file_scaricabile($doc_pronto['file'], $doc_pronto['nome'], str_ends_with($doc_pronto['nome'], '.pdf') ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
 }
 
 // ── Salvataggio del modulo ──
@@ -77,11 +77,12 @@ require_once 'header.php';
     <section id="documenti" class="card border-0 shadow-sm mb-4" style="border-left:5px solid #16a34a !important;"><div class="card-body">
         <h2 class="h5 fw-bold"><i class="fa fa-circle-check text-success me-1" aria-hidden="true"></i>I documenti sono pronti</h2>
         <div class="d-flex flex-wrap gap-2 my-3">
-            <a class="btn btn-success fw-bold" href="convenzione_online.php?t=<?php echo $h($cc['token']); ?>&amp;scarica=convenzione"><i class="fa fa-file-word me-1" aria-hidden="true"></i>Scarica la Convenzione (con Allegato A)</a>
-            <a class="btn btn-outline-success fw-bold" href="convenzione_online.php?t=<?php echo $h($cc['token']); ?>&amp;scarica=allegato"><i class="fa fa-file-word me-1" aria-hidden="true"></i>Scarica solo l'Allegato A</a>
+            <a class="btn btn-success fw-bold" href="convenzione_online.php?t=<?php echo $h($cc['token']); ?>&amp;scarica=allegato_pdf"><i class="fa fa-file-pdf me-1" aria-hidden="true"></i>Scarica l'Allegato A (PDF)</a>
+            <a class="btn btn-success fw-bold" href="convenzione_online.php?t=<?php echo $h($cc['token']); ?>&amp;scarica=convenzione_sola"><i class="fa fa-file-word me-1" aria-hidden="true"></i>Scarica la Convenzione (Word)</a>
         </div>
+        <p class="small text-secondary">Preferisci i vecchi documenti Word? <a href="convenzione_online.php?t=<?php echo $h($cc['token']); ?>&amp;scarica=convenzione">Convenzione con l'Allegato A in fondo</a> · <a href="convenzione_online.php?t=<?php echo $h($cc['token']); ?>&amp;scarica=allegato">Solo l'Allegato A in Word</a></p>
         <ol class="mb-2">
-            <li>Apri i file e controlla i dati (i campi rimasti in <span style="background:#fef08a;">giallo</span> sono da completare).</li>
+            <li>Apri i file e controlla i dati (nel Word i campi rimasti in <span style="background:#fef08a;">giallo</span> sono da completare).</li>
             <li>Il <strong>Dirigente Scolastico</strong> firma i documenti <strong>digitalmente in formato PAdES</strong> (PDF firmato; il formato CAdES .p7m non è accettato).</li>
             <li>La scuola li invia dalla propria PEC a <a href="mailto:<?php echo $h($cfg['pec']); ?>?subject=<?php echo rawurlencode('Convenzione Formazione Scuola Lavoro – ' . ($s['denominazione'] ?? '')); ?>" class="fw-bold"><?php echo $h($cfg['pec']); ?></a>.</li>
             <li>Il Dipartimento firma, registra la convenzione e <strong>conferma le prenotazioni</strong>: riceverete un'email.</li>
@@ -118,7 +119,7 @@ require_once 'header.php';
         <section class="card border-0 shadow-sm mb-3"><div class="card-body">
             <h2 class="h5 fw-bold"><span class="cv-passo">2</span>Dirigente Scolastico</h2>
             <div class="row g-2">
-                <div class="col-md-6"><label class="form-label small fw-bold" for="cvDir">Nome e cognome <span class="text-danger">*</span></label><input class="form-control" id="cvDir" name="dirigente" value="<?php echo $h($s['dirigente']); ?>" required maxlength="255" placeholder="Dott.ssa Maria Rossi"></div>
+                <div class="col-md-6"><label class="form-label small fw-bold" for="cvDir">Nome e cognome</label><input class="form-control" id="cvDir" name="dirigente" value="<?php echo $h($s['dirigente']); ?>" maxlength="255" placeholder="Dott.ssa Maria Rossi"></div>
                 <div class="col-md-6"><label class="form-label small fw-bold" for="cvDcf">Codice fiscale</label><input class="form-control font-monospace" id="cvDcf" name="dir_cf" value="<?php echo $h($s['dir_cf']); ?>" maxlength="16" style="text-transform:uppercase;"></div>
                 <div class="col-md-6"><label class="form-label small fw-bold" for="cvLn">Luogo di nascita</label><input class="form-control" id="cvLn" name="luogo_nascita" value="<?php echo $h($s['luogo_nascita']); ?>" maxlength="255"></div>
                 <div class="col-md-6"><label class="form-label small fw-bold" for="cvDn">Data di nascita</label><input type="date" class="form-control" id="cvDn" name="data_nascita" value="<?php echo $h($s['data_nascita']); ?>"></div>

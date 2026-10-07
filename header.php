@@ -38,6 +38,9 @@ $titolo_portale = !empty($cfg_portale_header['nome_portale']) ? $cfg_portale_hea
 $sottotitolo_portale = !empty($cfg_portale_header['sottotitolo_portale']) ? $cfg_portale_header['sottotitolo_portale'] : 'Portale Eventi e Laboratori Dipartimentali';
 
 $u_logged_header = !empty($_SESSION['utente_id']);
+// Programma FSL della scuola: icona con il numero di attività scelte (compare solo quando ce n'è almeno una)
+$n_programma_fsl = 0;
+try { $n_programma_fsl = \App\Core\App::get(\App\Fsl\ProgrammaFsl::class)->conta(); } catch (\Throwable $e_prog) { $n_programma_fsl = 0; }
 $u_ruolo_header = isset($_SESSION['utente_ruolo_id']) ? (int)$_SESSION['utente_ruolo_id'] : 5;
 $u_sec_roles_header = !empty($_SESSION['utente_ruoli_secondari']) ? explode(',', $_SESSION['utente_ruoli_secondari']) : [];
 $is_admin_header = ($u_ruolo_header === 1 || $u_ruolo_header === 2 || in_array('1', $u_sec_roles_header) || in_array('2', $u_sec_roles_header));
@@ -120,6 +123,8 @@ if ($u_logged_header) {
 
         .top-bar-btn, .top-bar-istituzionale a.top-bar-btn { background-color: #ffffff !important; color: #B30000 !important; border: 1px solid #ffffff !important; border-radius: 4px; padding: 5px 15px; font-weight: bold; text-decoration: none !important; transition: all 0.2s; font-size: 0.85rem; display: inline-block; }
         .top-bar-btn:hover, .top-bar-istituzionale a.top-bar-btn:hover { background-color: #B30000 !important; color: #ffffff !important; border-color: #B30000 !important; }
+        .programma-fsl-btn { position: relative; }
+        .programma-fsl-btn .programma-fsl-n { position: absolute; top: -8px; right: -8px; min-width: 20px; height: 20px; border-radius: 10px; background: #B30000; color: #fff; border: 2px solid #fff; font-size: .7rem; line-height: 16px; text-align: center; padding: 0 4px; }
 
         .it-header-center-wrapper { background-color: #B30000 !important; border-bottom: 1px solid #7a0000; padding: 15px 0; }
         .it-brand-title { color: #ffffff !important; font-size: 2.2rem !important; font-weight: 700 !important; line-height: 1.1; letter-spacing: -0.5px; }
@@ -304,6 +309,9 @@ if ($u_logged_header) {
             </div>
             
             <div class="d-flex align-items-center gap-2">
+                <?php if ($n_programma_fsl > 0): ?>
+                    <a href="programma_fsl.php" class="top-bar-btn programma-fsl-btn me-2" title="Il programma FSL della scuola" aria-label="Programma FSL: <?php echo (int)$n_programma_fsl; ?> attività. Apri il programma"><i class="fa fa-clipboard-list" aria-hidden="true"></i><span class="programma-fsl-n" aria-hidden="true"><?php echo (int)$n_programma_fsl; ?></span></a>
+                <?php endif; ?>
                 <?php if ($u_logged_header): ?>
                     <div class="dropdown">
                         <button class="top-bar-btn dropdown-toggle d-flex align-items-center" type="button" id="userTopDropdown" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Menu utente">
@@ -425,6 +433,9 @@ if ($u_logged_header) {
             <button class="btn btn-outline-light btn-sm flex-fill" id="btnContrastMob" aria-label="Attiva Alto Contrasto"><i class="fa fa-adjust" aria-hidden="true"></i></button>
         </div>
 
+        <?php if ($n_programma_fsl > 0): ?>
+            <a href="programma_fsl.php" class="mob-nav-link" style="font-weight:bold;"><i class="fa fa-clipboard-list me-2" style="color:#fbbf24;" aria-hidden="true"></i> Programma FSL (<?php echo (int)$n_programma_fsl; ?>)</a>
+        <?php endif; ?>
         <div class="mob-nav-label">Account</div>
         <?php if ($u_logged_header): ?>
             <div class="mob-nav-user"><i class="fa fa-user-circle me-2" aria-hidden="true"></i><?php echo htmlspecialchars($nome_visualizzato); ?></div>

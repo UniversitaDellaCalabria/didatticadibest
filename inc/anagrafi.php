@@ -233,25 +233,32 @@ if (!function_exists('nome_scheda_corso')) {
     function nome_scheda_corso(array $c): string { return \App\Anagrafi\Testi::nomeSchedaCorso($c); }
 }
 if (!function_exists('html_scelta_corso_scheda')) {
-    // Scheda di progetti ed eventi: tendina dei corsi di studio + testo libero (name=struttura)
-    function html_scelta_corso_scheda($conn, string $codice, string $testo, string $id = 'schedaCorso'): string {
+    // Scheda di progetti ed eventi: uno o più corsi di studio dell'anagrafe + testo libero (name=struttura).
+    // $scheda = riga di progetti_dettagli (corsi_codici, corso_codice, struttura). Nelle schede più vecchie il testo era il nome del corso scelto:
+    // si toglie, perché il corso compare già nell'elenco.
+    function html_scelta_corso_scheda($conn, ?array $scheda, string $id = 'schedaCorso'): string {
         $corsi = \App\Core\App::per($conn)->get(\App\Anagrafi\ServizioCorsi::class);
-        $visibili = $corsi->visibili();
-        $tutti = array_merge(...array_values($visibili ?: [[]]));
-        $trovato = $codice === '' || in_array($codice, array_column($tutti, 'codice'), true);
-        return \App\Anagrafi\Vista\Corsi::sceltaScheda($visibili, !$trovato ? $corsi->corso($codice) : null, $codice, $testo, $id);
+        $scelti = $corsi->corsiDi($scheda);
+        $testo = (string)($scheda['struttura'] ?? '');
+        foreach ($scelti as $c) if (mb_strtolower(trim($testo)) === mb_strtolower(\App\Anagrafi\Testi::nomeSchedaCorso($c))) $testo = '';
+        return \App\Anagrafi\Vista\Corsi::sceltaScheda($corsi->visibili(), $scelti, $testo, $id);
     }
 }
 if (!function_exists('html_corso_pubblico')) {
-    // Nome del corso/struttura nelle schede pubbliche, con il link alla pagina del corso se scelto dall'anagrafe
+    // Corsi di studio / struttura nelle schede pubbliche, con il link alla pagina di ogni corso scelto dall'anagrafe
     function html_corso_pubblico($conn, ?array $d, string $stile = ''): string {
         $corsi = \App\Core\App::per($conn)->get(\App\Anagrafi\ServizioCorsi::class);
         $testo = trim((string)($d['struttura'] ?? ''));
-        $corso = $corsi->corso($d['corso_codice'] ?? '');
-        if ($corso && empty($corso['regdid_id'])) $corso = $corsi->completaRegdid($corso);
-        $url = \App\Anagrafi\Testi::urlCorsoStudio($corso);
-        if ($testo === '' && $url !== '') $testo = \App\Anagrafi\Testi::etichettaCorso($corsi->corso($d['corso_codice']));
-        return \App\Anagrafi\Vista\Corsi::pubblico($testo, $url, $stile);
+        $elenco = [];
+        foreach ($corsi->corsiDi($d) as $corso) {
+            if (empty($corso['regdid_id'])) $corso = $corsi->completaRegdid($corso);
+            $elenco[] = [\App\Anagrafi\Testi::nomeSchedaCorso($corso), \App\Anagrafi\Testi::urlCorsoStudio($corso)];
+        }
+        // Un solo corso (schede più vecchie): il testo della struttura, se c'è, fa da nome del link
+        if (count($elenco) === 1 && trim((string)($d['corsi_codici'] ?? '')) === '') {
+            return \App\Anagrafi\Vista\Corsi::pubblico($testo !== '' ? $testo : \App\Anagrafi\Testi::etichettaCorso($corsi->corso($d['corso_codice'])), $elenco[0][1], $stile);
+        }
+        return \App\Anagrafi\Vista\Corsi::pubblicoElenco($testo, $elenco, $stile);
     }
 }
 if (!function_exists('html_campo_corso')) {

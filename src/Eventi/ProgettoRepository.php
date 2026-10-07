@@ -58,6 +58,16 @@ final class ProgettoRepository
         $this->db->esegui('UPDATE progetti_dettagli SET corso_codice = ? WHERE evento_id = ?', [$codice, $eventoId]);
     }
 
+    /**
+     * Corsi di studio dell'attività scelti dall'anagrafe (link alle pagine dei corsi nella scheda pubblica): corso_codice è il primo.
+     *
+     * @param list<string> $codici
+     */
+    public function impostaCorsi(int $eventoId, array $codici): void
+    {
+        $this->db->esegui('UPDATE progetti_dettagli SET corso_codice = ?, corsi_codici = ? WHERE evento_id = ?', [$codici[0] ?? null, $codici ? implode(',', $codici) : null, $eventoId]);
+    }
+
     /** Rimando a un'altra pagina (slug di un'area o indirizzo http(s)). Lancia RuntimeException se non riesce. */
     public function impostaDestinazione(int $eventoId, ?string $destinazione): void
     {

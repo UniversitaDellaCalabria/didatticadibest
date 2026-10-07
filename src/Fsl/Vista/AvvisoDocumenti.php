@@ -9,6 +9,10 @@ use App\Core\Sito;
 /** Testi sui documenti da consegnare prima dell'attività FSL (elenco degli studenti e autorizzazione della scuola): pagina, email e promemoria. */
 final class AvvisoDocumenti
 {
+    /** Aspetto dei riquadri informativi del modulo di prenotazione FSL (questo e quello del programma, in master_template.php: devono restare uguali). */
+    public const STILE_RIQUADRO = 'border:1px solid #0d6efd;border-left-width:6px;background:#eef5ff;border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:.95rem;line-height:1.5;';
+    public const STILE_TITOLO = 'font-weight:700;font-size:1.02rem;margin-bottom:4px;color:#0a4aa8;';
+
     public function __construct(private Sito $sito)
     {
     }
@@ -51,8 +55,8 @@ final class AvvisoDocumenti
     {
         $quando = $scadenza !== null ? 'entro il <strong>' . date('d/m/Y', (int) strtotime($scadenza)) . '</strong>' : 'prima dell\'inizio dell\'attività';
 
-        return "<div role='note' style='border:2px solid #0d6efd;border-left-width:8px;background:#eef5ff;border-radius:8px;padding:14px 16px;margin-bottom:16px;font-size:1.05rem;line-height:1.45;'>"
-            . "<div style='font-weight:700;font-size:1.15rem;margin-bottom:6px;color:#0a4aa8;'><i class='fa fa-triangle-exclamation me-1' aria-hidden='true'></i> Dopo la prenotazione dovrai caricare due documenti</div>"
+        return "<div role='note' style='" . self::STILE_RIQUADRO . "'>"
+            . "<div style='" . self::STILE_TITOLO . "'><i class='fa fa-triangle-exclamation me-1' aria-hidden='true'></i> Dopo la prenotazione dovrai caricare due documenti</div>"
             . "<ol style='margin:0 0 8px;padding-left:22px;'>"
             . "<li>l'<strong>elenco degli studenti</strong> (cognome e nome: puoi scriverlo, incollarlo da Excel o caricare il modello compilato);</li>"
             . "<li>l'<strong>autorizzazione della scuola</strong> alla partecipazione, in <strong>PDF</strong>.</li></ol>"

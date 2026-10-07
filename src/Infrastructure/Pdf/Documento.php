@@ -36,6 +36,9 @@ final class Documento
     private ?array $logo = null;      // [dati JPEG, larghezza, altezza, componenti]
     private float $logo_l = 0;
     private float $logo_a = 0;
+    private ?array $logo2 = null;     // secondo logo allineato a destra (es. la scuola): [dati JPEG, larghezza, altezza, componenti]
+    private float $logo2_l = 0;
+    private float $logo2_a = 0;
     private string $logo_pos = 'centro'; // 'centro' o 'sinistra' (allineato al margine del testo)
     private string $piede = '';
     private array $info = [];
@@ -45,7 +48,7 @@ final class Documento
     private array $ttf = [];          // PDF/A: [chiave font => TrueType]
     private array $usati = [];        // PDF/A: [chiave font => [codice WinAnsi => true]]
 
-    // $o: logo, logo_larghezza, logo_pos ('sinistra'), piede, info (Title, Author, Subject, Keywords, Creator), pdfa (bool), xmp ([nome => valore]), lingua
+    // $o: logo, logo_larghezza, logo_pos ('sinistra'), logo2 (JPEG a destra), logo2_larghezza, piede, info (Title, Author, Subject, Keywords, Creator), pdfa (bool), xmp ([nome => valore]), lingua
     public function __construct(array $o = [])
     {
         if (!empty($o['logo']) && is_file($o['logo']) && ($im = @getimagesize($o['logo'])) && $im[2] === IMAGETYPE_JPEG) {
@@ -53,6 +56,15 @@ final class Documento
             $this->logo_l = (float)($o['logo_larghezza'] ?? 200);
             $this->logo_a = $this->logo_l * $im[1] / max(1, $im[0]);
             $this->logo_pos = ($o['logo_pos'] ?? '') === 'sinistra' ? 'sinistra' : 'centro';
+        }
+        if (!empty($o['logo2']) && is_file($o['logo2']) && ($im2 = @getimagesize($o['logo2'])) && $im2[2] === IMAGETYPE_JPEG) {
+            $this->logo2 = [file_get_contents($o['logo2']), (int)$im2[0], (int)$im2[1], (int)($im2['channels'] ?? 3)];
+            $this->logo2_l = (float)($o['logo2_larghezza'] ?? 110);
+            $this->logo2_a = $this->logo2_l * $im2[1] / max(1, $im2[0]);
+            if ($this->logo2_a > 60) {
+                $this->logo2_l *= 60 / $this->logo2_a;
+                $this->logo2_a = 60;
+            }
         }
         $this->piede = (string)($o['piede'] ?? '');
         $this->info = $o['info'] ?? [];
@@ -141,6 +153,10 @@ final class Documento
             $x = $this->logo_pos === 'sinistra' ? $this->sx : ($this->larg - $this->logo_l) / 2;
             $this->out('q ' . $this->n($this->logo_l) . ' 0 0 ' . $this->n($this->logo_a) . ' ' . $this->n($x) . ' ' . $this->n($this->alt - 28 - $this->logo_a) . ' cm /Logo Do Q');
             $this->y = 28 + $this->logo_a + 22;
+        }
+        if ($this->logo2) {
+            $this->out('q ' . $this->n($this->logo2_l) . ' 0 0 ' . $this->n($this->logo2_a) . ' ' . $this->n($this->larg - $this->dx - $this->logo2_l) . ' ' . $this->n($this->alt - 28 - $this->logo2_a) . ' cm /Logo2 Do Q');
+            $this->y = max($this->y, 28 + $this->logo2_a + 22);
         }
     }
     public function spazio(float $pt): void
@@ -389,7 +405,17 @@ final class Documento
             $obj[$id_logo] = "<< /Type /XObject /Subtype /Image /Width {$this->logo[1]} /Height {$this->logo[2]} /ColorSpace $cs /BitsPerComponent 8 /Filter /DCTDecode"
                             . ($this->logo[3] === 4 ? ' /Decode [1 0 1 0 1 0 1 0]' : '') . " /Length " . strlen($this->logo[0]) . " >>\nstream\n" . $this->logo[0] . "\nendstream";
         }
-        $risorse = '<< /Font << ' . implode(' ', array_map(fn ($k, $i) => "/$k $i 0 R", array_keys($font_ids), $font_ids)) . ' >>' . ($id_logo ? " /XObject << /Logo $id_logo 0 R >>" : '') . ' >>';
+        $id_logo2 = null;
+        if ($this->logo2) {
+            $id_logo2 = $id++;
+            $cs2 = $this->logo2[3] === 1 ? '/DeviceGray' : ($this->logo2[3] === 4 ? '/DeviceCMYK' : '/DeviceRGB');
+            $obj[$id_logo2] = "<< /Type /XObject /Subtype /Image /Width {$this->logo2[1]} /Height {$this->logo2[2]} /ColorSpace $cs2 /BitsPerComponent 8 /Filter /DCTDecode"
+                            . ($this->logo2[3] === 4 ? ' /Decode [1 0 1 0 1 0 1 0]' : '') . " /Length " . strlen($this->logo2[0]) . " >>
+stream
+" . $this->logo2[0] . "
+endstream";
+        }
+        $risorse = '<< /Font << ' . implode(' ', array_map(fn ($k, $i) => "/$k $i 0 R", array_keys($font_ids), $font_ids)) . ' >>' . (($id_logo || $id_logo2) ? ' /XObject << ' . ($id_logo ? "/Logo $id_logo 0 R " : '') . ($id_logo2 ? "/Logo2 $id_logo2 0 R " : '') . '>>' : '') . ' >>';
         $kids = [];
         foreach ($this->pagine as $c) {
             $z = function_exists('gzcompress') ? gzcompress($c, 6) : null;

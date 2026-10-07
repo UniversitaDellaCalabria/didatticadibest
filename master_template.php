@@ -10,6 +10,13 @@ require_once 'functions.php';
 
 sync_sso_user($conn);
 
+// L'attività è già nel programma FSL della scuola (cambia il testo del pulsante)
+if (!function_exists('fsl_programma_ha')) {
+    function fsl_programma_ha(int $eventoId): bool {
+        try { return \App\Core\App::get(\App\Fsl\ProgrammaFsl::class)->contiene($eventoId); } catch (\Throwable $e) { return false; }
+    }
+}
+
 $current_filename = $page_slug ?? basename($_SERVER['PHP_SELF'], '.php');
 $utente_logged = !empty($_SESSION['utente_id']);
 $utente_ruolo_id = (int)($_SESSION['utente_ruolo_id'] ?? 5);
@@ -61,6 +68,25 @@ if ($utente_logged) {
     }
 }
 
+// AGGIUNTA AL PROGRAMMA FSL: l'attività va nel programma della scuola (nessun posto riservato); la prenotazione di tutte le attività
+// scelte avviene insieme da programma_fsl.php. Dopo l'aggiunta si torna alla stessa pagina con la domanda «prenota ora o scegli altre».
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['aggiungi_programma'])) {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    $esito_prog = \App\Core\App::get(\App\Fsl\ServizioProgrammaFsl::class)->aggiungi(
+        (int)($_POST['turno_id'] ?? 0), $_POST, $utente_logged, $utente_ruolo_id,
+        isset($_SESSION['utente_ruoli_secondari']) ? explode(',', $_SESSION['utente_ruoli_secondari']) : []
+    );
+    $dove_prog = $current_filename . '.php';
+    if (!empty($_GET['progetto'])) $dove_prog .= '?progetto=' . (int)$_GET['progetto'];
+    elseif ((int)($_POST['da_scheda'] ?? 0) > 0) $dove_prog .= '?evento=' . (int)$_POST['da_scheda'];
+    if ($esito_prog['ok']) {
+        $_SESSION['programma_aggiunta'] = ['titolo' => $esito_prog['titolo'], 'sostituita' => $esito_prog['sostituita']];
+        header('Location: ' . $dove_prog . (str_contains($dove_prog, '?') ? '&' : '?') . 'programma=ok'); exit;
+    }
+    $_SESSION['programma_errore'] = ['titolo' => $esito_prog['titolo'], 'errore' => $esito_prog['errore']];
+    header('Location: ' . $dove_prog . (str_contains($dove_prog, '?') ? '&' : '?') . 'programma=errore'); exit;
+}
+
 // ELABORAZIONE POST PRENOTAZIONE
 // La logica (controlli, anti-robot, blocco per persona e area, transazione con conteggio dei posti bloccato, lista d'attesa,
 // email) sta in src/Iscrizioni/ServizioPrenotazioni: restituisce dove rimandare la persona.
@@ -85,6 +111,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['invia_prenotazione'])
 
 // RENDER MESSAGGI
 $messaggio_prenotazione = "";
+$modal_programma = null;   // attività appena aggiunta al programma: domanda «prenota ora o scegli altre»
+if (($_GET['programma'] ?? '') === 'ok' && !empty($_SESSION['programma_aggiunta'])) {
+    $modal_programma = $_SESSION['programma_aggiunta'];
+    unset($_SESSION['programma_aggiunta']);
+} elseif (($_GET['programma'] ?? '') === 'errore' && !empty($_SESSION['programma_errore'])) {
+    $e_prog = $_SESSION['programma_errore'];
+    unset($_SESSION['programma_errore']);
+    $messaggio_prenotazione = "<div class='alert alert-danger fw-bold text-center my-4 shadow-sm border-0 border-start border-4 border-danger'><i class='fa fa-clipboard-list me-2'></i> Non aggiunta al programma" . ($e_prog['titolo'] !== '' ? ' (' . htmlspecialchars($e_prog['titolo']) . ')' : '') . ': ' . htmlspecialchars((string)$e_prog['errore']) . '</div>';
+}
 if (isset($_GET['status'])) {
     $st = $_GET['status'];
     if ($st === 'success' && isset($_GET['code'])) {
@@ -307,9 +342,11 @@ $pulsante_progetto = function (array $ev, array $ip, ?array $ed = null) use ($co
         $ed = $ip['edizioni'][0];
     }
     $t_id = (int)$ed['t']['id'];
+    $fsl_b = (int)($ip['d']['convenzione'] ?? 0) === 1; // attività FSL: va nel programma della scuola
+    $nel_programma = $fsl_b && fsl_programma_ha((int)$ev['id']);
     if (!$ed['libera'] && empty($ed['t']['abilita_lista_attesa'])) return '<button class="btn btn-outline-secondary fw-bold w-100" disabled>' . ($sc ? 'Edizione già assegnata' : 'Posti esauriti') . '</button>';
-    if (!$ed['libera']) return '<button type="button" class="btn btn-warning fw-bold text-dark w-100" data-bs-toggle="modal" data-bs-target="#modPrenota' . $t_id . '"><i class="fa fa-hourglass-half me-1" aria-hidden="true"></i>Mettiti in lista d\'attesa</button>';
-    return '<button type="button" class="btn fw-bold w-100" style="' . $stile . '" data-bs-toggle="modal" data-bs-target="#modPrenota' . $t_id . '"><i class="fa ' . ($sc ? 'fa-school' : 'fa-user-plus') . ' me-1" aria-hidden="true"></i>' . ($sc ? 'Iscrivi la scuola' : 'Iscriviti') . '</button>';
+    if (!$ed['libera']) return '<button type="button" class="btn btn-warning fw-bold text-dark w-100" data-bs-toggle="modal" data-bs-target="#modPrenota' . $t_id . '"><i class="fa ' . ($fsl_b ? 'fa-clipboard-list' : 'fa-hourglass-half') . ' me-1" aria-hidden="true"></i>' . ($fsl_b ? ($nel_programma ? 'Nel programma: modifica' : 'Aggiungi al programma (lista d\'attesa)') : 'Mettiti in lista d\'attesa') . '</button>';
+    return '<button type="button" class="btn fw-bold w-100" style="' . $stile . '" data-bs-toggle="modal" data-bs-target="#modPrenota' . $t_id . '"><i class="fa ' . ($fsl_b ? 'fa-clipboard-list' : ($sc ? 'fa-school' : 'fa-user-plus')) . ' me-1" aria-hidden="true"></i>' . ($fsl_b ? ($nel_programma ? 'Nel programma: modifica' : 'Aggiungi al programma') : ($sc ? 'Iscrivi la scuola' : 'Iscriviti')) . '</button>';
 };
 
 // Intestazione di un giorno nei template cronologici. I turni senza data stanno sotto la chiave
@@ -444,6 +481,7 @@ function printModalPrenotazione($t, $col_primaria, $utente_logged, $val_nome, $v
     $is_progetto = ($t['evento_tipo'] ?? '') === 'progetto';
     $per_scuole_m = $is_progetto && !empty($t['per_scuole']); // progetto per le scuole: testi "scuola" e numero di partecipanti
     $classe_m = prenotazione_di_classe($is_progetto, $t['dett_progetto'] ?? null); // numero di studenti (progetti per le scuole, eventi con attestati di classe)
+    $fsl_m = (int)($t['dett_progetto']['convenzione'] ?? 0) === 1; // attività FSL: si aggiunge al programma della scuola e si prenota insieme alle altre
     ?>
     <div class="modal fade" id="modPrenota<?php echo $t['id']; ?>" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -451,13 +489,20 @@ function printModalPrenotazione($t, $col_primaria, $utente_logged, $val_nome, $v
                 <form method="POST" enctype="multipart/form-data">
                     <?php csrf_field(); ?>
                     <input type="hidden" name="turno_id" value="<?php echo $t['id']; ?>">
+                    <?php if ($fsl_m): ?><input type="hidden" name="aggiungi_programma" value="1"><?php endif; ?>
                     <?php if (!empty($GLOBALS['evento_scheda_id'])): ?><input type="hidden" name="da_scheda" value="<?php echo (int)$GLOBALS['evento_scheda_id']; ?>"><?php endif; ?>
                     <div class="modal-header py-2 bg-light border-bottom-0">
-                        <h6 class="modal-title fw-bold text-dark"><i class="fa <?php echo $per_scuole_m ? 'fa-school' : 'fa-ticket-alt'; ?> me-1" style="color:<?php echo $col_primaria; ?>;"></i> <?php echo $per_scuole_m ? 'Iscrizione della scuola' : ($is_progetto ? 'Iscrizione' : 'Prenotazione'); ?>: <?php echo htmlspecialchars($t['evento_titolo']); ?><?php if ($is_progetto && !empty($t['nome_turno']) && !in_array($t['nome_turno'], ['Iscrizione scuole', 'Iscrizioni'], true)): ?> <span class="badge ms-1" style="background: <?php echo $col_primaria; ?>; color: <?php echo colore_testo_su($col_primaria); ?>;"><?php echo htmlspecialchars($t['nome_turno']); ?></span><?php endif; ?></h6>
+                        <h6 class="modal-title fw-bold text-dark"><i class="fa <?php echo $fsl_m ? 'fa-clipboard-list' : ($per_scuole_m ? 'fa-school' : 'fa-ticket-alt'); ?> me-1" style="color:<?php echo $col_primaria; ?>;"></i> <?php echo $fsl_m ? 'Aggiungi al programma FSL' : ($per_scuole_m ? 'Iscrizione della scuola' : ($is_progetto ? 'Iscrizione' : 'Prenotazione')); ?>: <?php echo htmlspecialchars($t['evento_titolo']); ?><?php if ($is_progetto && !empty($t['nome_turno']) && !in_array($t['nome_turno'], ['Iscrizione scuole', 'Iscrizioni'], true)): ?> <span class="badge ms-1" style="background: <?php echo $col_primaria; ?>; color: <?php echo colore_testo_su($col_primaria); ?>;"><?php echo htmlspecialchars($t['nome_turno']); ?></span><?php endif; ?></h6>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body text-start">
-                        <?php if ($is_progetto): ?>
+                        <?php if ($fsl_m): ?>
+                        <div role="note" style="<?php echo \App\Fsl\Vista\AvvisoDocumenti::STILE_RIQUADRO; ?>">
+                            <div style="<?php echo \App\Fsl\Vista\AvvisoDocumenti::STILE_TITOLO; ?>"><i class="fa fa-clipboard-list me-1" aria-hidden="true"></i> Stai aggiungendo l'attività al programma della scuola</div>
+                            Potrai sceglierne altre e poi prenotarle <strong>tutte insieme</strong>, con un'unica convenzione e l'Allegato A già compilato. I dati della scuola e di chi prenota si chiedono una volta sola, alla fine.
+                            <?php if ($is_waitlist): ?><strong>I posti sono esauriti</strong>: alla conferma la richiesta entrerà in lista d'attesa.<?php else: ?>I posti si assegnano alla conferma, non quando aggiungi l'attività.<?php endif; ?>
+                        </div>
+                        <?php elseif ($is_progetto): ?>
                         <div class="alert <?php echo $is_waitlist ? 'alert-warning' : 'alert-info'; ?> border-0 small mb-3">
                             <i class="fa fa-circle-info me-1" aria-hidden="true"></i>
                             <?php if ($per_scuole_m && $is_waitlist): ?>
@@ -482,7 +527,7 @@ function printModalPrenotazione($t, $col_primaria, $utente_logged, $val_nome, $v
                             Prenotazione per una <strong>classe</strong>: indica il numero di studenti. Dopo la conferma potrai inserire l'elenco degli studenti per gli <strong>attestati</strong> dalla tua Area personale (accesso con SPID, CIE o credenziali Unical, con la stessa email).
                         </div>
                         <?php endif; ?>
-                        <div class="alert alert-light border shadow-sm mb-3" <?php echo $is_progetto ? 'hidden' : ''; ?>>
+                        <div class="alert alert-light border shadow-sm mb-3" <?php echo ($is_progetto || $fsl_m) ? 'hidden' : ''; ?>>
                             <div class="d-flex align-items-center gap-2 mb-1">
                                 <?php if (!empty($t['nome_turno'])): ?><span class="badge" style="background:<?php echo $col_primaria; ?>;">🏷️ <?php echo htmlspecialchars($t['nome_turno']); ?></span><?php endif; ?>
                                 <?php if (!empty($t['data_turno'])): ?><span class="badge bg-dark">📅 <?php echo date('d/m/Y', strtotime($t['data_turno'])); ?></span><?php endif; ?>
@@ -492,14 +537,15 @@ function printModalPrenotazione($t, $col_primaria, $utente_logged, $val_nome, $v
                             <?php if(!empty($t['annullabile_fino'])): ?><small class="text-muted d-block mt-1"><i class="fa fa-rotate-left me-1" aria-hidden="true"></i> Potrai annullare o cambiare turno fino al <strong><?php echo date('d/m/Y \a\l\l\e H:i', strtotime($t['annullabile_fino'])); ?></strong>.</small><?php endif; ?>
                         </div>
                         
-                        <?php if (isset($t['abilita_multi_posto']) && $t['abilita_multi_posto'] == 1): ?>
+                        <?php if (!$fsl_m && isset($t['abilita_multi_posto']) && $t['abilita_multi_posto'] == 1): ?>
                             <div class="mb-3 p-2 bg-light rounded border border-primary">
                                 <label class="form-label small fw-bold text-primary mb-1"><i class="fa fa-users me-1"></i> Posti da Prenotare <span class="text-danger">*</span></label>
                                 <input type="number" name="num_posti" class="form-control form-control-sm fw-bold text-primary" value="1" min="1" max="<?php echo max(1, $disponibili); ?>" required>
                             </div>
                         <?php endif; ?>
 
-                        <!-- DATI ANAGRAFICI A DUE A DUE -->
+                        <!-- DATI ANAGRAFICI A DUE A DUE (programma FSL: si chiedono una volta sola, alla conferma) -->
+                        <?php if (!$fsl_m): ?>
                         <div class="row g-3 mb-2">
                             <div class="col-md-6"><label class="form-label small fw-bold">Nome <span class="text-danger">*</span></label><input type="text" name="nome" class="form-control form-control-sm" value="<?php echo htmlspecialchars($val_nome); ?>" required <?php echo $read_nome; ?>></div>
                             <div class="col-md-6"><label class="form-label small fw-bold">Cognome <span class="text-danger">*</span></label><input type="text" name="cognome" class="form-control form-control-sm" value="<?php echo htmlspecialchars($val_cognome); ?>" required <?php echo $read_cognome; ?>></div>
@@ -515,6 +561,7 @@ function printModalPrenotazione($t, $col_primaria, $utente_logged, $val_nome, $v
                                 <div class="col-12 form-text mt-1">Scrivi l'indirizzo a cui vuoi ricevere conferma, promemoria e attestati.</div>
                             <?php endif; ?>
                         </div>
+                        <?php endif; // !fsl_m ?>
 
                         <!-- CAMPI PERSONALIZZATI (con campi condizionali e nuovi tipi) -->
                         <?php
@@ -522,6 +569,7 @@ function printModalPrenotazione($t, $col_primaria, $utente_logged, $val_nome, $v
                             // Il numero di partecipanti compare solo nei progetti per le scuole, con l'etichetta "studenti"
                             foreach (\App\Core\App::get(\App\Iscrizioni\CampiFormRepository::class)->perModulo((int)$p_id, (int)$t['evento_id']) as $cfr) {
                                 if (!campo_form_visibile($cfr, $is_progetto, $t['dett_progetto'] ?? null)) continue;
+                                if ($fsl_m && $cfr['tipo_campo'] === 'scuola') continue; // la scuola si indica una volta sola, alla conferma del programma
                                 if ($cfr['nome_campo'] === CAMPO_PARTECIPANTI) $cfr['etichetta'] = 'Numero di studenti partecipanti';
                                 $campi_array[] = $cfr;
                             }
@@ -693,48 +741,9 @@ function printModalPrenotazione($t, $col_primaria, $utente_logged, $val_nome, $v
 
                         <?php endif; // end !empty($campi_array) ?>
                         
-                        <?php if ((int)($t['dett_progetto']['convenzione'] ?? 0) === 1): $cid = 'conv' . (int)$t['id'];
-                            [$cv_dal, $cv_al] = periodo_attivita($t['dett_progetto']['data_inizio'] ?? null, $t['dett_progetto']['data_fine'] ?? null, $t['data_turno'] ?? null); ?>
-                        <!-- CONVENZIONE CON LA SCUOLA: "No" → prenotazione in attesa finché la convenzione non arriva.
-                             La convenzione deve coprire tutto il periodo dell'attività (data-dal / data-al) -->
-                        <fieldset class="mt-3 p-3 rounded border conv-box" data-dal="<?php echo $cv_dal; ?>" data-al="<?php echo $cv_al; ?>">
-                            <legend class="form-label small fw-bold mb-2 float-start w-100 p-0" style="font-size:.875rem; white-space:normal; overflow:visible; text-overflow:clip; position:static; line-height:1.4;"><i class="fa fa-file-signature me-1" aria-hidden="true"></i>La scuola ha già stipulato la convenzione con il Dipartimento per la Formazione Scuola Lavoro? <span class="text-danger">*</span></legend>
-                            <div class="clearfix"></div>
-                            <div class="form-check form-check-inline"><input class="form-check-input conv-radio" type="radio" name="convenzione" id="<?php echo $cid; ?>si" value="si" required><label class="form-check-label small" for="<?php echo $cid; ?>si">Sì, è già stipulata</label></div>
-                            <div class="form-check form-check-inline"><input class="form-check-input conv-radio" type="radio" name="convenzione" id="<?php echo $cid; ?>no" value="no" required><label class="form-check-label small" for="<?php echo $cid; ?>no">No, non ancora</label></div>
-                            <div class="conv-scad alert alert-danger small mt-2 mb-0" hidden><i class="fa fa-triangle-exclamation me-1" aria-hidden="true"></i>La convenzione della scuola registrata al Dipartimento non copre tutto il periodo dell'attività (<?php echo $cv_dal === $cv_al ? date('d/m/Y', strtotime($cv_dal)) : date('d/m/Y', strtotime($cv_dal)) . ' – ' . date('d/m/Y', strtotime($cv_al)); ?>): <strong>va stipulata una nuova convenzione</strong>.</div>
-                            <div class="conv-reg alert alert-success small mt-2 mb-0" hidden><i class="fa fa-circle-check me-1" aria-hidden="true"></i>La scuola scelta ha già una convenzione con il Dipartimento valida per il periodo dell'attività (<span class="conv-reg-sc"></span>): non devi inviare nulla.</div>
-                            <div class="conv-no alert alert-warning small mt-2 mb-0" hidden><?php echo html_istruzioni_convenzione($GLOBALS['page_cfg'] ?? []); ?></div>
-                        </fieldset>
-                        <script>
-                        if (!window.convInit) { window.convInit = true;
-                            document.addEventListener('change', function (e) {
-                                if (!e.target.classList || !e.target.classList.contains('conv-radio')) return;
-                                var box = e.target.closest('.conv-box'); box.querySelector('.conv-no').hidden = e.target.value !== 'no';
-                            });
-                            // Scuola scelta dall'anagrafe (campo-scuola.js): se nel registro c'è una convenzione che copre tutto il periodo
-                            // dell'attività si risponde "Sì" da soli; se ce n'è una che non lo copre, "No" (ne va stipulata una nuova)
-                            document.addEventListener('scuola-scelta', function (e) {
-                                var form = e.target.closest('form'), box = form && form.querySelector('.conv-box');
-                                if (!box) return;
-                                var s = e.detail, reg = box.querySelector('.conv-reg'), scad = box.querySelector('.conv-scad');
-                                reg.hidden = true; scad.hidden = true;
-                                if (!s || !Array.isArray(s.conv) || !s.conv.length) return;
-                                var dal = box.dataset.dal, al = box.dataset.al;
-                                var fmt = function (d) { return d.split('-').reverse().join('/'); };
-                                var ok = s.conv.filter(function (p) { return (!p[0] || p[0] <= dal) && (!p[1] || p[1] >= al); })[0];
-                                box.querySelector('.conv-radio[value="' + (ok ? 'si' : 'no') + '"]').checked = true;
-                                box.querySelector('.conv-no').hidden = !!ok;
-                                if (ok) {
-                                    box.querySelector('.conv-reg-sc').textContent = ok[1] ? (ok[0] ? 'dal ' + fmt(ok[0]) + ' al ' : 'fino al ') + fmt(ok[1]) : 'senza scadenza';
-                                    reg.hidden = false;
-                                } else scad.hidden = false;
-                            });
-                        }
-                        </script>
-                        <?php endif; ?>
+                        <?php // Attività FSL: la risposta sulla convenzione si dà una volta sola, nel riepilogo del programma (programma_fsl.php) ?>
 
-                        <?php if (!$utente_logged): $cap = captcha_prenotazione(); ?>
+                        <?php if (!$utente_logged && !$fsl_m): $cap = captcha_prenotazione(); ?>
                         <!-- CONTROLLO ANTI-ROBOT (solo prenotazioni senza accesso) -->
                         <div class="mt-3 p-3 rounded border bg-light">
                             <label for="captcha_<?php echo $t['id']; ?>" class="form-label small fw-bold mb-1"><i class="fa fa-shield-halved me-1" aria-hidden="true"></i>Controllo anti-robot: <?php echo htmlspecialchars($cap['domanda']); ?> <span class="text-danger">*</span></label>
@@ -749,7 +758,8 @@ function printModalPrenotazione($t, $col_primaria, $utente_logged, $val_nome, $v
                         </div>
                         <?php endif; ?>
 
-                        <!-- CHECKBOX PRIVACY OBBLIGATORIO -->
+                        <!-- CHECKBOX PRIVACY OBBLIGATORIO (programma FSL: nel riepilogo) -->
+                        <?php if (!$fsl_m): ?>
                         <div class="form-check mt-3 mb-1 p-3 bg-light rounded border border-secondary shadow-sm">
                             <input class="form-check-input border-secondary" type="checkbox" name="accetta_privacy" id="privacyCheck_<?php echo $t['id']; ?>" required>
                             <label class="form-check-label text-dark" for="privacyCheck_<?php echo $t['id']; ?>" style="font-size: 0.85rem; line-height: 1.4;">
@@ -757,10 +767,13 @@ function printModalPrenotazione($t, $col_primaria, $utente_logged, $val_nome, $v
                                 Ho letto l'<a href="privacy.php" target="_blank" rel="noopener" class="fw-bold" style="color: <?php echo colore_testo_su($col_primaria) === '#FFFFFF' ? $col_primaria : '#1F2937'; ?>; text-decoration: underline;">informativa sul trattamento dei dati personali</a>.
                             </label>
                         </div>
+                        <?php endif; // !fsl_m ?>
                         
                     </div>
                     <div class="modal-footer py-2 bg-light border-top-0">
-                        <?php if($is_waitlist): ?>
+                        <?php if ($fsl_m): ?>
+                            <button type="submit" class="btn btn-sm fw-bold w-100 shadow-sm <?php echo $is_waitlist ? 'btn-warning text-dark' : 'btn-primary'; ?>" <?php echo $is_waitlist ? '' : 'style="background-color: ' . $col_primaria . '; border: none;"'; ?>><i class="fa fa-clipboard-list me-1" aria-hidden="true"></i><?php echo $is_waitlist ? "Aggiungi al programma (lista d'attesa)" : 'Aggiungi al programma'; ?></button>
+                        <?php elseif($is_waitlist): ?>
                             <button type="submit" name="invia_prenotazione" class="btn btn-warning btn-sm fw-bold w-100 text-dark border-0"><?php echo $per_scuole_m ? "Metti la scuola in lista d'attesa" : "Aggiungimi in Lista d'Attesa"; ?></button>
                         <?php else: ?>
                             <button type="submit" name="invia_prenotazione" class="btn btn-primary btn-sm fw-bold w-100 shadow-sm" style="background-color: <?php echo $col_primaria; ?>; border: none;"><?php echo $per_scuole_m ? 'Conferma l\'iscrizione della scuola' : ($is_progetto ? 'Conferma l\'iscrizione' : 'Conferma e Prenota'); ?></button>
@@ -792,6 +805,8 @@ function getPulsanteAzione($t, $col_primaria, $utente_logged, $utente_ruolo_id, 
     $is_waitlist = ($soldout && isset($t['abilita_lista_attesa']) && $t['abilita_lista_attesa'] == 1);
     
     $now = date('Y-m-d H:i:s');
+    $fsl = (int)($t['dett_progetto']['convenzione'] ?? 0) === 1; // attività FSL: va nel programma della scuola
+    $nel_programma = $fsl && fsl_programma_ha((int)$t['evento_id']);
 
     if (turno_concluso($t)) {
         return '<button class="btn btn-secondary btn-sm fw-bold py-1 px-3 shadow-sm" disabled><i class="fa fa-flag-checkered me-1"></i> Evento Concluso</button>';
@@ -810,9 +825,11 @@ function getPulsanteAzione($t, $col_primaria, $utente_logged, $utente_ruolo_id, 
     } elseif (($ruolo_richiesto > 0 || $ruolo_richiesto === -1) && $utente_logged && !$ruolo_ok) {
         return '<button class="btn btn-secondary btn-sm fw-bold py-1 px-3" disabled>🔒 Riservato</button>';
     } elseif ($is_waitlist) {
-        return '<button type="button" class="btn btn-warning btn-sm fw-bold text-dark py-1 px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#modPrenota'.$t['id'].'">Lista d\'Attesa</button>';
+        $etic = $fsl ? ($nel_programma ? 'Nel programma' : 'Aggiungi (lista d\'attesa)') : 'Lista d\'Attesa';
+        return '<button type="button" class="btn btn-warning btn-sm fw-bold text-dark py-1 px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#modPrenota'.$t['id'].'">'.($fsl ? '<i class="fa fa-clipboard-list me-1" aria-hidden="true"></i>' : '').$etic.'</button>';
     } else {
-        return '<button type="button" class="btn btn-primary btn-sm fw-bold py-1 px-4 shadow-sm" style="background-color: '.$col_primaria.'; color: '.colore_testo_su($col_primaria).'; border: none;" data-bs-toggle="modal" data-bs-target="#modPrenota'.$t['id'].'">Prenota Ora</button>';
+        $etic = $fsl ? ($nel_programma ? 'Nel programma: modifica' : 'Aggiungi al programma') : 'Prenota Ora';
+        return '<button type="button" class="btn btn-primary btn-sm fw-bold py-1 px-4 shadow-sm" style="background-color: '.$col_primaria.'; color: '.colore_testo_su($col_primaria).'; border: none;" data-bs-toggle="modal" data-bs-target="#modPrenota'.$t['id'].'">'.($fsl ? '<i class="fa fa-clipboard-list me-1" aria-hidden="true"></i>' : '').$etic.'</button>';
     }
 }
 
@@ -857,6 +874,35 @@ function evSetRating(btn) {
     <?php echo $messaggio_prenotazione; ?>
         
 </div>
+<?php endif; ?>
+<?php if ($modal_programma): $n_prog = \App\Core\App::get(\App\Fsl\ProgrammaFsl::class)->conta(); ?>
+<!-- Attività appena aggiunta al programma FSL: prenotare ora o scegliere altre attività -->
+<div class="modal fade" id="modProgrammaAggiunta" tabindex="-1" aria-labelledby="modProgrammaAggiuntaTit" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius: 12px;">
+            <div class="modal-header border-0 pb-0">
+                <h2 class="modal-title h5 fw-bold" id="modProgrammaAggiuntaTit"><i class="fa fa-circle-check text-success me-2" aria-hidden="true"></i><?php echo $modal_programma['sostituita'] ? 'Programma aggiornato' : 'Aggiunta al programma'; ?></h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Chiudi"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-2"><strong><?php echo htmlspecialchars($modal_programma['titolo']); ?></strong> <?php echo $modal_programma['sostituita'] ? 'è stata aggiornata nel' : 'è nel'; ?> programma della tua scuola, che ora ha <strong><?php echo $n_prog; ?> attività</strong>.</p>
+                <p class="small text-secondary mb-0">Puoi prenotare adesso oppure scegliere altre attività: le prenoterai tutte insieme, con un'unica convenzione e l'Allegato A già compilato. I posti si assegnano alla conferma.</p>
+            </div>
+            <div class="modal-footer border-0 flex-column flex-sm-row gap-2">
+                <button type="button" class="btn btn-outline-secondary fw-bold w-100 m-0" data-bs-dismiss="modal"><i class="fa fa-magnifying-glass me-1" aria-hidden="true"></i>Scegli altre attività</button>
+                <a href="programma_fsl.php" class="btn btn-primary fw-bold w-100 m-0" style="background-color: <?php echo $col_primaria; ?>; border: none; color: <?php echo colore_testo_su($col_primaria); ?>;"><i class="fa fa-clipboard-list me-1" aria-hidden="true"></i>Vai al programma e prenota</a>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var el = document.getElementById('modProgrammaAggiunta');
+    if (el && window.bootstrap) new bootstrap.Modal(el).show();
+    // Ripulisce l'indirizzo: ricaricando la pagina la domanda non si ripropone
+    if (history.replaceState) history.replaceState(null, '', location.pathname + location.search.replace(/([?&])programma=[^&]*&?/, '$1').replace(/[?&]$/, ''));
+});
+</script>
 <?php endif; ?>
 
 <!-- ======================================================= -->
