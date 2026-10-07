@@ -326,6 +326,10 @@ final class ServizioIscritti
         if (!$p) {
             return;
         }
+        // Autorizzazione della scuola (PDF) delle attività FSL: il file non resta orfano
+        if (preg_match('#^uploads/autorizzazioni/[a-f0-9]{32}\.pdf$#', (string) ($p['autorizzazione_file'] ?? ''))) {
+            @unlink($this->sito->radice() . '/' . $p['autorizzazione_file']);
+        }
         $this->iscritti->elimina($prenotazioneId);
         if (!empty($p['email'])) {
             $this->mailer->invia((string) $p['email'], 'Cancellazione Prenotazione', "La tua prenotazione per <strong>{$p['evento_titolo']}</strong> è stata cancellata.", $this->colori->delTurno((int) $p['turno_id']));

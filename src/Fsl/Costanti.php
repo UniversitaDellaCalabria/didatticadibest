@@ -12,6 +12,9 @@ final class Costanti
     public const URL_ALLEGATO = 'assets/modelli/Allegato_A_FSL_DiBEST.doc';
     public const PEC = 'dipartimento.best@pec.unical.it';
 
+    /** Cartella (bloccata al web) delle autorizzazioni della scuola caricate dai docenti prima dell'attività. */
+    public const DIR_AUTORIZZAZIONI = 'uploads/autorizzazioni/';
+
     /** Durata proposta: il modello del Dipartimento vale un anno dalla stipula (art. 8). */
     public const DURATA_ANNI = 1;
 

@@ -180,7 +180,7 @@ final class IscrittiRepository
         return Righe::testo($this->db->righe(
             "SELECT pr.*, COALESCE(NULLIF(pr.matricola, ''), u.matricola_studente, u.matricola_dipendente, u.matricola) as matricola_effettiva,
                     t.nome_turno, t.data_turno, t.orario_inizio, t.orario_fine, t.evento_id, e.titolo as evento_titolo, e.luogo as evento_luogo, e.abilita_presenze,
-                    e.tipo AS evento_tipo, pd.per_scuole, pd.attestati AS progetto_attestati, pd.data_inizio AS pd_inizio, pd.data_fine AS pd_fine,
+                    e.tipo AS evento_tipo, pd.per_scuole, pd.attestati AS progetto_attestati, pd.data_inizio AS pd_inizio, pd.data_fine AS pd_fine, IFNULL(pd.convenzione, 0) AS fsl,
                     (SELECT COUNT(*) FROM partecipanti_prenotazione pp WHERE pp.prenotazione_id = pr.id) AS n_studenti
              FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id LEFT JOIN utenti u ON pr.utente_id = u.id LEFT JOIN progetti_dettagli pd ON pd.evento_id = e.id
              $where ORDER BY pr.data_prenotazione DESC LIMIT ? OFFSET ?",

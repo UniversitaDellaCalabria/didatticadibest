@@ -1,6 +1,8 @@
 <?php
 // elenco_studenti.php - Il docente che ha iscritto la scuola a un progetto inserisce l'elenco degli studenti
 // (per gli attestati di partecipazione): righe scritte o incollate da Excel, oppure file .xlsx/.csv dal modello.
+// Attività di Formazione Scuola Lavoro: l'elenco e l'autorizzazione della scuola (PDF) si consegnano dopo la prenotazione e
+// prima dell'inizio (src/Fsl/ServizioDocumentiClasse), anche in attesa della convenzione.
 // Dopo l'invio degli attestati l'elenco non è più modificabile dal docente (resta modificabile dall'admin).
 require_once 'config.php';
 require_once 'functions.php';
@@ -13,10 +15,15 @@ if (empty($_SESSION['utente_id'])) { header('Location: saml_login.php?redirect='
 $pr_id = \App\Core\App::per($conn)->get(\App\Attestati\ServizioAttestati::class)->idPerCodice($code);
 $p = $pr_id ? prenotazione_per_attestati($conn, $pr_id) : null;
 if (!$p || !puo_vedere_prenotazione($p)) { http_response_code(403); die("Accesso negato."); }
-if (!attestati_di_classe($p)) {
+$documenti = \App\Core\App::per($conn)->get(\App\Fsl\ServizioDocumentiClasse::class);
+$docs_fsl = $documenti->richiesti($p);
+$con_attestati = attestati_di_classe($p);
+if (!$con_attestati && !$docs_fsl) {
     die("Questa attività non prevede l'elenco degli studenti.");
 }
-if (($p['stato'] ?? 'confermata') !== 'confermata') die("L'elenco degli studenti si compila quando la prenotazione è confermata.");
+if ($docs_fsl ? !$documenti->attiva($p) : (($p['stato'] ?? 'confermata') !== 'confermata')) {
+    die($docs_fsl ? "L'elenco e l'autorizzazione non si caricano per una prenotazione annullata o rifiutata." : "L'elenco degli studenti si compila quando la prenotazione è confermata.");
+}
 $is_progetto = ($p['evento_tipo'] ?? '') === 'progetto';
 
 $dett = get_dettagli_progetti($conn, [(int)$p['evento_id']])[(int)$p['evento_id']] ?? null;
@@ -31,6 +38,12 @@ if (isset($_GET['modello'])) {
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$bloccato) {
     csrf_verify($_POST['csrf_token'] ?? '');
+    // Autorizzazione della scuola (PDF): solo attività FSL
+    if ($docs_fsl && (isset($_POST['carica_autorizzazione']) || isset($_POST['togli_autorizzazione']))) {
+        $esito = isset($_POST['togli_autorizzazione']) ? $documenti->togli($p) : $documenti->carica($p, $_FILES['file_autorizzazione'] ?? []);
+        flash_set($esito->messaggio, $esito->riuscito ? 'success' : 'danger');
+        header("Location: $url_self"); exit;
+    }
     $righe = null; $errore = null;
     if (isset($_POST['carica_file']) && !empty($_FILES['file_elenco']['name'])) {
         $testo = testo_da_file_elenco($_FILES['file_elenco'], $errore);
@@ -57,9 +70,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && !$bloccato) {
 }
 
 $studenti = get_partecipanti_prenotazione($conn, $pr_id);
+$stato_docs = $docs_fsl ? $documenti->stato($p, $max) : null;
 $col = colore_valido($p['colore_primario'] ?? '', '#0056B3');
 
-$page_cfg['titolo'] = "Elenco studenti";
+$page_cfg['titolo'] = $docs_fsl ? "Elenco studenti e autorizzazione" : "Elenco studenti";
 require_once 'header.php';
 ?>
 <div class="container my-4" style="max-width: 980px;">
@@ -68,7 +82,7 @@ require_once 'header.php';
 
     <div class="card border-0 shadow-sm mb-4" style="border-top: 4px solid <?php echo $col; ?> !important; border-radius: 12px;">
         <div class="card-body p-4">
-            <div class="small text-uppercase fw-bold text-secondary mb-1" style="letter-spacing: .05em;">Elenco degli studenti per gli attestati</div>
+            <div class="small text-uppercase fw-bold text-secondary mb-1" style="letter-spacing: .05em;"><?php echo $docs_fsl ? "Documenti da consegnare prima dell'attività" : 'Elenco degli studenti per gli attestati'; ?></div>
             <h1 class="fw-bold fs-3 mb-2"><?php echo h($p['evento_titolo']); ?></h1>
             <div class="d-flex flex-wrap gap-3 small text-secondary fw-semibold">
                 <?php if (!empty($p['nome_turno']) && !in_array($p['nome_turno'], ['Iscrizione scuole', 'Iscrizioni'], true)): ?><span><i class="fa fa-clone me-1" aria-hidden="true"></i><?php echo h($p['nome_turno']); ?></span><?php endif; ?>
@@ -78,7 +92,13 @@ require_once 'header.php';
             </div>
             <div class="mt-3 d-flex align-items-center gap-3 flex-wrap">
                 <span class="badge fs-6 <?php echo count($studenti) === 0 ? 'bg-warning text-dark' : 'bg-success'; ?>"><?php echo count($studenti); ?> / <?php echo $max; ?> studenti</span>
-                <?php if ($is_progetto && !empty($p['data_fine'])): ?><span class="small text-secondary">Gli attestati partono dopo la fine del progetto (<?php echo date('d/m/Y', strtotime($p['data_fine'])); ?>), per le classi di cui è stata registrata la presenza.</span>
+                <?php if ($stato_docs): ?>
+                    <span class="badge fs-6 <?php echo $stato_docs['autorizzazione'] ? 'bg-success' : 'bg-warning text-dark'; ?>"><i class="fa <?php echo $stato_docs['autorizzazione'] ? 'fa-check' : 'fa-file-pdf'; ?> me-1" aria-hidden="true"></i>Autorizzazione della scuola <?php echo $stato_docs['autorizzazione'] ? 'caricata' : 'mancante'; ?></span>
+                    <?php if ($stato_docs['scadenza'] !== null && !$stato_docs['completi']): ?><span class="small fw-semibold <?php echo $stato_docs['scaduti'] ? 'text-danger' : 'text-secondary'; ?>"><i class="fa fa-clock me-1" aria-hidden="true"></i>Da consegnare entro il <?php echo date('d/m/Y', strtotime($stato_docs['scadenza'])); ?><?php echo $stato_docs['scaduti'] ? ' (scaduto)' : ''; ?></span><?php endif; ?>
+                    <?php if ($stato_docs['completi']): ?><span class="small fw-semibold text-success"><i class="fa fa-circle-check me-1" aria-hidden="true"></i>Documenti completi</span><?php endif; ?>
+                <?php endif; ?>
+                <?php if (!$con_attestati): ?>
+                <?php elseif ($is_progetto && !empty($p['data_fine'])): ?><span class="small text-secondary">Gli attestati partono dopo la fine del progetto (<?php echo date('d/m/Y', strtotime($p['data_fine'])); ?>), per le classi di cui è stata registrata la presenza.</span>
                 <?php elseif (!$is_progetto): ?><span class="small text-secondary">Gli attestati partono dopo l'attività, se la presenza della classe è stata registrata con il check-in.</span><?php endif; ?>
             </div>
         </div>
@@ -122,6 +142,28 @@ require_once 'header.php';
                 </div>
             </div>
             <div class="col-lg-5">
+                <?php if ($docs_fsl): ?>
+                <div class="card border-0 shadow-sm mb-4" style="border-radius: 12px;">
+                    <div class="card-body p-4">
+                        <h2 class="fs-5 fw-bold mb-2"><i class="fa fa-file-pdf me-1 text-danger" aria-hidden="true"></i>Autorizzazione della scuola</h2>
+                        <p class="small text-secondary">Carica l'<strong>autorizzazione della scuola</strong> alla partecipazione della classe all'attività, in <strong>PDF</strong> (al massimo 10 MB).</p>
+                        <?php if ($stato_docs['autorizzazione']): ?>
+                            <div class="alert alert-success small py-2 d-flex flex-wrap align-items-center gap-2">
+                                <i class="fa fa-circle-check" aria-hidden="true"></i><span class="flex-grow-1">File caricato<?php echo !empty($p['autorizzazione_il']) ? ' il ' . h(date('d/m/Y H:i', strtotime($p['autorizzazione_il']))) : ''; ?>: <strong><?php echo h($p['autorizzazione_nome'] ?? 'autorizzazione.pdf'); ?></strong></span>
+                                <a href="autorizzazione_scuola.php?code=<?php echo urlencode($code); ?>" target="_blank" class="btn btn-sm btn-outline-success fw-bold"><i class="fa fa-eye me-1" aria-hidden="true"></i>Apri</a>
+                                <form method="POST" class="d-inline"><?php csrf_field(); ?><input type="hidden" name="code" value="<?php echo h($code); ?>"><button type="submit" name="togli_autorizzazione" value="1" class="btn btn-sm btn-outline-danger fw-bold" onclick="return confirm('Togliere il file caricato?');"><i class="fa fa-trash me-1" aria-hidden="true"></i>Togli</button></form>
+                            </div>
+                        <?php endif; ?>
+                        <form method="POST" enctype="multipart/form-data">
+                            <?php csrf_field(); ?>
+                            <input type="hidden" name="code" value="<?php echo h($code); ?>">
+                            <label for="fileAutorizzazione" class="form-label small fw-bold"><?php echo $stato_docs['autorizzazione'] ? 'Sostituisci con un altro PDF' : 'Scegli il PDF'; ?></label>
+                            <input type="file" name="file_autorizzazione" id="fileAutorizzazione" class="form-control form-control-sm mb-2" accept="application/pdf,.pdf" required>
+                            <button type="submit" name="carica_autorizzazione" value="1" class="btn fw-bold w-100" style="background: <?php echo $col; ?>; color: <?php echo colore_testo_su($col); ?>;"><i class="fa fa-upload me-1" aria-hidden="true"></i>Carica l'autorizzazione</button>
+                        </form>
+                    </div>
+                </div>
+                <?php endif; ?>
                 <div class="card border-0 shadow-sm mb-4" style="border-radius: 12px;">
                     <div class="card-body p-4">
                         <h2 class="fs-5 fw-bold mb-2"><i class="fa fa-file-excel me-1 text-success" aria-hidden="true"></i>Usa il modello Excel</h2>
@@ -141,7 +183,7 @@ require_once 'header.php';
                 </div>
                 <div class="alert alert-light border small mb-0">
                     <i class="fa fa-shield-halved me-1" aria-hidden="true"></i>
-                    I nomi degli studenti servono solo a generare gli attestati di partecipazione e sono visibili a te e alla segreteria del dipartimento. Trascorsi <?php echo (int)MESI_CONSERVAZIONE_STUDENTI; ?> mesi dalla fine <?php echo $is_progetto ? 'del progetto' : "dell'attività"; ?> vengono ridotti alle iniziali.
+                    I nomi degli studenti servono <?php echo $con_attestati ? 'a generare gli attestati di partecipazione' : "all'organizzazione dell'attività"; ?> e sono visibili a te e alla segreteria del dipartimento. <?php if ($docs_fsl): ?>L'autorizzazione della scuola è visibile solo a te e a chi gestisce l'attività. <?php endif; ?> Trascorsi <?php echo (int)MESI_CONSERVAZIONE_STUDENTI; ?> mesi dalla fine <?php echo $is_progetto ? 'del progetto' : "dell'attività"; ?> vengono ridotti alle iniziali.
                 </div>
             </div>
         </div>

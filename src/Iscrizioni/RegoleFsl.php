@@ -37,6 +37,14 @@ interface RegoleFsl
     public function istruzioniConvenzione(array $areaCfg, bool $perEmail = false, string $codice = '', bool $inAttesa = true): string;
 
     /**
+     * Avviso sui documenti da caricare prima dell'attività FSL (elenco degli studenti e autorizzazione della scuola, con la
+     * scadenza): '' se l'attività non è di Formazione Scuola Lavoro per le classi.
+     *
+     * @param array<string, mixed>|null $dettagli riga di progetti_dettagli
+     */
+    public function avvisoDocumentiClasse(?array $dettagli, bool $eProgetto, string $codice, ?string $dataTurno): string;
+
+    /**
      * Periodo da coprire con la convenzione: progetto dal/al, evento il giorno del turno.
      *
      * @return array{0: string, 1: string}

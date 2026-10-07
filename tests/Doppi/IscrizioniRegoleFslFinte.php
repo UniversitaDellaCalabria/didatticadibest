@@ -42,6 +42,11 @@ final class IscrizioniRegoleFslFinte implements RegoleFsl
         return '[istruzioni convenzione ' . ($perEmail ? 'email' : 'pagina') . ' ' . $codice . ']';
     }
 
+    public function avvisoDocumentiClasse(?array $dettagli, bool $eProgetto, string $codice, ?string $dataTurno): string
+    {
+        return (int) ($dettagli['convenzione'] ?? 0) === 1 ? '[avviso documenti ' . $codice . ']' : '';
+    }
+
     public function periodoAttivita(?string $inizio, ?string $fine, ?string $dataTurno = null): array
     {
         $dal = $inizio ?: ($dataTurno ?: ($fine ?: null));

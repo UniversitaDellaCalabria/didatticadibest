@@ -97,6 +97,8 @@ if (isset($_GET['status'])) {
         elseif (isset($_GET['st_tipo']) && $_GET['st_tipo'] === 'approvare') { $messaggio_prenotazione = "<div class='alert alert-info fw-bold text-center my-4 shadow-sm border-0 border-start border-5 border-info'><i class='fa fa-hourglass-half me-2'></i> Richiesta in approvazione! Codice: <span class='badge bg-info text-dark ms-2'>$codice_p</span> $btn_scarica_pdf</div>"; } 
         elseif (isset($_GET['st_tipo']) && $_GET['st_tipo'] === 'attesa') { $messaggio_prenotazione = "<div class='alert alert-warning fw-bold text-center my-4 shadow-sm border-0 border-start border-5 border-warning'><i class='fa fa-clock me-2'></i> In Lista d'Attesa! Codice: <span class='badge bg-warning text-dark ms-2'>$codice_p</span> $btn_scarica_pdf</div>" . (($_GET['conv'] ?? '') === 'no' ? $box_conv : ''); } 
         else { $messaggio_prenotazione = "<div class='alert alert-success fw-bold text-center my-4 shadow-sm border-0 border-start border-5 border-success'><i class='fa fa-check-circle me-2'></i> Prenotazione confermata! Codice: <span class='badge bg-success ms-2'>$codice_p</span> $btn_scarica_pdf</div>"; }
+        // Attività FSL: oltre alla convenzione, elenco degli studenti e autorizzazione della scuola da caricare prima dell'inizio
+        $messaggio_prenotazione .= \App\Core\App::get(\App\Fsl\ServizioDocumentiClasse::class)->avvisoPerCodice((string)$_GET['code']);
     } elseif ($st === 'dup') { $messaggio_prenotazione = "<div class='alert alert-warning fw-bold text-center my-4 shadow-sm border-0 border-start border-4 border-warning'><i class='fa fa-exclamation-triangle me-2'></i> Prenotazione già esistente per questo turno con la stessa email.</div>"; } 
     elseif ($st === 'full') { $messaggio_prenotazione = "<div class='alert alert-danger fw-bold text-center my-4 shadow-sm border-0 border-start border-4 border-danger'><i class='fa fa-exclamation-circle me-2'></i> Posti esauriti per questo turno.</div>"; } 
     elseif ($st === 'closed') { $messaggio_prenotazione = "<div class='alert alert-danger fw-bold text-center my-4 shadow-sm border-0 border-start border-4 border-danger'><i class='fa fa-times-circle me-2'></i> Le prenotazioni sono chiuse.</div>"; } 
@@ -469,8 +471,11 @@ function printModalPrenotazione($t, $col_primaria, $utente_logged, $val_nome, $v
                             <?php endif; ?>
                         </div>
                         <?php endif; ?>
-                        <?php if (!$is_progetto && $classe_m): ?>
-                        <div class="alert alert-info border-0 small mb-3">
+                        <?php // Attività FSL: riquadro evidente sui documenti da caricare dopo la prenotazione (elenco studenti e autorizzazione)
+                        $box_doc_m = \App\Core\App::get(\App\Fsl\ServizioDocumentiClasse::class)->avvisoModulo($t['dett_progetto'] ?? null, (bool)$is_progetto, $t['data_turno'] ?? null);
+                        if ($box_doc_m !== ''): echo $box_doc_m;
+                        elseif (!$is_progetto && $classe_m): ?>
+                        <div class="alert alert-info border border-2 border-info shadow-sm mb-3" role="note" style="font-size:1.05rem;line-height:1.45;border-left-width:8px !important;">
                             <i class="fa fa-school me-1" aria-hidden="true"></i>
                             Prenotazione per una <strong>classe</strong>: indica il numero di studenti. Dopo la conferma potrai inserire l'elenco degli studenti per gli <strong>attestati</strong> dalla tua Area personale (accesso con SPID, CIE o credenziali Unical, con la stessa email).
                         </div>

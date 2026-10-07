@@ -353,6 +353,9 @@ final class ServizioPrenotazioni
             $corpo = ($sistema['email_conferma_corpo'] ?: "<p>Gentile <strong>{NOME} {COGNOME}</strong>,</p><p>Prenotazione confermata per <strong>{TITOLO_EVENTO}</strong>.</p><p>📅 {DATA_TURNO} | 🕒 {ORARIO_TURNO}<br>🎟️ Codice: <strong>{CODICE_PRENOTAZIONE}</strong></p>{LINK_RICEVUTA}") . $bottoniCalendario;
         }
 
+        // Attività FSL: oltre alla convenzione, l'elenco degli studenti e l'autorizzazione della scuola vanno caricati prima dell'inizio
+        $corpo .= $this->fsl->avvisoDocumentiClasse($dett, ($t['evento_tipo'] ?? '') === 'progetto', $codice, $t['data_turno'] ?? null);
+
         // Attestati per la classe: chi ha prenotato inserisce l'elenco degli studenti dall'Area personale
         if ($stato === 'confermata' && $this->fsl->attestatiDiClasse(['evento_tipo' => $t['evento_tipo'] ?? '', 'attestati' => $dett['attestati'] ?? 0, 'per_scuole' => $dett['per_scuole'] ?? 1])) {
             $linkElenco = $this->sito->urlBase() . '/elenco_studenti.php?code=' . urlencode($codice);

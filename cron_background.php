@@ -78,6 +78,13 @@ echo $cron->convenzioniAvvisoGestori();
 echo $cron->convenzioniInScadenza();
 
 // =========================================================================
+// TASK 1h: DOCUMENTI DA CONSEGNARE PRIMA DELLE ATTIVITÀ FSL
+// Elenco degli studenti e autorizzazione della scuola (PDF): il docente che ha prenotato riceve un promemoria ogni 7 giorni
+// (al massimo 6) finché manca qualcosa, poi un ultimo avviso quando si supera la scadenza (7 giorni prima dell'inizio).
+// =========================================================================
+echo \App\Core\App::get(\App\Fsl\ServizioDocumentiClasse::class)->promemoria();
+
+// =========================================================================
 // TASK 1i: SCHEDA DI VALUTAZIONE DELLA STRUTTURA OSPITANTE (FSL)
 // Attività FSL concluse da non più di 30 giorni, prenotazione confermata con la presenza registrata: il docente
 // riceve il link alla scheda; se dopo 7 giorni non l'ha compilata, un solo promemoria.

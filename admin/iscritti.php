@@ -93,6 +93,7 @@ if (!$can_manage_iscritti) {
 function admin_redirect($url) { echo "<script>window.location.replace('$url');</script>"; exit; }
 
 $iscritti_repo = \App\Core\App::get(\App\Iscritti\IscrittiRepository::class);
+$documenti_fsl = \App\Core\App::get(\App\Fsl\ServizioDocumentiClasse::class);
 $iscritti_srv  = \App\Core\App::get(\App\Iscritti\ServizioIscritti::class);
 $operatore = new \App\Iscritti\Operatore((int)($_SESSION['utente_id'] ?? 0), (string)($_SESSION['utente_email'] ?? ''), (string)($_SERVER['REMOTE_ADDR'] ?? 'Sconosciuto'));
 
@@ -563,6 +564,10 @@ $col_area_i = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
                             <span class="stato-badge mt-1" style="background:#f0fdf4;color:#166534;" title="Convenzione ricevuta o valida nel registro"><i class="fa fa-file-circle-check"></i>Convenzione ricevuta</span>
                         <?php elseif ($cv_pr === 'si' && $cv_attiva): [$cv_dal, $cv_al] = periodo_prenotazione($pr); $cv_reg = !empty($pr['scuola_codice']) && convenzione_valida($conn, $pr['scuola_codice'], false, $cv_dal, $cv_al); ?>
                             <span class="stato-badge mt-1" style="background:<?php echo $cv_reg ? '#f0fdf4' : '#fefce8'; ?>;color:<?php echo $cv_reg ? '#166534' : '#854d0e'; ?>;" title="<?php echo $cv_reg ? 'Dichiarata dalla scuola e presente nel registro per il periodo dell\'attività' : 'Dichiarata dalla scuola ma nel registro non c\'è una convenzione che copre il periodo dell\'attività: da verificare'; ?>"><i class="fa fa-file-signature"></i><?php echo $cv_reg ? 'Convenzione in registro' : 'Convenzione dichiarata, da verificare'; ?></span>
+                        <?php endif; ?>
+                        <?php if ($cv_attiva && $documenti_fsl->richiesti($pr)): $dc_el = (int)($pr['n_studenti'] ?? 0); $dc_au = !empty($pr['autorizzazione_file']); $dc_ok = $dc_el > 0 && $dc_au; ?>
+                            <span class="stato-badge mt-1" style="background:<?php echo $dc_ok ? '#f0fdf4' : '#fff7ed'; ?>;color:<?php echo $dc_ok ? '#166534' : '#9a3412'; ?>;" title="Documenti da consegnare prima dell'attività: elenco degli studenti e autorizzazione della scuola<?php echo (int)($pr['doc_promemoria'] ?? 0) > 0 ? ' · promemoria inviati: ' . (int)$pr['doc_promemoria'] : ''; ?>"><i class="fa fa-paperclip"></i>Elenco <?php echo $dc_el > 0 ? '(' . $dc_el . ')' : 'mancante'; ?> · Autorizzazione <?php echo $dc_au ? 'ricevuta' : 'mancante'; ?></span>
+                            <?php if ($dc_au): ?><a href="../autorizzazione_scuola.php?code=<?php echo urlencode($pr['codice_prenotazione']); ?>" target="_blank" class="small fw-bold d-block mt-1"><i class="fa fa-file-pdf me-1" aria-hidden="true"></i>Apri l'autorizzazione</a><?php endif; ?>
                         <?php endif; ?>
                     </td>
 

@@ -37,7 +37,7 @@ foreach (['attestati_gruppo.php?code=NONESISTE', 'elenco_studenti.php?code=NONES
     prova($http("/eventi/$pag", null, $jar)['codice'] === 403, "$pag: prenotazione sconosciuta (403)");
 }
 $r = $http('/eventi/elenco_studenti.php?code=OP-PROVA001', null, $jar);
-prova($r['codice'] === 200 && $senza_errori($r) && str_contains($r['corpo'], 'Elenco degli studenti per gli attestati') && str_contains($r['corpo'], 'name="stud_cognome[]"'), "elenco_studenti.php: modulo dell'elenco");
+prova($r['codice'] === 200 && $senza_errori($r) && str_contains($r['corpo'], "Documenti da consegnare prima dell'attività") && str_contains($r['corpo'], 'name="stud_cognome[]"') && str_contains($r['corpo'], 'name="file_autorizzazione"'), "elenco_studenti.php: modulo dell'elenco e dell'autorizzazione (attività FSL)");
 $r = $http('/eventi/elenco_studenti.php?code=OP-PROVA001&modello=1', null, $jar);
 prova($r['codice'] === 200 && (str_starts_with($r['corpo'], 'PK') || str_contains($r['corpo'], 'Cognome;Nome')), "elenco_studenti.php: modello da scaricare");
 prova($http('/eventi/elenco_studenti.php?code=OP-PROVA001', ['csrf_token' => 'sbagliato', 'salva_elenco' => '1'], $jar)['codice'] === 403, "elenco_studenti.php: token CSRF sbagliato respinto");

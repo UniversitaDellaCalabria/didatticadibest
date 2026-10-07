@@ -14,7 +14,8 @@ final class RegoleIscrizioniFsl implements RegoleFsl
         private RegoleClasse $classi,
         private Istruzioni $istruzioni,
         private PeriodiConvenzione $periodi,
-        private ServizioConvenzioni $convenzioni
+        private ServizioConvenzioni $convenzioni,
+        private ServizioDocumentiClasse $documenti
     ) {
     }
 
@@ -36,6 +37,11 @@ final class RegoleIscrizioniFsl implements RegoleFsl
     public function istruzioniConvenzione(array $areaCfg, bool $perEmail = false, string $codice = '', bool $inAttesa = true): string
     {
         return $this->istruzioni->html($areaCfg, $perEmail, $codice, $inAttesa);
+    }
+
+    public function avvisoDocumentiClasse(?array $dettagli, bool $eProgetto, string $codice, ?string $dataTurno): string
+    {
+        return $this->documenti->avvisoPrenotazione($dettagli, $eProgetto, $codice, $dataTurno, true);
     }
 
     public function periodoAttivita(?string $inizio, ?string $fine, ?string $dataTurno = null): array

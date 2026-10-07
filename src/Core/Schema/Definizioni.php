@@ -470,6 +470,13 @@ final class Definizioni
             'valutazione_token'       => "ADD COLUMN valutazione_token VARCHAR(64) DEFAULT NULL",
             'valutazione_inviata'     => "ADD COLUMN valutazione_inviata DATETIME DEFAULT NULL",
             'valutazione_promemoria'  => "ADD COLUMN valutazione_promemoria TINYINT(1) NOT NULL DEFAULT 0",
+            // v45: documenti della classe da consegnare prima dell'attività FSL (autorizzazione della scuola in PDF) e promemoria
+            'autorizzazione_file'  => "ADD COLUMN autorizzazione_file VARCHAR(255) DEFAULT NULL",
+            'autorizzazione_nome'  => "ADD COLUMN autorizzazione_nome VARCHAR(255) DEFAULT NULL",
+            'autorizzazione_il'    => "ADD COLUMN autorizzazione_il DATETIME DEFAULT NULL",
+            'doc_promemoria'       => "ADD COLUMN doc_promemoria INT NOT NULL DEFAULT 0",
+            'doc_promemoria_il'    => "ADD COLUMN doc_promemoria_il DATETIME DEFAULT NULL",
+            'doc_ultimo_avviso'    => "ADD COLUMN doc_ultimo_avviso TINYINT(1) NOT NULL DEFAULT 0",
         ],
         'eventi' => [
             // v40: ambiti dell'evento (orientamento, ricerca, terza_missione, didattica), separati da virgola; '' = quello dell'area

@@ -270,7 +270,7 @@ final class CronRepository
     public function daAnonimizzare(int $mesi): array
     {
         return Righe::testo($this->db->righe(
-            "SELECT pr.id, pr.dati_custom_json FROM prenotazioni pr
+            "SELECT pr.id, pr.dati_custom_json, pr.autorizzazione_file FROM prenotazioni pr
              JOIN turni t ON pr.turno_id = t.id LEFT JOIN progetti_dettagli pd ON pd.evento_id = t.evento_id
              WHERE IFNULL(pr.email, '') <> ''
                AND COALESCE(pd.data_fine, t.data_turno, DATE(pr.data_prenotazione)) < CURDATE() - INTERVAL ? MONTH
@@ -285,7 +285,8 @@ final class CronRepository
         $this->db->esegui('DELETE FROM messaggi_prenotazioni WHERE prenotazione_id = ?', [$prenotazioneId]);
         $this->db->esegui(
             "UPDATE prenotazioni SET nome = CONCAT(LEFT(nome, 1), '.'), cognome = IF(cognome = '', '', CONCAT(LEFT(cognome, 1), '.')),
-                      email = '', matricola = '', dati_custom_json = NULL, utente_id = NULL WHERE id = ?",
+                      email = '', matricola = '', dati_custom_json = NULL, utente_id = NULL,
+                      autorizzazione_file = NULL, autorizzazione_nome = NULL WHERE id = ?",
             [$prenotazioneId]
         );
     }

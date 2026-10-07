@@ -44,7 +44,7 @@ done
 [ -f .env ] && ok ".env presente" || ko ".env mancante (copia .env.example e compilalo)"
 [ -f .htaccess ] && ok ".htaccess presente" || ko ".htaccess mancante nella cartella del portale"
 [ -f cache/.htaccess ] && ok "cache/.htaccess presente" || ko "cache/.htaccess mancante: la cache sarebbe raggiungibile dal web"
-for d in uploads/incarichi uploads/pratiche uploads/verbali; do
+for d in uploads/incarichi uploads/pratiche uploads/verbali uploads/autorizzazioni; do
     if [ -d "$d" ]; then [ -f "$d/.htaccess" ] && ok "$d/.htaccess presente" || ko "$d/.htaccess mancante: i documenti sarebbero raggiungibili dal web"; fi
 done
 if [ -f .env ]; then

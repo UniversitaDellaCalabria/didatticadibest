@@ -270,6 +270,10 @@ final class ServizioCron
                     }
                 }
             }
+            // Autorizzazione della scuola (PDF) delle attività FSL
+            if (preg_match('#^uploads/autorizzazioni/[a-f0-9]{32}\.pdf$#', (string) ($p['autorizzazione_file'] ?? ''))) {
+                @unlink($this->sito->radice() . '/' . $p['autorizzazione_file']);
+            }
             $this->cron->anonimizza((int) $p['id']);
             ++$n;
         }

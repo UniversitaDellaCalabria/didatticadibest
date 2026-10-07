@@ -26,7 +26,7 @@ final class AreaPersonaleRepository
         return $this->db->righe(
             "SELECT pr.*, t.nome_turno, t.data_turno, t.orario_inizio, t.orario_fine, t.annullabile_fino,
            e.titolo as evento_titolo, e.luogo as evento_luogo, e.id as evento_id, e.locandina_path, e.abilita_presenze, e.tipo AS evento_tipo,
-           pd.per_scuole, pd.attestati, pd.data_fine AS progetto_fine,
+           pd.per_scuole, pd.attestati, pd.data_fine AS progetto_fine, pd.data_inizio, IFNULL(pd.convenzione, 0) AS fsl,
            pe.titolo as pagina_titolo, pe.colore_primario, pe.id as p_id
            FROM prenotazioni pr
            JOIN turni t ON pr.turno_id = t.id

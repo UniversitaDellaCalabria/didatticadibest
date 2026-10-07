@@ -153,6 +153,17 @@ function pulsanti_attestato_pr($conn, array $pr): string {
     $confermata = in_array($st, ['confermata', 'confermato', 'confirmed'], true);
     $code = urlencode($pr['codice_prenotazione']);
     $btn_att = fn($label) => '<a href="stampa_attestato.php?code=' . $code . '" target="_blank" class="btn btn-success btn-sm fw-bold" style="background:#198754;border:none;"><i class="fa fa-graduation-cap me-1"></i>' . $label . '</a>';
+    // Attività FSL: elenco degli studenti e autorizzazione della scuola da consegnare prima dell'inizio (anche in attesa della convenzione)
+    $docs = \App\Core\App::get(\App\Fsl\ServizioDocumentiClasse::class);
+    if ($docs->consegnaAperta($pr)) {
+        $s = $docs->stato($pr);
+        $mancano = array_filter([!$s['elenco'] ? 'elenco' : '', !$s['autorizzazione'] ? 'autorizzazione' : '']);
+        $out = '<a href="elenco_studenti.php?code=' . $code . '" class="btn btn-sm fw-bold ' . ($s['completi'] ? 'btn-outline-success' : 'btn-warning') . '"><i class="fa fa-paperclip me-1"></i>'
+             . ($s['completi'] ? 'Elenco studenti (' . $s['studenti'] . ') e autorizzazione' : 'Carica ' . implode(' e ', $mancano)) . '</a>';
+        if (!$s['completi'] && $s['scadenza'] !== null) $out .= ' <span class="small fw-semibold ' . ($s['scaduti'] ? 'text-danger' : 'text-secondary') . '">entro il ' . date('d/m/Y', strtotime($s['scadenza'])) . '</span>';
+        if ((int)($pr['attestati'] ?? 0) === 1 && !empty($pr['attestato_inviato'])) $out .= ' <a href="attestati_gruppo.php?code=' . $code . '" target="_blank" class="btn btn-success btn-sm fw-bold" style="background:#198754;border:none;"><i class="fa fa-graduation-cap me-1"></i>Attestati degli studenti</a>';
+        return $out;
+    }
     $di_classe = attestati_di_classe($pr);
     if (($pr['evento_tipo'] ?? '') !== 'progetto' && !$di_classe) {
         return ((int)$pr['presente'] === 1 && $confermata) ? $btn_att('Attestato') : '';
