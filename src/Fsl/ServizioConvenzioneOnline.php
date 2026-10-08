@@ -126,6 +126,54 @@ final class ServizioConvenzioneOnline
     }
 
     /**
+     * Convenzione o Allegato A già compilati per le prenotazioni indicate, senza che la scuola abbia usato il modulo online (documenti per il
+     * pannello): dati della scuola dall'anagrafe e dalle prenotazioni; se la scuola ha compilato il modulo, i suoi dati (Dirigente, codice
+     * fiscale, PEC, studenti, tutor, protocollo e logo) hanno la precedenza. Senza logo il documento non lo mette: si aggiunge a mano.
+     *
+     * @param list<int> $prenotazioniIds prenotazioni della stessa scuola
+     * @return array{file: string, nome: string}|null file temporaneo da cancellare dopo l'uso
+     */
+    public function scaricaPerPrenotazioni(string $doc, array $prenotazioniIds): ?array
+    {
+        $prenotate = [];
+        foreach (array_values(array_unique(array_map('intval', $prenotazioniIds))) as $id) {
+            if ($id > 0 && ($p = $this->prenotazioni->dati($id))) {
+                $prenotate[$id] = $p;
+            }
+        }
+        if (!$prenotate) {
+            return null;
+        }
+        $p0 = reset($prenotate);
+        $base = $this->precompilazione->dati($p0);
+        $anagrafe = !empty($p0['scuola_codice']) ? $this->scuole->perCodice((string) $p0['scuola_codice']) : null;
+        $s = [
+            'denominazione' => $base['ISTITUTO_FIRMA'] !== '' ? $base['ISTITUTO_FIRMA'] : ServizioScuole::nomeScrittoNelModulo($p0),
+            'codice' => $anagrafe ? (string) ($anagrafe['istituto_codice'] ?: $anagrafe['codice']) : '', 'comune' => $base['COMUNE'], 'indirizzo' => $base['INDIRIZZO'],
+            'cf' => '', 'dirigente' => '', 'luogo_nascita' => '', 'data_nascita' => '', 'dir_cf' => '', 'pec' => '', 'email' => (string) ($p0['email'] ?? ''),
+        ];
+        // Compilazione online della scuola (la più recente), se c'è: i suoi dati valgono più di quelli proposti
+        $cc = $this->compilate->perPrenotazioni(array_keys($prenotate))[0] ?? null;
+        $dati = $cc ? (json_decode((string) $cc['dati_json'], true) ?: []) : [];
+        $s = array_filter((array) ($dati['scuola'] ?? []), static fn ($v): bool => trim((string) $v) !== '') + $s;
+        $voci = [];
+        foreach (array_keys($prenotate) as $id) {
+            $scelta = [];
+            foreach ((array) ($dati['attivita'] ?? []) as $a) {
+                if ((int) ($a['pr'] ?? 0) === $id) {
+                    $scelta = $a;
+                    break;
+                }
+            }
+            $voci[] = ['pr' => $id, 'studenti' => (int) ($scelta['studenti'] ?? 0), 'tutor' => (string) ($scelta['tutor'] ?? '')];
+        }
+        // id 0: scaricare dal pannello non segna la compilazione come «scaricata dalla scuola»
+        $ccFinta = ['id' => 0, 'logo' => $cc['logo'] ?? null, 'protocollo' => $cc['protocollo'] ?? '', 'protocollo_data' => $cc['protocollo_data'] ?? null];
+
+        return $this->scarica($doc, $ccFinta, ['s' => $s, 'dati' => ['scuola' => $s, 'attivita' => $voci], 'prenotate' => $prenotate, 'prenotabili' => []]);
+    }
+
+    /**
      * Le attività scelte per l'Allegato A in PDF: prenotazione (o attività ancora da prenotare) con studenti e docente referente.
      *
      * @param array<string, mixed> $dati

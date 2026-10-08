@@ -612,6 +612,9 @@ $col_area_i = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
                                 <a href="../stampa_attestato.php?code=<?php echo urlencode($pr['codice_prenotazione']); ?>" target="_blank" class="act-btn green" title="Attestato PDF"><i class="fa fa-graduation-cap"></i></a>
                             <?php endif; ?>
                             <?php if (!$is_archivio): ?>
+                                <?php if ($puo_fsl_convenzioni && $cv_attiva && $documenti_fsl->richiesti($pr)): ?>
+                                    <a href="allegato_a.php?pr=<?php echo (int)$pr['id']; ?>&amp;doc=allegato_pdf" class="act-btn" title="Allegato A già compilato (PDF), con le prenotazioni della scuola. Il logo si aggiunge a mano" aria-label="Scarica l'Allegato A già compilato"><i class="fa fa-file-pdf"></i></a>
+                                <?php endif; ?>
                                 <?php if (($pr['convenzione'] ?? '') === 'no' && in_array($st_val, ['confermata', 'in_attesa', 'richiesta_conferma', 'da_approvare'], true)): ?>
                                     <?php if ($st_val !== 'da_approvare'): ?>
                                     <form method="POST" class="d-inline">

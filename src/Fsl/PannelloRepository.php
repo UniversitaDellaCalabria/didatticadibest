@@ -64,6 +64,25 @@ final class PannelloRepository
     }
 
     /**
+     * Prenotazioni alle attività FSL in essere (attive e non concluse), con o senza convenzione: servono alla pagina «Convenzioni da
+     * stipulare» e ai documenti precompilati per scuola.
+     *
+     * @return list<array<string, string|null>>
+     */
+    public function iscrizioniInEssere(): array
+    {
+        return Righe::testo($this->db->righe(
+            "SELECT pr.id, pr.scuola_codice, pr.nome, pr.cognome, pr.email, pr.codice_prenotazione, pr.stato, pr.convenzione, pr.dati_custom_json, pr.data_prenotazione,
+                    t.data_turno, t.nome_turno, pd.data_inizio AS pd_inizio, pd.data_fine AS pd_fine, e.titolo, e.tipo AS evento_tipo, e.pagina_id, pe.titolo AS area
+             FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id JOIN pagine_eventi pe ON e.pagina_id = pe.id
+             JOIN progetti_dettagli pd ON pd.evento_id = e.id
+             WHERE e.archiviato = 0 AND pd.convenzione = 1 AND IFNULL(pr.stato, 'confermata') IN ('confermata', 'in_attesa', 'da_approvare', 'richiesta_conferma')
+               AND COALESCE(pd.data_fine, t.data_turno, CURDATE()) >= CURDATE()
+             ORDER BY COALESCE(pd.data_inizio, t.data_turno), pr.data_prenotazione, pr.id"
+        ));
+    }
+
+    /**
      * Iscrizioni non concluse da stipulare: segnate «da stipulare» (o dichiarate ma senza registro) e scuole scritte a mano nelle attività FSL.
      *
      * @return list<array<string, string|null>>
