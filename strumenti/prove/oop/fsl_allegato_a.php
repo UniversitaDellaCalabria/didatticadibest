@@ -55,6 +55,10 @@ prova(!str_contains($xml_al, 'w:highlight') && str_contains($xml_al, 'w:fill="B3
 prova(in_array('Descrizione', $tutte_et, true) && !str_contains($testo_word_al, 'Il Direttore') && !str_contains($testo_word_al, 'firma digitale') && !str_contains($testo_pdf_al, '(Direttore)') && !str_contains($testo_pdf_al, '(PAdES)'),
     "Allegato A: descrizione e altri campi nella tabella, senza firme (PDF e Word)");
 if ($file_word_al) @unlink($file_word_al);
+// Acrobat si ferma sulla pagina se un operatore colore ha il numero sbagliato di operandi (il browser lo tollera): RG/rg vogliono 3 numeri, G/g uno
+$num_al = '-?\d*\.?\d+';
+prova(!preg_match('/(?<![\d.])(?:' . $num_al . ')\s+(?:RG|rg)\b/', preg_replace('/(?:' . $num_al . '\s+){3}(?:RG|rg)\b/', '', $testo_pdf_al)),
+    "Allegato A PDF: ogni colore RG/rg ha tre operandi (Acrobat non si ferma sulla pagina)");
 
 // Convenzione Word: precompilata, senza scritte gialle
 $cc_al = AppAl::per($conn)->get(\App\Fsl\ServizioConvenzioneOnline::class);

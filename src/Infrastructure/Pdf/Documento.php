@@ -307,7 +307,8 @@ final class Documento
                     // prima colonna (etichette) su sfondo colorato, es. '0.96 0.96 0.97'
                     $this->out('q ' . $o['col0'] . ' rg ' . $this->n($x) . ' ' . $this->n($yb) . ' ' . $this->n($larg[$c]) . ' ' . $this->n($h) . ' re f Q');
                 }
-                $this->out('q ' . ($o['bordo'] ?? '0.5') . ' ' . (isset($o['bordo']) ? 'RG' : 'G') . ' 0.5 w ' . $this->n($x) . ' ' . $this->n($yb) . ' ' . $this->n($larg[$c]) . ' ' . $this->n($h) . ' re S Q');
+                $bordo = trim((string)($o['bordo'] ?? '0.5'));
+                $this->out('q ' . $bordo . ' ' . (substr_count($bordo, ' ') === 2 ? 'RG' : 'G') . ' 0.5 w ' . $this->n($x) . ' ' . $this->n($yb) . ' ' . $this->n($larg[$c]) . ' ' . $this->n($h) . ' re S Q');
                 $this->y = $top + $pad;
                 $this->scriviRighe($celle[$c], $x + $pad, $larg[$c] - 2 * $pad, $sz, $testa ? 'centro' : ($o['al'][$c] ?? 'sinistra'), $sz * 1.25);
                 $x += $larg[$c];

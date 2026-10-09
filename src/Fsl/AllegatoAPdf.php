@@ -19,7 +19,7 @@ final class AllegatoAPdf
     private const ROSSO = '0.70 0 0';
     private const ARDESIA = '0.16 0.22 0.32';
     private const SFONDO_ETICHETTE = '0.95 0.95 0.97';
-    private const BORDO = '0.88';
+    private const BORDO = '0.88 0.88 0.88';
 
     public function __construct(private Sito $sito, private AllegatoAModello $modello, private LogoScuola $logoScuola)
     {
