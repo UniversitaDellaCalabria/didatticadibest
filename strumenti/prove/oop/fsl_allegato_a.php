@@ -63,6 +63,13 @@ $z_al = new ZipArchive(); $z_al->open((string)($doc_conv_al['file'] ?? '')); $xm
 prova($doc_conv_al !== null && !str_contains($xml_conv_al, '<w:highlight') && str_contains(strip_tags($xml_conv_al), 'LICEO ALLEGATO 985') || ($doc_conv_al !== null && !str_contains($xml_conv_al, '<w:highlight')), "Convenzione Word: nessuna scritta evidenziata in giallo");
 if ($doc_conv_al) @unlink($doc_conv_al['file']);
 
+// Attività con due corsi di laurea: l'intestazione del gruppo li riporta entrambi
+$q("DELETE FROM corsi_studio WHERE codice IN ('ZZ98501', 'ZZ98502')");
+$q("INSERT INTO corsi_studio (codice, nome, tipo, tipo_descrizione, visibile, presente) VALUES ('ZZ98501', 'Biologia 985', 'L', 'Laurea', 1, 1), ('ZZ98502', 'Scienze e tecnologie biologiche 985', 'L', 'Laurea', 1, 1)");
+$q("UPDATE progetti_dettagli SET struttura = '', corsi_codici = 'ZZ98502,ZZ98501' WHERE evento_id = 98505");
+$mod3_al = AppAl::per($conn)->get(\App\Fsl\AllegatoAModello::class)->costruisci($scuola_al, [['p' => $pren_al->dati(98505), 'studenti' => 10, 'tutor' => 'X']], '');
+prova(($mod3_al['gruppi'][0]['corso'] ?? '') === 'Corso di laurea in Biologia 985 · Corso di laurea in Scienze e tecnologie biologiche 985', "Allegato A: con due corsi di laurea l'intestazione li riporta entrambi, in ordine alfabetico", $mod3_al['gruppi'][0]['corso'] ?? '');
+$q("DELETE FROM corsi_studio WHERE codice IN ('ZZ98501', 'ZZ98502')");
 foreach (["DELETE FROM convenzioni_compilate WHERE prenotazione_id BETWEEN 98503 AND 98506", "DELETE FROM prenotazioni WHERE id BETWEEN 98503 AND 98506", "DELETE FROM turni WHERE id BETWEEN 98502 AND 98512", "DELETE FROM progetti_dettagli WHERE evento_id BETWEEN 98501 AND 98511",
           "DELETE FROM eventi WHERE id BETWEEN 98501 AND 98511", "DELETE FROM pagine_eventi WHERE id = 98500"] as $sql) $q($sql);
 

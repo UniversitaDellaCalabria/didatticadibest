@@ -12,7 +12,7 @@ use App\Eventi\Turni;
 /**
  * Contenuto dell'Allegato A: la scuola e, per ogni attività, la scheda completa (titolo, corso, periodo, sede, durata, modalità, destinatari,
  * studenti, tutor, descrizione, percorso, obiettivi, conoscenze, competenze, altre informazioni). Le attività sono raggruppate per corso di
- * laurea e, dentro ogni corso, in ordine di data; tutti i campi di un'attività stanno in un'unica tabella etichetta/valore. Lo disegnano allo stesso modo il PDF (AllegatoAPdf) e il Word (AllegatoAWord): il testo
+ * laurea (con più corsi, il gruppo li riporta tutti nell'intestazione) e, dentro ogni gruppo, in ordine di data; tutti i campi di un'attività stanno in un'unica tabella etichetta/valore. Lo disegnano allo stesso modo il PDF (AllegatoAPdf) e il Word (AllegatoAWord): il testo
  * è semplice, con **grassetto** e «\n» per andare a capo.
  */
 final class AllegatoAModello
@@ -143,10 +143,22 @@ final class AllegatoAModello
         }
 
         return [
-            'corso' => $corsi ? $this->pulito($corsi[0]) : self::SENZA_CORSO,
+            // Intestazione del gruppo: tutti i corsi dell'attività (in ordine alfabetico, così attività con gli stessi corsi stanno insieme)
+            'corso' => $corsi ? $this->pulito(implode(' · ', $this->ordinati($corsi))) : self::SENZA_CORSO,
             'inizio' => (string) (($p['data_turno'] ?? null) ?: ($p['pd_inizio'] ?? null) ?: ($d['data_inizio'] ?? null) ?: '9999-12-31'),
             'voce' => ['titolo' => $this->pulito($titolo), 'righe' => $righe],
         ];
+    }
+
+    /**
+     * @param list<string> $nomi
+     * @return list<string>
+     */
+    private function ordinati(array $nomi): array
+    {
+        usort($nomi, static fn (string $a, string $b): int => strcasecmp($a, $b));
+
+        return $nomi;
     }
 
     /** HTML dell'editor → testo semplice con gli elenchi puntati e i paragrafi a capo. */
