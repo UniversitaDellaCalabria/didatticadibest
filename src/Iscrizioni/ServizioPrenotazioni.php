@@ -122,8 +122,9 @@ final class ServizioPrenotazioni
                 return new EsitoPrenotazione("{$ritorno}status=riservato");
             }
         }
-        // Progetti: si partecipa a una sola edizione dello stesso progetto (anche la lista d'attesa conta)
+        // Progetti: si partecipa a una sola edizione dello stesso progetto (anche la lista d'attesa conta), salvo che il progetto consenta più edizioni
         if (($t['evento_tipo'] ?? '') === 'progetto'
+            && !$this->prenotazioni->piuEdizioniConsentite((int) $t['evento_id'])
             && $this->prenotazioni->partecipaAdAltraEdizione((int) $t['evento_id'], $turnoId, (int) ($r->utenteId ?? 0), $email)) {
             return new EsitoPrenotazione("{$ritorno}status=altra_edizione");
         }

@@ -205,14 +205,14 @@ require_once 'header.php';
                         </div>
                         <div class="d-flex gap-2 align-items-start">
                             <?php if ($v['slug'] !== ''): ?><a class="btn btn-sm btn-outline-secondary" href="<?php echo $h($v['slug'] . '.php?' . ($v['tipo'] === 'progetto' ? 'progetto' : 'evento') . '=' . (int)$v['evento_id']); ?>"><i class="fa fa-pen me-1" aria-hidden="true"></i>Modifica</a><?php endif; ?>
-                            <button type="submit" name="togli" value="<?php echo (int)$v['evento_id']; ?>" class="btn btn-sm btn-outline-danger" formnovalidate aria-label="Togli dal programma: <?php echo $h($v['titolo']); ?>"><i class="fa fa-trash me-1" aria-hidden="true"></i>Togli</button>
+                            <button type="submit" name="togli" value="<?php echo (int)$v['turno_id']; ?>" class="btn btn-sm btn-outline-danger" formnovalidate aria-label="Togli dal programma: <?php echo $h($v['titolo']); ?>"><i class="fa fa-trash me-1" aria-hidden="true"></i>Togli</button>
                         </div>
                     </div>
                     <?php if (!$bloccata): ?>
                     <div class="pg-docente mt-3">
-                        <label class="pg-docente-tit" for="doc<?php echo (int)$v['evento_id']; ?>"><i class="fa fa-user-tie me-1" aria-hidden="true"></i>Docente referente della scuola per questa attività</label>
-                        <input class="form-control" id="doc<?php echo (int)$v['evento_id']; ?>" name="docente[<?php echo (int)$v['evento_id']; ?>]" maxlength="150" placeholder="es. Prof.ssa Maria Verdi"
-                               value="<?php echo $h($mod['docente'][$v['evento_id']] ?? $v['docente']); ?>">
+                        <label class="pg-docente-tit" for="doc<?php echo (int)$v['turno_id']; ?>"><i class="fa fa-user-tie me-1" aria-hidden="true"></i>Docente referente della scuola per questa attività</label>
+                        <input class="form-control" id="doc<?php echo (int)$v['turno_id']; ?>" name="docente[<?php echo (int)$v['turno_id']; ?>]" maxlength="150" placeholder="es. Prof.ssa Maria Verdi"
+                               value="<?php echo $h($mod['docente'][$v['turno_id']] ?? $v['docente']); ?>">
                         <div class="form-text">È il docente che accompagna gli studenti e compare nell'Allegato A. Se lasci vuoto, è chi sta prenotando.</div>
                     </div>
                     <?php endif; ?>

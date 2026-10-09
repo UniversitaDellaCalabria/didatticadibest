@@ -206,7 +206,7 @@ if (isset($_POST['salva_progetto'])) {
         $d,
         ['referenti_json' => $ref_json, 'info_json' => $info_json, 'moduli_json' => $mod_json, 'obiettivi' => $obiettivi, 'conoscenze' => $conoscenze, 'competenze' => $competenze,
          'per_scuole' => $per_scuole, 'attestati' => $attestati],
-        (array)($_POST['corsi_codici'] ?? ($_POST['corso_codice'] ?? '')), $destinazione, $edizioni, $lista_attesa, $approvazione, $convenzione
+        (array)($_POST['corsi_codici'] ?? ($_POST['corso_codice'] ?? '')), $destinazione, $edizioni, $lista_attesa, $approvazione, $convenzione, isset($_POST['piu_edizioni']) ? 1 : 0
     );
     $ev_id = $esito['evento'];
     $edizioni_non_tolte = $esito['non_tolte'];
@@ -529,6 +529,12 @@ if ($mostra_form):
                     <label class="form-check-label small fw-bold" for="pjApprov">Iscrizioni da confermare dai gestori</label>
                 </div>
                 <p class="form-text mt-0 mb-3">Acceso: ogni iscrizione (di tutte le edizioni) resta <strong>da approvare</strong> finché un gestore non la conferma da Iscrizioni; il posto resta occupato nel frattempo.</p>
+                <?php $piu_v = !empty($dp['piu_edizioni']); ?>
+                <div class="form-check form-switch mb-1">
+                    <input class="form-check-input" type="checkbox" name="piu_edizioni" id="pjPiuEd" value="1" <?php echo $piu_v ? 'checked' : ''; ?>>
+                    <label class="form-check-label small fw-bold" for="pjPiuEd"><span class="pj-solo-scuole">La stessa scuola può prenotare più edizioni</span><span class="pj-solo-generico">Ci si può iscrivere a più edizioni</span></label>
+                </div>
+                <p class="form-text mt-0 mb-3">Spento: <span class="pj-solo-scuole">una scuola</span><span class="pj-solo-generico">ogni persona</span> può prenotare <strong>una sola edizione</strong> del progetto (anche in lista d'attesa). Acceso: <span class="pj-solo-scuole">la stessa scuola</span><span class="pj-solo-generico">la stessa persona</span> può prenotare <strong>più edizioni</strong>, una prenotazione per ogni edizione (non due volte la stessa). Ha senso con più edizioni.</p>
                 <?php $conv_v = !empty($dp['convenzione']) || $converti || (!$id_modifica && tipo_area($page_cfg) === 'fsl'); // nuovo progetto in un'area FSL: già acceso ?>
                 <div class="form-check form-switch mb-1">
                     <input class="form-check-input" type="checkbox" name="convenzione" id="pjConv" value="1" <?php echo $conv_v ? 'checked' : ''; ?>>
@@ -569,7 +575,7 @@ if ($mostra_form):
                 <p class="form-text pj-solo-piu-ed mt-0">Con più edizioni apertura, chiusura<span class="pj-solo-scuole"> e numero di partecipanti</span> si indicano per ogni edizione e sono obbligatori.</p>
                 <div class="alert alert-light border small mt-3 mb-2">
                     <i class="fa fa-circle-info me-1" aria-hidden="true"></i>
-                    Le iscrizioni vanno in <strong>ordine di arrivo</strong>; ci si può iscrivere a <strong>una sola edizione</strong> dello stesso progetto.
+                    Le iscrizioni vanno in <strong>ordine di arrivo</strong>; ci si può iscrivere a <strong>una sola edizione</strong> dello stesso progetto, a meno che sopra non sia attivato «più edizioni».
                     Per iscriversi serve l'accesso con <strong>SPID, CIE o credenziali Unical</strong>.
                     Le domande del modulo (es. scuola, classe, contatti) si impostano dal <a href="form_builder.php?p_id=<?php echo $filtro_p; ?>">Form Builder</a>.
                 </div>

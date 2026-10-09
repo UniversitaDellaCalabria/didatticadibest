@@ -76,6 +76,12 @@ final class ProgettoRepository
         }
     }
 
+    /** Una stessa scuola (o persona) può prenotare più edizioni del progetto. */
+    public function impostaPiuEdizioni(int $eventoId, int $piuEdizioni): void
+    {
+        $this->db->esegui('UPDATE progetti_dettagli SET piu_edizioni = ? WHERE evento_id = ?', [$piuEdizioni, $eventoId]);
+    }
+
     /** Attività di Formazione Scuola Lavoro: processo delle convenzioni. */
     public function impostaConvenzione(int $eventoId, int $convenzione): void
     {

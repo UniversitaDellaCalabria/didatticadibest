@@ -12,8 +12,8 @@ sync_sso_user($conn);
 
 // L'attività è già nel programma FSL della scuola (cambia il testo del pulsante)
 if (!function_exists('fsl_programma_ha')) {
-    function fsl_programma_ha(int $eventoId): bool {
-        try { return \App\Core\App::get(\App\Fsl\ProgrammaFsl::class)->contiene($eventoId); } catch (\Throwable $e) { return false; }
+    function fsl_programma_ha(int $eventoId, int $turnoId = 0): bool {
+        try { $p = \App\Core\App::get(\App\Fsl\ProgrammaFsl::class); return $turnoId > 0 ? $p->contieneTurno($turnoId) : $p->contiene($eventoId); } catch (\Throwable $e) { return false; }
     }
 }
 
@@ -310,7 +310,8 @@ $info_progetto = function (array $ev) use ($conn, $dettagli_progetti, &$mie_iscr
             'prossima_apertura' => $ie['prossima_apertura'], 'limiti' => testo_limiti_partecipanti($min_ed, $max_ed), 'max_studenti' => $max_ed,
             // Senza date, la nota sul periodo (es. "novembre-dicembre 2026") vale più di "Date da definire"
             'stato' => $ie['stato'], 'periodo' => (empty($d['data_inizio']) && empty($d['data_fine']) && !empty($d['periodo_note'])) ? $d['periodo_note'] : periodo_progetto($d), 'mio' => $ie['mio'], 'mio_ed' => $mio_ed,
-            'attesa' => array_sum(array_column($ie['edizioni'], 'attesa')), 'scuole' => (int)($d['per_scuole'] ?? 1) === 1];
+            'attesa' => array_sum(array_column($ie['edizioni'], 'attesa')), 'scuole' => (int)($d['per_scuole'] ?? 1) === 1,
+            'piu_ed' => (int)($d['piu_edizioni'] ?? 0) === 1];   // il progetto consente di prenotare più edizioni
 };
 
 // Pulsante di iscrizione (testi "scuola" nei progetti per le scuole). Con $ed: pulsante di quella edizione (scheda);
@@ -325,7 +326,7 @@ $pulsante_progetto = function (array $ev, array $ip, ?array $ed = null) use ($co
     $sc = $ip['scuole'];
     if ($mio !== null) return '<a href="area_personale.php" class="btn btn-success fw-bold w-100"><i class="fa fa-check me-1" aria-hidden="true"></i>' . ($sc ? 'La tua scuola è iscritta' : 'Sei iscritto') . '</a>';
     // Si partecipa a una sola edizione: già iscritti (o in attesa) su un'altra
-    if ($ed && $ip['mio'] !== null) return '';
+    if ($ed && $ip['mio'] !== null && empty($ip['piu_ed'])) return '';
     if (!$ip['edizioni'] || (int)($ev['richiede_prenotazione'] ?? 1) === 0) return '';
     // Ogni edizione ha la sua finestra: con $ed vale lo stato di quell'edizione, altrimenti quello del progetto
     $c = $ed ? $ed['stato']['codice'] : $ip['stato']['codice'];
@@ -343,7 +344,7 @@ $pulsante_progetto = function (array $ev, array $ip, ?array $ed = null) use ($co
     }
     $t_id = (int)$ed['t']['id'];
     $fsl_b = (int)($ip['d']['convenzione'] ?? 0) === 1; // attività FSL: va nel programma della scuola
-    $nel_programma = $fsl_b && fsl_programma_ha((int)$ev['id']);
+    $nel_programma = $fsl_b && fsl_programma_ha((int)$ev['id'], $ed ? (int)$ed['t']['id'] : 0);
     if (!$ed['libera'] && empty($ed['t']['abilita_lista_attesa'])) return '<button class="btn btn-outline-secondary fw-bold w-100" disabled>' . ($sc ? 'Edizione già assegnata' : 'Posti esauriti') . '</button>';
     if (!$ed['libera']) return '<button type="button" class="btn btn-warning fw-bold text-dark w-100" data-bs-toggle="modal" data-bs-target="#modPrenota' . $t_id . '"><i class="fa ' . ($fsl_b ? 'fa-clipboard-list' : 'fa-hourglass-half') . ' me-1" aria-hidden="true"></i>' . ($fsl_b ? ($nel_programma ? 'Nel programma: modifica' : 'Aggiungi al programma (lista d\'attesa)') : 'Mettiti in lista d\'attesa') . '</button>';
     return '<button type="button" class="btn fw-bold w-100" style="' . $stile . '" data-bs-toggle="modal" data-bs-target="#modPrenota' . $t_id . '"><i class="fa ' . ($fsl_b ? 'fa-clipboard-list' : ($sc ? 'fa-school' : 'fa-user-plus')) . ' me-1" aria-hidden="true"></i>' . ($fsl_b ? ($nel_programma ? 'Nel programma: modifica' : 'Aggiungi al programma') : ($sc ? 'Iscrivi la scuola' : 'Iscriviti')) . '</button>';
@@ -512,7 +513,7 @@ function printModalPrenotazione($t, $col_primaria, $utente_logged, $val_nome, $v
                             <?php elseif ($is_waitlist): ?>
                                 I posti sono esauriti: entri in <strong>lista d'attesa</strong>, in ordine di arrivo. Se un posto si libera riceverai un'email per confermarlo.
                             <?php else: ?>
-                                Puoi iscriverti a <strong>una sola edizione</strong> del progetto.
+                                <?php echo !empty($t['dett_progetto']['piu_edizioni']) ? 'Puoi iscriverti a <strong>una o più edizioni</strong> del progetto (una prenotazione per ogni edizione).' : 'Puoi iscriverti a <strong>una sola edizione</strong> del progetto.'; ?>
                             <?php endif; ?>
                         </div>
                         <?php endif; ?>
@@ -806,7 +807,7 @@ function getPulsanteAzione($t, $col_primaria, $utente_logged, $utente_ruolo_id, 
     
     $now = date('Y-m-d H:i:s');
     $fsl = (int)($t['dett_progetto']['convenzione'] ?? 0) === 1; // attività FSL: va nel programma della scuola
-    $nel_programma = $fsl && fsl_programma_ha((int)$t['evento_id']);
+    $nel_programma = $fsl && fsl_programma_ha((int)$t['evento_id'], (int)$t['id']);
 
     if (turno_concluso($t)) {
         return '<button class="btn btn-secondary btn-sm fw-bold py-1 px-3 shadow-sm" disabled><i class="fa fa-flag-checkered me-1"></i> Evento Concluso</button>';
@@ -1063,7 +1064,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         <?php $sc_p = $ip['scuole']; ?>
                         <h2><i class="fa <?php echo $sc_p ? 'fa-school' : 'fa-user-plus'; ?> me-1" aria-hidden="true"></i><?php echo $piu_ed ? 'Edizioni e iscrizione' : ($sc_p ? 'Iscrizione della scuola' : 'Iscrizione'); ?></h2>
                         <?php if ($piu_ed): ?>
-                            <p class="small text-secondary mb-2">Il progetto si ripete in <strong><?php echo count($ip['edizioni']); ?> edizioni</strong><?php echo $sc_p ? ': ognuna accoglie una scuola' : ''; ?>. Puoi iscriverti a una sola edizione.</p>
+                            <p class="small text-secondary mb-2">Il progetto si ripete in <strong><?php echo count($ip['edizioni']); ?> edizioni</strong><?php echo $sc_p ? ': ognuna accoglie una scuola' : ''; ?>. <?php echo !empty($ip['piu_ed']) ? ($sc_p ? 'La stessa scuola può prenotare più edizioni (una prenotazione per ogni edizione).' : 'Puoi iscriverti a più edizioni (una prenotazione per ogni edizione).') : 'Puoi iscriverti a una sola edizione.'; ?></p>
                         <?php endif; ?>
                         <div class="d-flex flex-column gap-2 mb-3">
                             <?php foreach ($ip['edizioni'] as $ed):

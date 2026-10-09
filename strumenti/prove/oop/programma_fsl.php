@@ -64,9 +64,18 @@ $r = $prg->aggiungi(98911, ['custom_numero_partecipanti' => '3'], false, 5, []);
 prova(!$r['ok'] && str_contains((string)$r['errore'], 'compreso tra 5 e 30') && $prg->conta() === 0, "programma: numero di studenti dentro i limiti del progetto", (string)$r['errore']);
 $r = $prg->aggiungi(98911, ['custom_numero_partecipanti' => '12', 'custom_scuola' => 'Scritta a mano', 'custom_altro' => ['a', 'b']], false, 5, []);
 prova($r['ok'] && !$r['sostituita'] && $r['titolo'] === 'Biodiversita989' && $prg->conta() === 1 && $prg->contiene(98901), "programma: aggiunta di un'edizione del progetto");
-prova(!isset($cart->voci()[98901]['custom']['scuola']) && ($cart->voci()[98901]['custom']['altro'] ?? '') === 'a, b' && $cart->voci()[98901]['custom']['numero_partecipanti'] === '12', "programma: la scuola non si tiene per attività, gli elenchi diventano testo");
+prova(!isset($cart->voci()[98911]['custom']['scuola']) && ($cart->voci()[98911]['custom']['altro'] ?? '') === 'a, b' && $cart->voci()[98911]['custom']['numero_partecipanti'] === '12', "programma: la scuola non si tiene per attività, gli elenchi diventano testo");
 $r = $prg->aggiungi(98912, ['custom_numero_partecipanti' => '15'], false, 5, []);
-prova($r['ok'] && $r['sostituita'] && $prg->conta() === 1 && $cart->turnoDi(98901) === 98912, "programma: un'altra edizione della stessa attività sostituisce la prima");
+prova($r['ok'] && $r['sostituita'] && $prg->conta() === 1 && $cart->turnoDi(98901) === 98912 && !$cart->contieneTurno(98911), "programma: un'altra edizione della stessa attività sostituisce la prima (progetto con una sola edizione)");
+// Progetto che consente più edizioni: le edizioni si sommano, una voce per edizione
+$q("UPDATE progetti_dettagli SET piu_edizioni = 1 WHERE evento_id = 98901");
+$r = $prg->aggiungi(98911, ['custom_numero_partecipanti' => '12'], false, 5, []);
+prova($r['ok'] && !$r['sostituita'] && $prg->conta() === 2 && $cart->contieneTurno(98911) && $cart->contieneTurno(98912) && $cart->contiene(98901), "programma: con «più edizioni» le edizioni dello stesso progetto si sommano");
+$r = $prg->aggiungi(98911, ['custom_numero_partecipanti' => '14'], false, 5, []);
+prova($r['ok'] && $r['sostituita'] && $prg->conta() === 2 && $cart->voci()[98911]['custom']['numero_partecipanti'] === '14', "programma: la stessa edizione ripetuta si aggiorna, non si duplica");
+$prg->togli(98911);
+prova($prg->conta() === 1 && !$cart->contieneTurno(98911) && $cart->contieneTurno(98912) && $cart->contiene(98901), "programma: si toglie una sola edizione");
+$q("UPDATE progetti_dettagli SET piu_edizioni = 0 WHERE evento_id = 98901");
 $prg->aggiungi(98913, [], false, 5, []);
 $prg->aggiungi(98914, [], false, 5, []);
 prova($prg->conta() === 3, "programma: tre attività (progetto, evento in lista d'attesa, evento esaurito)");
@@ -98,7 +107,7 @@ $n_email = count($EMAIL);
 $post_ok = $base_post([
     'email_conferma' => 'docente989@prg989.example.org', 'custom_scuola' => 'Istituto Fuori Elenco 989', 'convenzione' => 'no', 'captcha_id' => 'c1', 'captcha_risposta' => '7',
     'dirigente' => 'Dott.ssa Maria Dirigente989', 'cf' => '12345678901', 'pec' => 'scuola989@pec.example.org', 'comune' => 'Cosenza (CS)', 'indirizzo' => 'Via Fuori 989',
-    'email' => 'referente@prg989.example.org', 'docente' => [98901 => 'Prof. Luisa Tutor989', 98902 => ''],
+    'email' => 'referente@prg989.example.org', 'docente' => [98912 => 'Prof. Luisa Tutor989', 98913 => ''],
 ]);
 $e = $prg->conferma($rid('Anna', 'Docente', 'docente989@prg989.example.org', $post_ok));
 $per_ev = [];

@@ -169,6 +169,12 @@ final class PrenotazioneRepository
     }
 
     /** Progetti: la persona (utente o email) partecipa già a un'altra edizione dello stesso progetto, anche in lista d'attesa. */
+    /** Il progetto consente di prenotare più edizioni (progetti_dettagli.piu_edizioni). */
+    public function piuEdizioniConsentite(int $eventoId): bool
+    {
+        return (int) ($this->db->valore('SELECT piu_edizioni FROM progetti_dettagli WHERE evento_id = ?', [$eventoId]) ?? 0) === 1;
+    }
+
     public function partecipaAdAltraEdizione(int $eventoId, int $turnoId, int $utenteId, string $email): bool
     {
         return $this->db->righe(

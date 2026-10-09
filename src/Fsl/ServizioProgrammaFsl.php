@@ -71,9 +71,10 @@ final class ServizioProgrammaFsl
         return $this->programma->contiene($eventoId);
     }
 
-    public function togli(int $eventoId): void
+    /** Toglie dal programma un'edizione (turno). */
+    public function togli(int $turnoId): void
     {
-        $this->programma->togli($eventoId);
+        $this->programma->togli($turnoId);
     }
 
     public function svuota(): void
@@ -82,7 +83,8 @@ final class ServizioProgrammaFsl
     }
 
     /**
-     * Aggiunge al programma l'edizione scelta (o sostituisce quella già scelta della stessa attività) con le risposte del modulo.
+     * Aggiunge al programma l'edizione scelta con le risposte del modulo. Se il progetto consente una sola edizione, sostituisce quella già
+     * scelta della stessa attività; se ne consente più, le edizioni si sommano (una voce per edizione).
      * Controlla che l'attività sia FSL, prenotabile ora, consentita a chi sta navigando e, per le attività di classe, il numero di studenti.
      *
      * @param array<string, mixed> $post campi del modulo dell'attività (custom_*)
@@ -131,8 +133,9 @@ final class ServizioProgrammaFsl
                 return $no($err, $titolo, $eventoId);
             }
         }
-        $sostituita = $this->programma->contiene($eventoId);
-        if (!$this->programma->aggiungi($eventoId, $turnoId, $custom)) {
+        $piuEdizioni = !empty($dett['piu_edizioni']);
+        $sostituita = $piuEdizioni ? $this->programma->contieneTurno($turnoId) : $this->programma->contiene($eventoId);
+        if (!$this->programma->aggiungi($eventoId, $turnoId, $custom, $piuEdizioni)) {
             return $no('Il programma può contenere al massimo ' . ProgrammaFsl::MASSIMO . ' attività.', $titolo, $eventoId);
         }
 
@@ -148,7 +151,8 @@ final class ServizioProgrammaFsl
     {
         $elenco = [];
         $adesso = $this->orologio->adesso()->format('Y-m-d H:i:s');
-        foreach ($this->programma->voci() as $eventoId => $voce) {
+        foreach ($this->programma->voci() as $voce) {
+            $eventoId = $voce['evento_id'];
             $t = $this->repo->turno($voce['turno_id']);
             if ($t === null || (int) $t['archiviato'] === 1 || (int) $t['evento_id'] !== $eventoId) {
                 $elenco[] = ['evento_id' => $eventoId, 'turno_id' => $voce['turno_id'], 'titolo' => 'Attività non più disponibile', 'turno' => '', 'periodo' => '', 'sede' => '',
@@ -273,7 +277,8 @@ final class ServizioProgrammaFsl
         $riuscite = [];
         $rinnovo = false;
         $serveConvenzione = false;
-        foreach ($voci as $eventoId => $voce) {
+        foreach ($voci as $chiave => $voce) {
+            $eventoId = $voce['evento_id'];
             $t = $this->repo->turno($voce['turno_id']);
             $titolo = $t ? (string) $t['evento_titolo'] : 'Attività non più disponibile';
             $etichetta = $t ? (($t['evento_tipo'] ?? '') === 'progetto' ? trim((string) ($t['nome_turno'] ?? '')) : Turni::etichetta($t)) : '';
@@ -282,11 +287,11 @@ final class ServizioProgrammaFsl
                 $esiti[] = $this->voceEsito($eventoId, $titolo, $etichetta, 'errore', null, 'L\'attività non è più disponibile.');
                 continue;
             }
-            $docente = trim(mb_substr((string) ($docenti[$eventoId] ?? ''), 0, 150)) ?: trim((string) ($voce['custom']['docente_riferimento'] ?? '')) ?: trim($nome . ' ' . $cognome);
+            $docente = trim(mb_substr((string) ($docenti[$chiave] ?? ''), 0, 150)) ?: trim((string) ($voce['custom']['docente_riferimento'] ?? '')) ?: trim($nome . ' ' . $cognome);
             $esito = $this->prenotazione->prenota($this->richiesta($r, $area, $t, $voce, $docente, $risposta, $nomeScuola, $codiceScuola, $email));
             $esiti[] = $this->esitoVoce($eventoId, $titolo, $etichetta, $esito);
             if ($esito->riuscita()) {
-                $riuscite[$eventoId] = ['esito' => $esito, 'docente' => $docente, 'studenti' => (int) ($voce['custom'][CAMPO_PARTECIPANTI] ?? 0)];
+                $riuscite[$chiave] = ['esito' => $esito, 'docente' => $docente, 'studenti' => (int) ($voce['custom'][CAMPO_PARTECIPANTI] ?? 0)];
                 $rinnovo = $rinnovo || $esito->convenzioneDaRinnovare();
                 $serveConvenzione = $serveConvenzione || $esito->inAttesaConvenzione();
             }
@@ -301,13 +306,13 @@ final class ServizioProgrammaFsl
         // Una sola compilazione con tutte le prenotazioni: Allegato A (PDF) e Convenzione (Word) precompilati
         $attivita = [];
         $primo = 0;
-        foreach ($riuscite as $eventoId => $x) {
+        foreach ($riuscite as $chiave => $x) {
             $pr = $this->prenotazioniFsl->perCodiceConvenzione((string) $x['esito']->codice());
             if ($pr) {
                 $primo = $primo ?: (int) $pr['id'];
                 $attivita[] = ['pr' => (int) $pr['id'], 'studenti' => $x['studenti'], 'tutor' => $x['docente']];
             }
-            $this->programma->togli($eventoId);
+            $this->programma->togli($chiave);
         }
         // Convenzione da stipulare solo se almeno una prenotazione la aspetta (il registro può già coprire la scuola anche se ha risposto «No»)
         $statoConv = $rinnovo ? 'rinnovo' : ($serveConvenzione ? 'no' : 'si');

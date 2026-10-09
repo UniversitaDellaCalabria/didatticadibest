@@ -27,9 +27,9 @@ final class ServizioSchedaProgetto
      * @param list<array<string, mixed>> $edizioni id, nome, posti, apertura, chiusura, min, max
      * @return array{evento: int, non_tolte: list<string>} id del progetto e edizioni che non si sono potute eliminare perché hanno iscritti
      */
-    public function salva(int $paginaId, int $eventoId, array $evento, array $d, array $json, string|array $corsoCodice, ?string $destinazione, array $edizioni, int $listaAttesa, int $approvazione, int $convenzione): array
+    public function salva(int $paginaId, int $eventoId, array $evento, array $d, array $json, string|array $corsoCodice, ?string $destinazione, array $edizioni, int $listaAttesa, int $approvazione, int $convenzione, int $piuEdizioni = 0): array
     {
-        return $this->db->transazione(function () use ($paginaId, $eventoId, $evento, $d, $json, $corsoCodice, $destinazione, $edizioni, $listaAttesa, $approvazione, $convenzione): array {
+        return $this->db->transazione(function () use ($paginaId, $eventoId, $evento, $d, $json, $corsoCodice, $destinazione, $edizioni, $listaAttesa, $approvazione, $convenzione, $piuEdizioni): array {
             if ($eventoId === 0) {
                 $eventoId = $this->eventi->inserisciProgetto($paginaId, $evento);
             } else {
@@ -40,6 +40,7 @@ final class ServizioSchedaProgetto
             $this->progetti->impostaCorsi($eventoId, $this->codiciCorsi($corsoCodice));
             $this->progetti->impostaDestinazione($eventoId, $destinazione);
             $this->progetti->impostaConvenzione($eventoId, $convenzione);
+            $this->progetti->impostaPiuEdizioni($eventoId, $piuEdizioni);
             // Edizioni = turni di iscrizione (solo progetti senza rimando)
             $nonTolte = $destinazione === null ? $this->turni->salvaEdizioniProgetto($eventoId, $edizioni, $listaAttesa, $approvazione) : [];
             $this->anagrafe->assicuraCampiProgetto($paginaId);

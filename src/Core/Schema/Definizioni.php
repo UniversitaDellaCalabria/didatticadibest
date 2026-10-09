@@ -521,6 +521,8 @@ final class Definizioni
             'convenzione' => "ADD COLUMN convenzione TINYINT(1) NOT NULL DEFAULT 0",
             // v27: evento dedicato alle scuole (prenota il docente per la classe, con il numero di studenti)
             'dedicata_scuole' => "ADD COLUMN dedicata_scuole TINYINT(1) NOT NULL DEFAULT 0",
+            // v47: la stessa scuola (o persona) può prenotare più edizioni dello stesso progetto (0 = una sola, come prima)
+            'piu_edizioni' => "ADD COLUMN piu_edizioni TINYINT(1) NOT NULL DEFAULT 0",
             // v31: insegnamento dell'anagrafe da cui nasce l'attività (aree "Gruppi degli insegnamenti")
             'insegnamento_id' => "ADD COLUMN insegnamento_id INT DEFAULT NULL",
             // v46: più corsi di studio per attività (codici separati da virgola; corso_codice resta il primo)

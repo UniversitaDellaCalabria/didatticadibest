@@ -364,8 +364,9 @@ final class ServizioIscritti
         if ($tp && $tp['tipo'] === 'progetto') {
             $eventoId = (int) $tp['evento_id'];
             $numPosti = 1;
-            $errore = $this->iscrizioni->validaPartecipantiProgetto($custom, $this->eventi->dettagliProgetti([$eventoId])[$eventoId] ?? null, $tp);
-            if ($errore === null && $email !== '' && $this->iscritti->emailGiaIscrittaAEvento($eventoId, $email)) {
+            $dettProgetto = $this->eventi->dettagliProgetti([$eventoId])[$eventoId] ?? null;
+            $errore = $this->iscrizioni->validaPartecipantiProgetto($custom, $dettProgetto, $tp);
+            if ($errore === null && $email !== '' && empty($dettProgetto['piu_edizioni']) && $this->iscritti->emailGiaIscrittaAEvento($eventoId, $email)) {
                 $errore = "questa email è già iscritta (o in lista d'attesa) a un'edizione del progetto";
             }
             if ($errore !== null) {

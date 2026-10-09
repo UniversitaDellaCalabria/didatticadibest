@@ -59,15 +59,15 @@ if ($non_fsl) {
 // La pagina del programma
 $r = $http('/eventi/programma_fsl.php', null, $jar_prg);
 prova($r['codice'] === 200 && $senza_errori($r['corpo']) && str_contains($r['corpo'], 'Il programma FSL della scuola') && str_contains($r['corpo'], 'Attività scelte (1)') && str_contains($r['corpo'], 'name="conferma_programma"')
-    && str_contains($r['corpo'], 'name="docente[20]"') && str_contains($r['corpo'], 'name="convenzione"') && str_contains($r['corpo'], 'name="accetta_privacy"') && str_contains($r['corpo'], 'class="scuola-campo'), "programma_fsl.php: attività scelte, docente referente, scuola, convenzione, privacy");
+    && str_contains($r['corpo'], 'name="docente[201]"') && str_contains($r['corpo'], 'name="convenzione"') && str_contains($r['corpo'], 'name="accetta_privacy"') && str_contains($r['corpo'], 'class="scuola-campo'), "programma_fsl.php: attività scelte, docente referente, scuola, convenzione, privacy");
 prova(str_contains($r['corpo'], 'value="Luca"') && str_contains($r['corpo'], 'readonly') && !str_contains($r['corpo'], 'name="captcha_risposta"') && !str_contains($r['corpo'], 'name="email_conferma"'), "programma_fsl.php: connesso, nome ed email già noti e niente controllo anti-robot");
 prova($http('/eventi/programma_fsl.php')['codice'] === 200 && str_contains($http('/eventi/programma_fsl.php')['corpo'], 'Il programma è vuoto'), "programma_fsl.php: senza accesso e senza attività, programma vuoto");
 
 // Togli e svuota
 $tk = $csrf_prg('/eventi/programma_fsl.php');
-$rr = $http('/eventi/programma_fsl.php', ['csrf_token' => 'sbagliato', 'togli' => 20], $jar_prg);
+$rr = $http('/eventi/programma_fsl.php', ['csrf_token' => 'sbagliato', 'togli' => 201], $jar_prg);
 prova($rr['codice'] === 403, "togli: token CSRF sbagliato respinto");
-$rr = $http('/eventi/programma_fsl.php', ['csrf_token' => $tk, 'togli' => 20], $jar_prg);
+$rr = $http('/eventi/programma_fsl.php', ['csrf_token' => $tk, 'togli' => 201], $jar_prg);
 $r = $http('/eventi/programma_fsl.php', null, $jar_prg);
 prova(in_array($rr['codice'], [302, 303], true) && str_contains($r['corpo'], 'Il programma è vuoto') && !str_contains($r['corpo'], 'class="programma-fsl-n"'), "togli: l'attività esce dal programma e l'icona sparisce");
 
@@ -75,7 +75,7 @@ prova(in_array($rr['codice'], [302, 303], true) && str_contains($r['corpo'], 'Il
 $http('/eventi/fsl.php?progetto=20', ['csrf_token' => $csrf_prg('/eventi/fsl.php?progetto=20')] + $campi, $jar_prg);
 $dati_conf_piatti = function (array $dati): array { $out = []; foreach ($dati as $k => $v) { if (is_array($v)) foreach ($v as $k2 => $v2) $out[$k . '[' . $k2 . ']'] = $v2; else $out[$k] = $v; } return $out; };
 $dati_conf = ['conferma_programma' => 1, 'custom_scuola' => 'Liceo', 'scuola_codice' => ['scuola' => 'ZZPR00000P'], 'convenzione' => 'no', 'accetta_privacy' => 'on',
-              'cf' => '123', 'pec' => 'scuola.prova@pec.example.org', 'dirigente' => '', 'docente' => [20 => 'Prof. Verdi Prova']];
+              'cf' => '123', 'pec' => 'scuola.prova@pec.example.org', 'dirigente' => '', 'docente' => [201 => 'Prof. Verdi Prova']];
 $rr = $http('/eventi/programma_fsl.php', ['csrf_token' => $csrf_prg('/eventi/programma_fsl.php')] + $dati_conf, $jar_prg);
 $r = $http('/eventi/programma_fsl.php', null, $jar_prg);
 $n_pr = (int)$loc->query("SELECT COUNT(*) c FROM prenotazioni WHERE turno_id = 201 AND email = 'luca.insegnante@example.org'")->fetch_assoc()['c'];

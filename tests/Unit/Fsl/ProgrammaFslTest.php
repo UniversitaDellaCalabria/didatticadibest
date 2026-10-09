@@ -38,8 +38,9 @@ final class ProgrammaFslTest extends TestCase
         self::assertSame(2, $this->programma->conta());
         self::assertTrue($this->programma->contiene(5));
         self::assertSame(51, $this->programma->turnoDi(5));
-        self::assertSame(['numero_partecipanti' => '12'], $this->programma->voci()[5]['custom']);
-        self::assertSame([5, 7], array_keys($this->programma->voci()), "l'ordine è quello di inserimento");
+        self::assertSame(['numero_partecipanti' => '12'], $this->programma->voci()[51]['custom']);
+        self::assertSame(5, $this->programma->voci()[51]['evento_id']);
+        self::assertSame([51, 71], array_keys($this->programma->voci()), "una voce per edizione, nell'ordine di inserimento");
     }
 
     public function testUnaSolaEdizionePerAttivita(): void
@@ -49,15 +50,30 @@ final class ProgrammaFslTest extends TestCase
 
         self::assertSame(1, $this->programma->conta());
         self::assertSame(52, $this->programma->turnoDi(5));
-        self::assertSame('20', $this->programma->voci()[5]['custom']['numero_partecipanti']);
+        self::assertSame('20', $this->programma->voci()[52]['custom']['numero_partecipanti']);
+        self::assertFalse($this->programma->contieneTurno(51));
+    }
+
+    public function testPiuEdizioniDellaStessaAttivita(): void
+    {
+        self::assertTrue($this->programma->aggiungi(5, 51, ['numero_partecipanti' => '12'], true));
+        self::assertTrue($this->programma->aggiungi(5, 52, ['numero_partecipanti' => '20'], true));
+
+        self::assertSame(2, $this->programma->conta());
+        self::assertTrue($this->programma->contieneTurno(51) && $this->programma->contieneTurno(52));
+        self::assertTrue($this->programma->contiene(5));
+
+        $this->programma->togli(51);
+        self::assertSame([52], array_keys($this->programma->voci()));
+        self::assertTrue($this->programma->contiene(5));
     }
 
     public function testTogliESvuota(): void
     {
         $this->programma->aggiungi(5, 51, []);
         $this->programma->aggiungi(7, 71, []);
-        $this->programma->togli(5);
-        self::assertSame([7], array_keys($this->programma->voci()));
+        $this->programma->togli(51);
+        self::assertSame([71], array_keys($this->programma->voci()));
 
         $this->programma->svuota();
         self::assertSame(0, $this->programma->conta());
@@ -82,8 +98,9 @@ final class ProgrammaFslTest extends TestCase
             11 => 'non un array',
         ]);
 
-        self::assertSame([5], array_keys($this->programma->voci()));
-        self::assertSame(['a' => 'b'], $this->programma->voci()[5]['custom'], 'solo valori semplici');
+        self::assertSame([51], array_keys($this->programma->voci()), 'le vecchie sessioni (chiave = attività) si leggono per edizione');
+        self::assertSame(['a' => 'b'], $this->programma->voci()[51]['custom'], 'solo valori semplici');
+        self::assertSame(5, $this->programma->voci()[51]['evento_id']);
     }
 
     public function testEsitoDellaPrenotazioneLettoDalRimando(): void
