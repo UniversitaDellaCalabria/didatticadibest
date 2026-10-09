@@ -120,7 +120,7 @@ if (isset($_GET['esito']) && !empty($_SESSION['programma_esito'])) {
                 <?php if ($es['convenzione'] === 'rinnovo'): ?><li>La convenzione registrata dal Dipartimento <strong>non copre tutto il periodo</strong> delle attività: ne va stipulata una nuova (scarica anche la Convenzione).</li>
                 <?php elseif ($es['convenzione'] === 'si'): ?><li>La scuola ha già la convenzione con il Dipartimento: serve solo l'<strong>Allegato A</strong>.
                     Se ti serve anche la Convenzione <a href="convenzione_online.php?t=<?php echo $tk; ?>&amp;scarica=convenzione_sola">scaricala qui</a>.</li><?php endif; ?>
-                <li>Apri i file e controlla i dati (nel Word i campi rimasti in <span style="background:#fef08a;">giallo</span> sono da completare).</li>
+                <li>Apri i file e controlla i dati (nella Convenzione in Word i dati non ancora indicati restano come puntini da completare a mano).</li>
                 <li>Il <strong>Dirigente Scolastico</strong> firma <strong>digitalmente in formato PAdES</strong> (PDF firmato; il formato CAdES .p7m non è accettato). Il Word della Convenzione va prima salvato in PDF.</li>
                 <li>La scuola invia i documenti firmati dalla propria PEC a <?php echo $pec !== '' ? '<a href="mailto:' . $h($pec) . '" class="fw-bold">' . $h($pec) . '</a>' : 'alla PEC del Dipartimento'; ?>.</li>
                 <li>Il Dipartimento registra la convenzione e <strong>conferma le prenotazioni</strong>: riceverete un'email.</li>

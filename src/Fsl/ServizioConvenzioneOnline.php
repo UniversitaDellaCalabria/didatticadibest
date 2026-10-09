@@ -29,7 +29,8 @@ final class ServizioConvenzioneOnline
         private Upload $upload,
         private Mailer $mailer,
         private Sito $sito,
-        private AllegatoAPdf $allegatoPdf
+        private AllegatoAPdf $allegatoPdf,
+        private AllegatoAWord $allegatoWord
     ) {
     }
 
@@ -96,9 +97,9 @@ final class ServizioConvenzioneOnline
      */
     public function scarica(string $doc, array $cc, array $ctx): ?array
     {
-        // 'convenzione' = Word con l'Allegato A in fondo; 'convenzione_sola' = Word senza Allegato A; 'allegato' = Allegato A in Word;
-        // 'allegato_pdf' = Allegato A in PDF con la scheda completa di ogni attività (da firmare in PAdES)
-        $doc = in_array($doc, ['allegato', 'allegato_pdf', 'convenzione_sola'], true) ? $doc : 'convenzione';
+        // 'convenzione' (o 'convenzione_sola') = Convenzione in Word precompilata, senza Allegato A; 'allegato' = Allegato A in Word e
+        // 'allegato_pdf' = Allegato A in PDF: stesso contenuto e stesso ordine (corso di laurea e data), con la scheda completa di ogni attività
+        $doc = in_array($doc, ['allegato', 'allegato_pdf'], true) ? $doc : 'convenzione_sola';
         $radice = $this->sito->radice();
         $logo = $cc['logo'] && is_file($radice . '/' . $cc['logo']) ? $radice . '/' . $cc['logo'] : null;
         $prot = trim((string) ($cc['protocollo'] ?? '') . (!empty($cc['protocollo_data']) ? ' del ' . date('d/m/Y', strtotime($cc['protocollo_data'])) : ''));
@@ -112,13 +113,19 @@ final class ServizioConvenzioneOnline
                 return null;
             }
             $nome = 'Allegato_A_FSL_' . $sigla . '.pdf';
-        } else {
-            [$scuola, $att] = $this->datiDocumenti($ctx['dati'], $ctx['prenotate'], $ctx['prenotabili']);
-            $file = $this->documenti->genera($doc === 'convenzione_sola' ? 'convenzione' : $doc, $scuola, $att, $logo, $prot, $doc === 'convenzione_sola');
+        } elseif ($doc === 'allegato') {
+            $file = $this->allegatoWord->genera($s, $this->vociAllegato($ctx['dati'], $ctx['prenotate'], $ctx['prenotabili']), $logo, $prot);
             if (!$file) {
                 return null;
             }
-            $nome = ($doc === 'allegato' ? 'Allegato_A_FSL_' : 'Convenzione_FSL_') . $sigla . '.docx';
+            $nome = 'Allegato_A_FSL_' . $sigla . '.docx';
+        } else {
+            [$scuola, $att] = $this->datiDocumenti($ctx['dati'], $ctx['prenotate'], $ctx['prenotabili']);
+            $file = $this->documenti->genera('convenzione', $scuola, $att, $logo, $prot, true);
+            if (!$file) {
+                return null;
+            }
+            $nome = 'Convenzione_FSL_' . $sigla . '.docx';
         }
         $this->compilate->segnaScaricata((int) $cc['id']);
 

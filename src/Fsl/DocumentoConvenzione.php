@@ -50,7 +50,10 @@ final class DocumentoConvenzione
                     $v = trim((string)($valori[$k] ?? ''));
                     $run = $m[0];
                     if ($v === '') {
-                        return str_replace('{{' . $k . '}}', htmlspecialchars($orig, ENT_XML1, 'UTF-8'), $run);
+                        // dato non indicato: puntini da completare a mano (niente testo del modello né evidenziazione gialla)
+                        $run = (string) preg_replace('#<w:highlight [^>]*/>#', '', $run);
+                        $run = str_replace('w:val="FF0000"', 'w:val="000000"', $run);
+                        return str_replace('{{' . $k . '}}', '……………………', $run);
                     }
                     $run = (string) preg_replace('#<w:highlight [^>]*/>#', '', $run);
                     $run = str_replace('w:val="FF0000"', 'w:val="000000"', $run);
@@ -152,6 +155,7 @@ final class DocumentoConvenzione
                 $xml = (string) preg_replace('#<w:body>#', '<w:body><w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r>' . $disegno . '</w:r></w:p>', $xml, 1);
             }
         }
+        $xml = (string) preg_replace('#<w:highlight [^>]*/>#', '', $xml);
         $zip->addFromString('word/document.xml', $xml);
         $zip->close();
         return $tmp;

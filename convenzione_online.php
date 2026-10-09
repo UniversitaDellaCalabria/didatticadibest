@@ -80,9 +80,9 @@ require_once 'header.php';
             <a class="btn btn-success fw-bold" href="convenzione_online.php?t=<?php echo $h($cc['token']); ?>&amp;scarica=allegato_pdf"><i class="fa fa-file-pdf me-1" aria-hidden="true"></i>Scarica l'Allegato A (PDF)</a>
             <a class="btn btn-success fw-bold" href="convenzione_online.php?t=<?php echo $h($cc['token']); ?>&amp;scarica=convenzione_sola"><i class="fa fa-file-word me-1" aria-hidden="true"></i>Scarica la Convenzione (Word)</a>
         </div>
-        <p class="small text-secondary">Preferisci i vecchi documenti Word? <a href="convenzione_online.php?t=<?php echo $h($cc['token']); ?>&amp;scarica=convenzione">Convenzione con l'Allegato A in fondo</a> · <a href="convenzione_online.php?t=<?php echo $h($cc['token']); ?>&amp;scarica=allegato">Solo l'Allegato A in Word</a></p>
+        <p class="small text-secondary">Ti serve l'Allegato A da modificare? <a href="convenzione_online.php?t=<?php echo $h($cc['token']); ?>&amp;scarica=allegato">Scaricalo in Word</a>: ha lo stesso contenuto e lo stesso ordine del PDF.</p>
         <ol class="mb-2">
-            <li>Apri i file e controlla i dati (nel Word i campi rimasti in <span style="background:#fef08a;">giallo</span> sono da completare).</li>
+            <li>Apri i file e controlla i dati (nella Convenzione in Word i dati non ancora indicati restano come puntini da completare a mano).</li>
             <li>Il <strong>Dirigente Scolastico</strong> firma i documenti <strong>digitalmente in formato PAdES</strong> (PDF firmato; il formato CAdES .p7m non è accettato).</li>
             <li>La scuola li invia dalla propria PEC a <a href="mailto:<?php echo $h($cfg['pec']); ?>?subject=<?php echo rawurlencode('Convenzione Formazione Scuola Lavoro – ' . ($s['denominazione'] ?? '')); ?>" class="fw-bold"><?php echo $h($cfg['pec']); ?></a>.</li>
             <li>Il Dipartimento firma, registra la convenzione e <strong>conferma le prenotazioni</strong>: riceverete un'email.</li>

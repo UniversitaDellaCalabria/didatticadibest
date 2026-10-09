@@ -61,9 +61,11 @@ function data_ora_da($v): ?string {
 if (isset($_POST['salva_progetto'])) {
     csrf_verify($_POST['csrf_token'] ?? '');
     $ev_id = (int)($_POST['evento_id'] ?? 0);
-    if ($ev_id > 0 && !progetto_autorizzato($conn, $ev_id, $filtro_p, $sql_filtro_eventi_rbac)) nega_accesso();
+    // Un evento semplice si trasforma in progetto dal suo modulo (Formazione Scuola Lavoro): le prenotazioni restano, i turni diventano edizioni
+    $converti_post = $ev_id > 0 && !empty($_POST['converti']) && $repo_eventi->eventoConvertibile($ev_id, $filtro_p, $sql_filtro_eventi_rbac);
+    if ($ev_id > 0 && !$converti_post && !progetto_autorizzato($conn, $ev_id, $filtro_p, $sql_filtro_eventi_rbac)) nega_accesso();
     if ($ev_id === 0 && !$puo_creare) nega_accesso();
-    $url_form = "progetti.php?p_id=$filtro_p&" . ($ev_id ? "id=$ev_id" : "azione=nuovo");
+    $url_form = "progetti.php?p_id=$filtro_p&" . ($ev_id ? "id=$ev_id" . ($converti_post ? '&converti=1' : '') : "azione=nuovo");
 
     $titolo = post_testo('titolo');
     if ($titolo === null) { flash_set("Il titolo del progetto è obbligatorio.", 'danger'); admin_redirect($url_form); }
@@ -217,8 +219,8 @@ if (isset($_POST['salva_progetto'])) {
         if ($n_att > 0) $avvisi[] = "lista d'attesa disattivata, ma $n_att " . ($n_att === 1 ? "iscrizione è" : "iscrizioni sono") . " già in attesa: restano in coda finché non le annulli da Iscrizioni";
     }
     if ($edizioni_non_tolte) $avvisi[] = "non ho eliminato le edizioni con iscritti o persone in attesa (" . implode(', ', $edizioni_non_tolte) . "): annulla prima le loro iscrizioni";
-    registra_log_audit($conn, (int)($_POST['evento_id'] ?? 0) ? "Modifica Progetto" : "Creazione Progetto", ["Evento ID" => $ev_id, "Titolo" => $titolo]);
-    flash_set("Progetto salvato." . ($avvisi ? " Attenzione: " . implode('; ', $avvisi) . "." : ''), $avvisi ? 'warning' : 'success');
+    registra_log_audit($conn, $converti_post ? "Evento trasformato in Progetto" : ((int)($_POST['evento_id'] ?? 0) ? "Modifica Progetto" : "Creazione Progetto"), ["Evento ID" => $ev_id, "Titolo" => $titolo]);
+    flash_set(($converti_post ? "L'evento è diventato un progetto (le prenotazioni sono rimaste). " : '') . "Progetto salvato." . ($avvisi ? " Attenzione: " . implode('; ', $avvisi) . "." : ''), $avvisi ? 'warning' : 'success');
     admin_redirect("progetti.php?p_id=$filtro_p");
 }
 
@@ -272,8 +274,9 @@ $id_modifica = (int)($_GET['id'] ?? 0);
 $mostra_form = ($_GET['azione'] ?? '') === 'nuovo' || $id_modifica > 0;
 
 if ($mostra_form):
+    $converti = $id_modifica > 0 && ($_GET['converti'] ?? '') === '1' && $repo_eventi->eventoConvertibile($id_modifica, $filtro_p, $sql_filtro_eventi_rbac);
     if ($id_modifica > 0) {
-        if (!progetto_autorizzato($conn, $id_modifica, $filtro_p, $sql_filtro_eventi_rbac)) nega_accesso();
+        if (!$converti && !progetto_autorizzato($conn, $id_modifica, $filtro_p, $sql_filtro_eventi_rbac)) nega_accesso();
         $ev = $repo_eventi->perId($id_modifica);
         $dp = get_dettagli_progetti($conn, [$id_modifica])[$id_modifica] ?? [];
         $turni_ed = [];
@@ -315,12 +318,16 @@ if ($mostra_form):
 </style>
 
 <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
-    <h4 class="fw-bold text-dark mb-0"><i class="fa fa-diagram-project me-2" style="color:<?php echo h($col_area); ?>" aria-hidden="true"></i><?php echo $id_modifica ? 'Modifica progetto' : 'Nuovo progetto'; ?></h4>
+    <h4 class="fw-bold text-dark mb-0"><i class="fa fa-diagram-project me-2" style="color:<?php echo h($col_area); ?>" aria-hidden="true"></i><?php echo $converti ? 'Trasforma l\'evento in progetto' : ($id_modifica ? 'Modifica progetto' : 'Nuovo progetto'); ?></h4>
     <a href="progetti.php?p_id=<?php echo $filtro_p; ?>" class="btn btn-outline-secondary btn-sm fw-bold"><i class="fa fa-arrow-left me-1" aria-hidden="true"></i>Torna ai progetti</a>
 </div>
 
+<?php if ($converti): ?>
+<div class="alert alert-info border border-2 border-info shadow-sm"><i class="fa fa-diagram-project me-1" aria-hidden="true"></i><strong>Formazione Scuola Lavoro: questo evento sta per diventare un progetto.</strong> Completa la scheda del progetto (corso di laurea, periodo, moduli, edizioni, convenzione…) e salva. Le <strong>prenotazioni già ricevute restano</strong> e i turni dell'evento diventano le edizioni del progetto. Finché non salvi, l'evento resta com'è.</div>
+<?php endif; ?>
 <form method="POST" enctype="multipart/form-data" onsubmit="if (window.tinymce) tinymce.triggerSave();">
     <?php csrf_field(); ?>
+    <?php if ($converti): ?><input type="hidden" name="converti" value="1"><?php endif; ?>
     <input type="hidden" name="evento_id" value="<?php echo $id_modifica; ?>">
     <input type="hidden" name="p_id" value="<?php echo $filtro_p; ?>">
 
@@ -522,7 +529,7 @@ if ($mostra_form):
                     <label class="form-check-label small fw-bold" for="pjApprov">Iscrizioni da confermare dai gestori</label>
                 </div>
                 <p class="form-text mt-0 mb-3">Acceso: ogni iscrizione (di tutte le edizioni) resta <strong>da approvare</strong> finché un gestore non la conferma da Iscrizioni; il posto resta occupato nel frattempo.</p>
-                <?php $conv_v = !empty($dp['convenzione']) || (!$id_modifica && tipo_area($page_cfg) === 'fsl'); // nuovo progetto in un'area FSL: già acceso ?>
+                <?php $conv_v = !empty($dp['convenzione']) || $converti || (!$id_modifica && tipo_area($page_cfg) === 'fsl'); // nuovo progetto in un'area FSL: già acceso ?>
                 <div class="form-check form-switch mb-1">
                     <input class="form-check-input" type="checkbox" name="convenzione" id="pjConv" value="1" <?php echo $conv_v ? 'checked' : ''; ?>>
                     <label class="form-check-label small fw-bold" for="pjConv"><i class="fa fa-file-signature me-1" aria-hidden="true"></i>Attività di Formazione Scuola Lavoro</label>

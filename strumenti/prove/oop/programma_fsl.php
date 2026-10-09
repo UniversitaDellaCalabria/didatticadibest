@@ -157,7 +157,7 @@ prova(str_contains($tp, 'Modulo') && str_contains($tp, 'Alfa989') && str_contain
     "Allegato A: percorso, obiettivi, conoscenze, competenze e descrizione con gli elenchi");
 prova(str_contains($tp, 'Referente989') && str_contains($tp, 'referente989@example.org') && str_contains($tp, 'Tutor989') && str_contains($tp, 'Laboratorio') && str_contains($tp, 'Pranzo') && str_contains($tp, 'Classi') && str_contains($tp, 'quinte'),
     "Allegato A: referenti del Dipartimento, docente referente della scuola, sede, altre informazioni, destinatari");
-prova(str_contains($tp, '15') && str_contains($tp, 'laurea') && str_contains($tp, 'PAdES'), "Allegato A: studenti, corso di studio e indicazione della firma PAdES");
+prova(str_contains($tp, '15') && str_contains($tp, 'laurea') && !str_contains($tp, 'PAdES'), "Allegato A: studenti e corso di studio, senza indicazione di firme (allegato della convenzione già firmata)");
 @unlink($doc['file'] ?? '');
 
 // Convenzione Word senza l'Allegato A
@@ -168,7 +168,10 @@ $t_sola = $doc_sola ? $leggi_docx($doc_sola['file']) : '';
 $t_con = $doc_con ? $leggi_docx($doc_con['file']) : '';
 prova($doc_sola && str_ends_with($doc_sola['nome'], '.docx') && str_contains($t_sola, 'Istituto Fuori Elenco 989') && str_contains($t_sola, 'Dott.ssa Maria Dirigente989') && str_contains($t_sola, 'Art.7')
     && !str_contains($t_sola, 'Allegato_A') && !str_contains($t_sola, 'Titolo corso') && !str_contains($t_sola, 'Biodiversita989'), "Convenzione Word: precompilata e senza la pagina dell'Allegato A", substr($t_sola, -300));
-prova($doc_con && str_contains($t_con, 'Allegato_A') && str_contains($t_con, 'Biodiversita989') && str_contains($t_con, 'Geologia989'), "Convenzione Word «unica»: l'Allegato A in fondo resta disponibile come prima");
+$doc_all = $conv->scarica('allegato', $cc, $ctx);
+$t_all = $doc_all ? $leggi_docx($doc_all['file']) : '';
+prova($doc_con && str_contains($t_con, 'Art.7') && !str_contains($t_con, 'Biodiversita989') && $doc_all && str_contains($t_all, 'Biodiversita989') && str_contains($t_all, 'Geologia989'),
+    "Convenzione Word sempre senza Allegato A; l'Allegato A Word è quello nuovo, uguale al PDF");
 @unlink($doc_sola['file'] ?? ''); @unlink($doc_con['file'] ?? '');
 $doc_all = $conv->scarica('allegato', $cc, $ctx);
 prova($doc_all && str_contains($leggi_docx($doc_all['file']), 'Biodiversita989'), "Allegato A in Word: resta disponibile");
@@ -212,7 +215,7 @@ $ctx4 = $conv->contesto($cc4);
 $doc4 = $conv->scarica('convenzione_sola', $cc4, $ctx4);
 $t4 = $doc4 ? $leggi_docx($doc4['file']) : '';
 $z4 = new ZipArchive(); $z4->open($doc4['file'] ?? ''); $x4 = (string)$z4->getFromName('word/document.xml'); $z4->close();
-prova($doc4 && str_contains($t4, 'Scuola Senza Dati 989') && str_contains($x4, '<w:highlight'), "Convenzione senza dati facoltativi: precompilata con quanto c'è e i campi vuoti restano evidenziati da completare");
+prova($doc4 && str_contains($t4, 'Scuola Senza Dati 989') && !str_contains($x4, '<w:highlight') && str_contains($t4, '……'), "Convenzione senza dati facoltativi: precompilata con quanto c'è, i dati mancanti restano puntini (nessuna evidenziazione gialla)");
 @unlink($doc4['file'] ?? '');
 $pdf4 = $conv->scarica('allegato_pdf', $cc4, $ctx4);
 prova($pdf4 && str_starts_with((string)file_get_contents($pdf4['file']), '%PDF-'), "Allegato A in PDF anche senza i dati facoltativi");

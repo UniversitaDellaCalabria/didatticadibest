@@ -216,6 +216,12 @@ final class EventoRepository
         return $this->db->riga("SELECT 1 FROM eventi e WHERE e.id = ? AND e.pagina_id = ? AND e.tipo = 'progetto' $rbac LIMIT 1", [$id, $paginaId]) !== null;
     }
 
+    /** L'evento è un evento semplice dell'area (non ancora un progetto), visibile al gestore: si può trasformare in progetto. */
+    public function eventoConvertibile(int $id, int $paginaId, string $rbac): bool
+    {
+        return $this->db->riga("SELECT 1 FROM eventi e WHERE e.id = ? AND e.pagina_id = ? AND IFNULL(e.tipo, 'evento') <> 'progetto' $rbac LIMIT 1", [$id, $paginaId]) !== null;
+    }
+
     /**
      * Nuovo evento normale. $v: sub_id, titolo, luogo, desc, locandina, pdf, evid, req_pren, abilita_pres, ruolo_acc, ord. Ritorna l'id.
      *
@@ -365,7 +371,8 @@ final class EventoRepository
      */
     public function aggiornaProgetto(int $id, array $v, bool $eliminaLocandina, bool $eliminaPdf, ?string $nuovaLocandina, ?string $nuovoPdf): void
     {
-        $sql = 'UPDATE eventi SET titolo=?, luogo=?, descrizione=?, is_evidenza=?, ordine=?, email_notifiche_extra=?, richiede_prenotazione=1, ruolo_accesso_id=-1, abilita_presenze=IF(? = 1, 1, abilita_presenze)';
+        // tipo = 'progetto': salvando dal modulo del progetto un evento semplice (con le sue prenotazioni) diventa un progetto
+        $sql = "UPDATE eventi SET tipo='progetto', titolo=?, luogo=?, descrizione=?, is_evidenza=?, ordine=?, email_notifiche_extra=?, richiede_prenotazione=1, ruolo_accesso_id=-1, abilita_presenze=IF(? = 1, 1, abilita_presenze)";
         $par = [$v['titolo'], $v['luogo'], $v['desc'], (int) $v['evid'], (int) $v['ord'], $v['notif_csv'], (int) $v['attestati']];
         if ($eliminaLocandina) {
             $sql .= ", locandina_path=''";

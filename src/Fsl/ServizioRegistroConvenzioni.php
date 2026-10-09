@@ -42,8 +42,9 @@ final class ServizioRegistroConvenzioni
             if (($files[$campo]['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
                 continue;
             }
-            $pades = is_uploaded_file((string) ($files[$campo]['tmp_name'] ?? '')) && $this->firme->firmePades((string) file_get_contents($files[$campo]['tmp_name']));
-            $fn = $pades ? $this->upload->salva($files[$campo], $cartella, ['pdf'], ['application/pdf']) : null;
+            // La convenzione va firmata in PAdES; l'Allegato A può essere un PDF qualsiasi, anche senza firma
+            $valido = is_uploaded_file((string) ($files[$campo]['tmp_name'] ?? '')) && ($campo === 'file_allegato' || $this->firme->firmePades((string) file_get_contents($files[$campo]['tmp_name'])));
+            $fn = $valido ? $this->upload->salva($files[$campo], $cartella, ['pdf'], ['application/pdf']) : null;
             if ($fn) {
                 $nuovi[$campo] = self::CARTELLA . $fn;
             } else {

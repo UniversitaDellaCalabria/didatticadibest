@@ -41,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         registra_log_audit($conn, $esito_cv->modifica ? "Convenzione modificata" : "Convenzione registrata", ["Scuola" => $cod_cv, "Valida dal" => $_POST['data_stipula'] ?? '', "Valida fino al" => $_POST['scadenza'] ?? '', "Prenotazioni aggiornate" => $n_cv]);
         flash_set("Convenzione " . ($esito_cv->modifica ? "aggiornata" : "registrata") . " per " . etichetta_scuola($s_cv) . "."
                   . ($n_cv ? " $n_cv prenotazioni della scuola coperte dalla convenzione (chi era in attesa è stato avvisato per email)." : '')
-                  . ($errori_file ? " File non caricati (serve il PDF firmato digitalmente in PAdES; i .p7m CAdES non sono accettati): " . implode(', ', $errori_file) . "." : ''), $errori_file ? 'warning' : 'success');
+                  . ($errori_file ? " File non caricati (serve un PDF; la convenzione deve essere firmata digitalmente in PAdES, i .p7m CAdES non sono accettati):" . implode(', ', $errori_file) . "." : ''), $errori_file ? 'warning' : 'success');
     }
     if (isset($_POST['conv_elimina'])) {
         $id_cv = (int)$_POST['conv_elimina'];
@@ -237,7 +237,7 @@ $oggi_cv = date('Y-m-d'); $tra60_cv = date('Y-m-d', strtotime('+60 days'));
             <?php if (!empty($cm['file_convenzione'])): ?><div class="form-text"><a href="convenzione_file.php?id=<?php echo (int)$cm['id']; ?>&f=conv" target="_blank"><i class="fa fa-file-pdf me-1"></i>File attuale</a></div><?php endif; ?>
         </div>
         <div class="col-md-6">
-            <label class="form-label small fw-bold mb-1" for="cvFileA">Allegato A firmato (PDF PAdES)<?php echo empty($cm['file_allegato']) ? '' : ' – carica solo per sostituirlo'; ?></label>
+            <label class="form-label small fw-bold mb-1" for="cvFileA">Allegato A (PDF, anche senza firma PAdES)<?php echo empty($cm['file_allegato']) ? '' : ' – carica solo per sostituirlo'; ?></label>
             <input type="file" name="file_allegato" id="cvFileA" class="form-control form-control-sm" accept=".pdf,application/pdf">
             <?php if (!empty($cm['file_allegato'])): ?><div class="form-text"><a href="convenzione_file.php?id=<?php echo (int)$cm['id']; ?>&f=all" target="_blank"><i class="fa fa-file-pdf me-1"></i>File attuale</a></div><?php endif; ?>
         </div>

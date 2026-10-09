@@ -79,10 +79,11 @@ function salva_turni_evento($conn, int $ev_id, array $turni, array &$avvisi): in
 }
 
 // Opzione "Attestati per gli studenti della classe": progetti_dettagli.attestati dell'evento
-// "Dedicato alle scuole" (dedicata_scuole) e "Attività di Formazione Scuola Lavoro" (convenzione: domanda sulla
-// convenzione nel modulo e tutto il processo delle convenzioni). FSL è sempre anche dedicata alle scuole.
+// "Dedicato alle scuole" (dedicata_scuole). La Formazione Scuola Lavoro (convenzione: domanda sulla convenzione nel modulo e tutto il
+// processo delle convenzioni, programma della scuola, documenti) è dei PROGETTI: spuntando «Formazione Scuola Lavoro» nel modulo evento si apre
+// il modulo del progetto (admin/progetti.php) e l'evento diventa un progetto. Qui il flag esistente non si cambia.
 function salva_attestati_classe_evento($conn, int $ev_id, int $attivi): void {
-    $conv = isset($_POST['fsl']) ? 1 : 0;
+    $conv = (int)(get_dettagli_progetti($conn, [$ev_id])[$ev_id]['convenzione'] ?? 0);   // invariato: si cambia solo trasformando l'evento in progetto
     $scuole = ($conv || isset($_POST['dedicata_scuole'])) ? 1 : 0;
     \App\Core\App::per($conn)->get(\App\Eventi\ProgettoRepository::class)->salvaOpzioniScuole($ev_id, $attivi, $conv, $scuole);
 }
@@ -160,7 +161,7 @@ if (isset($_POST['add_evento'])) {
     $ruolo_acc = (int)($_POST['ruolo_accesso_id'] ?? 0);
     $att_classe = isset($_POST['attestati_classe']) ? 1 : 0;
     if ($att_classe) $abilita_pres = 1; // gli attestati della classe richiedono il check-in
-    $classe_ev = $att_classe || isset($_POST['dedicata_scuole']) || isset($_POST['fsl']); // prenota il docente per la classe
+    $classe_ev = $att_classe || isset($_POST['dedicata_scuole']); // prenota il docente per la classe
     $errori_t = [];
     $turni_post = leggi_turni_post($classe_ev, $errori_t);
     if ($errori_t) { flash_set("Evento non creato: " . implode('; ', $errori_t) . ".", 'danger'); admin_redirect("eventi.php?p_id=$filtro_p&azione=nuovo"); }
@@ -223,7 +224,7 @@ if (isset($_POST['edit_evento'])) {
     $ruolo_acc = (int)($_POST['ruolo_accesso_id'] ?? 0);
     $att_classe = isset($_POST['attestati_classe']) ? 1 : 0;
     if ($att_classe) $abilita_pres = 1; // gli attestati della classe richiedono il check-in
-    $classe_ev = $att_classe || isset($_POST['dedicata_scuole']) || isset($_POST['fsl']); // prenota il docente per la classe
+    $classe_ev = $att_classe || isset($_POST['dedicata_scuole']); // prenota il docente per la classe
     $errori_t = [];
     $turni_post = leggi_turni_post($classe_ev, $errori_t);
     if ($errori_t) { flash_set("Evento non salvato: " . implode('; ', $errori_t) . ".", 'danger'); admin_redirect("eventi.php?p_id=$filtro_p&id=$ev_id"); }
@@ -329,10 +330,10 @@ if ($mostra_form):
         $ev = []; $referenti = []; $dett_f = [];
     }
     $att_classe_v = (int)($dett_f['attestati'] ?? 0) === 1;
-    $fsl_v = (int)($dett_f['convenzione'] ?? 0) === 1;
+    $fsl_v = (int)($dett_f['convenzione'] ?? 0) === 1;   // evento già marcato FSL (da trasformare in progetto)
     $scuole_v = $fsl_v || (int)($dett_f['dedicata_scuole'] ?? 0) === 1;
-    // Nuovo evento in un'area di Formazione Scuola Lavoro: "Attività FSL" e "Dedicato alle scuole" già accesi
-    if (empty($ev) && tipo_area($page_cfg) === 'fsl') { $fsl_v = true; $scuole_v = true; }
+    // Nuovo evento in un'area di Formazione Scuola Lavoro: "Dedicato alle scuole" già acceso
+    if (empty($ev) && tipo_area($page_cfg) === 'fsl') { $scuole_v = true; }
     if (!$referenti) $referenti = [['ruolo' => 'Referente', 'notifiche' => 1]];
     $col_f = colore_valido($page_cfg['colore_primario'] ?? '', '#0056B3');
     $txt_f = colore_testo_su($col_f);
@@ -600,11 +601,15 @@ form:not(.ev-form-classe) .ev-t-riga2 { grid-template-columns: repeat(3, 1fr); }
                     <label class="form-check-label small fw-bold" for="evScuole"><i class="fa fa-school me-1" aria-hidden="true"></i>Dedicato alle scuole</label>
                 </div>
                 <p class="form-text mt-0 mb-3">Prenota il docente per la sua classe, indicando il numero di studenti (min/max in ogni turno).</p>
+                <?php $url_fsl = $nuovo ? "progetti.php?p_id=$filtro_p&azione=nuovo" : "progetti.php?p_id=$filtro_p&id=$id_modifica&converti=1"; ?>
                 <div class="form-check form-switch mb-1">
-                    <input class="form-check-input" type="checkbox" name="fsl" id="evFsl" value="1" <?php echo $fsl_v ? 'checked' : ''; ?>>
-                    <label class="form-check-label small fw-bold" for="evFsl"><i class="fa fa-file-signature me-1" aria-hidden="true"></i>Attività di Formazione Scuola Lavoro</label>
+                    <input class="form-check-input" type="checkbox" id="evFsl" data-vai="<?php echo h($url_fsl); ?>" data-nuovo="<?php echo $nuovo ? '1' : '0'; ?>">
+                    <label class="form-check-label small fw-bold" for="evFsl"><i class="fa fa-file-signature me-1" aria-hidden="true"></i>Formazione Scuola Lavoro</label>
                 </div>
-                <p class="form-text mt-0 mb-0">Attiva il processo delle convenzioni: nel modulo la scuola dichiara se ha la convenzione con il Dipartimento, che deve coprire il giorno del turno (registro in Formazione Scuola Lavoro → Convenzioni). Senza convenzione valida la prenotazione resta da approvare con le istruzioni per inviarla (modelli e PEC in Impostazioni area); promemoria e avvisi partono da soli. Include "Dedicato alle scuole".</p>
+                <p class="form-text mt-0 mb-0">Spuntandola si apre il modulo del <strong>progetto</strong> (corso di laurea, periodo, moduli, edizioni, convenzione…) e l'evento <strong>diventa un progetto</strong>: ha convenzioni, Allegato A, programma della scuola ed elenco degli studenti. Le prenotazioni già ricevute restano e i turni diventano edizioni.</p>
+                <?php if (!$nuovo && $fsl_v): ?>
+                    <div class="alert alert-warning small mt-2 mb-0"><i class="fa fa-triangle-exclamation me-1" aria-hidden="true"></i>Questo evento è ancora segnato come Formazione Scuola Lavoro ma non è un progetto. <a href="<?php echo h($url_fsl); ?>" class="fw-bold">Trasformalo in progetto</a> (le prenotazioni restano).</div>
+                <?php endif; ?>
             </section>
 
             <section class="pj-sez">
@@ -701,13 +706,18 @@ document.addEventListener('change', function (e) {
     if (!sw) return;
     var form = sw.closest('form');
     function aggiorna() {
-        if (fsl && fsl.checked) scu.checked = true;
-        if (scu) scu.disabled = !!(fsl && fsl.checked);
         form.classList.toggle('ev-form-classe', sw.checked || (scu && scu.checked));
         if (sw.checked) pres.checked = true;
         pres.disabled = sw.checked;
     }
-    [sw, scu, fsl].forEach(function (x) { if (x) x.addEventListener('change', aggiorna); }); aggiorna();
+    [sw, scu].forEach(function (x) { if (x) x.addEventListener('change', aggiorna); }); aggiorna();
+    // Formazione Scuola Lavoro: l'evento diventa un progetto, si apre il modulo del progetto
+    if (fsl) fsl.addEventListener('change', function () {
+        if (!fsl.checked) return;
+        var testo = fsl.dataset.nuovo === '1' ? 'Un\'attività di Formazione Scuola Lavoro è un progetto: si apre il modulo del progetto. Continuare?'
+            : 'L\'evento diventa un progetto di Formazione Scuola Lavoro: si apre il modulo del progetto (le prenotazioni restano; le modifiche non salvate di questa pagina vanno perse). Continuare?';
+        if (confirm(testo)) window.location.href = fsl.dataset.vai; else fsl.checked = false;
+    });
     form.addEventListener('submit', function () { if (scu) scu.disabled = false; });
     // Un interruttore disattivato non viene inviato: prima dell'invio lo si riattiva
     form.addEventListener('submit', function () { pres.disabled = false; });

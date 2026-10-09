@@ -303,8 +303,11 @@ final class Documento
                 $yb = $this->alt - $top - $h;
                 if ($testa) {
                     $this->out('q 0.91 0.91 0.91 rg ' . $this->n($x) . ' ' . $this->n($yb) . ' ' . $this->n($larg[$c]) . ' ' . $this->n($h) . ' re f Q');
+                } elseif ($c === 0 && !empty($o['col0'])) {
+                    // prima colonna (etichette) su sfondo colorato, es. '0.96 0.96 0.97'
+                    $this->out('q ' . $o['col0'] . ' rg ' . $this->n($x) . ' ' . $this->n($yb) . ' ' . $this->n($larg[$c]) . ' ' . $this->n($h) . ' re f Q');
                 }
-                $this->out('q 0.5 G 0.5 w ' . $this->n($x) . ' ' . $this->n($yb) . ' ' . $this->n($larg[$c]) . ' ' . $this->n($h) . ' re S Q');
+                $this->out('q ' . ($o['bordo'] ?? '0.5') . ' ' . (isset($o['bordo']) ? 'RG' : 'G') . ' 0.5 w ' . $this->n($x) . ' ' . $this->n($yb) . ' ' . $this->n($larg[$c]) . ' ' . $this->n($h) . ' re S Q');
                 $this->y = $top + $pad;
                 $this->scriviRighe($celle[$c], $x + $pad, $larg[$c] - 2 * $pad, $sz, $testa ? 'centro' : ($o['al'][$c] ?? 'sinistra'), $sz * 1.25);
                 $x += $larg[$c];
@@ -312,6 +315,26 @@ final class Documento
             $this->y = $top + $h;
         }
         $this->y += (float)($o['dopo'] ?? 10);
+    }
+
+    // Fascia a tutta larghezza con sfondo colorato e testo bianco in grassetto. $o: sz (11), colore (r g b 0-1, es. '0.70 0 0'), al, dopo, prima
+    public function fascia(string $testo, array $o = []): void
+    {
+        $sz = (float)($o['sz'] ?? 11);
+        $pad = 5;
+        $l = $this->larg - $this->sx - $this->dx;
+        $righe = $this->righe($testo, $l - 2 * $pad, $sz, 'B', 'B');
+        $h = count($righe) * $sz * 1.3 + 2 * $pad;
+        $this->y += (float)($o['prima'] ?? 0);
+        $this->serve($h + 40);   // la fascia non resta sola in fondo alla pagina
+        $yb = $this->alt - $this->y - $h;
+        $this->out('q ' . ($o['colore'] ?? '0.70 0 0') . ' rg ' . $this->n($this->sx) . ' ' . $this->n($yb) . ' ' . $this->n($l) . ' ' . $this->n($h) . ' re f Q');
+        $top = $this->y;
+        $this->y += $pad;
+        $this->out('1 1 1 rg');
+        $this->scriviRighe($righe, $this->sx + $pad, $l - 2 * $pad, $sz, $o['al'] ?? 'sinistra', $sz * 1.3);
+        $this->out('0 g');
+        $this->y = $top + $h + (float)($o['dopo'] ?? 6);
     }
 
     // Riquadro con bordo e sfondo (es. conferma con SPID/CIE). $o: sz, colore (r g b 0-1), font
