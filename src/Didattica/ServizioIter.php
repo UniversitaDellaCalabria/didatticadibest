@@ -214,6 +214,36 @@ final class ServizioIter
         return $out . '</ol>';
     }
 
+    /**
+     * I passi dell'iter nella forma della linea dell'iter del pannello (Pannello::iter): fatti, passo corrente con chi ha la pratica, da fare.
+     * Pratica conclusa: tutti fatti, l'ultimo porta l'esito.
+     *
+     * @param array<string, mixed> $p
+     * @param array<string, mixed>|null $m
+     * @return list<array{nome: string, stato: string, nota: string}>
+     */
+    public function passiIter(array $p, ?array $m): array
+    {
+        $passi = $this->passi($m, $p);
+        $conclusa = in_array($p['stato'], ['accolta', 'respinta', 'chiusa'], true);
+        $att = (int) $p['passo'];
+        $o = !empty($p['assegnata_a']) ? $this->ufficio->operatore((int) $p['assegnata_a']) : null;
+        if (!$o && !empty($p['ufficio_id']) && ($uAtt = $this->uffici->tutti()[(int) $p['ufficio_id']] ?? null)) {
+            $o = ['nominativo' => $uAtt['nome']];
+        }
+        $passi[count($passi)] = $conclusa ? Costanti::STATI_PRATICA[$p['stato']][0] : 'Conclusa';
+        $out = [];
+        foreach ($passi as $i => $nome) {
+            $out[] = [
+                'nome' => (string) $nome,
+                'stato' => $conclusa || $i < $att ? 'fatto' : ($i === $att ? 'qui' : ''),
+                'nota' => ($i === $att && $o && !$conclusa) ? (string) $o['nominativo'] : '',
+            ];
+        }
+
+        return $out;
+    }
+
     /** Etichetta colorata dello stato della pratica. */
     public static function badge(string $stato): string
     {

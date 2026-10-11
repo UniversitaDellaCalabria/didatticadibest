@@ -202,3 +202,7 @@ body { background-color: var(--pn-sfondo); color: var(--pn-testo); }
 @media print {
     .pn-testata-azioni, .pn-schede, .pn-fasi, .pn-prossima-azioni { display: none !important; }
 }
+
+/* Barra delle azioni sulle righe selezionate */
+.pn-barra { display: flex; flex-wrap: wrap; gap: 8px 22px; align-items: center; padding: 10px 14px; margin-bottom: .75rem; border-radius: var(--pn-raggio); background: var(--pn-carta); border: 2px solid var(--pn-mod); box-shadow: var(--pn-ombra); position: sticky; top: 70px; z-index: 5; }
+.pn-barra[hidden] { display: none; }

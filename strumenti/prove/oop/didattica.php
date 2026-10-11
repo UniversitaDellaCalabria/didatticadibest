@@ -70,3 +70,21 @@ prova(is_file(RADICE_SITO . '/' . $all->cartella() . '.htaccess') && $all->carte
 foreach (["DELETE FROM pratiche_eventi WHERE pratica_id = $id_pr80", "DELETE FROM pratiche_operatori WHERE pratica_id = $id_pr80", "DELETE FROM pratiche WHERE id = $id_pr80", "DELETE FROM didattica_moduli WHERE id = 9980",
           "DELETE FROM ufficio_didattica WHERE email = 'prova.did80@example.org'", "DELETE FROM didattica_uffici WHERE id = $id_uff80"] as $sql) $q($sql);
 uffici_didattica($conn, true);
+
+// Fasi delle pratiche: dove si trova una pratica e che cosa fare (App\Didattica\FasePratica)
+sezione("Didattica: fasi delle pratiche");
+use App\Didattica\FasePratica as FP_;
+prova(FP_::di(['stato' => 'accolta'], 'protocollo') === 'conclusa' && FP_::di(['stato' => 'chiusa', 'seduta_id' => 3]) === 'conclusa', "FasePratica: una pratica conclusa è «conclusa» ovunque si trovi");
+prova(FP_::di(['stato' => 'integrazione', 'ufficio_id' => 6], 'protocollo') === 'integrazione', "FasePratica: se si aspetta lo studente, prima di tutto «attesa dello studente»");
+prova(FP_::di(['stato' => 'inviata', 'ufficio_id' => 6], 'protocollo') === 'protocollare' && FP_::di(['stato' => 'inviata', 'ufficio_id' => 9, 'assegnata_a' => 4], 'segreteria') === 'segreteria', "FasePratica: protocollo e segreteria si riconoscono dal tipo dell'ufficio");
+prova(FP_::di(['stato' => 'in_lavorazione', 'seduta_id' => 2, 'esito_seduta' => '', 'assegnata_a' => 4]) === 'consiglio' && FP_::di(['stato' => 'in_lavorazione', 'seduta_id' => 2, 'esito_seduta' => 'approvata']) === 'decisa', "FasePratica: in seduta senza esito è per il consiglio, con esito è decisa");
+prova(FP_::di(['stato' => 'inviata']) === 'smistare' && FP_::di(['stato' => 'inviata', 'ufficio_id' => 7], 'cdl') === 'prendere' && FP_::di(['stato' => 'in_lavorazione', 'ufficio_id' => 7, 'assegnata_a' => 4], 'cdl') === 'lavorazione', "FasePratica: da assegnare, da prendere in carico, in lavorazione");
+prova(FP_::cosaFare('protocollare', ['protocollo' => ''])['tipo'] === 'azione' && FP_::cosaFare('protocollare', ['protocollo' => '55'])['tipo'] === 'attesa', "FasePratica::cosaFare(): protocollo registrato = si aspetta il bollo");
+prova(FP_::cosaFare('consiglio', [])['dove'] === 'seduta' && FP_::cosaFare('integrazione', [])['tipo'] === 'attesa' && FP_::cosaFare('conclusa', [])['tipo'] === 'nessuna' && FP_::cosaFare('lavorazione', ['seduta_id' => 1])['testo'] === 'Istruisci', "FasePratica::cosaFare(): dove si va e tipo di azione");
+prova(array_keys(FP_::FASI) === ['protocollare', 'smistare', 'prendere', 'lavorazione', 'integrazione', 'consiglio', 'decisa', 'segreteria', 'conclusa'], "FasePratica: fasi nell'ordine dell'iter");
+$cp_ = FP_::conta([['stato' => 'inviata'], ['stato' => 'inviata'], ['stato' => 'accolta']], fn($x) => '');
+prova($cp_ === ['smistare' => 2, 'conclusa' => 1], "FasePratica::conta(): numeri per fase");
+$it_ = \App\Core\App::per($conn)->get(\App\Didattica\ServizioIter::class)->passiIter(['stato' => 'accolta', 'passo' => 1, 'assegnata_a' => null, 'ufficio_id' => null], null);
+prova(array_unique(array_column($it_, 'stato')) === ['fatto'] && end($it_)['nome'] === 'Accolta', "ServizioIter::passiIter(): pratica conclusa, tutti i passi fatti e l'ultimo porta l'esito");
+$it2_ = \App\Core\App::per($conn)->get(\App\Didattica\ServizioIter::class)->passiIter(['stato' => 'inviata', 'passo' => 1, 'assegnata_a' => null, 'ufficio_id' => null], null);
+prova(count(array_filter($it2_, fn($x) => $x['stato'] === 'qui')) === 1 && $it2_[0]['stato'] === 'fatto' && end($it2_)['stato'] === '', "ServizioIter::passiIter(): un solo passo corrente, prima fatti e dopo da fare");

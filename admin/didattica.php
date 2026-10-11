@@ -99,21 +99,24 @@ if (isset($_GET['esporta']) && in_array($_GET['esporta'], ['xlsx', 'docx'], true
 .dd-preset { border: 1px dashed #94a3b8; border-radius: 10px; padding: .6rem .8rem; background: #f8fafc; }
 </style>
 
-<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
-    <h4 class="fw-bold text-dark mb-0"><i class="fa fa-folder-open me-2" style="color:#047857;" aria-hidden="true"></i>Didattica · Ufficio didattico</h4>
-    <a href="../modulistica.php" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary"><i class="fa fa-up-right-from-square me-1" aria-hidden="true"></i>Pagina pubblica della modulistica</a>
-</div>
-<ul class="nav nav-pills gap-1 mb-3" style="--bs-nav-pills-link-active-bg:#047857;">
-    <?php foreach (['pratiche' => ['fa-inbox', 'Pratiche' . ($n_aperte ? " <span class='badge bg-warning text-dark'>$n_aperte aperte</span>" : '')],
-                    'sedute' => ['fa-gavel', 'Sedute e verbali (' . count($sedute) . ')'],
-                    'moduli' => ['fa-file-lines', 'Moduli e documenti (' . count($moduli) . ')'],
-                    'ufficio' => ['fa-people-group', 'Ufficio e ricevimento'],
-                    'statistiche' => ['fa-chart-column', 'Statistiche']] as $k => [$ico, $txt]): ?>
-        <?php if ($solo_ref && $k !== 'sedute') continue; ?>
-        <li class="nav-item"><a class="nav-link fw-bold<?php echo $tab === $k ? ' active' : ' bg-light text-dark'; ?>" href="<?php echo $base; ?>&amp;tab=<?php echo $k; ?>"><i class="fa <?php echo $ico; ?> me-1" aria-hidden="true"></i><?php echo $txt; ?></a></li>
-    <?php endforeach; ?>
-    <?php if ($puo_tutorato): ?><li class="nav-item"><a class="nav-link fw-bold bg-light text-dark" href="tutorato.php?p_id=<?php echo (int)$filtro_p; ?>"><i class="fa fa-user-graduate me-1" aria-hidden="true"></i>Tutorato · lettere di incarico</a></li><?php endif; ?>
-</ul>
+<?php
+// Intestazione comune: titolo, una frase per scheda e schede uniformi (Pratiche · Sedute · Moduli · Ufficio · Statistiche · Tutorato)
+$aiuto_did = ['pratiche' => 'Le domande degli studenti: ogni riga dice a che punto è la pratica e che cosa tocca fare.',
+              'sedute' => 'Consigli dei corsi di studio: sedute, presenze, decisioni sulle pratiche e verbali da firmare.',
+              'moduli' => 'Modulistica da scaricare e moduli online che gli studenti compilano.',
+              'ufficio' => 'Chi lavora nell\'ufficio, quali compiti ha e quando riceve gli studenti.',
+              'statistiche' => 'Quante pratiche, di che tipo e quanto tempo servono.'][$tab] ?? '';
+$schede_did = [];
+foreach (['pratiche' => ['fa-inbox', 'Pratiche', $n_aperte, true], 'sedute' => ['fa-gavel', 'Sedute e verbali', count($sedute), false], 'moduli' => ['fa-file-lines', 'Moduli e documenti', count($moduli), false],
+          'ufficio' => ['fa-people-group', 'Ufficio e ricevimento', 0, false], 'statistiche' => ['fa-chart-column', 'Statistiche', 0, false]] as $k_d => [$ico_d, $txt_d, $num_d, $av_d]) {
+    if ($solo_ref && $k_d !== 'sedute') continue;
+    $schede_did[$k_d] = ['href' => $base . '&tab=' . $k_d, 'testo' => $txt_d, 'icona' => $ico_d, 'numero' => $num_d, 'avviso' => $av_d];
+}
+if ($puo_tutorato) $schede_did['tutorato'] = ['href' => 'tutorato.php?p_id=' . (int)$filtro_p, 'testo' => 'Tutorato · lettere di incarico', 'icona' => 'fa-user-graduate'];
+echo pn_testata('Didattica · Ufficio didattico', 'fa-graduation-cap', $aiuto_did,
+    '<a href="../modulistica.php" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary"><i class="fa fa-up-right-from-square me-1" aria-hidden="true"></i>Pagina pubblica della modulistica</a>');
+echo pn_schede($schede_did, $tab, 'Sezioni della Didattica');
+?>
 
 <?php
 $fase = 'vista';
