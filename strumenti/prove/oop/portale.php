@@ -28,3 +28,22 @@ prova(tipo_area($a_cal) === 'calendario' && modulo_di_area(['tipo_area' => 'fsl'
 // Menu proposto
 $prop = menu_proposto($conn);
 prova($prop[0][0] === 'Home' && end($prop)[1] === 'area_personale.php' && count($prop) === 5, "menu_proposto(): cinque voci di primo livello");
+
+// Pannello: componenti comuni (pn_*) e conteggi di «La mia scrivania»
+sezione("Pannello: componenti e cose da fare");
+$h_t = pn_testata('Titolo <b>', 'fa-house', 'Aiuto', '<a href="#">Nuovo</a>', '<a href="#">Indietro</a>');
+prova(str_contains($h_t, 'Titolo &lt;b&gt;') && str_contains($h_t, 'pn-testata-azioni') && str_contains($h_t, 'Indietro'), "pn_testata(): titolo ripulito, azioni e percorso");
+$h_s = pn_schede(['a' => ['href' => 'a.php', 'testo' => 'A', 'numero' => 3, 'avviso' => true], 'b' => ['href' => 'b.php', 'testo' => 'B', 'numero' => 0]], 'a');
+prova(str_contains($h_s, 'aria-current="page"') && str_contains($h_s, 'pn-num avviso') && substr_count($h_s, 'pn-num') === 1, "pn_schede(): scheda attiva e numero solo se maggiore di zero");
+$h_i = pn_iter([['nome' => 'Uno', 'stato' => 'fatto'], ['nome' => 'Due', 'stato' => 'qui'], ['nome' => 'Tre', 'stato' => 'x']]);
+prova(str_contains($h_i, 'class="fatto"') && str_contains($h_i, 'aria-current="step"') && str_contains($h_i, '<li class="">'), "pn_iter(): passi fatti, passo corrente e passi da fare");
+prova(str_contains(pn_cosa(4, 'Cosa', 'Dove', 'x.php?a=1&b=2', '#b30000', true), 'a=1&amp;b=2') && str_contains(pn_cosa(1, 'C', '', 'x.php', 'rosso'), 'class="pn-cosa"') && !str_contains(pn_cosa(1, 'C', '', 'x.php', 'rosso'), 'style='), "pn_cosa(): link ripulito e colore non valido ignorato");
+prova(str_contains(pn_stato('Fatto', 'ok'), 'pn-tono-ok') && str_contains(pn_stato('?', 'inesistente'), 'pn-tono-info'), "pn_stato(): tono sconosciuto torna a «info»");
+$cdf_p = \App\Core\App::per($conn)->get(\App\Portale\CoseDaFare::class);
+$q('INSERT INTO pratiche (modulo_id, utente_id, codice, stato, creata_il) VALUES (1, 1, "PROVA-CDF-1", "inviata", NOW() - INTERVAL 5 DAY)');
+$sm0 = $cdf_p->praticheDaSmistare();
+prova($sm0['n'] >= 1 && $sm0['giorni'] >= 5, "CoseDaFare: pratica senza ufficio né persona conteggiata, con i giorni della più vecchia");
+$q('UPDATE pratiche SET stato = "chiusa" WHERE codice = "PROVA-CDF-1"');
+prova($cdf_p->praticheDaSmistare()['n'] === $sm0['n'] - 1, "CoseDaFare: una pratica chiusa non è più da smistare");
+$q('DELETE FROM pratiche WHERE codice = "PROVA-CDF-1"');
+prova($cdf_p->messaggiNonLetti([]) === [] && $cdf_p->prenotazioniRisorseDaApprovare([]) === [] && is_int($cdf_p->verbaliInFirma([])) && is_int($cdf_p->verbaliInFirma(null)), "CoseDaFare: nessuna area, nessun conteggio");

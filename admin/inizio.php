@@ -48,6 +48,46 @@ $numeri_area = function (array $a) use ($is_full_admin, $u_id_curr): ?array {
     $out[] = [(int)$x['iscritti'], 'iscritti'];
     return $out;
 };
+
+// ── Cose da fare: ogni riga è [modulo, numero, titolo, dettaglio, link, avviso] e compare solo se l'utente può occuparsene ──
+$cose = [];
+$col_mod = fn(string $k) => MODULI_PORTALE[$k]['colore'] ?? '#334155';
+try {
+    $cdf = \App\Core\App::per($conn)->get(\App\Portale\CoseDaFare::class);
+    if ($puo_didattica_tutto) {
+        $sm = $cdf->praticheDaSmistare();
+        if ($sm['n'] > 0) $cose[] = ['didattica', $sm['n'], $sm['n'] === 1 ? 'Pratica da assegnare' : 'Pratiche da assegnare',
+            'Didattica · ' . ($sm['giorni'] >= 3 ? 'la più vecchia aspetta da ' . $sm['giorni'] . ' giorni' : 'arrivate da poco'), 'didattica.php?tab=pratiche&carico=smistare', $sm['giorni'] >= 7];
+    }
+    if ($puo_didattica) {
+        $vf = $cdf->verbaliInFirma($puo_didattica_tutto ? null : $consigli_referente);
+        if ($vf > 0) $cose[] = ['didattica', $vf, $vf === 1 ? 'Verbale in attesa di firma' : 'Verbali in attesa di firma', 'Didattica · sedute dei consigli', 'didattica.php?tab=sedute', false];
+    }
+    if ($puo_fsl_convenzioni) {
+        $n_st = count(array_filter(\App\Core\App::per($conn)->get(\App\Fsl\ServizioConvenzioniScuole::class)->scuole(), fn($g) => $g['da_stipulare']));
+        if ($n_st > 0) $cose[] = ['fsl', $n_st, $n_st === 1 ? 'Convenzione da stipulare' : 'Convenzioni da stipulare', 'Formazione Scuola Lavoro · scuole con prenotazioni ma senza convenzione valida', 'fsl.php?tab=stipulare', true];
+    }
+    // Messaggi e prenotazioni da approvare: nelle aree che l'utente gestisce per intero
+    $aree_mie = array_values(array_filter($pagine_disponibili, fn($a) => $is_full_admin || in_array((int)$u_id_curr, ids_gestori_da_campi($a['gestore_utente_id'] ?? 0, $a['gestori_utenti_ids'] ?? '', $a['permessi_gestori_json'] ?? ''), true)));
+    $ids_mie = array_map(fn($a) => (int)$a['id'], $aree_mie);
+    $ids_cal = array_map(fn($a) => (int)$a['id'], array_filter($aree_mie, fn($a) => tipo_area($a) === 'calendario'));
+    $msg_aree = $cdf->messaggiNonLetti(array_values(array_diff($ids_mie, $ids_cal)));
+    $app_aree = $cdf->prenotazioniRisorseDaApprovare($ids_cal);
+    foreach ($aree_mie as $a) {
+        $id_a = (int)$a['id']; $mod_a = modulo_di_area($a);
+        if (!empty($msg_aree[$id_a])) $cose[] = [$mod_a, $msg_aree[$id_a], $msg_aree[$id_a] === 1 ? 'Messaggio da leggere' : 'Messaggi da leggere', $a['titolo'] . ' · scritti da chi si è iscritto', 'messaggi.php?p_id=' . $id_a, false];
+        if (!empty($app_aree[$id_a])) $cose[] = [$mod_a, $app_aree[$id_a], $app_aree[$id_a] === 1 ? 'Prenotazione da approvare' : 'Prenotazioni da approvare', $a['titolo'] . ' · aule, laboratori e sportelli', 'prenotazioni_risorse.php?p_id=' . $id_a, false];
+    }
+} catch (\Throwable $e) {
+    error_log('Scrivania, cose da fare: ' . $e->getMessage());
+}
+$cose_per_modulo = [];
+foreach ($cose as $c) $cose_per_modulo[$c[0]] = ($cose_per_modulo[$c[0]] ?? 0) + $c[1];
+$mesi_it = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
+$giorni_it = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
+$ora_h = (int)date('G');
+$saluto = $ora_h < 13 ? 'Buongiorno' : ($ora_h < 18 ? 'Buon pomeriggio' : 'Buonasera');
+$nome_u = trim((string)($utente_admin['nome'] ?? ''));
 ?>
 <style>
 .ini-card { border: 1px solid #e2e8f0; border-radius: 14px; background: #fff; transition: transform .12s, box-shadow .12s, border-color .12s; color: inherit; text-decoration: none; display: flex; flex-direction: column; height: 100%; }
@@ -67,18 +107,36 @@ $numeri_area = function (array $a) use ($is_full_admin, $u_id_curr): ?array {
 <?php if (!$moduli_utente): ?>
     <div class="card border-0 shadow-sm"><div class="card-body text-center text-muted py-5">Non risulti assegnato a nessuna area o modulo.</div></div>
 <?php elseif ($sez_sel === null): ?>
-    <h4 class="fw-bold text-dark mb-1"><i class="fa fa-house me-2 text-primary" aria-hidden="true"></i>Da dove vuoi iniziare?</h4>
-    <p class="text-secondary small mb-4">Scegli il modulo: ognuno ha il suo menu e le sue funzioni, con anagrafi, moduli di iscrizione, sondaggi e scanner in comune.</p>
+    <?php echo pn_testata($saluto . ($nome_u !== '' ? ', ' . $nome_u : ''), 'fa-house', 'Oggi è ' . $giorni_it[(int)date('w')] . ' ' . date('j') . ' ' . $mesi_it[(int)date('n') - 1] . '. Ecco cosa ti aspetta; sotto trovi i tuoi moduli.'); ?>
+
+    <h2 class="h6 fw-bold text-secondary text-uppercase mb-2" style="letter-spacing:.05em;font-size:.75rem;">Cose da fare</h2>
+    <div class="pn-cose mb-4">
+        <?php
+        // Le righe si compongono prima: se manca un file (caricamento a metà) compare un avviso, non una pagina bianca
+        try {
+            $html_cose = '';
+            foreach ($cose as [$k_c, $n_c, $t_c, $d_c, $u_c, $av_c]) {
+                $html_cose .= pn_cosa($n_c, $t_c, $d_c, $u_c . (str_contains($u_c, '?') ? '&' : '?') . (str_contains($u_c, 'p_id=') ? '' : 'p_id=' . (int)$filtro_p), $col_mod($k_c), $av_c);
+            }
+        } catch (\Throwable $e) {
+            error_log('Scrivania, righe: ' . $e->getMessage());
+            $html_cose = '<div class="p-3 text-danger"><i class="fa fa-triangle-exclamation me-1" aria-hidden="true"></i>Non riesco a mostrare le cose da fare: controlla che tutti i file del pannello siano stati caricati (inc/pannello.php e src/Portale/Vista/Pannello.php).</div>';
+        }
+        echo $html_cose !== '' ? $html_cose : '<div class="pn-tutto-ok"><i class="fa fa-circle-check me-1" aria-hidden="true"></i>Tutto in ordine: al momento non c\'è niente che aspetti te.</div>'; ?>
+    </div>
+
+    <h2 class="h6 fw-bold text-secondary text-uppercase mb-2" style="letter-spacing:.05em;font-size:.75rem;">I miei moduli</h2>
     <div class="row g-3">
         <?php foreach ($moduli_utente as $k): $s = MODULI_PORTALE[$k]; $col = $s['colore']; $aree_s = $aree_per_modulo[$k] ?? []; ?>
         <div class="col-md-6 col-xl-4">
             <a class="ini-card p-4" href="inizio.php?sezione=<?php echo urlencode($k); ?>&amp;p_id=<?php echo (int)$filtro_p; ?>">
                 <div class="d-flex align-items-center gap-3 mb-3">
                     <span class="ini-ico" style="background: <?php echo $col; ?>1a; color: <?php echo $col; ?>;"><i class="fa <?php echo $s['icona']; ?>" aria-hidden="true"></i></span>
-                    <div>
+                    <div class="flex-grow-1">
                         <h2 class="h5 fw-bold mb-0"><?php echo htmlspecialchars($s['nome']); ?></h2>
                         <?php if ($aree_s): ?><div class="small text-secondary"><?php echo count($aree_s); ?> <?php echo count($aree_s) === 1 ? 'area' : 'aree'; ?></div><?php endif; ?>
                     </div>
+                    <?php if (!empty($cose_per_modulo[$k])): ?><span class="pn-stato pn-tono-attesa align-self-start"><i class="fa fa-hourglass-half" aria-hidden="true"></i><?php echo (int)$cose_per_modulo[$k]; ?> da fare</span><?php endif; ?>
                 </div>
                 <p class="small text-secondary mb-3"><?php echo htmlspecialchars($s['descr']); ?></p>
                 <div class="ini-aree mt-auto">
@@ -90,11 +148,8 @@ $numeri_area = function (array $a) use ($is_full_admin, $u_id_curr): ?array {
         <?php endforeach; ?>
     </div>
 <?php else: $s = MODULI_PORTALE[$sez_sel]; $aree_mod = $aree_per_modulo[$sez_sel] ?? []; $funz = $funzioni_modulo[$sez_sel] ?? []; ?>
-    <nav aria-label="Percorso" class="small mb-2">
-        <?php if (count($moduli_utente) > 1): ?><a href="inizio.php?p_id=<?php echo (int)$filtro_p; ?>" class="text-decoration-none"><i class="fa fa-arrow-left me-1" aria-hidden="true"></i>Tutti i moduli</a><?php endif; ?>
-    </nav>
-    <h4 class="fw-bold text-dark mb-1"><i class="fa <?php echo $s['icona']; ?> me-2" style="color: <?php echo $s['colore']; ?>;" aria-hidden="true"></i><?php echo htmlspecialchars($s['nome']); ?></h4>
-    <p class="text-secondary small mb-4"><?php echo htmlspecialchars($s['descr']); ?>.<?php echo $aree_mod ? " Scegli l'area: entri nella sua dashboard." : ''; ?></p>
+    <?php echo pn_testata($s['nome'], $s['icona'], $s['descr'] . '.' . ($aree_mod ? " Scegli l'area: entri nella sua dashboard." : ''),
+        '', count($moduli_utente) > 1 ? '<a href="inizio.php?p_id=' . (int)$filtro_p . '" class="text-decoration-none"><i class="fa fa-arrow-left me-1" aria-hidden="true"></i>La mia scrivania</a>' : ''); ?>
 
     <?php if ($aree_mod): ?>
     <?php if ($funz): ?><h2 class="h6 fw-bold text-secondary text-uppercase mb-2" style="letter-spacing:.05em;font-size:.75rem;">Aree</h2><?php endif; ?>

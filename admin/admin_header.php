@@ -235,6 +235,7 @@ $unread_count = \App\Core\App::get(\App\Portale\AreeRepository::class)->messaggi
     <link href="<?php echo url_vendor('datatables/1.13.6/css/dataTables.bootstrap5.min.css'); ?>" rel="stylesheet">
     <link href="<?php echo url_vendor('jsdelivr/npm/select2@4.1.0-rc.0/dist/css/select2.min.css'); ?>" rel="stylesheet" />
     <link rel="stylesheet" href="<?php echo url_vendor('cdnjs/ajax/libs/font-awesome/6.4.0/css/all.min.css'); ?>">
+    <link rel="stylesheet" href="../assets/css/pannello.css?v=2">
     <script src="<?php echo url_vendor('jquery/jquery-3.7.1.min.js'); ?>" integrity="sha384-1H217gwSVyLSIfaLxHbE7dRb3v4mYCKbpQvzx0cegeju1MVsGrX5xXxAvs/HgeFs" crossorigin="anonymous"></script>
     <script>
       // Applica il tema prima del render per evitare il flash
@@ -244,7 +245,7 @@ $unread_count = \App\Core\App::get(\App\Portale\AreeRepository::class)->messaggi
       })();
     </script>
     <style>
-        body { background-color: #f8f9fa; overflow-x: hidden; }
+        body { background-color: var(--pn-sfondo, #f8f9fa); overflow-x: hidden; }
         [data-bs-theme="dark"] body { background-color: #1a1d21 !important; }
         [data-bs-theme="dark"] #sidebar { background: #101418 !important; }
         [data-bs-theme="dark"] .bg-white { background-color: #2b2f33 !important; }
@@ -255,9 +256,9 @@ $unread_count = \App\Core\App::get(\App\Portale\AreeRepository::class)->messaggi
         #wrapper { display: flex; width: 100%; min-height: 100vh; }
         #sidebar { width: 260px; min-height: 100vh; transition: all 0.3s ease; z-index: 1000; background: #1e293b; }
         #page-content-wrapper { flex-grow: 1; width: 100%; transition: all 0.3s ease; }
-        .nav-pills .nav-link { color: #cbd5e1; border-radius: 8px; margin-bottom: 5px; text-align: left; font-weight: 600; padding: 10px 15px; }
-        .nav-pills .nav-link.active { background-color: #990000; color: #fff; }
-        .nav-pills .nav-link:hover:not(.active) { background-color: rgba(255,255,255,0.1); color: #fff; }
+        #sidebar .nav-pills .nav-link { color: #cbd5e1; border-radius: 8px; margin-bottom: 5px; text-align: left; font-weight: 600; padding: 10px 15px; }
+        #sidebar .nav-pills .nav-link.active { background-color: var(--pn-mod-lato, #990000); color: #fff; }
+        #sidebar .nav-pills .nav-link:hover:not(.active) { background-color: rgba(255,255,255,0.1); color: #fff; }
         #sidebar .nav > li { width: 100%; min-width: 0; }
         /* Gruppi richiudibili del menu */
         .side-grp > summary { list-style: none; cursor: pointer; display: flex; align-items: center; }
@@ -278,6 +279,8 @@ $unread_count = \App\Core\App::get(\App\Portale\AreeRepository::class)->messaggi
             #page-content-wrapper > .navbar .area-top { flex: 1 1 0; max-width: none; justify-content: center; }
             .navbar-azioni { width: 100%; flex-wrap: wrap; justify-content: flex-end; }
         }
+        .side-num { margin-left: auto; min-width: 22px; padding: 0 7px; border-radius: 999px; background: #f59e0b; color: #1f2937; font-size: .72rem; font-weight: 800; line-height: 20px; text-align: center; }
+        #sidebar .nav-link { display: flex; align-items: center; }
         .side-area { background: rgba(255,255,255,0.06); overflow: hidden; }
         .side-modulo { background: rgba(255,255,255,0.08); color: #fff; }
         .side-modulo:hover, .side-modulo.attivo { background: rgba(255,255,255,0.16); }
@@ -290,7 +293,12 @@ $unread_count = \App\Core\App::get(\App\Portale\AreeRepository::class)->messaggi
         }
     </style>
 </head>
-<body>
+<?php
+// Colore del modulo corrente per le pagine (schede, pulsanti principali, iter): assets/css/pannello.css
+$colore_modulo = colore_valido(MODULI_PORTALE[$modulo_corrente]['colore'] ?? '', '#990000');
+$colore_lato = $modulo_corrente === 'portale' ? '#64748b' : $colore_modulo; // l'ardesia non si vede sul menu scuro
+?>
+<body style="--pn-mod: <?php echo $colore_modulo; ?>; --pn-mod-testo: <?php echo colore_testo_su($colore_modulo); ?>; --pn-mod-lato: <?php echo $colore_lato; ?>;">
 
 <div id="wrapper" class="no-print">
 
@@ -305,10 +313,11 @@ $unread_count = \App\Core\App::get(\App\Portale\AreeRepository::class)->messaggi
             <ul class="nav nav-pills flex-column">
                 <?php
                 // Voce del menu; $attive = pagine che la accendono (la prima è il link)
-                $voce_menu = function (array $attive, string $href, string $icona, string $testo, bool $accesa = false) use ($current_page, $filtro_p) {
+                $voce_menu = function (array $attive, string $href, string $icona, string $testo, bool $accesa = false, int $numero = 0) use ($current_page, $filtro_p) {
                     $on = $accesa || in_array($current_page, $attive, true);
                     echo '<li class="nav-item"><a class="nav-link w-100' . ($on ? ' active' : '') . '" href="' . htmlspecialchars($href) . (str_contains($href, '?') ? '&amp;' : '?') . 'p_id=' . (int)$filtro_p . '"' . ($on ? ' aria-current="page"' : '') . '>'
-                       . '<i class="fa ' . $icona . ' me-2 text-center" style="width:20px;" aria-hidden="true"></i> ' . htmlspecialchars($testo) . '</a></li>';
+                       . '<i class="fa ' . $icona . ' me-2 text-center" style="width:20px;" aria-hidden="true"></i> ' . htmlspecialchars($testo)
+                       . ($numero > 0 ? '<span class="side-num" title="Da fare">' . $numero . '</span>' : '') . '</a></li>';
                 };
                 // Gruppo richiudibile: aperto se contiene la pagina corrente, altrimenti come l'ha lasciato l'utente (localStorage)
                 $apri_gruppo = function (string $id, string $icona, string $titolo, array $pagine) use ($current_page) {
@@ -319,7 +328,7 @@ $unread_count = \App\Core\App::get(\App\Portale\AreeRepository::class)->messaggi
                 };
                 $chiudi_gruppo = function () { echo '</ul></details></li>'; };
                 ?>
-                <?php if (count($moduli_utente) > 1 || count($pagine_disponibili) > 1) $voce_menu([], 'inizio.php', 'fa-table-cells-large', 'Tutti i moduli', $current_page === 'inizio.php' && $modulo_corrente === ''); ?>
+                <?php if (count($moduli_utente) > 1 || count($pagine_disponibili) > 1) $voce_menu([], 'inizio.php', 'fa-house', 'La mia scrivania', $current_page === 'inizio.php' && $modulo_corrente === ''); ?>
 
                 <?php if ($modulo_corrente !== ''): $mod_c = MODULI_PORTALE[$modulo_corrente]; ?>
                 <!-- ── Modulo corrente: il menu mostra solo ciò che gli appartiene ── -->
@@ -367,7 +376,7 @@ $unread_count = \App\Core\App::get(\App\Portale\AreeRepository::class)->messaggi
                     $n_appr = 0;
                     if ($is_area_manager) {
                         $n_appr = \App\Core\App::get(\App\Portale\AreeRepository::class)->prenotazioniDaApprovare((int)$filtro_p);
-                        $voce_menu(['prenotazioni_risorse.php'], 'prenotazioni_risorse.php', 'fa-calendar-check', 'Prenotazioni' . ($n_appr ? " ($n_appr da approvare)" : ''));
+                        $voce_menu(['prenotazioni_risorse.php'], 'prenotazioni_risorse.php', 'fa-calendar-check', 'Prenotazioni', false, $n_appr);
                         $voce_menu(['risorse.php'], 'risorse.php', 'fa-door-open', 'Risorse, orari e chiusure');
                     }
                 ?>
@@ -381,7 +390,7 @@ $unread_count = \App\Core\App::get(\App\Portale\AreeRepository::class)->messaggi
                 <?php $chiudi_gruppo(); endif; ?>
 
                 <?php if ($can_manage_iscritti || $can_manage_sondaggi): $apri_gruppo('partecipanti', 'fa-users', 'Partecipanti', ['iscritti.php', 'scanner.php', 'stampa_badge.php', 'stampa_lista_iscritti.php', 'partecipanti.php', 'sondaggi.php']); ?>
-                    <?php if ($can_manage_iscritti) $voce_menu(['iscritti.php', 'scanner.php', 'stampa_badge.php', 'stampa_lista_iscritti.php'], 'iscritti.php', 'fa-user-check', 'Iscritti e check-in'); ?>
+                    <?php if ($can_manage_iscritti) $voce_menu(['iscritti.php', 'scanner.php', 'stampa_badge.php', 'stampa_lista_iscritti.php'], 'iscritti.php', 'fa-user-check', 'Iscritti e presenze'); ?>
                     <?php if ($mostra_classi) $voce_menu(['partecipanti.php'], 'partecipanti.php', 'fa-graduation-cap', 'Studenti e attestati'); ?>
                     <?php if ($can_manage_sondaggi) $voce_menu(['sondaggi.php'], 'sondaggi.php', 'fa-star', 'Sondaggi'); ?>
                 <?php $chiudi_gruppo(); endif; ?>
@@ -405,8 +414,15 @@ $unread_count = \App\Core\App::get(\App\Portale\AreeRepository::class)->messaggi
                 <?php if ($modulo_corrente === 'didattica' && $puo_didattica): ?>
                     <?php $tab_did = $current_page === 'didattica.php' ? (in_array($_GET['tab'] ?? '', ['sedute', 'moduli', 'ufficio', 'statistiche'], true) ? $_GET['tab'] : 'pratiche') : '';
                     if (!$puo_didattica_tutto) $tab_did = $current_page === 'didattica.php' ? 'sedute' : '';
-                    if ($puo_didattica_tutto) $voce_menu([], 'didattica.php?tab=pratiche', 'fa-inbox', 'Pratiche degli studenti', $tab_did === 'pratiche');
-                    $voce_menu([], 'didattica.php?tab=sedute', 'fa-gavel', $puo_didattica_tutto ? 'Sedute e verbali' : 'Sedute del consiglio', $tab_did === 'sedute');
+                    // Numeri accanto alle voci: se non si riescono a contare (file non ancora caricato) il menu resta senza numeri
+                    $n_da_smistare = $n_verbali_firma = 0;
+                    try {
+                        $cdf_menu = \App\Core\App::get(\App\Portale\CoseDaFare::class);
+                        $n_da_smistare = $puo_didattica_tutto ? $cdf_menu->praticheDaSmistare()['n'] : 0;
+                        $n_verbali_firma = $cdf_menu->verbaliInFirma($puo_didattica_tutto ? null : $consigli_referente);
+                    } catch (\Throwable $e) { error_log('Menu, cose da fare: ' . $e->getMessage()); }
+                    if ($puo_didattica_tutto) $voce_menu([], 'didattica.php?tab=pratiche', 'fa-inbox', 'Pratiche degli studenti', $tab_did === 'pratiche', \App\Core\App::get(\App\Portale\CoseDaFare::class)->praticheDaSmistare()['n']);
+                    $voce_menu([], 'didattica.php?tab=sedute', 'fa-gavel', $puo_didattica_tutto ? 'Sedute e verbali' : 'Sedute del consiglio', $tab_did === 'sedute', \App\Core\App::get(\App\Portale\CoseDaFare::class)->verbaliInFirma($puo_didattica_tutto ? null : $consigli_referente));
                     if ($puo_didattica_tutto) {
                         $voce_menu([], 'didattica.php?tab=moduli', 'fa-file-lines', 'Moduli e documenti', $tab_did === 'moduli');
                         $voce_menu([], 'didattica.php?tab=ufficio', 'fa-people-group', 'Ufficio e ricevimento', $tab_did === 'ufficio');
