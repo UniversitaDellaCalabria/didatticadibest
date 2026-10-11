@@ -88,6 +88,10 @@ if (!function_exists('invia_verbale_alla_firma')) {
     function registra_firma_verbale($conn, int $sid, string $pdf, string $come = 'caricamento'): ?string {
         return \App\Core\App::per($conn)->get(\App\Didattica\VerbaleFirmato::class)->registraFirma($sid, $pdf, $come);
     }
+    // Sollecito a mano a chi deve firmare il verbale (al massimo uno al giorno): null se inviato, altrimenti il motivo
+    function sollecita_verbale_firma($conn, int $sid): ?string {
+        return \App\Core\App::per($conn)->get(\App\Didattica\VerbaleFirmato::class)->sollecita($sid);
+    }
     // Cron: sollecito ogni FIRME_GIORNI_SOLLECITO giorni (al massimo 3) a chi deve firmare il verbale
     function solleciti_verbali($conn): int {
         return \App\Core\App::per($conn)->get(\App\Didattica\VerbaleFirmato::class)->solleciti();

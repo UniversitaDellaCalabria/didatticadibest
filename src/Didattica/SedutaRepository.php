@@ -43,6 +43,22 @@ final class SedutaRepository
     }
 
     /**
+     * Pratiche portate in seduta e ancora senza esito (non concluse), per consiglio.
+     *
+     * @return array<int, int> id consiglio => numero
+     */
+    public function praticheSenzaEsitoPerConsiglio(): array
+    {
+        $out = [];
+        foreach ($this->db->righe("SELECT s.consiglio_id AS c, COUNT(*) AS n FROM pratiche p JOIN didattica_sedute s ON s.id = p.seduta_id
+            WHERE s.consiglio_id IS NOT NULL AND p.esito_seduta = '' AND p.stato IN ('inviata', 'in_lavorazione', 'integrazione') GROUP BY s.consiglio_id") as $r) {
+            $out[(int) $r['c']] = (int) $r['n'];
+        }
+
+        return $out;
+    }
+
+    /**
      * Id delle sedute dei consigli indicati.
      *
      * @param list<int> $consigli

@@ -151,6 +151,31 @@ final class VerbaleFirmato
         return null;
     }
 
+    /**
+     * Sollecito a mano a chi deve firmare il verbale (oltre a quello automatico del cron): un'email con il link personale.
+     * Non più di uno al giorno, per non riempire la casella di chi deve firmare.
+     */
+    public function sollecita(int $sid): ?string
+    {
+        $s = $this->sedute->perId($sid);
+        if ($s === null || !in_array($s['verbale_stato'] ?? '', ['segretario', 'coordinatore'], true)) {
+            return 'Il verbale non è in attesa di firma.';
+        }
+        $ultimo = $this->db->valore('SELECT COALESCE(verbale_sollecito_il, verbale_inviato_il) FROM didattica_sedute WHERE id = ?', [$sid]);
+        if ($ultimo !== null && strtotime((string) $ultimo) > time() - 86400) {
+            return 'Chi deve firmare è stato avvisato meno di un giorno fa: aspetta ancora un po\'.';
+        }
+        $seg = $s['verbale_stato'] === 'segretario';
+        $a = (string) ($seg ? $s['segretario_email'] : $s['coordinatore_email']);
+        if (!filter_var($a, FILTER_VALIDATE_EMAIL)) {
+            return 'Manca l\'email di chi deve firmare.';
+        }
+        $this->emailFirma($s, $a, ($seg ? 'segretario verbalizzante' : 'coordinatore') . ' (sollecito)');
+        $this->db->esegui('UPDATE didattica_sedute SET verbale_sollecito_il = NOW(), verbale_solleciti = verbale_solleciti + 1 WHERE id = ?', [$sid]);
+
+        return null;
+    }
+
     public function solleciti(): int
     {
         $gg = max(1, (int)($this->env->valore('FIRME_GIORNI_SOLLECITO') ?? 5));

@@ -88,6 +88,15 @@ if ($fase === 'azioni') {
         flash_set($err ?? "Convocazione inviata a $n componenti." . ($senza ? " $senza senza email: avvisali tu." : ''), $err ? 'danger' : 'success');
         admin_redirect("$base&tab=sedute&id=" . (int)$sed['id'] . "&r=" . time() . "#convocazione");
     }
+    // ── Sollecito a mano a chi deve firmare il verbale ──
+    if (isset($_POST['sollecita_verbale'])) {
+        $sed = seduta_didattica($conn, (int)($_POST['seduta_id'] ?? 0));
+        if (!$puo_seduta($sed)) nega_accesso();
+        $err = sollecita_verbale_firma($conn, (int)$sed['id']);
+        if (!$err) registra_log_audit($conn, "Seduta: sollecito della firma del verbale", ["Seduta" => $sed['id']]);
+        flash_set($err ?? "Sollecito inviato: chi deve firmare riceve di nuovo l'email con il link.", $err ? 'warning' : 'success');
+        admin_redirect("$base&tab=sedute&id=" . (int)$sed['id'] . "&r=" . time() . "#ps-firme");
+    }
     // ── Verbale firmato in PAdES: PDF alla firma del segretario e del coordinatore ──
     if (isset($_POST['invia_verbale_firma']) || isset($_POST['carica_verbale_firmato'])) {
         $sed = seduta_didattica($conn, (int)($_POST['seduta_id'] ?? 0));
@@ -98,7 +107,7 @@ if ($fase === 'azioni') {
         else $err = registra_firma_verbale($conn, (int)$sed['id'], (string)file_get_contents($f['tmp_name']), 'caricata da ' . $autore_nome);
         if (!$err) registra_log_audit($conn, isset($_POST['invia_verbale_firma']) ? "Seduta: verbale inviato alla firma" : "Seduta: firma del verbale caricata", ["Seduta" => $sed['id']]);
         flash_set($err ?? (isset($_POST['invia_verbale_firma']) ? "Verbale inviato: il segretario riceve l'email per firmarlo, poi tocca al coordinatore." : "Firma registrata."), $err ? 'danger' : 'success');
-        admin_redirect("$base&tab=sedute&id=" . (int)$sed['id'] . "&r=" . time() . "#verbale");
+        admin_redirect("$base&tab=sedute&id=" . (int)$sed['id'] . "&r=" . time() . "#ps-firme");
     }
     // ── Sedute ──
     if (isset($_POST['salva_seduta'])) {
@@ -341,14 +350,28 @@ if ($fase === 'azioni') {
         $conv = convocazioni_seduta($conn, (int)$sel['id']);
         $n_giust = count(array_filter($conv, fn($c) => !empty($c['giustificata_il'])));
         $da_applicare = count(array_filter($pr_sel, fn($x) => (in_array($x['esito_seduta'], ['approvata', 'approvata_mod'], true) && !in_array($x['stato'], ['accolta', 'chiusa'], true)) || ($x['esito_seduta'] === 'respinta' && $x['stato'] !== 'respinta') || $x['esito_seduta'] === 'rinviata'));
-        $passi_s = [
-            ['Convocazione', !empty($sel['convocazione_il']), 'convocazione', 'facoltativa'],
-            ['Presenze', count(array_filter($presenze, fn($r) => !empty($r['_salvata']))) > $n_giust, 'presenze', ''],
-            ['Pratiche e decisioni', $pr_sel && $con_esito === count($pr_sel), 'pratiche', ''],
-            ['Esiti agli studenti', $pr_sel && $con_esito && !$da_applicare, 'pratiche', ''],
-            ['Verbale firmato', ($sel['verbale_stato'] ?? '') === 'firmato', 'verbale', ''],
-        ];
         $con_esito = count(array_filter($pr_sel, fn($x) => ($x['esito_seduta'] ?? '') !== ''));
+        $vs = (string)($sel['verbale_stato'] ?? ''); $sv = STATI_VERBALE[$vs] ?? STATI_VERBALE[''];
+        // Passi della seduta: chiave, nome, fatto?, nota. La convocazione è facoltativa.
+        $passi_s = [
+            ['convocazione', 'Convocazione', !empty($sel['convocazione_il']), 'facoltativa'],
+            ['presenze', 'Presenze', count(array_filter($presenze, fn($r) => !empty($r['_salvata']))) > $n_giust, ''],
+            ['pratiche', 'Pratiche e decisioni', !empty($pr_sel) && $con_esito === count($pr_sel), ''],
+            ['esiti', 'Esiti agli studenti', !empty($pr_sel) && $con_esito > 0 && !$da_applicare, ''],
+            ['verbale', 'Verbale', $vs !== '', ''],
+            ['firme', 'Firme', $vs === 'firmato', ''],
+        ];
+        // Passo corrente: il primo che manca dopo l'ultimo fatto (la convocazione è facoltativa e non conta).
+        // Passo da mostrare: quello scelto (?passo=), altrimenti il corrente (la convocazione se la seduta è futura e non è ancora partita).
+        $chiavi_passi = array_column($passi_s, 0);
+        $ultimo_fatto = 0;
+        foreach ($passi_s as $i_ps => $ps_) if ($i_ps >= 1 && $ps_[2]) $ultimo_fatto = $i_ps;
+        $passo_corrente = '';
+        foreach ($passi_s as $i_ps => $ps_) if ($i_ps >= 1 && $i_ps > $ultimo_fatto && !$ps_[2]) { $passo_corrente = $ps_[0]; break; }
+        $passo_aperto = in_array($_GET['passo'] ?? '', $chiavi_passi, true) ? (string)$_GET['passo'] : '';
+        if ($passo_aperto === '') {
+            $passo_aperto = (!$passi_s[0][2] && $sel['data'] && $sel['data'] >= date('Y-m-d') && $ultimo_fatto === 0) ? 'convocazione' : ($passo_corrente ?: 'firme');
+        }
         $ins_dip = insegnamenti_dipartimento_scelta($conn);
     ?>
     <nav class="small mb-2"><a href="<?php echo $base; ?>&amp;tab=sedute" class="text-decoration-none"><i class="fa fa-arrow-left me-1" aria-hidden="true"></i>Tutte le sedute</a></nav>
@@ -366,20 +389,22 @@ if ($fase === 'azioni') {
         </div>
     </div></div>
 
-    <style>
-    .dd-passi { display: flex; flex-wrap: wrap; gap: 6px; counter-reset: passo; }
-    .dd-passi a { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: #f1f5f9; color: #475569; font-size: .8rem; font-weight: 600; text-decoration: none; }
-    .dd-passi a.fatto { background: #dcfce7; color: #166534; }
-    .dd-passi a::before { counter-increment: passo; content: counter(passo); display: inline-grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: #fff; font-size: .7rem; }
-    </style>
-    <nav class="dd-passi mb-3" aria-label="Passi della seduta">
-        <?php foreach ($passi_s as [$n, $fatto, $anc, $nota]): ?><a href="#<?php echo $anc; ?>" class="<?php echo $fatto ? 'fatto' : ''; ?>"><?php echo $h($n); ?><?php echo $fatto ? ' <i class="fa fa-check" aria-hidden="true"></i>' : ($nota ? ' <span class="fw-normal">(' . $h($nota) . ')</span>' : ''); ?></a><?php endforeach; ?>
+    <nav class="pn-passi" role="tablist" aria-label="Passi della seduta">
+        <?php foreach ($passi_s as $i_ps => [$k_ps, $n_ps, $fatto_ps, $nota_ps]): $on_ps = $k_ps === $passo_aperto; ?>
+        <button type="button" class="pn-passo<?php echo $fatto_ps ? ' fatto' : ''; echo $k_ps === $passo_corrente ? ' qui' : ''; echo $on_ps ? ' active' : ''; ?>" role="tab" data-bs-toggle="tab" data-bs-target="#ps-<?php echo $k_ps; ?>" aria-selected="<?php echo $on_ps ? 'true' : 'false'; ?>">
+            <span class="pn-passo-n"><?php echo $fatto_ps ? '<i class="fa fa-check" aria-hidden="true"></i><span class="visually-hidden">fatto: </span>' : $i_ps + 1; ?></span>
+            <span><?php echo $h($n_ps); ?><?php echo $nota_ps ? '<small>' . $h($nota_ps) . '</small>' : ''; ?></span>
+        </button>
+        <?php endforeach; ?>
     </nav>
+    <div class="tab-content">
 
+
+    <div class="tab-pane fade<?php echo $passo_aperto === 'convocazione' ? ' show active' : ''; ?>" id="ps-convocazione" role="tabpanel">
     <?php if ($cons_s):
         $con_email = count(array_filter(persone_consiglio($conn, (int)$cons_s['id']), fn($c) => filter_var($c['email'], FILTER_VALIDATE_EMAIL)));
         $conv_ok = $sel['data'] && $sel['data'] >= date('Y-m-d'); ?>
-    <details class="card border-0 shadow-sm mb-3" id="convocazione">
+    <details class="card border-0 shadow-sm mb-3" id="convocazione" open>
         <summary class="card-header bg-white small d-flex flex-wrap gap-2 align-items-center" style="cursor:pointer;">
             <span class="fw-bold"><i class="fa fa-envelope me-1 text-primary" aria-hidden="true"></i>Convocazione per email <span class="fw-normal text-secondary">(facoltativa)</span></span>
             <span class="ms-auto text-secondary"><?php echo $sel['convocazione_il'] ? 'Inviata il ' . date('d/m/Y H:i', strtotime($sel['convocazione_il'])) . ' · ' . count($conv) . ' componenti · ' . $n_giust . ' assenze giustificate' : 'Non inviata'; ?></span>
@@ -404,8 +429,11 @@ if ($fase === 'azioni') {
             </div>
         </form>
     </details>
+    <?php else: ?><div class="alert alert-light border small">Questa seduta non è collegata a un consiglio: non c'è nessuna convocazione da inviare.</div>
     <?php endif; ?>
+    </div>
 
+    <div class="tab-pane fade<?php echo $passo_aperto === 'presenze' ? ' show active' : ''; ?>" id="ps-presenze" role="tabpanel">
     <?php if ($presenze): ?>
     <form method="POST" class="card border-0 shadow-sm mb-3" id="presenze"><div class="card-body">
         <?php csrf_field(); ?><input type="hidden" name="seduta_id" value="<?php echo (int)$sel['id']; ?>">
@@ -428,14 +456,15 @@ if ($fase === 'azioni') {
     <?php elseif ($cons_s): ?>
         <div class="alert alert-light border small">Il consiglio non ha ancora componenti: <a href="<?php echo $base; ?>&amp;tab=sedute&amp;consiglio=<?php echo (int)$cons_s['id']; ?>">inseriscili una volta sola</a> e qui segnerai le presenze.</div>
     <?php endif; ?>
+    </div>
 
+    <div class="tab-pane fade<?php echo $passo_aperto === 'pratiche' ? ' show active' : ''; ?>" id="ps-pratiche" role="tabpanel">
     <div class="row g-3">
         <div class="col-lg-8">
             <div class="card border-0 shadow-sm" id="pratiche"><div class="card-body">
                 <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
                     <h6 class="fw-bold mb-0"><i class="fa fa-folder-open me-1 text-primary" aria-hidden="true"></i>Pratiche in seduta (<?php echo count($pr_sel); ?>)</h6>
-                    <?php if ($con_esito): ?><form method="POST" class="ms-auto m-0"><?php csrf_field(); ?><input type="hidden" name="seduta_id" value="<?php echo (int)$sel['id']; ?>">
-                        <button type="submit" name="applica_esiti" value="1" class="btn btn-sm btn-success fw-bold" data-confirm="Applicare gli esiti? Le approvate diventano accolte e le respinte respinte: gli studenti ricevono l'email e trovano nella pratica l'estratto del verbale in PDF; le rinviate tornano senza seduta."><i class="fa fa-check-double me-1" aria-hidden="true"></i>Applica gli esiti alle pratiche (<?php echo $con_esito; ?>)</button></form><?php endif; ?>
+                    <?php if ($con_esito): ?><a class="btn btn-sm btn-outline-success fw-bold ms-auto" href="#ps-esiti">Passo successivo: esiti agli studenti <i class="fa fa-arrow-right ms-1" aria-hidden="true"></i></a><?php endif; ?>
                 </div>
                 <?php if (!$pr_sel): ?><p class="small text-muted mb-0">Nessuna: aggiungile dall'elenco a destra<?php echo $solo_ref ? '' : ' o dalla scheda Pratiche'; ?>.</p><?php endif; ?>
                 <?php $mod_corr = null; foreach ($pr_sel as $x):
@@ -502,31 +531,100 @@ if ($fase === 'azioni') {
             </div></form>
         </div>
     </div>
-    <?php $vs = (string)($sel['verbale_stato'] ?? ''); $sv = STATI_VERBALE[$vs] ?? STATI_VERBALE['']; ?>
-    <div class="card border-0 shadow-sm mt-3" id="verbale" style="border-left:4px solid <?php echo $sv[1]; ?> !important;"><div class="card-body">
-        <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
-            <h6 class="fw-bold mb-0"><i class="fa fa-file-signature me-1 text-primary" aria-hidden="true"></i>Verbale firmato in PAdES</h6>
-            <span class="badge" style="background:<?php echo $sv[1]; ?>;"><?php echo $h($sv[0]); ?></span>
-            <?php if ($sel['verbale_pdf']): ?><a class="btn btn-sm btn-outline-primary ms-auto" href="<?php echo $h($url_sel); ?>&amp;esporta=verbale_pdf"><i class="fa fa-download me-1" aria-hidden="true"></i><?php echo $vs === 'firmato' ? 'PDF firmato' : 'PDF attuale'; ?></a><?php endif; ?>
-        </div>
-        <?php if ($vs === '' ): ?>
-            <p class="small text-secondary">Scarica il <strong>Verbale in Word</strong>, completalo, salvalo in PDF e caricalo qui: firma prima il segretario verbalizzante e poi il coordinatore (link personale per email; firma remota Aruba se configurata, altrimenti scaricano il PDF, lo firmano in PAdES e lo ricaricano).</p>
-            <form method="POST" enctype="multipart/form-data" class="row g-2 align-items-end"><?php csrf_field(); ?><input type="hidden" name="seduta_id" value="<?php echo (int)$sel['id']; ?>">
-                <div class="col-md-4"><label class="form-label small fw-bold mb-0" for="vPdf">Verbale in PDF</label><input type="file" class="form-control form-control-sm" id="vPdf" name="verbale_pdf" accept=".pdf,application/pdf" required></div>
-                <div class="col-md-3"><label class="form-label small fw-bold mb-0" for="vSeg">Email del segretario<?php echo $sel['segretario'] ? ' (' . $h($sel['segretario']) . ')' : ''; ?></label><input type="email" class="form-control form-control-sm" id="vSeg" name="segretario_email" value="<?php echo $h($sel['segretario_email']); ?>" required></div>
-                <div class="col-md-3"><label class="form-label small fw-bold mb-0" for="vCoo">Email del coordinatore<?php echo $sel['coordinatore'] ? ' (' . $h($sel['coordinatore']) . ')' : ''; ?></label><input type="email" class="form-control form-control-sm" id="vCoo" name="coordinatore_email" value="<?php echo $h($sel['coordinatore_email']); ?>" required></div>
-                <div class="col-md-2"><button type="submit" name="invia_verbale_firma" value="1" class="btn btn-sm btn-primary fw-bold w-100"><i class="fa fa-paper-plane me-1" aria-hidden="true"></i>Invia alla firma</button></div>
-            </form>
-        <?php elseif ($vs !== 'firmato'): $chi_v = $vs === 'segretario' ? 'del segretario (' . $sel['segretario_email'] . ')' : 'del coordinatore (' . $sel['coordinatore_email'] . ')'; ?>
-            <p class="small mb-2">In attesa della firma <?php echo $h($chi_v); ?>: ha ricevuto l'email con il link<?php echo $sel['verbale_solleciti'] ? ' · ' . (int)$sel['verbale_solleciti'] . ' solleciti' : ''; ?>. Se ti manda il PDF firmato in PAdES, caricalo qui.</p>
-            <form method="POST" enctype="multipart/form-data" class="d-flex flex-wrap gap-2"><?php csrf_field(); ?><input type="hidden" name="seduta_id" value="<?php echo (int)$sel['id']; ?>">
-                <input type="file" class="form-control form-control-sm" style="max-width:360px;" name="verbale_pdf" accept=".pdf,application/pdf" required aria-label="Verbale firmato">
-                <button type="submit" name="carica_verbale_firmato" value="1" class="btn btn-sm btn-primary fw-bold"><i class="fa fa-upload me-1" aria-hidden="true"></i>Carica la firma <?php echo $vs === 'segretario' ? 'del segretario' : 'del coordinatore'; ?></button>
-            </form>
-        <?php else: ?>
-            <p class="small mb-0 text-success"><i class="fa fa-check me-1" aria-hidden="true"></i>Firmato dal segretario e dal coordinatore il <?php echo date('d/m/Y H:i', strtotime($sel['verbale_firmato_il'])); ?>: il PDF è stato inviato ai referenti.</p>
-        <?php endif; ?>
-    </div></div>
+    </div>
+    <div class="tab-pane fade<?php echo $passo_aperto === 'esiti' ? ' show active' : ''; ?>" id="ps-esiti" role="tabpanel">
+        <div class="card border-0 shadow-sm"><div class="card-body">
+            <h6 class="fw-bold"><i class="fa fa-check-double me-1 text-primary" aria-hidden="true"></i>Esiti agli studenti</h6>
+            <?php if (!$pr_sel): ?>
+                <p class="small text-muted mb-0">Non ci sono pratiche in questa seduta: portale dal passo «Pratiche e decisioni».</p>
+            <?php else: $conta_es = []; foreach ($pr_sel as $x_es) { $k_es = ($x_es['esito_seduta'] ?? '') ?: 'nessuno'; $conta_es[$k_es] = ($conta_es[$k_es] ?? 0) + 1; } ?>
+                <p class="small text-secondary">Quando hai deciso su tutte le pratiche, applica gli esiti: le approvate diventano <strong>accolte</strong> e le respinte <strong>respinte</strong>, gli studenti ricevono l'email e trovano nella pratica l'estratto del verbale in PDF; le rinviate tornano senza seduta.</p>
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    <?php foreach (ESITI_SEDUTA as $k_es => $e_es): if (empty($conta_es[$k_es])) continue; ?><span class="badge" style="background:<?php echo $e_es[1]; ?>;font-size:.85rem;"><?php echo (int)$conta_es[$k_es]; ?> · <?php echo $h($e_es[0]); ?></span><?php endforeach; ?>
+                    <?php if (!empty($conta_es['nessuno'])): ?><span class="badge bg-light text-secondary border" style="font-size:.85rem;"><?php echo (int)$conta_es['nessuno']; ?> · senza esito</span><?php endif; ?>
+                </div>
+                <?php if ($con_esito < count($pr_sel)): ?>
+                    <div class="alert alert-warning small py-2"><i class="fa fa-circle-exclamation me-1" aria-hidden="true"></i><?php echo count($pr_sel) - $con_esito; ?> pratiche non hanno ancora un esito: <a href="#ps-pratiche">torna a «Pratiche e decisioni»</a>. Puoi comunque applicare quelli già decisi.</div>
+                <?php endif; ?>
+                <?php if ($con_esito && !$da_applicare): ?>
+                    <p class="small text-success mb-0"><i class="fa fa-check me-1" aria-hidden="true"></i>Gli esiti sono già stati applicati: gli studenti sono stati avvisati. Resta il verbale.</p>
+                <?php elseif ($con_esito): ?>
+                    <form method="POST" class="m-0"><?php csrf_field(); ?><input type="hidden" name="seduta_id" value="<?php echo (int)$sel['id']; ?>">
+                        <button type="submit" name="applica_esiti" value="1" class="btn btn-success fw-bold" data-confirm="Applicare gli esiti? Le approvate diventano accolte e le respinte respinte: gli studenti ricevono l'email e trovano nella pratica l'estratto del verbale in PDF; le rinviate tornano senza seduta."><i class="fa fa-check-double me-1" aria-hidden="true"></i>Applica gli esiti e avvisa gli studenti (<?php echo (int)$con_esito; ?>)</button>
+                    </form>
+                <?php else: ?>
+                    <p class="small text-muted mb-0">Registra almeno un esito nel passo «Pratiche e decisioni».</p>
+                <?php endif; ?>
+            <?php endif; ?>
+        </div></div>
+    </div>
+    <div class="tab-pane fade<?php echo $passo_aperto === 'verbale' ? ' show active' : ''; ?>" id="ps-verbale" role="tabpanel">
+        <div class="card border-0 shadow-sm" id="verbale" style="border-left:4px solid <?php echo $sv[1]; ?> !important;"><div class="card-body">
+            <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+                <h6 class="fw-bold mb-0"><i class="fa fa-file-lines me-1 text-primary" aria-hidden="true"></i>Verbale</h6>
+                <span class="badge" style="background:<?php echo $sv[1]; ?>;"><?php echo $h($sv[0]); ?></span>
+                <span class="ms-auto d-flex gap-2 flex-wrap">
+                    <a class="btn btn-sm btn-primary fw-bold" href="<?php echo $h($url_sel); ?>&amp;esporta=docx"><i class="fa fa-file-word me-1" aria-hidden="true"></i>Verbale in Word</a>
+                    <a class="btn btn-sm btn-success fw-bold" href="<?php echo $h($url_sel); ?>&amp;esporta=xlsx"><i class="fa fa-file-excel me-1" aria-hidden="true"></i>Excel</a>
+                    <?php if ($sel['verbale_pdf']): ?><a class="btn btn-sm btn-outline-primary" href="<?php echo $h($url_sel); ?>&amp;esporta=verbale_pdf"><i class="fa fa-download me-1" aria-hidden="true"></i><?php echo $vs === 'firmato' ? 'PDF firmato' : 'PDF caricato'; ?></a><?php endif; ?>
+                </span>
+            </div>
+            <?php if ($vs === ''): ?>
+                <ol class="small mb-3"><li>Scarica il <strong>Verbale in Word</strong> (ha già presenze, decisioni e delibere).</li><li>Completalo e salvalo in <strong>PDF</strong>.</li><li>Caricalo qui sotto e indica chi firma: prima il <strong>segretario verbalizzante</strong>, poi il <strong>coordinatore</strong>; ricevono un link personale per email (firma remota Aruba se configurata, altrimenti scaricano, firmano e ricaricano).</li></ol>
+                <form method="POST" enctype="multipart/form-data" class="row g-2 align-items-end"><?php csrf_field(); ?><input type="hidden" name="seduta_id" value="<?php echo (int)$sel['id']; ?>">
+                    <div class="col-md-4"><label class="form-label small fw-bold mb-0" for="vPdf">Verbale in PDF</label><input type="file" class="form-control form-control-sm" id="vPdf" name="verbale_pdf" accept=".pdf,application/pdf" required></div>
+                    <div class="col-md-3"><label class="form-label small fw-bold mb-0" for="vSeg">Email del segretario<?php echo $sel['segretario'] ? ' (' . $h($sel['segretario']) . ')' : ''; ?></label><input type="email" class="form-control form-control-sm" id="vSeg" name="segretario_email" required value="<?php echo $h($sel['segretario_email'] ?? ''); ?>"></div>
+                    <div class="col-md-3"><label class="form-label small fw-bold mb-0" for="vCoo">Email del coordinatore<?php echo $sel['coordinatore'] ? ' (' . $h($sel['coordinatore']) . ')' : ''; ?></label><input type="email" class="form-control form-control-sm" id="vCoo" name="coordinatore_email" required value="<?php echo $h($sel['coordinatore_email'] ?? ''); ?>"></div>
+                    <div class="col-md-2"><button type="submit" name="invia_verbale_firma" value="1" class="btn btn-sm btn-primary fw-bold w-100"><i class="fa fa-paper-plane me-1" aria-hidden="true"></i>Invia alla firma</button></div>
+                </form>
+            <?php else: ?>
+                <p class="small mb-0"><i class="fa fa-paper-plane me-1 text-primary" aria-hidden="true"></i>Il verbale è stato inviato alla firma<?php echo !empty($sel['verbale_inviato_il']) ? ' il ' . date('d/m/Y H:i', strtotime($sel['verbale_inviato_il'])) : ''; ?>. Come sta andando lo vedi nel passo <a href="#ps-firme">Firme</a>.</p>
+            <?php endif; ?>
+        </div></div>
+    </div>
+
+    <div class="tab-pane fade<?php echo $passo_aperto === 'firme' ? ' show active' : ''; ?>" id="ps-firme" role="tabpanel">
+        <div class="card border-0 shadow-sm" id="firme" style="border-left:4px solid <?php echo $sv[1]; ?> !important;"><div class="card-body">
+            <h6 class="fw-bold"><i class="fa fa-file-signature me-1 text-primary" aria-hidden="true"></i>Firme del verbale</h6>
+            <?php if ($vs === ''): ?>
+                <p class="small text-secondary mb-2">Il verbale non è ancora stato inviato alla firma.</p>
+                <a class="btn btn-sm btn-primary fw-bold" href="#ps-verbale">Vai al passo Verbale</a>
+            <?php else:
+                echo pn_iter([
+                    ['nome' => 'Segretario verbalizzante', 'stato' => $vs === 'segretario' ? 'qui' : 'fatto', 'nota' => (string)($sel['segretario_email'] ?? '')],
+                    ['nome' => 'Coordinatore', 'stato' => $vs === 'coordinatore' ? 'qui' : ($vs === 'firmato' ? 'fatto' : ''), 'nota' => (string)($sel['coordinatore_email'] ?? '')],
+                    ['nome' => 'Verbale firmato', 'stato' => $vs === 'firmato' ? 'fatto' : ''],
+                ], 'Firme del verbale'); ?>
+                <?php if ($vs === 'firmato'): ?>
+                    <p class="small mb-0 text-success"><i class="fa fa-check me-1" aria-hidden="true"></i>Firmato dal segretario e dal coordinatore il <?php echo date('d/m/Y H:i', strtotime($sel['verbale_firmato_il'])); ?>: il PDF è stato inviato ai referenti.</p>
+                <?php else: $chi_v = $vs === 'segretario' ? 'del segretario (' . $sel['segretario_email'] . ')' : 'del coordinatore (' . $sel['coordinatore_email'] . ')'; ?>
+                    <p class="small mb-2">In attesa della firma <?php echo $h($chi_v); ?>: ha ricevuto l'email con il link<?php echo !empty($sel['verbale_inviato_il']) ? ' il ' . date('d/m/Y', strtotime($sel['verbale_inviato_il'])) : ''; ?><?php echo $sel['verbale_solleciti'] ? ' · ' . (int)$sel['verbale_solleciti'] . ' solleciti' : ''; ?>. Un sollecito parte da solo ogni pochi giorni (al massimo 3); puoi anche mandarlo tu.</p>
+                    <form method="POST" class="mb-3"><?php csrf_field(); ?><input type="hidden" name="seduta_id" value="<?php echo (int)$sel['id']; ?>">
+                        <button type="submit" name="sollecita_verbale" value="1" class="btn btn-sm btn-warning fw-bold"><i class="fa fa-bell me-1" aria-hidden="true"></i>Sollecita la firma ora</button>
+                    </form>
+                    <div class="small text-secondary mb-1">Se ti ha mandato il PDF già firmato in PAdES, caricalo qui:</div>
+                    <form method="POST" enctype="multipart/form-data" class="d-flex flex-wrap gap-2"><?php csrf_field(); ?><input type="hidden" name="seduta_id" value="<?php echo (int)$sel['id']; ?>">
+                        <input type="file" class="form-control form-control-sm" style="max-width:360px;" name="verbale_pdf" accept=".pdf,application/pdf" required aria-label="Verbale firmato">
+                        <button type="submit" name="carica_verbale_firmato" value="1" class="btn btn-sm btn-primary fw-bold"><i class="fa fa-upload me-1" aria-hidden="true"></i>Carica la firma <?php echo $vs === 'segretario' ? 'del segretario' : 'del coordinatore'; ?></button>
+                    </form>
+                <?php endif; ?>
+            <?php endif; ?>
+        </div></div>
+    </div>
+    </div>
+    <script>
+    // I collegamenti interni (#presenze, #pr12, #ps-esiti…) aprono il passo che li contiene
+    document.addEventListener('DOMContentLoaded', function () {
+        function apri() {
+            var h = location.hash; if (!h || h.length < 2) return;
+            var el; try { el = document.querySelector(h); } catch (e) { return; }
+            var pane = el && el.closest('.tab-pane'); if (!pane) return;
+            var b = document.querySelector('[data-bs-target="#' + pane.id + '"]');
+            if (b && window.bootstrap) { bootstrap.Tab.getOrCreateInstance(b).show(); if (el !== pane) el.scrollIntoView(); }
+        }
+        apri(); window.addEventListener('hashchange', apri);
+    });
+    </script>
     <?php else:
         // ── Elenco: consigli (schede) e sedute (prossime e passate) con lo stato di convocazione, presenze e verbale ──
         $oggi = date('Y-m-d');
@@ -559,29 +657,42 @@ if ($fase === 'azioni') {
     .dd-data { width: 60px; line-height: 1.2; background: #eff6ff; color: #0056B3; border-radius: .5rem; padding: 4px 0; }
     .dd-chip { display: inline-flex; align-items: center; gap: 4px; background: #f1f5f9; border-radius: 999px; padding: 2px 10px; font-size: .75rem; color: #334155; }
     </style>
-    <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
-        <h5 class="fw-bold mb-0"><i class="fa fa-landmark me-1 text-primary" aria-hidden="true"></i>Consigli dei corsi di studio</h5>
-        <?php if (!$solo_ref): ?><a href="<?php echo $base; ?>&amp;tab=sedute&amp;consiglio=0" class="btn btn-sm btn-outline-primary ms-auto"><i class="fa fa-plus me-1" aria-hidden="true"></i>Nuovo consiglio</a><?php endif; ?>
+    <?php
+    // Cose in sospeso per i consigli visibili: verbali da firmare, pratiche portate in seduta e non ancora decise, sedute senza data, consigli senza componenti
+    $in_attesa_c = array_intersect_key(\App\Core\App::per($conn)->get(\App\Didattica\SedutaRepository::class)->praticheSenzaEsitoPerConsiglio(), $consigli_vis);
+    $n_verbali_firma = count(array_filter($sedute, fn($x) => in_array($x['verbale_stato'] ?? '', ['segretario', 'coordinatore'], true)));
+    $n_senza_data = count(array_filter($sedute, fn($x) => !$x['data']));
+    $n_senza_comp = count(array_filter($consigli_vis, fn($c, $k) => !persone_consiglio($conn, (int)$k), ARRAY_FILTER_USE_BOTH));
+    echo pn_percorso([
+        ['numero' => $n_verbali_firma, 'testo' => 'Verbali in attesa di firma', 'nota' => 'dal segretario o dal coordinatore', 'href' => '#sedute-elenco', 'avviso' => $n_verbali_firma > 0],
+        ['numero' => array_sum($in_attesa_c), 'testo' => 'Pratiche da decidere', 'nota' => 'portate in seduta, senza esito', 'href' => '#sedute-elenco'],
+        ['numero' => $n_senza_data, 'testo' => 'Sedute senza data', 'nota' => 'da fissare', 'href' => '#sedute-elenco', 'avviso' => $n_senza_data > 0],
+        ['numero' => $n_senza_comp, 'testo' => 'Consigli senza componenti', 'nota' => 'servono per le presenze', 'href' => '#consigli', 'avviso' => $n_senza_comp > 0],
+    ], 'Cosa aspetta i consigli');
+    ?>
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-2" id="consigli">
+        <h2 class="h5 fw-bold mb-0"><i class="fa fa-landmark me-1" style="color:var(--pn-mod);" aria-hidden="true"></i>Consigli dei corsi di studio</h2>
+        <?php if (!$solo_ref): ?><a href="<?php echo $base; ?>&amp;tab=sedute&amp;consiglio=0" class="btn btn-sm btn-outline-secondary ms-auto"><i class="fa fa-plus me-1" aria-hidden="true"></i>Nuovo consiglio</a><?php endif; ?>
     </div>
     <p class="small text-secondary mb-2"><?php echo $solo_ref ? 'Sei referente di questi consigli: inserisci i componenti una volta sola, crea le sedute, segna le presenze e decidi sulle pratiche.' : "L'Ufficio didattico sceglie i referenti di ogni consiglio; i referenti inseriscono i componenti e gestiscono le sedute."; ?></p>
     <div class="row g-3 mb-4">
     <?php foreach ($consigli_vis as $k => $c):
         $nr = count(persone_consiglio($conn, $k, 'referente')); $nc = count(persone_consiglio($conn, $k));
         $sed_c = array_filter($sedute, fn($x) => (int)$x['consiglio_id'] === $k);
-        $pross = null; foreach ($sed_c as $x) if ($x['data'] && $x['data'] >= $oggi) $pross = $x; ?>
+        $pross = null; foreach ($sed_c as $x) if ($x['data'] && $x['data'] >= $oggi) $pross = $x;
+        $ultima = null; foreach ($sed_c as $x) if ($x['data'] && $x['data'] < $oggi) { $ultima = $x; break; }
+        $stato_v = ['' => ['Non ancora inviato alla firma', 'attesa'], 'segretario' => ['Da firmare: segretario', 'attesa'], 'coordinatore' => ['Da firmare: coordinatore', 'attesa'], 'firmato' => ['Firmato', 'ok']]; ?>
         <div class="col-md-6 col-xl-4">
-            <div class="card border-0 shadow-sm h-100 dd-cons<?php echo (int)$c['attivo'] ? '' : ' dd-off'; ?>"><div class="card-body d-flex flex-column">
-                <div class="small fw-bold dd-due-righe mb-2" title="<?php echo $h($c['nome']); ?>"><?php echo $h($c['nome']); ?></div>
-                <div class="d-flex flex-wrap gap-1 mb-2">
-                    <span class="dd-chip"><i class="fa fa-user-shield" aria-hidden="true"></i><?php echo $nr; ?> referenti</span>
-                    <span class="dd-chip<?php echo $nc ? '' : ' text-danger'; ?>"><i class="fa fa-users" aria-hidden="true"></i><?php echo $nc; ?> componenti</span>
-                    <span class="dd-chip"><i class="fa fa-calendar" aria-hidden="true"></i><?php echo count($sed_c); ?> sedute</span>
-                    <?php if (!(int)$c['attivo']): ?><span class="badge bg-secondary">non attivo</span><?php endif; ?>
-                </div>
-                <div class="small text-secondary mb-3"><?php if ($pross): ?><i class="fa fa-clock me-1" aria-hidden="true"></i>Prossima: <a href="<?php echo $base; ?>&amp;tab=sedute&amp;id=<?php echo (int)$pross['id']; ?>"><?php echo date('d/m/Y', strtotime($pross['data'])); ?></a><?php else: ?>Nessuna seduta in programma<?php endif; ?></div>
-                <div class="d-flex gap-2 mt-auto">
+            <div class="card border-0 shadow-sm h-100 dd-cons<?php echo (int)$c['attivo'] ? '' : ' dd-off'; ?>" style="border-top:4px solid var(--pn-mod) !important;border-left:0 !important;"><div class="card-body d-flex flex-column">
+                <div class="fw-bold dd-due-righe" title="<?php echo $h($c['nome']); ?>"><?php echo $h($c['nome']); ?></div>
+                <div class="small text-secondary mb-2"><?php echo $c['coordinatore'] !== '' ? 'Coordinatore: ' . $h($c['coordinatore']) . ' · ' : ''; ?><span class="<?php echo $nc ? '' : 'text-danger fw-bold'; ?>"><?php echo $nc; ?> componenti</span> · <?php echo $nr; ?> referenti<?php echo !(int)$c['attivo'] ? ' · <span class="badge bg-secondary">non attivo</span>' : ''; ?></div>
+                <div class="pn-riga"><span>Prossima seduta</span><?php echo $pross ? '<a class="fw-bold text-decoration-none" href="' . $base . '&amp;tab=sedute&amp;id=' . (int)$pross['id'] . '">' . date('d/m/Y', strtotime($pross['data'])) . '</a>' : pn_stato('Da fissare', 'attesa'); ?></div>
+                <div class="pn-riga"><span>Pratiche da decidere</span><b><?php echo (int)($in_attesa_c[$k] ?? 0); ?></b></div>
+                <div class="pn-riga"><span>Ultimo verbale<?php echo $ultima ? ' (' . date('d/m', strtotime($ultima['data'])) . ')' : ''; ?></span><?php if ($ultima): [$lv, $tv] = $stato_v[$ultima['verbale_stato'] ?? ''] ?? $stato_v['']; echo '<a href="' . $base . '&amp;tab=sedute&amp;id=' . (int)$ultima['id'] . '&amp;passo=firme" class="text-decoration-none">' . pn_stato($lv, $tv) . '</a>'; else: ?><span class="text-secondary">nessuno</span><?php endif; ?></div>
+                <div class="d-flex gap-2 mt-3 pt-1">
+                    <?php if ($pross): ?><a class="btn btn-sm fw-bold flex-fill" style="background:var(--pn-mod);border-color:var(--pn-mod);color:var(--pn-mod-testo);" href="<?php echo $base; ?>&amp;tab=sedute&amp;id=<?php echo (int)$pross['id']; ?>"><i class="fa fa-folder-open me-1" aria-hidden="true"></i>Apri la seduta</a>
+                    <?php else: ?><a class="btn btn-sm fw-bold flex-fill" style="background:var(--pn-mod);border-color:var(--pn-mod);color:var(--pn-mod-testo);" href="<?php echo $base; ?>&amp;tab=sedute&amp;nuova=1&amp;consiglio_id=<?php echo $k; ?>"><i class="fa fa-calendar-plus me-1" aria-hidden="true"></i>Fissa una seduta</a><?php endif; ?>
                     <a class="btn btn-sm btn-outline-secondary flex-fill" href="<?php echo $base; ?>&amp;tab=sedute&amp;consiglio=<?php echo $k; ?>"><i class="fa fa-users me-1" aria-hidden="true"></i><?php echo $solo_ref ? 'Componenti' : 'Gestisci'; ?></a>
-                    <a class="btn btn-sm btn-primary fw-bold flex-fill" href="<?php echo $base; ?>&amp;tab=sedute&amp;nuova=1&amp;consiglio_id=<?php echo $k; ?>"><i class="fa fa-plus me-1" aria-hidden="true"></i>Nuova seduta</a>
                 </div>
             </div></div>
         </div>
@@ -589,8 +700,8 @@ if ($fase === 'azioni') {
     <?php if (!$consigli_vis): ?><div class="col-12 text-muted small">Nessun consiglio.</div><?php endif; ?>
     </div>
 
-    <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
-        <h5 class="fw-bold mb-0"><i class="fa fa-calendar-days me-1 text-primary" aria-hidden="true"></i>Sedute</h5>
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-2" id="sedute-elenco">
+        <h2 class="h5 fw-bold mb-0"><i class="fa fa-calendar-days me-1" style="color:var(--pn-mod);" aria-hidden="true"></i>Sedute</h2>
         <form method="GET" class="d-flex gap-1 ms-auto"><input type="hidden" name="p_id" value="<?php echo (int)$filtro_p; ?>"><input type="hidden" name="tab" value="sedute">
             <select class="form-select form-select-sm" name="cons" onchange="this.form.submit()" aria-label="Filtra per consiglio" style="max-width:320px;"><option value="0">Tutti i consigli</option>
                 <?php foreach ($consigli_vis as $k => $c): ?><option value="<?php echo $k; ?>"<?php echo $f_cons === $k ? ' selected' : ''; ?>><?php echo $h(mb_strimwidth($c['nome'], 0, 70, '…')); ?></option><?php endforeach; ?></select></form>

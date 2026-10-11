@@ -104,5 +104,18 @@ $EMAIL = [];
 prova(solleciti_verbali($conn) >= 1 && count($EMAIL) >= 1 && $EMAIL[0]['a'] === 'seg81@example.org', "verbale: sollecito della firma del segretario");
 prova(is_file(RADICE_SITO . '/' . DIR_VERBALI . '.htaccess'), "cartella dei verbali protetta (.htaccess)");
 
+// Sollecito della firma a mano: al massimo uno al giorno, solo per un verbale in attesa
+$EMAIL = [];
+prova($s_ver->sollecita($sid81) === 'Chi deve firmare è stato avvisato meno di un giorno fa: aspetta ancora un po\'.' && $EMAIL === [], "verbale: sollecito a mano rifiutato se chi deve firmare è stato avvisato da meno di un giorno");
+$q("UPDATE didattica_sedute SET verbale_sollecito_il = NOW() - INTERVAL 2 DAY WHERE id = $sid81");
+$sol81 = (int)$conn->query("SELECT verbale_solleciti FROM didattica_sedute WHERE id = $sid81")->fetch_row()[0];
+prova($s_ver->sollecita($sid81) === null && count($EMAIL) === 1 && $EMAIL[0]['a'] === 'seg81@example.org' && (int)$conn->query("SELECT verbale_solleciti FROM didattica_sedute WHERE id = $sid81")->fetch_row()[0] === $sol81 + 1, "verbale: sollecito a mano inviato al firmatario e contato");
+prova($s_ver->sollecita(0) === 'Il verbale non è in attesa di firma.' && sollecita_verbale_firma($conn, 0) === 'Il verbale non è in attesa di firma.', "verbale: nessun sollecito se la seduta non esiste o non è in attesa di firma");
+// Pratiche da decidere per consiglio
+$q("UPDATE pratiche SET esito_seduta = '' , stato = 'in_lavorazione' WHERE id = $pid81");
+prova((AppSed::per($conn)->get(\App\Didattica\SedutaRepository::class)->praticheSenzaEsitoPerConsiglio()[$cid81] ?? 0) === 1, "consigli: la pratica portata in seduta senza esito è «da decidere»");
+$q("UPDATE pratiche SET esito_seduta = 'approvata' WHERE id = $pid81");
+prova(!isset(AppSed::per($conn)->get(\App\Didattica\SedutaRepository::class)->praticheSenzaEsitoPerConsiglio()[$cid81]), "consigli: con l'esito registrato non è più «da decidere»");
+
 if ($pdf81) @unlink($pdf81);
 $ripulisci_81();
