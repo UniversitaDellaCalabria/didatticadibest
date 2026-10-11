@@ -154,6 +154,21 @@ body { background-color: var(--pn-sfondo); color: var(--pn-testo); }
 .pn-tono-lavoro { background: var(--pn-lavoro-bg); color: var(--pn-lavoro); }
 .pn-tono-spento { background: var(--pn-spento-bg); color: var(--pn-spento); }
 
+/* Percorso a tappe con i numeri */
+.pn-percorso { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); list-style: none; margin: 0 0 1.25rem; padding: 0; gap: 0; counter-reset: pn-tappa; }
+.pn-percorso li { counter-increment: pn-tappa; position: relative; background: var(--pn-carta); border: 1px solid var(--pn-bordo); margin-left: -1px; margin-top: -1px; }
+.pn-percorso li:first-child { border-radius: var(--pn-raggio) 0 0 var(--pn-raggio); margin-left: 0; }
+.pn-percorso li:last-child { border-radius: 0 var(--pn-raggio) var(--pn-raggio) 0; }
+.pn-percorso a, .pn-percorso li > div { display: block; height: 100%; padding: 12px 14px; text-decoration: none; color: var(--pn-testo); }
+.pn-percorso a:hover, .pn-percorso a:focus-visible { background: var(--pn-morbido); color: var(--pn-testo); }
+.pn-percorso b { display: block; font-size: 1.7rem; line-height: 1.1; color: var(--pn-mod); }
+.pn-percorso span { display: block; font-weight: 600; font-size: .88rem; }
+.pn-percorso small { display: block; color: var(--pn-tenue); font-size: .8rem; }
+.pn-percorso li.avviso { background: var(--pn-blocco-bg); border-color: #fca5a5; z-index: 1; }
+.pn-percorso li.avviso b { color: var(--pn-blocco); }
+.pn-percorso li.avviso a:hover { background: var(--pn-blocco-bg); filter: brightness(.97); }
+@media (max-width: 767.98px) { .pn-percorso li, .pn-percorso li:first-child, .pn-percorso li:last-child { border-radius: 0; margin-left: 0; } }
+
 /* Cose da fare */
 .pn-cose { background: var(--pn-carta); border: 1px solid var(--pn-bordo); border-radius: var(--pn-raggio); box-shadow: var(--pn-ombra); overflow: hidden; }
 .pn-cosa { --pn-cosa: var(--pn-mod); display: flex; align-items: center; gap: 14px; padding: 12px 16px; text-decoration: none; color: var(--pn-testo); border-top: 1px solid var(--pn-bordo); }

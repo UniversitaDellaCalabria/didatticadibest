@@ -104,6 +104,24 @@ final class Pannello
         return $o . '</nav>';
     }
 
+    /**
+     * Tappe di un percorso con il numero di ciascuna (es. FSL: Progetti → Scuole → Convenzioni → …); ogni tappa porta all'elenco.
+     *
+     * @param list<array{numero: int|string, testo: string, nota?: string, href?: string, avviso?: bool}> $tappe
+     */
+    public static function percorso(array $tappe, string $etichetta = 'Percorso'): string
+    {
+        $o = '<ol class="pn-percorso" aria-label="' . self::h($etichetta) . '">';
+        foreach ($tappe as $t) {
+            $avviso = !empty($t['avviso']);
+            $dentro = '<b>' . self::h((string) $t['numero']) . '</b><span>' . self::h($t['testo']) . '</span>'
+                . (!empty($t['nota']) ? '<small>' . self::h($t['nota']) . '</small>' : '');
+            $o .= '<li class="' . ($avviso ? 'avviso' : '') . '">' . (!empty($t['href']) ? '<a href="' . self::h($t['href']) . '">' . $dentro . '</a>' : '<div>' . $dentro . '</div>') . '</li>';
+        }
+
+        return $o . '</ol>';
+    }
+
     /** Etichetta di stato: sempre colore + icona + parola. */
     public static function stato(string $testo, string $tono = 'info', string $icona = ''): string
     {

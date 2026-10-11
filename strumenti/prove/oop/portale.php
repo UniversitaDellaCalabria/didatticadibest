@@ -47,3 +47,22 @@ $q('UPDATE pratiche SET stato = "chiusa" WHERE codice = "PROVA-CDF-1"');
 prova($cdf_p->praticheDaSmistare()['n'] === $sm0['n'] - 1, "CoseDaFare: una pratica chiusa non è più da smistare");
 $q('DELETE FROM pratiche WHERE codice = "PROVA-CDF-1"');
 prova($cdf_p->messaggiNonLetti([]) === [] && $cdf_p->prenotazioniRisorseDaApprovare([]) === [] && is_int($cdf_p->verbaliInFirma([])) && is_int($cdf_p->verbaliInFirma(null)), "CoseDaFare: nessuna area, nessun conteggio");
+
+// Percorso FSL: regole dei passi e numeri per fase (senza database)
+sezione("FSL: percorso delle scuole");
+$pf_p = \App\Fsl\PercorsoFsl::passi(true, false, false, null, null, null);
+prova(count($pf_p) === 3 && $pf_p[0]['stato'] === 'fatto' && $pf_p[1]['stato'] === 'qui' && $pf_p[2]['stato'] === '', "PercorsoFsl::passi(): senza convenzione il passo corrente è la convenzione; i passi senza oggetto non compaiono");
+$pf_q = \App\Fsl\PercorsoFsl::passi(true, true, true, false, false, false);
+prova(count($pf_q) === 6 && $pf_q[3]['stato'] === 'qui' && $pf_q[4]['stato'] === '' && $pf_q[5]['stato'] === '', "PercorsoFsl::passi(): un solo passo «qui», il primo che manca");
+prova(array_unique(array_column(\App\Fsl\PercorsoFsl::passi(true, true, true, true, true, true), 'stato')) === ['fatto'], "PercorsoFsl::passi(): tutto fatto, nessun passo «qui»");
+$r_a = ['stato' => 'confermata', 'tipo' => 'progetto', 'pd_attestati' => 1, 'pd_per_scuole' => 1, 'al' => '2026-09-10', 'n_elenco' => 0, 'attestato_inviato' => 0, 'scuola_codice' => 'AAA', 'scuola_nome' => 'A'];
+$r_b = ['stato' => 'confermata', 'tipo' => 'evento', 'pd_attestati' => 1, 'pd_per_scuole' => 0, 'al' => '2026-09-12', 'n_elenco' => 12, 'attestato_inviato' => 1, 'scuola_codice' => 'BBB', 'scuola_nome' => 'B'];
+$r_c = ['stato' => 'confermata', 'tipo' => 'progetto', 'pd_attestati' => 1, 'pd_per_scuole' => 0, 'al' => '2026-09-10', 'n_elenco' => 0, 'scuola_codice' => 'CCC', 'scuola_nome' => 'C'];
+$r_d = ['stato' => 'in_attesa', 'tipo' => 'progetto', 'pd_attestati' => 1, 'pd_per_scuole' => 1, 'al' => '2026-09-10', 'n_elenco' => 0, 'scuola_codice' => '', 'scuola_nome' => 'D'];
+$r_e = ['stato' => 'confermata', 'tipo' => 'progetto', 'pd_attestati' => 1, 'pd_per_scuole' => 1, 'al' => '2026-12-10', 'n_elenco' => 0, 'scuola_codice' => 'EEE', 'scuola_nome' => 'E'];
+$ct = \App\Fsl\PercorsoFsl::contatori([$r_a, $r_b, $r_c, $r_d, $r_e], '2026-10-11');
+prova($ct['scuole'] === 5 && $ct['in_attesa'] === 1, "PercorsoFsl::contatori(): scuole e iscrizioni in attesa");
+prova(count($ct['elenchi_mancanti']) === 1 && $ct['elenchi_mancanti'][0]['scuola_nome'] === 'A', "PercorsoFsl::contatori(): manca l'elenco solo per attività finite con attestati (non per progetti generici, in attesa o non finiti)");
+prova($ct['attestati_dovuti'] === 2 && $ct['attestati_inviati'] === 1, "PercorsoFsl::contatori(): attestati dovuti e inviati");
+prova(\App\Fsl\PercorsoFsl::conclusa(['al' => '2026-10-10'], '2026-10-11') && !\App\Fsl\PercorsoFsl::conclusa(['al' => '2026-10-11'], '2026-10-11') && !\App\Fsl\PercorsoFsl::conclusa([], '2026-10-11'), "PercorsoFsl::conclusa(): finita solo se la data di fine è passata");
+prova(str_contains(pn_percorso([['numero' => '2/5', 'testo' => 'T', 'avviso' => true, 'href' => 'x.php?a=1&b=2'], ['numero' => 0, 'testo' => 'U']]), 'class="avviso"') && str_contains(pn_percorso([['numero' => 1, 'testo' => 'T', 'href' => 'a&b']]), 'a&amp;b'), "pn_percorso(): tappe con avviso e link ripuliti");

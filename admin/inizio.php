@@ -67,6 +67,12 @@ try {
         $n_st = count(array_filter(\App\Core\App::per($conn)->get(\App\Fsl\ServizioConvenzioniScuole::class)->scuole(), fn($g) => $g['da_stipulare']));
         if ($n_st > 0) $cose[] = ['fsl', $n_st, $n_st === 1 ? 'Convenzione da stipulare' : 'Convenzioni da stipulare', 'Formazione Scuola Lavoro · scuole con prenotazioni ma senza convenzione valida', 'fsl.php?tab=stipulare', true];
     }
+    if ($puo_fsl) {
+        $pf = \App\Core\App::per($conn)->get(\App\Fsl\ServizioPannelloFsl::class);
+        $anno_f = $pf->annoCorrente();
+        $n_el = count(\App\Fsl\PercorsoFsl::contatori($pf->riepilogo("$anno_f-09-01", ($anno_f + 1) . '-08-31')['righe'], date('Y-m-d'))['elenchi_mancanti']);
+        if ($n_el > 0) $cose[] = ['fsl', $n_el, $n_el === 1 ? 'Elenco studenti mancante' : 'Elenchi studenti mancanti', 'Formazione Scuola Lavoro · attività finite: senza elenco non partono gli attestati', 'fsl.php?tab=riepilogo#elenchi', false];
+    }
     // Messaggi e prenotazioni da approvare: nelle aree che l'utente gestisce per intero
     $aree_mie = array_values(array_filter($pagine_disponibili, fn($a) => $is_full_admin || in_array((int)$u_id_curr, ids_gestori_da_campi($a['gestore_utente_id'] ?? 0, $a['gestori_utenti_ids'] ?? '', $a['permessi_gestori_json'] ?? ''), true)));
     $ids_mie = array_map(fn($a) => (int)$a['id'], $aree_mie);

@@ -59,3 +59,10 @@ if (!function_exists('pn_vuoto')) {
         return \App\Portale\Vista\Pannello::vuoto($testo, $icona, $azioni);
     }
 }
+
+if (!function_exists('pn_percorso')) {
+    // Tappe di un percorso con i numeri: [['numero', 'testo', 'nota', 'href', 'avviso']]
+    function pn_percorso(array $tappe, string $etichetta = 'Percorso'): string {
+        return \App\Portale\Vista\Pannello::percorso($tappe, $etichetta);
+    }
+}
