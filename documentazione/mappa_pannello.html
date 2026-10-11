@@ -1,0 +1,721 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mappa del pannello</title>
+<style>
+:root {
+  --bg: #f5f6f8; --carta: #ffffff; --testo: #1f2937; --tenue: #5b6474; --linea: #e2e5ea; --morbido: #f0f2f5;
+  --rosso: #b30000; --blu: #0056b3; --verde: #047857; --viola: #7c3aed; --ardesia: #334155; --ambra: #b45309;
+  --ok: #15803d; --okbg: #dcfce7; --corso: #b45309; --corsobg: #fef3c7; --dafare: #475569; --dafarebg: #eef1f5;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15181d; --carta: #1e2228; --testo: #e5e7eb; --tenue: #a3abb8; --linea: #343a43; --morbido: #262b33;
+    --okbg: #14361f; --corsobg: #3b2c0c; --dafarebg: #2a3039; --ok: #4ade80; --corso: #fbbf24; --dafare: #cbd5e1;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15181d; --carta: #1e2228; --testo: #e5e7eb; --tenue: #a3abb8; --linea: #343a43; --morbido: #262b33;
+  --okbg: #14361f; --corsobg: #3b2c0c; --dafarebg: #2a3039; --ok: #4ade80; --corso: #fbbf24; --dafare: #cbd5e1;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--testo); font: 16px/1.55 "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif; }
+a { color: var(--blu); }
+.guscio { display: grid; grid-template-columns: 250px 1fr; max-width: 1280px; margin: 0 auto; }
+nav.indice { position: sticky; top: 0; height: 100vh; overflow: auto; padding: 28px 18px; border-right: 1px solid var(--linea); }
+nav.indice b { display: block; font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; color: var(--tenue); margin: 18px 0 6px; }
+nav.indice a { display: block; padding: 6px 10px; border-radius: 8px; color: var(--testo); text-decoration: none; font-size: .93rem; }
+nav.indice a:hover { background: var(--morbido); }
+main { padding: 32px 40px 80px; min-width: 0; }
+h1 { font-size: 1.9rem; margin: 0 0 6px; }
+h2 { font-size: 1.4rem; margin: 56px 0 6px; padding-top: 8px; }
+h3 { font-size: 1.1rem; margin: 28px 0 8px; }
+.sotto { color: var(--tenue); margin: 0 0 18px; max-width: 72ch; }
+.carta { background: var(--carta); border: 1px solid var(--linea); border-radius: 14px; padding: 20px 22px; }
+.griglia { display: grid; gap: 14px; }
+.g2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.g3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; font-size: .8rem; font-weight: 600; white-space: nowrap; }
+.chip.fatto { background: var(--okbg); color: var(--ok); }
+.chip.corso { background: var(--corsobg); color: var(--corso); }
+.chip.dafare { background: var(--dafarebg); color: var(--dafare); }
+.testata { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.testata button { font: inherit; font-size: .85rem; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--linea); background: var(--carta); color: var(--testo); cursor: pointer; }
+.avanzamento { height: 10px; border-radius: 99px; background: var(--morbido); overflow: hidden; margin: 10px 0 4px; }
+.avanzamento span { display: block; height: 100%; background: var(--ok); }
+
+/* Step */
+.step { display: grid; grid-template-columns: 44px 1fr; gap: 14px; padding: 18px 0; border-bottom: 1px solid var(--linea); }
+.step:last-child { border-bottom: 0; }
+.step .num { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; background: var(--morbido); }
+.step.fatto .num { background: var(--okbg); color: var(--ok); }
+.step.corso .num { background: var(--corsobg); color: var(--corso); }
+.step h4 { margin: 0 0 4px; font-size: 1.05rem; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.step p { margin: 4px 0; }
+.step ul { margin: 6px 0 0; padding-left: 20px; }
+.step .file { font-family: Consolas, monospace; font-size: .8rem; color: var(--tenue); }
+
+/* Albero */
+.albero { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.modulo { border-top: 5px solid var(--c); }
+.modulo h4 { margin: 0 0 2px; color: var(--c); font-size: 1.05rem; }
+.modulo .chi { font-size: .8rem; color: var(--tenue); margin-bottom: 10px; }
+.modulo ul { list-style: none; padding: 0; margin: 0; }
+.modulo li { padding: 6px 0; border-top: 1px dashed var(--linea); font-size: .9rem; }
+.modulo li code { font-size: .75rem; color: var(--tenue); }
+.modulo li small { display: block; color: var(--tenue); }
+
+/* Problemi */
+.problema { display: grid; grid-template-columns: 34px 1fr; gap: 10px; padding: 12px 0; border-top: 1px solid var(--linea); }
+.problema:first-child { border-top: 0; }
+.problema .ico { width: 30px; height: 30px; border-radius: 8px; background: var(--corsobg); color: var(--corso); display: grid; place-items: center; font-weight: 700; }
+
+table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--linea); vertical-align: top; }
+th { font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; color: var(--tenue); }
+.tabella-scorre { overflow-x: auto; }
+
+/* ====== MOCKUP: imitano il pannello ====== */
+.schermo { border: 1px solid var(--linea); border-radius: 14px; overflow: hidden; background: #f4f6f9; color: #1f2937; box-shadow: 0 10px 30px rgba(15,23,42,.08); }
+.schermo .barra { display: flex; align-items: center; gap: 10px; background: #fff; border-bottom: 1px solid #e5e7eb; padding: 10px 16px; font-size: .85rem; }
+.schermo .barra .bc { color: #64748b; }
+.schermo .barra .bc b { color: #0f172a; }
+.schermo .barra .cerca { margin-left: auto; border: 1px solid #d6dae1; border-radius: 8px; padding: 5px 12px; color: #94a3b8; min-width: 200px; }
+.schermo .corpo { display: grid; grid-template-columns: 190px 1fr; min-height: 380px; }
+.schermo .lato { background: #1e293b; color: #cbd5e1; padding: 14px 10px; font-size: .82rem; }
+.schermo .lato .gr { font-size: .65rem; text-transform: uppercase; letter-spacing: .08em; color: #8391a7; margin: 14px 8px 4px; }
+.schermo .lato .v { padding: 7px 10px; border-radius: 7px; margin-bottom: 2px; display: flex; justify-content: space-between; }
+.schermo .lato .v.on { background: var(--mc, #990000); color: #fff; font-weight: 600; }
+.schermo .lato .v i { font-style: normal; background: rgba(255,255,255,.15); border-radius: 99px; padding: 0 7px; font-size: .72rem; }
+.schermo .area { padding: 18px 20px; min-width: 0; }
+.schermo h5 { margin: 0; font-size: 1.15rem; color: #0f172a; }
+.schermo .aiuto { font-size: .82rem; color: #475569; margin: 2px 0 14px; }
+.schermo .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px; }
+.schermo .btn { display: inline-block; border-radius: 8px; padding: 7px 14px; font-weight: 600; font-size: .82rem; border: 1px solid transparent; }
+.schermo .btn.pr { background: var(--mc, #b30000); color: #fff; }
+.schermo .btn.sec { background: #fff; border-color: #cbd5e1; color: #1f2937; }
+.schermo .btn.big { padding: 10px 18px; font-size: .9rem; }
+.schermo .kpi { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px; margin-bottom: 14px; }
+.schermo .kpi .card b { display: block; font-size: 1.5rem; line-height: 1.1; }
+.schermo .kpi .card span { font-size: .75rem; color: #475569; }
+.schermo .todo { display: flex; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid #eef0f3; font-size: .85rem; }
+.schermo .todo:first-of-type { border-top: 0; }
+.schermo .todo .pal { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; color: #fff; font-weight: 700; flex-shrink: 0; }
+.schermo .todo .cosa { flex: 1; min-width: 0; }
+.schermo .todo .cosa small { display: block; color: #64748b; }
+.schermo .stato { display: inline-block; border-radius: 99px; padding: 1px 9px; font-size: .72rem; font-weight: 700; }
+.schermo .percorso { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 0; margin-bottom: 14px; }
+.schermo .percorso .tappa { position: relative; background: #fff; border: 1px solid #e5e7eb; padding: 10px 10px 10px 22px; font-size: .78rem; min-height: 82px; }
+.schermo .percorso .tappa:first-child { border-radius: 12px 0 0 12px; padding-left: 12px; }
+.schermo .percorso .tappa:last-child { border-radius: 0 12px 12px 0; }
+.schermo .percorso .tappa b { display: block; font-size: 1.35rem; color: var(--mc); }
+.schermo .percorso .tappa.att { background: #fff7f7; border-color: var(--mc); box-shadow: inset 0 -3px 0 var(--mc); }
+.schermo .percorso .tappa::after { content: "›"; position: absolute; right: -9px; top: 28px; width: 18px; height: 18px; border-radius: 50%; background: #fff; border: 1px solid #e5e7eb; display: grid; place-items: center; z-index: 1; font-size: .8rem; color: #64748b; }
+.schermo .percorso .tappa:last-child::after { display: none; }
+.schermo .colonne { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(150px, 1fr); gap: 10px; overflow-x: auto; }
+.schermo .col { background: #eef1f5; border-radius: 12px; padding: 8px; }
+.schermo .col h6 { margin: 2px 4px 8px; font-size: .78rem; display: flex; justify-content: space-between; }
+.schermo .tess { background: #fff; border-radius: 9px; padding: 8px 9px; margin-bottom: 7px; font-size: .75rem; border-left: 3px solid var(--tc, #94a3b8); }
+.schermo .tess b { display: block; font-size: .8rem; }
+.schermo .tess small { color: #64748b; }
+.schermo .linea-iter { display: flex; gap: 0; margin: 4px 0 14px; }
+.schermo .linea-iter div { flex: 1; text-align: center; font-size: .72rem; color: #64748b; position: relative; padding-top: 26px; }
+.schermo .linea-iter div::before { content: ""; position: absolute; top: 9px; left: 0; right: 0; height: 3px; background: #e2e8f0; }
+.schermo .linea-iter div::after { content: ""; position: absolute; top: 3px; left: calc(50% - 8px); width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 3px solid #cbd5e1; }
+.schermo .linea-iter div.ok { color: #166534; }
+.schermo .linea-iter div.ok::before, .schermo .linea-iter div.ok::after { background: #16a34a; border-color: #16a34a; }
+.schermo .linea-iter div.qui { color: #0f172a; font-weight: 700; }
+.schermo .linea-iter div.qui::after { border-color: var(--mc); background: var(--mc); box-shadow: 0 0 0 4px rgba(4,120,87,.18); }
+.schermo .prossima { display: flex; gap: 14px; align-items: center; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; font-size: .85rem; }
+.schermo .wiz { display: grid; grid-template-columns: 170px 1fr; gap: 12px; }
+.schermo .wiz .passi div { padding: 8px 10px; border-radius: 9px; font-size: .8rem; margin-bottom: 4px; background: #fff; border: 1px solid #e5e7eb; display: flex; gap: 8px; align-items: center; }
+.schermo .wiz .passi div span { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: .68rem; background: #e2e8f0; flex-shrink: 0; }
+.schermo .wiz .passi div.ok span { background: #16a34a; color: #fff; }
+.schermo .wiz .passi div.qui { border-color: var(--mc); box-shadow: inset 3px 0 0 var(--mc); font-weight: 700; }
+.schermo .riga { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid #eef0f3; font-size: .82rem; }
+.schermo .riga:first-child { border-top: 0; }
+.schermo .mod { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; }
+.schermo .mod .card { border-top: 4px solid var(--c); }
+.schermo .mod .card b { color: var(--c); }
+.schermo .mod .card small { display: block; color: #64748b; font-size: .74rem; }
+.nota-mock { font-size: .88rem; color: var(--tenue); margin: 10px 2px 0; }
+.nota-mock b { color: var(--testo); }
+
+@media (max-width: 900px) {
+  .guscio { grid-template-columns: 1fr; }
+  nav.indice { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--linea); padding: 16px; }
+  main { padding: 20px 16px 60px; }
+  .g2, .g3 { grid-template-columns: 1fr; }
+  .schermo .corpo { grid-template-columns: 1fr; }
+  .schermo .lato { display: none; }
+  .schermo .kpi, .schermo .mod { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .schermo .wiz { grid-template-columns: 1fr; }
+  .schermo .percorso { grid-auto-flow: row; }
+  .schermo .percorso .tappa, .schermo .percorso .tappa:first-child, .schermo .percorso .tappa:last-child { border-radius: 0; padding-left: 12px; }
+  .schermo .percorso .tappa::after { display: none; }
+}
+@media print {
+  nav.indice, .testata button { display: none; }
+  .guscio { display: block; }
+  body { background: #fff; }
+  h2 { break-before: page; }
+  .schermo { break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+<div class="guscio">
+<nav class="indice" aria-label="Indice">
+  <b>Mappa</b>
+  <a href="#breve">In breve</a>
+  <a href="#step">Piano a step</a>
+  <b>Oggi</b>
+  <a href="#oggi">Com'è fatto il pannello</a>
+  <a href="#problemi">Cosa lo rende difficile</a>
+  <b>Domani</b>
+  <a href="#nuovo">La nuova struttura</a>
+  <a href="#dove">Dove trovo… (vecchio → nuovo)</a>
+  <a href="#regole">Regole grafiche</a>
+  <b>Schermate di prova</b>
+  <a href="#s-scrivania">A · La mia scrivania</a>
+  <a href="#s-fsl">B · FSL: percorso e scheda scuola</a>
+  <a href="#s-pratiche">C · Pratiche: bacheca per fasi</a>
+  <a href="#s-pratica">D · Una pratica e il suo iter</a>
+  <a href="#s-consigli">E · Consigli</a>
+  <a href="#s-seduta">F · Seduta guidata</a>
+  <b>Garanzie</b>
+  <a href="#non-cambia">Cosa non cambia</a>
+  <a href="#decidere">Da decidere insieme</a>
+</nav>
+
+<main>
+<div class="testata" id="breve">
+  <div>
+    <h1>Mappa del pannello di gestione</h1>
+    <p class="sotto">Riprogettazione del pannello di amministrazione di Eventi DiBEST: più semplice da usare per chi non ha dimestichezza con le piattaforme informatiche, con tutte le funzioni di oggi. Aggiornata a ogni step.</p>
+  </div>
+  <button type="button" id="tema" aria-label="Cambia tema chiaro/scuro">Tema chiaro/scuro</button>
+</div>
+
+<div class="griglia g3">
+  <div class="carta"><b>Obiettivo</b><p style="margin:.3em 0 0">Chi apre il pannello capisce subito <b>cosa deve fare oggi</b> e <b>a che punto è</b> ogni pratica, convenzione o seduta, senza cercare tra menu e schede.</p></div>
+  <div class="carta"><b>Metodo</b><p style="margin:.3em 0 0">Uno step alla volta. Ogni step si prova in locale, poi si carica sul server. Le funzioni restano tutte: cambiano posizione, aspetto e parole.</p></div>
+  <div class="carta"><b>Stato</b>
+    <div class="avanzamento" aria-hidden="true"><span id="barra"></span></div>
+    <div id="riassunto" style="font-size:.9rem;color:var(--tenue)"></div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="step">Piano a step</h2>
+<p class="sotto">Ogni step è chiuso e utilizzabile da solo: se ci si ferma a metà, il pannello funziona comunque. L'ordine si può cambiare.</p>
+<div class="carta" id="elenco-step"></div>
+
+<!-- ============================================================ -->
+<h2 id="oggi">Oggi: com'è fatto il pannello</h2>
+<p class="sotto">Le 50 pagine della cartella <code>admin/</code>, raggruppate per modulo come le vede oggi chi entra. Si entra da <code>inizio.php</code> («Da dove vuoi iniziare?»), si sceglie il modulo e, nei moduli con aree, l'area.</p>
+<div class="albero">
+  <div class="carta modulo" style="--c:#0056b3">
+    <h4>Eventi e seminari</h4><div class="chi">Amministratori e gestori di area o di singoli eventi</div>
+    <ul>
+      <li>Dashboard dell'area <code>dashboard.php</code><small>numeri, ultime prenotazioni, messaggi, prossimi turni</small></li>
+      <li>Eventi e turni <code>eventi.php</code><small>scheda evento a sezioni, duplica evento/turno</small></li>
+      <li>Progetti <code>progetti.php</code><small>edizioni, moduli, obiettivi, referenti</small></li>
+      <li>Moduli di iscrizione <code>form_builder.php</code></li>
+      <li>Archivio <code>archivio.php</code></li>
+      <li>Iscritti e check-in <code>iscritti.php</code> · <code>scanner.php</code> · badge · lista stampabile · QR aula</li>
+      <li>Studenti e attestati <code>partecipanti.php</code></li>
+      <li>Sondaggi <code>sondaggi.php</code> · Statistiche <code>statistiche.php</code></li>
+      <li>Impostazioni area <code>impostazioni_area.php</code></li>
+      <li>Messaggi <code>messaggi.php</code> (pulsante in alto)</li>
+      <li>Report per ambito <code>report_ambiti.php</code><small>terza missione, per anno</small></li>
+    </ul>
+  </div>
+  <div class="carta modulo" style="--c:#b30000">
+    <h4>Formazione Scuola Lavoro</h4><div class="chi">Amministratori, abilitati FSL, abilitati alle sole convenzioni</div>
+    <ul>
+      <li>Aree FSL: le stesse pagine di «Eventi e seminari» (progetti, iscritti, studenti e attestati…)</li>
+      <li>Pannello FSL <code>fsl.php</code> con 5 schede:
+        <small>Riepilogo dell'anno · Da stipulare · Convenzioni (registro, in vigore / scadute) · Verifica iscrizioni · Valutazioni</small></li>
+      <li>Documenti <code>allegato_a.php</code> · <code>convenzione_file.php</code><small>Allegato A (PDF/Word) e Convenzione precompilati, file firmati</small></li>
+      <li>Anagrafe scuole <code>scuole.php</code> (in «Gestione del portale»)</li>
+    </ul>
+  </div>
+  <div class="carta modulo" style="--c:#047857">
+    <h4>Didattica</h4><div class="chi">Ufficio didattico, operatori, referenti dei consigli (solo sedute)</div>
+    <ul>
+      <li>Pratiche degli studenti <code>didattica.php?tab=pratiche</code><small>elenco con 7 filtri, «da smistare / del mio ufficio / assegnate a me», scheda pratica con iter, protocollo, istruttoria, integrazioni, messaggi, cambio stato, Excel e Word</small></li>
+      <li>Sedute e verbali <code>?tab=sedute</code><small>consigli (componenti, referenti), sedute con convocazione, presenze, pratiche e decisioni, esiti, verbale Word/Excel, firma PAdES</small></li>
+      <li>Moduli e documenti <code>?tab=moduli</code><small>modulistica da scaricare e moduli online con logica, iter e campi del verbale</small></li>
+      <li>Ufficio e ricevimento <code>?tab=ufficio</code><small>uffici, operatori e compiti, sportello</small></li>
+      <li>Statistiche <code>?tab=statistiche</code></li>
+      <li>Tutorato · lettere di incarico <code>tutorato.php</code></li>
+    </ul>
+  </div>
+  <div class="carta modulo" style="--c:#7c3aed">
+    <h4>Prenotazioni e risorse</h4><div class="chi">Gestori delle aree di tipo calendario o gruppi</div>
+    <ul>
+      <li>Prenotazioni <code>prenotazioni_risorse.php</code><small>agenda, da approvare, CSV</small></li>
+      <li>Risorse, orari e chiusure <code>risorse.php</code></li>
+      <li>Aree «Gruppi degli insegnamenti»: pagine di Eventi</li>
+    </ul>
+  </div>
+  <div class="carta modulo" style="--c:#334155">
+    <h4>Gestione del portale</h4><div class="chi">Solo amministratori (scuole anche abilitati FSL)</div>
+    <ul>
+      <li>Anagrafi <code>anagrafe_personale.php</code><small>docenti, personale TA, insegnamenti, corsi, strutture</small></li>
+      <li>Anagrafe scuole <code>scuole.php</code></li>
+      <li>Aree <code>aree.php</code> · Nuova area <code>nuova_area.php</code></li>
+      <li>Sito pubblico: Testata e home <code>testata.php</code> · Menu <code>menu.php</code></li>
+      <li>Utenti e abilitazioni <code>utenti.php</code></li>
+      <li>Sistema e registri <code>sistema.php</code> · <code>audit_log.php</code> · <code>log_accessi.php</code><small>email, backup, controlli notturni</small></li>
+    </ul>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="problemi">Cosa lo rende difficile oggi</h2>
+<p class="sotto">Osservazioni sul codice e sulle schermate attuali. Nessuna è un errore: sono cose cresciute nel tempo, una funzione dopo l'altra.</p>
+<div class="carta">
+  <div class="problema"><div class="ico">1</div><div><b>Tre passaggi prima di lavorare.</b> «Tutti i moduli» → modulo → area → dashboard dell'area. Pagine simili tra loro (Inizio, Aree, Dashboard) e il menu laterale che cambia a seconda dell'area scelta: chi entra non sa dove si trova.</div></div>
+  <div class="problema"><div class="ico">2</div><div><b>Nessun posto per «cosa devo fare oggi».</b> I numeri sono sparsi: pratiche aperte in una scheda, messaggi nel pulsante in alto, prenotazioni da approvare nel menu, convenzioni da stipulare in un'altra scheda, verbali da firmare dentro la seduta.</div></div>
+  <div class="problema"><div class="ico">3</div><div><b>Pagine lunghissime.</b> La scheda della seduta (600 righe di codice) mette insieme consiglio, convocazione, presenze, pratiche, decisioni, esiti e verbale; la scheda pratica ha iter, protocollo, istruttoria, storico, due tipi di integrazione e cambio stato uno sotto l'altro.</div></div>
+  <div class="problema"><div class="ico">4</div><div><b>Tre stili di schede diversi.</b> Didattica a pillole verdi, FSL sottolineate rosse, Sistema a pillole scure; pulsanti piccoli (<code>btn-sm</code>) anche per le azioni importanti («Assegna», «Invia alla segreteria», «Registra»).</div></div>
+  <div class="problema"><div class="ico">5</div><div><b>Parole da addetti ai lavori.</b> PAdES, slot, smistare, perimetro, turno, check-in, CSV, o.d.g., «approvata_mod». Vanno bene per chi le conosce, spaventano gli altri.</div></div>
+  <div class="problema"><div class="ico">6</div><div><b>L'iter non si vede.</b> Gli stati della pratica (Inviata, In lavorazione, Integrazione, Accolta, Respinta, Chiusa) sono un'etichetta colorata in una tabella; i passaggi intermedi (da protocollare, marca da bollo, in seduta, alla segreteria) si capiscono solo aprendo la pratica. Lo stesso per la FSL: il percorso scuola → convenzione → studenti → attestati è diviso in 5 schede.</div></div>
+  <div class="problema"><div class="ico">7</div><div><b>Elenco pratiche affollato.</b> Sette filtri su una riga, poi due barre di azioni di massa (porta in seduta / invia alla segreteria) sopra la tabella.</div></div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="nuovo">La nuova struttura</h2>
+<p class="sotto">Un'idea guida: <b>prima il lavoro da fare, poi gli strumenti.</b> Ogni modulo ha una pagina iniziale che mostra il suo percorso (le fasi) con i numeri; ogni fase è un pulsante che porta all'elenco giusto.</p>
+<div class="griglia g2">
+  <div class="carta">
+    <h3 style="margin-top:0">1 · La mia scrivania (nuova pagina d'ingresso)</h3>
+    <ul>
+      <li><b>Cose da fare</b>: un elenco unico da tutti i moduli a cui si ha accesso, ognuna con il pulsante che porta dritto al lavoro.</li>
+      <li><b>I miei moduli</b>: le card di oggi, con un numero sopra («12 pratiche da smistare»).</li>
+      <li><b>Cerca ovunque</b>: una casella in alto per scuola, studente, pratica, evento.</li>
+    </ul>
+  </div>
+  <div class="carta">
+    <h3 style="margin-top:0">2 · Menu laterale più corto e sempre uguale</h3>
+    <ul>
+      <li>In alto «Scrivania» e il modulo corrente; sotto <b>due gruppi</b>: <i>Lavoro di tutti i giorni</i> e <i>Impostazioni</i>.</li>
+      <li>Il numero di cose da fare accanto a ogni voce.</li>
+      <li>Barra in alto con il percorso «Didattica › Pratiche › DID-2026-0142» cliccabile.</li>
+    </ul>
+  </div>
+  <div class="carta">
+    <h3 style="margin-top:0">3 · Formazione Scuola Lavoro a percorso</h3>
+    <ul>
+      <li>Pagina iniziale con le 5 fasi: <b>Progetti → Iscrizioni delle scuole → Convenzioni → Studenti e attestati → Valutazioni</b>.</li>
+      <li><b>Scheda scuola</b> nuova: tutto di una scuola in una pagina (prenotazioni, convenzione e scadenza, Allegato A, studenti, attestati, valutazioni) con il passo che manca in evidenza.</li>
+    </ul>
+  </div>
+  <div class="carta">
+    <h3 style="margin-top:0">4 · Didattica a percorso</h3>
+    <ul>
+      <li><b>Pratiche</b>: bacheca per fasi (Da protocollare · Da smistare · In lavorazione · Attesa integrazione · Pronte per il consiglio · Decise · Alla segreteria), con la tabella di oggi come seconda vista.</li>
+      <li><b>Scheda pratica</b>: iter disegnato in alto e un riquadro «Prossima azione» con un solo pulsante grande; il resto in schede (Domanda · Istruttoria · Storico e messaggi).</li>
+      <li><b>Consigli</b>: una card per consiglio con prossima seduta, pratiche in attesa, componenti.</li>
+      <li><b>Seduta guidata</b>: una schermata per passo (Convocazione → Presenze → Pratiche e decisioni → Esiti → Verbale → Firme).</li>
+    </ul>
+  </div>
+</div>
+
+<h3 id="dove">Dove trovo… (vecchio → nuovo)</h3>
+<p class="sotto">Ogni funzione di oggi ha un posto nella nuova struttura. Gli indirizzi delle pagine restano validi (anche quelli nelle email già spedite).</p>
+<div class="carta tabella-scorre">
+<table>
+  <thead><tr><th>Oggi</th><th>Domani</th><th>Step</th></tr></thead>
+  <tbody>
+    <tr><td>Inizio «Da dove vuoi iniziare?» + Dashboard</td><td>La mia scrivania (cose da fare + moduli); la dashboard dell'area resta come pagina dell'area</td><td>2</td></tr>
+    <tr><td>Pulsante «Messaggi» in alto</td><td>Anche tra le cose da fare della scrivania, con il numero</td><td>2</td></tr>
+    <tr><td>FSL › Riepilogo</td><td>FSL › Pagina iniziale (percorso con i numeri) › «Numeri dell'anno»</td><td>3</td></tr>
+    <tr><td>FSL › Da stipulare · Convenzioni · Verifica iscrizioni</td><td>FSL › Convenzioni, con tre filtri: Da stipulare · In vigore · Scadute; «Verifica» diventa un avviso sulla scheda scuola e un filtro</td><td>3</td></tr>
+    <tr><td>Allegato A e Convenzione precompilati</td><td>Pulsanti sulla scheda scuola (e restano dove sono oggi)</td><td>3</td></tr>
+    <tr><td>Studenti e attestati (per area)</td><td>FSL › Studenti e attestati, per tutte le aree FSL, con filtro per area</td><td>3</td></tr>
+    <tr><td>Didattica › Pratiche (tabella)</td><td>Didattica › Pratiche: bacheca per fasi; la tabella resta come «Vista elenco» con gli stessi filtri ed esportazioni</td><td>4</td></tr>
+    <tr><td>Porta in seduta / Invia alla segreteria (barre sopra la tabella)</td><td>Barra che compare quando si selezionano pratiche, con le azioni possibili</td><td>4</td></tr>
+    <tr><td>Scheda pratica (un'unica pagina lunga)</td><td>Iter + Prossima azione in alto; schede Domanda · Istruttoria e verbale · Storico e messaggi · Altre azioni</td><td>4</td></tr>
+    <tr><td>Sedute e verbali › consigli</td><td>Didattica › Consigli (card per consiglio) › scheda consiglio con Componenti · Referenti · Sedute</td><td>5</td></tr>
+    <tr><td>Scheda seduta (tutto insieme)</td><td>Seduta guidata a passi; ogni passo ha la sua schermata; Word/Excel/PDF in «Documenti della seduta»</td><td>5</td></tr>
+    <tr><td>Moduli e documenti</td><td>Didattica › Impostazioni › Moduli (costruttore con anteprima a fianco)</td><td>6</td></tr>
+    <tr><td>Ufficio e ricevimento</td><td>Didattica › Impostazioni › Uffici e persone · Sportello</td><td>6</td></tr>
+    <tr><td>Tutorato · lettere di incarico</td><td>Didattica › Tutorato (stesso contenuto, nuovo aspetto)</td><td>6</td></tr>
+    <tr><td>Eventi e turni · Progetti · Iscritti</td><td>Stesse pagine con indice laterale delle sezioni e azione principale sempre visibile</td><td>7</td></tr>
+    <tr><td>Utenti, Sistema, Anagrafi, Testata, Menu</td><td>Gestione del portale, stesse funzioni, nuovo aspetto</td><td>8</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3 id="regole">Regole grafiche (valgono per tutte le pagine)</h3>
+<div class="griglia g2">
+  <div class="carta">
+    <ul style="margin:0;padding-left:20px">
+      <li><b>Ogni pagina si apre con</b> titolo, una frase «a cosa serve» e <b>un solo pulsante principale</b> (es. «Nuova seduta»).</li>
+      <li><b>Stati</b> sempre con colore + icona + parola (mai solo colore): verde fatto, ambra da fare, rosso bloccato, grigio archiviato.</li>
+      <li><b>Testi</b> almeno 15px, pulsanti importanti grandi; le tabelle restano compatte ma con righe più alte.</li>
+      <li><b>Un colore per modulo</b> (quelli di oggi): rosso FSL, verde Didattica, blu Eventi, viola Prenotazioni, ardesia Portale.</li>
+      <li><b>Uno stile di schede</b> uguale ovunque.</li>
+    </ul>
+  </div>
+  <div class="carta">
+    <b>Parole più semplici</b> (proposta, da rivedere insieme)
+    <table style="margin-top:8px">
+      <tr><td>Smista</td><td>Assegna a una persona</td></tr>
+      <tr><td>Turno</td><td>Data / orario (o «Edizione» nei progetti)</td></tr>
+      <tr><td>Check-in</td><td>Registra presenze</td></tr>
+      <tr><td>Firma PAdES</td><td>Firma digitale del PDF</td></tr>
+      <tr><td>CSV</td><td>Scarica in Excel</td></tr>
+      <tr><td>O.d.g.</td><td>Ordine del giorno</td></tr>
+      <tr><td>Perimetro / abilitazione</td><td>Cosa può gestire</td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<h2>Schermate di prova</h2>
+<p class="sotto">Bozze per capirsi, non definitive: i numeri sono inventati. Mostrano disposizione e parole, non i colori esatti. Su ognuna serve un tuo «sì», «no» o «cambierei…».</p>
+
+<h3 id="s-scrivania">A · La mia scrivania</h3>
+<div class="schermo">
+  <div class="barra"><span class="bc"><b>La mia scrivania</b></span><span class="cerca">Cerca scuola, studente, pratica…</span></div>
+  <div class="corpo">
+    <div class="lato">
+      <div class="v on" style="--mc:#990000">Scrivania</div>
+      <div class="gr">I miei moduli</div>
+      <div class="v">Formazione Scuola Lavoro <i>5</i></div>
+      <div class="v">Didattica <i>14</i></div>
+      <div class="v">Eventi e seminari <i>2</i></div>
+      <div class="v">Gestione del portale</div>
+    </div>
+    <div class="area">
+      <h5>Buongiorno, Maria</h5>
+      <p class="aiuto">Ecco cosa ti aspetta oggi, sabato 11 ottobre. Clicca su una riga per cominciare.</p>
+      <div class="griglia g2" style="gap:12px">
+        <div class="card">
+          <b style="font-size:.9rem">Cose da fare</b>
+          <div class="todo"><span class="pal" style="background:#047857">8</span><span class="cosa">Pratiche da assegnare<small>Didattica · la più vecchia è di 6 giorni fa</small></span><span class="btn sec">Apri</span></div>
+          <div class="todo"><span class="pal" style="background:#047857">2</span><span class="cosa">Verbali in attesa di firma<small>Consiglio di Biologia · sollecito inviato</small></span><span class="btn sec">Apri</span></div>
+          <div class="todo"><span class="pal" style="background:#b30000">3</span><span class="cosa">Convenzioni da stipulare<small>FSL · scuole con attività a novembre</small></span><span class="btn sec">Apri</span></div>
+          <div class="todo"><span class="pal" style="background:#b30000">2</span><span class="cosa">Elenchi studenti mancanti<small>FSL · attività concluse</small></span><span class="btn sec">Apri</span></div>
+          <div class="todo"><span class="pal" style="background:#0056b3">4</span><span class="cosa">Messaggi non letti<small>Eventi e seminari</small></span><span class="btn sec">Apri</span></div>
+        </div>
+        <div>
+          <div class="card" style="margin-bottom:12px">
+            <b style="font-size:.9rem">In arrivo</b>
+            <div class="riga"><span>Consiglio di Scienze Naturali</span><span class="stato" style="background:#dcfce7;color:#166534">mar 14/10</span></div>
+            <div class="riga"><span>OpenLab · Liceo Scorza</span><span class="stato" style="background:#dbeafe;color:#1e3a8a">gio 16/10</span></div>
+            <div class="riga"><span>Scadenza convenzione IIS Mattei</span><span class="stato" style="background:#fef3c7;color:#92400e">31/10</span></div>
+          </div>
+          <div class="mod">
+            <div class="card" style="--c:#b30000"><b>FSL</b><small>5 da fare</small></div>
+            <div class="card" style="--c:#047857"><b>Didattica</b><small>14 da fare</small></div>
+            <div class="card" style="--c:#0056b3"><b>Eventi</b><small>2 da fare</small></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<p class="nota-mock"><b>Idea:</b> ognuno vede solo le righe dei moduli a cui ha accesso; un referente di consiglio vede solo le sue sedute. Se non c'è niente da fare: «Tutto in ordine 👍».</p>
+
+<h3 id="s-fsl">B · Formazione Scuola Lavoro: percorso e scheda scuola</h3>
+<div class="schermo" style="--mc:#b30000">
+  <div class="barra"><span class="bc">Scrivania › <b>Formazione Scuola Lavoro</b></span><span class="cerca">Cerca una scuola…</span></div>
+  <div class="corpo">
+    <div class="lato" style="--mc:#b30000">
+      <div class="v">Scrivania</div>
+      <div class="gr">Formazione Scuola Lavoro</div>
+      <div class="v on">Panoramica</div>
+      <div class="v">Progetti</div>
+      <div class="v">Iscrizioni scuole <i>2</i></div>
+      <div class="v">Convenzioni <i>3</i></div>
+      <div class="v">Studenti e attestati <i>2</i></div>
+      <div class="v">Valutazioni</div>
+      <div class="gr">Impostazioni</div>
+      <div class="v">Scuole</div>
+      <div class="v">Moduli di iscrizione</div>
+    </div>
+    <div class="area">
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <div><h5>Formazione Scuola Lavoro · a.s. 2026/27</h5><p class="aiuto">Il percorso di ogni scuola, dall'iscrizione all'attestato. Clicca una fase per vedere chi c'è dentro.</p></div>
+        <span><span class="btn pr">+ Nuovo progetto</span></span>
+      </div>
+      <div class="percorso">
+        <div class="tappa"><b>18</b>Progetti pubblicati</div>
+        <div class="tappa"><b>41</b>Scuole iscritte<br><span style="color:#b45309">2 in lista d'attesa</span></div>
+        <div class="tappa att"><b>3</b>Convenzioni da stipulare</div>
+        <div class="tappa"><b>2</b>Elenchi studenti mancanti</div>
+        <div class="tappa"><b>27</b>Attestati inviati</div>
+        <div class="tappa"><b>12</b>Valutazioni ricevute</div>
+      </div>
+      <div class="card">
+        <b style="font-size:.9rem">Convenzioni da stipulare</b> <span style="font-size:.78rem;color:#64748b">— scuole con prenotazioni ma senza convenzione valida per il periodo</span>
+        <div class="riga"><span><b>IIS «E. Mattei»</b> · Castrovillari<br><small style="color:#64748b">2 attività · prima il 04/11</small></span><span style="display:flex;gap:6px;flex-wrap:wrap"><span class="btn sec">Allegato A</span><span class="btn sec">Convenzione</span><span class="btn pr">Registra firmata</span></span></div>
+        <div class="riga"><span><b>Liceo «G. B. Scorza»</b> · Cosenza<br><small style="color:#64748b">1 attività · il 16/10 · <span style="color:#b30000;font-weight:600">mancano 5 giorni</span></small></span><span style="display:flex;gap:6px;flex-wrap:wrap"><span class="btn sec">Allegato A</span><span class="btn sec">Convenzione</span><span class="btn pr">Registra firmata</span></span></div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="schermo" style="--mc:#b30000;margin-top:16px">
+  <div class="barra"><span class="bc">FSL › Convenzioni › <b>Liceo «G. B. Scorza»</b></span></div>
+  <div class="area">
+    <h5>Liceo Scientifico «G. B. Scorza» <span style="font-size:.8rem;color:#64748b;font-weight:400">CSPS01000X · Cosenza</span></h5>
+    <p class="aiuto">Tutto quello che riguarda questa scuola. Il passo da fare è evidenziato.</p>
+    <div class="linea-iter" style="--mc:#b30000">
+      <div class="ok">Iscritta</div><div class="qui">Convenzione</div><div>Attività svolta</div><div>Elenco studenti</div><div>Attestati</div><div>Valutazione</div>
+    </div>
+    <div class="prossima" style="background:#fff5f5;border-color:#fecaca"><span style="flex:1"><b>Prossimo passo: registrare la convenzione firmata.</b><br>Scarica Allegato A e Convenzione già compilati, inviali alla scuola, poi carica il file firmato.</span><span class="btn pr big">Registra firmata</span></div>
+    <div class="griglia g2" style="gap:12px">
+      <div class="card"><b style="font-size:.85rem">Prenotazioni</b>
+        <div class="riga"><span>OpenLab Biotecnologie · 16/10<br><small style="color:#64748b">prof.ssa Rossi · 24 studenti</small></span><span class="stato" style="background:#dcfce7;color:#166534">confermata</span></div>
+      </div>
+      <div class="card"><b style="font-size:.85rem">Documenti</b>
+        <div class="riga"><span>Allegato A (PDF · Word)</span><span class="btn sec">Scarica</span></div>
+        <div class="riga"><span>Convenzione (Word)</span><span class="btn sec">Scarica</span></div>
+        <div class="riga"><span>Convenzione firmata</span><span class="stato" style="background:#fef3c7;color:#92400e">manca</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+<p class="nota-mock"><b>Idea:</b> la scheda scuola raccoglie ciò che oggi è sparso tra «Da stipulare», «Convenzioni», «Verifica iscrizioni», «Iscritti» e «Studenti e attestati».</p>
+
+<h3 id="s-pratiche">C · Didattica: pratiche in bacheca per fasi</h3>
+<div class="schermo" style="--mc:#047857">
+  <div class="barra"><span class="bc">Scrivania › Didattica › <b>Pratiche</b></span><span class="cerca">Nome, matricola o codice…</span></div>
+  <div class="corpo">
+    <div class="lato" style="--mc:#047857">
+      <div class="v">Scrivania</div>
+      <div class="gr">Didattica</div>
+      <div class="v">Panoramica</div>
+      <div class="v on">Pratiche <i>14</i></div>
+      <div class="v">Consigli e sedute <i>2</i></div>
+      <div class="v">Tutorato</div>
+      <div class="v">Statistiche</div>
+      <div class="gr">Impostazioni</div>
+      <div class="v">Moduli e documenti</div>
+      <div class="v">Uffici e persone</div>
+      <div class="v">Sportello</div>
+    </div>
+    <div class="area">
+      <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start">
+        <div><h5>Pratiche degli studenti</h5><p class="aiuto">Ogni colonna è una fase dell'iter. Clicca una pratica per lavorarla.</p></div>
+        <span style="display:flex;gap:6px"><span class="btn sec">▦ Bacheca</span><span class="btn sec" style="opacity:.6">☰ Elenco</span><span class="btn sec">Scarica Excel</span></span>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;font-size:.78rem">
+        <span class="btn sec" style="background:#0f172a;color:#fff">Tutte</span><span class="btn sec">Assegnate a me (5)</span><span class="btn sec">Del mio ufficio</span><span class="btn sec">Modulo: tutti ▾</span>
+      </div>
+      <div class="colonne">
+        <div class="col"><h6>Da protocollare <span>2</span></h6>
+          <div class="tess" style="--tc:#b45309"><b>Convalida esami</b>Bianchi Luca<br><small>da 3 giorni</small></div>
+        </div>
+        <div class="col"><h6>Da assegnare <span>8</span></h6>
+          <div class="tess" style="--tc:#0056b3"><b>Piano di studi</b>Ferraro Anna<br><small>da 6 giorni ⚠</small></div>
+          <div class="tess" style="--tc:#0056b3"><b>Riconoscimento CFU</b>Greco Paolo<br><small>ieri</small></div>
+        </div>
+        <div class="col"><h6>In lavorazione <span>4</span></h6>
+          <div class="tess" style="--tc:#7c3aed"><b>Convalida esami</b>Russo Marta<br><small>Ufficio CdS Biologia</small></div>
+        </div>
+        <div class="col"><h6>Attesa studente <span>1</span></h6>
+          <div class="tess" style="--tc:#b45309"><b>Passaggio di corso</b>Costa Sara<br><small>integrazione chiesta il 02/10</small></div>
+        </div>
+        <div class="col"><h6>Pronte per il consiglio <span>6</span></h6>
+          <div class="tess" style="--tc:#047857"><b>Piano di studi</b>Esposito Gianni<br><small>seduta 14/10</small></div>
+        </div>
+        <div class="col"><h6>Decise · alla segreteria <span>3</span></h6>
+          <div class="tess" style="--tc:#15803d"><b>Convalida esami</b>Marino Elena<br><small>accolta · da inviare</small></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<p class="nota-mock"><b>Idea:</b> le colonne si calcolano da stato, ufficio, protocollo e seduta che già esistono: nessun dato nuovo. Selezionando più pratiche compare una barra «Porta alla seduta… · Invia alla segreteria · Scarica».</p>
+
+<h3 id="s-pratica">D · Una pratica e il suo iter</h3>
+<div class="schermo" style="--mc:#047857">
+  <div class="barra"><span class="bc">Didattica › Pratiche › <b>DID-2026-0142</b></span></div>
+  <div class="area">
+    <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
+      <div><h5>Convalida esami · Russo Marta</h5><p class="aiuto">Matricola 245781 · Biologia (L-13) · inviata il 29/09/2026 · prot. 1534 del 30/09</p></div>
+      <span class="stato" style="background:#ede9fe;color:#5b21b6;align-self:flex-start;font-size:.8rem;padding:3px 12px">⚙ In lavorazione</span>
+    </div>
+    <div class="linea-iter">
+      <div class="ok">Inviata</div><div class="ok">Protocollata</div><div class="ok">Ufficio didattico</div><div class="qui">Ufficio CdS</div><div>Consiglio</div><div>Esito allo studente</div><div>Segreteria</div>
+    </div>
+    <div class="prossima"><span style="flex:1"><b>Tocca a te: completa l'istruttoria e porta la pratica in consiglio.</b><br>La prossima seduta del Consiglio di Biologia è martedì 14/10.</span><span class="btn pr big">Porta alla seduta del 14/10</span><span class="btn sec">Passa a un'altra persona</span></div>
+    <div style="display:flex;gap:4px;border-bottom:2px solid #e5e7eb;margin-bottom:10px;font-size:.82rem">
+      <span style="padding:7px 12px;border-bottom:3px solid #047857;margin-bottom:-2px;font-weight:700">Domanda</span>
+      <span style="padding:7px 12px">Istruttoria e verbale</span>
+      <span style="padding:7px 12px">Storico e messaggi (6)</span>
+      <span style="padding:7px 12px">Altre azioni</span>
+    </div>
+    <div class="card" style="font-size:.82rem">
+      <div class="riga"><span>Esame sostenuto: <b>Chimica generale</b> · 9 CFU · 28/30</span><span>→ <b>Chimica generale e inorganica</b></span></div>
+      <div class="riga"><span>Esame sostenuto: <b>Fisica I</b> · 6 CFU · 25/30</span><span>→ <b>Fisica</b></span></div>
+    </div>
+  </div>
+</div>
+<p class="nota-mock"><b>Idea:</b> «Prossima azione» cambia da sola: «Protocolla», «Prendi in carico», «Assegna», «Porta in seduta», «Comunica l'esito», «Invia alla segreteria». Chiedere un'integrazione, cambiare stato a mano e aggiungere un'attività restano in «Altre azioni».</p>
+
+<h3 id="s-consigli">E · Consigli dei corsi di studio</h3>
+<div class="schermo" style="--mc:#047857">
+  <div class="barra"><span class="bc">Didattica › <b>Consigli e sedute</b></span></div>
+  <div class="area">
+    <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
+      <div><h5>Consigli e sedute</h5><p class="aiuto">Un riquadro per ogni consiglio. Da qui prepari le sedute, convochi i componenti e segui le firme dei verbali.</p></div>
+      <span><span class="btn pr">+ Nuova seduta</span></span>
+    </div>
+    <div class="griglia g3" style="gap:12px">
+      <div class="card" style="border-top:4px solid #047857">
+        <b>Consiglio di Biologia</b><div style="font-size:.75rem;color:#64748b">Coord. prof. Verdi · 23 componenti</div>
+        <div class="riga"><span>Prossima seduta</span><b>mar 14/10</b></div>
+        <div class="riga"><span>Pratiche in attesa</span><b>6</b></div>
+        <div class="riga"><span>Verbale 23/09</span><span class="stato" style="background:#fef3c7;color:#92400e">firma coordinatore</span></div>
+        <div style="margin-top:8px;display:flex;gap:6px"><span class="btn pr">Apri seduta</span><span class="btn sec">Componenti</span></div>
+      </div>
+      <div class="card" style="border-top:4px solid #047857">
+        <b>Consiglio di Scienze Naturali</b><div style="font-size:.75rem;color:#64748b">Coord. prof.ssa Neri · 17 componenti</div>
+        <div class="riga"><span>Prossima seduta</span><span style="color:#b45309;font-weight:600">da fissare</span></div>
+        <div class="riga"><span>Pratiche in attesa</span><b>3</b></div>
+        <div class="riga"><span>Ultimo verbale</span><span class="stato" style="background:#dcfce7;color:#166534">firmato</span></div>
+        <div style="margin-top:8px;display:flex;gap:6px"><span class="btn pr">Fissa seduta</span><span class="btn sec">Componenti</span></div>
+      </div>
+      <div class="card" style="border-top:4px solid #047857">
+        <b>Consiglio di Biotecnologie</b><div style="font-size:.75rem;color:#64748b">Coord. prof. Bruno · 19 componenti</div>
+        <div class="riga"><span>Prossima seduta</span><b>gio 23/10</b></div>
+        <div class="riga"><span>Pratiche in attesa</span><b>0</b></div>
+        <div class="riga"><span>Ultimo verbale</span><span class="stato" style="background:#dcfce7;color:#166534">firmato</span></div>
+        <div style="margin-top:8px;display:flex;gap:6px"><span class="btn pr">Apri seduta</span><span class="btn sec">Componenti</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3 id="s-seduta">F · Seduta guidata, un passo alla volta</h3>
+<div class="schermo" style="--mc:#047857">
+  <div class="barra"><span class="bc">Didattica › Consigli › Biologia › <b>Seduta del 14/10/2026</b></span></div>
+  <div class="area">
+    <h5>Consiglio di Biologia · martedì 14 ottobre 2026, ore 15:00 · Aula Seminari</h5>
+    <p class="aiuto">Segui i passi nell'ordine. Puoi tornare indietro quando vuoi; i passi fatti diventano verdi.</p>
+    <div class="wiz">
+      <div class="passi">
+        <div class="ok"><span>✓</span>Convocazione</div>
+        <div class="ok"><span>✓</span>Presenze</div>
+        <div class="qui"><span>3</span>Pratiche e decisioni</div>
+        <div><span>4</span>Esiti agli studenti</div>
+        <div><span>5</span>Verbale</div>
+        <div><span>6</span>Firme</div>
+        <div style="background:transparent;border:0;font-size:.75rem;color:#64748b">Documenti: Word · Excel · PDF</div>
+      </div>
+      <div class="card">
+        <b>3 · Pratiche e decisioni</b> <span style="font-size:.78rem;color:#64748b">— 6 pratiche, 4 decise</span>
+        <div class="riga"><span>Esposito Gianni · Piano di studi</span><span style="display:flex;gap:4px"><span class="stato" style="background:#dcfce7;color:#166534">✓ approvata</span></span></div>
+        <div class="riga"><span>Russo Marta · Convalida esami</span><span style="display:flex;gap:4px;flex-wrap:wrap"><span class="btn sec">Approva</span><span class="btn sec">Con modifiche</span><span class="btn sec">Respingi</span><span class="btn sec">Rinvia</span></span></div>
+        <div class="riga"><span>Marino Elena · Convalida esami</span><span class="stato" style="background:#fee2e2;color:#991b1b">✗ respinta</span></div>
+        <div style="margin-top:10px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><span class="btn sec">← Presenze</span><span class="btn pr">Avanti: esiti agli studenti →</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+<p class="nota-mock"><b>Idea:</b> i 5 passi esistono già oggi come pillole in cima alla pagina della seduta; qui diventano schermate separate, così si vede una cosa alla volta. Le firme mostrano chi deve firmare, da quando, e il pulsante «Sollecita».</p>
+
+<!-- ============================================================ -->
+<h2 id="non-cambia">Cosa non cambia</h2>
+<div class="griglia g2">
+  <div class="carta"><ul style="margin:0;padding-left:20px">
+    <li><b>Nessuna funzione viene tolta.</b> Ogni riga della tabella «Dove trovo…» va verificata prima di chiudere lo step.</li>
+    <li><b>Dati e database</b>: le schermate nuove leggono gli stessi dati. Nessuna migrazione per la parte grafica.</li>
+    <li><b>Indirizzi delle pagine</b>: restano validi (le email agli operatori e ai firmatari contengono link al pannello).</li>
+  </ul></div>
+  <div class="carta"><ul style="margin:0;padding-left:20px">
+    <li><b>Permessi</b>: chi vede cosa resta deciso come oggi (amministratori, gestori, abilitati FSL, Ufficio didattico, referenti dei consigli).</li>
+    <li><b>Documenti generati</b> (Allegato A, Convenzione, verbali, lettere di incarico, attestati): identici.</li>
+    <li><b>Sito pubblico</b>: non è toccato da questa riprogettazione.</li>
+  </ul></div>
+</div>
+
+<h2 id="decidere">Da decidere insieme</h2>
+<div class="carta" id="domande"></div>
+
+<p style="margin-top:48px;font-size:.85rem;color:var(--tenue)">File: <code>documentazione/mappa_pannello.html</code> nella cartella del progetto · si apre con un doppio clic da qualsiasi PC, anche senza internet · per stamparla: Ctrl+P.</p>
+</main>
+</div>
+
+<script>
+// ── Stato degli step: si aggiorna qui a ogni step (fatto | corso | dafare) ──
+var STEP = [
+  { n: 0, stato: 'fatto', titolo: 'Mappa e schermate di prova', quando: '11/10/2026',
+    testo: 'Analisi delle 50 pagine del pannello, problemi, nuova struttura, tabella vecchio → nuovo e bozze delle schermate principali (questo documento).',
+    file: 'documentazione/mappa_pannello.html' },
+  { n: 1, stato: 'fatto', titolo: 'Base grafica comune', quando: '11/10/2026',
+    testo: 'Foglio di stile unico del pannello e componenti riutilizzabili (intestazione di pagina, schede, riquadro «prossimo passo», linea dell\'iter, filtri per fase, etichette di stato, elenco vuoto). Le pagine di oggi prendono subito il nuovo aspetto: schede a pillola uguali ovunque, colore del modulo (rosso FSL, verde Didattica, blu Eventi, viola Prenotazioni), testi e pulsanti più leggibili, tema scuro coerente. Nessuna funzione spostata. Le parole più semplici arrivano insieme alle pagine rifatte (step 2 e seguenti).',
+    punti: ['Provato in locale su Didattica e FSL; 1276 prove automatiche superate', 'File: assets/css/pannello.css (nuovo), src/Portale/Vista/Pannello.php (nuovo), inc/pannello.php (nuovo), admin/admin_header.php e functions.php (modificati)'],
+    file: 'assets/css/pannello.css · src/Portale/Vista/Pannello.php · inc/pannello.php · admin/admin_header.php · functions.php' },
+  { n: 2, stato: 'fatto', titolo: 'Scrivania e nuovo menu', quando: '11/10/2026',
+    testo: 'Pagina d\'ingresso «La mia scrivania»: saluto, «Cose da fare» (pratiche da assegnare, verbali in attesa di firma, convenzioni da stipulare, messaggi da leggere, prenotazioni da approvare) e «I miei moduli» con il numero di cose da fare. Menu laterale con «La mia scrivania» e numeri accanto alle voci (pratiche da assegnare, verbali, prenotazioni). Ognuno vede solo le righe di cui può occuparsi.',
+    punti: ['Provato in locale; 1284 prove automatiche superate (8 nuove)', 'Rimandati: casella «Cerca ovunque» e percorso «dove sono» in alto (arrivano con le pagine rifatte, step 3 e 4)', 'Elenchi studenti mancanti (FSL) non ancora tra le cose da fare: si aggiunge con lo step 3'],
+    file: 'src/Portale/CoseDaFare.php (nuovo) · admin/inizio.php · admin/admin_header.php · componente pn_cosa' },
+  { n: 3, stato: 'dafare', titolo: 'Formazione Scuola Lavoro a percorso',
+    testo: 'Panoramica con le fasi e i numeri; Convenzioni con filtri Da stipulare / In vigore / Scadute; nuova scheda scuola con tutto ciò che la riguarda e il prossimo passo in evidenza.',
+    file: 'admin/fsl.php (schede separate come per la Didattica) · nuova vista scheda scuola' },
+  { n: 4, stato: 'dafare', titolo: 'Didattica · Pratiche',
+    testo: 'Bacheca per fasi (con la tabella come seconda vista), barra delle azioni sulle pratiche selezionate, scheda pratica con iter in alto, «Prossima azione» e schede Domanda · Istruttoria · Storico · Altre azioni.',
+    file: 'admin/didattica_pratiche.php' },
+  { n: 5, stato: 'dafare', titolo: 'Didattica · Consigli e sedute',
+    testo: 'Card per consiglio (prossima seduta, pratiche in attesa, stato del verbale); seduta guidata a passi, una schermata per passo; stato delle firme con sollecito.',
+    file: 'admin/didattica_sedute.php' },
+  { n: 6, stato: 'dafare', titolo: 'Didattica · Moduli, uffici, sportello, tutorato',
+    testo: 'Costruttore dei moduli con anteprima a fianco, «Uffici e persone» (chi fa cosa), sportello; tutorato con il nuovo aspetto.',
+    file: 'admin/didattica_moduli.php · didattica_ufficio.php · tutorato.php' },
+  { n: 7, stato: 'dafare', titolo: 'Eventi, progetti e iscritti',
+    testo: 'Schede evento e progetto con indice laterale delle sezioni e pulsante Salva sempre visibile; iscritti con filtri chiari e azioni sulle righe selezionate.',
+    file: 'admin/eventi.php · progetti.php · iscritti.php · dashboard.php' },
+  { n: 8, stato: 'dafare', titolo: 'Portale, guida e prova con l\'ufficio',
+    testo: 'Gestione del portale con il nuovo aspetto; brevi guide «?» sulle pagine; controllo accessibilità; prova con due o tre persone dell\'ufficio e ritocchi.',
+    file: 'admin/utenti.php · sistema.php · anagrafe_personale.php · testata.php · menu.php' }
+];
+var DOMANDE = [
+  'Le schermate A–F vanno nella direzione giusta? C\'è qualcosa che cambieresti (disposizione, parole, cosa mettere in evidenza)?',
+  'Ordine degli step: dopo la base grafica (1) e la scrivania (2), preferisci partire dalla FSL (3) o dalla Didattica (4–5)?',
+  'Pratiche: la bacheca a colonne deve essere la vista predefinita, o preferisci l\'elenco con le colonne come alternativa?',
+  'Parole: va bene la tabella «parole più semplici»? Ci sono termini che l\'ufficio usa e che devono restare (es. «smistare»)?',
+  'Chi proverà le schermate nuove prima del rilascio (due o tre persone dell\'ufficio)?'
+];
+
+(function () {
+  var nomi = { fatto: 'Fatto', corso: 'In corso', dafare: 'Da fare' };
+  var box = document.getElementById('elenco-step');
+  var fatti = 0;
+  STEP.forEach(function (s) {
+    if (s.stato === 'fatto') fatti++;
+    var d = document.createElement('div');
+    d.className = 'step ' + s.stato;
+    var punti = (s.punti || []).map(function (p) { return '<li>' + p + '</li>'; }).join('');
+    d.innerHTML = '<div class="num">' + s.n + '</div><div><h4>' + s.titolo +
+      ' <span class="chip ' + s.stato + '">' + nomi[s.stato] + (s.quando ? ' · ' + s.quando : '') + '</span></h4>' +
+      '<p>' + s.testo + '</p>' + (punti ? '<ul>' + punti + '</ul>' : '') +
+      '<p class="file">' + s.file + '</p></div>';
+    box.appendChild(d);
+  });
+  document.getElementById('barra').style.width = Math.round(fatti / STEP.length * 100) + '%';
+  document.getElementById('riassunto').textContent = fatti + ' step su ' + STEP.length + ' completati';
+  document.getElementById('domande').innerHTML = '<ol style="margin:0;padding-left:20px">' +
+    DOMANDE.map(function (q) { return '<li style="margin-bottom:6px">' + q + '</li>'; }).join('') + '</ol>';
+
+  var btn = document.getElementById('tema');
+  btn.addEventListener('click', function () {
+    var r = document.documentElement;
+    var scuro = r.getAttribute('data-theme') === 'dark' ||
+      (!r.getAttribute('data-theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    r.setAttribute('data-theme', scuro ? 'light' : 'dark');
+  });
+})();
+</script>
+</body>
+</html>

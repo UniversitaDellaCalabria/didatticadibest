@@ -10,7 +10,7 @@ if (!defined('RADICE_SITO')) define('RADICE_SITO', __DIR__);
 require_once __DIR__ . '/src/bootstrap.php';
 
 // Le funzioni sono divise per argomento in inc/: l'ordine conta (costanti e codice eseguito al caricamento)
-foreach (['base', 'sezioni', 'aspetto', 'liste_attesa', 'sistema', 'dati', 'eventi_progetti', 'anagrafi', 'fsl', 'prenotazioni', 'attestati', 'risorse', 'calendario_risorse', 'esporta', 'didattica', 'catalogo_ateneo', 'pdf', 'tutorato', 'tutorato_registro', 'sedute', 'convalide', 'agenda', 'organizzazione', 'seminari', 'avvisi', 'report_ambiti', 'schema'] as $__inc) {
+foreach (['base', 'sezioni', 'aspetto', 'pannello', 'liste_attesa', 'sistema', 'dati', 'eventi_progetti', 'anagrafi', 'fsl', 'prenotazioni', 'attestati', 'risorse', 'calendario_risorse', 'esporta', 'didattica', 'catalogo_ateneo', 'pdf', 'tutorato', 'tutorato_registro', 'sedute', 'convalide', 'agenda', 'organizzazione', 'seminari', 'avvisi', 'report_ambiti', 'schema'] as $__inc) {
     require_once __DIR__ . '/inc/' . $__inc . '.php';
 }
 unset($__inc);

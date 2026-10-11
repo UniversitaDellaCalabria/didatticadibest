@@ -1,0 +1,189 @@
+/* =========================================================================
+   assets/css/pannello.css - Aspetto comune del pannello di gestione (admin/)
+   Caricato da admin/admin_header.php dopo Bootstrap. Componenti in src/Portale/Vista/Pannello.php.
+   --pn-mod e --pn-mod-testo (colore del modulo corrente e testo leggibile sopra) li imposta admin_header.php sul <body>.
+   1. Colori   2. Base (testi, pulsanti, schede, tabelle)   3. Componenti   4. Tema scuro   5. Stampa
+   ========================================================================= */
+
+/* 1. Colori ---------------------------------------------------------------- */
+:root {
+    --pn-mod: #990000;
+    --pn-mod-testo: #ffffff;
+    --pn-sfondo: #f4f6f9;
+    --pn-carta: #ffffff;
+    --pn-bordo: #e2e6ec;
+    --pn-testo: #1f2937;
+    --pn-tenue: #546072;
+    --pn-morbido: #eef1f5;
+    --pn-ok: #166534;       --pn-ok-bg: #dcfce7;
+    --pn-attesa: #92400e;   --pn-attesa-bg: #fef3c7;
+    --pn-blocco: #991b1b;   --pn-blocco-bg: #fee2e2;
+    --pn-info: #1e3a8a;     --pn-info-bg: #dbeafe;
+    --pn-lavoro: #5b21b6;   --pn-lavoro-bg: #ede9fe;
+    --pn-spento: #475569;   --pn-spento-bg: #eef1f5;
+    --pn-raggio: 12px;
+    --pn-ombra: 0 1px 2px rgba(15, 23, 42, .05), 0 1px 6px rgba(15, 23, 42, .04);
+}
+
+/* 2. Base ------------------------------------------------------------------ */
+body { background-color: var(--pn-sfondo); color: var(--pn-testo); }
+
+/* Testi piccoli: mai sotto i 13px, così si leggono anche senza occhiali */
+#page-content-wrapper .small, #page-content-wrapper small { font-size: max(.875em, 13px); }
+#page-content-wrapper .text-secondary { color: var(--pn-tenue) !important; }
+#page-content-wrapper .form-label { color: var(--pn-testo); }
+
+/* Pulsanti: un po' più grandi e con un'area di clic più comoda */
+#page-content-wrapper .btn { border-radius: 8px; }
+#page-content-wrapper .btn-sm { padding: .32rem .7rem; min-height: 32px; }
+#page-content-wrapper .btn-sm.py-0 { min-height: 26px; }
+
+/* Schede (card) */
+#page-content-wrapper .card { border-radius: var(--pn-raggio); }
+#page-content-wrapper .card.border-0.shadow-sm { border: 1px solid var(--pn-bordo) !important; box-shadow: var(--pn-ombra) !important; }
+#page-content-wrapper .card-header:first-child { border-radius: var(--pn-raggio) var(--pn-raggio) 0 0; }
+
+/* Tabelle: intestazioni chiare e righe un po' più alte */
+#page-content-wrapper .table > thead th { font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; color: var(--pn-tenue); font-weight: 700; white-space: nowrap; }
+#page-content-wrapper .table-sm > :not(caption) > * > * { padding: .5rem .5rem; }
+#page-content-wrapper .table-hover > tbody > tr:hover > * { --bs-table-hover-bg: #f6f8fb; }
+
+/* Badge più leggibili */
+#page-content-wrapper .badge { font-weight: 600; letter-spacing: .01em; }
+
+/* Le vecchie barre di schede delle pagine (pillole e linguette) prendono l'aspetto delle schede comuni */
+#page-content-wrapper .container-fluid > .nav-pills,
+#page-content-wrapper .container-fluid > .nav-tabs { gap: 6px !important; border-bottom: 0; margin-bottom: 1rem !important; }
+#page-content-wrapper .container-fluid > .nav-pills .nav-link,
+#page-content-wrapper .container-fluid > .nav-tabs .nav-link {
+    background: var(--pn-carta) !important; color: var(--pn-testo) !important; border: 1px solid var(--pn-bordo) !important;
+    border-radius: 999px !important; padding: .45rem 1rem; font-weight: 600; font-size: .9rem; margin: 0;
+}
+#page-content-wrapper .container-fluid > .nav-pills .nav-link:hover,
+#page-content-wrapper .container-fluid > .nav-tabs .nav-link:hover { border-color: var(--pn-mod) !important; }
+#page-content-wrapper .container-fluid > .nav-pills .nav-link.active,
+#page-content-wrapper .container-fluid > .nav-tabs .nav-link.active {
+    background: var(--pn-mod) !important; color: var(--pn-mod-testo) !important; border-color: var(--pn-mod) !important;
+}
+#page-content-wrapper .container-fluid > .nav-pills .nav-link.active .badge,
+#page-content-wrapper .container-fluid > .nav-tabs .nav-link.active .badge { background: rgba(255, 255, 255, .25) !important; color: inherit !important; border: 0 !important; }
+
+/* 3. Componenti -------------------------------------------------------------- */
+
+/* Intestazione della pagina */
+.pn-testata { margin-bottom: 1.25rem; }
+.pn-sopra { font-size: .85rem; margin-bottom: .35rem; }
+.pn-sopra a { text-decoration: none; }
+.pn-testata-riga { display: flex; align-items: flex-start; gap: 14px; flex-wrap: wrap; }
+.pn-testata-ico {
+    width: 46px; height: 46px; border-radius: 12px; flex-shrink: 0; display: grid; place-items: center; font-size: 1.25rem;
+    color: var(--pn-mod); background: var(--pn-morbido); background: color-mix(in srgb, var(--pn-mod) 12%, transparent);
+}
+.pn-testata-testi { flex: 1 1 320px; min-width: 0; }
+.pn-titolo { font-size: 1.45rem; font-weight: 700; margin: 0; line-height: 1.25; color: var(--pn-testo); }
+.pn-aiuto { margin: .2rem 0 0; color: var(--pn-tenue); font-size: .95rem; max-width: 80ch; }
+.pn-testata-azioni { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-left: auto; }
+
+/* Schede della pagina */
+.pn-schede { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 1rem; }
+.pn-scheda {
+    display: inline-flex; align-items: center; gap: 8px; padding: .45rem 1rem; border-radius: 999px; text-decoration: none;
+    background: var(--pn-carta); color: var(--pn-testo); border: 1px solid var(--pn-bordo); font-weight: 600; font-size: .9rem;
+}
+.pn-scheda:hover { border-color: var(--pn-mod); color: var(--pn-testo); }
+.pn-scheda.attiva { background: var(--pn-mod); border-color: var(--pn-mod); color: var(--pn-mod-testo); }
+.pn-scheda .fa { opacity: .85; }
+.pn-num { display: inline-block; min-width: 22px; padding: 0 7px; border-radius: 999px; font-size: .75rem; line-height: 20px; text-align: center; background: var(--pn-morbido); color: var(--pn-testo); }
+.pn-num.avviso { background: #b30000; color: #fff; }
+.pn-scheda.attiva .pn-num { background: rgba(255, 255, 255, .25); color: inherit; }
+
+/* Prossimo passo */
+.pn-prossima {
+    display: flex; gap: 14px; align-items: center; flex-wrap: wrap; padding: 14px 16px; margin-bottom: 1rem;
+    border-radius: var(--pn-raggio); border: 1px solid var(--pn-bordo); border: 1px solid color-mix(in srgb, var(--pn-mod) 35%, transparent);
+    background: var(--pn-carta); background: color-mix(in srgb, var(--pn-mod) 7%, var(--pn-carta));
+}
+.pn-prossima-testo { flex: 1 1 280px; min-width: 0; }
+.pn-prossima-testo strong { display: block; font-size: 1rem; }
+.pn-prossima-testo span { display: block; color: var(--pn-tenue); font-size: .9rem; }
+.pn-prossima-azioni { display: flex; gap: 8px; flex-wrap: wrap; }
+.pn-prossima-ok { border-color: #86efac; background: #f0fdf4; }
+.pn-prossima-attesa { border-color: #fcd34d; background: #fffbeb; }
+
+/* Linea dell'iter */
+.pn-iter { display: flex; list-style: none; margin: 0 0 1rem; padding: 0; counter-reset: pn-passo; }
+.pn-iter li { flex: 1 1 0; min-width: 0; position: relative; text-align: center; padding-top: 30px; font-size: .8rem; color: var(--pn-tenue); counter-increment: pn-passo; }
+.pn-iter li::before { content: ""; position: absolute; top: 11px; left: 0; right: 0; height: 3px; background: var(--pn-bordo); }
+.pn-iter li:first-child::before { left: 50%; }
+.pn-iter li:last-child::before { right: 50%; }
+.pn-iter li::after {
+    content: counter(pn-passo); position: absolute; top: 0; left: calc(50% - 13px); width: 26px; height: 26px; border-radius: 50%;
+    display: grid; place-items: center; font-size: .72rem; font-weight: 700; background: var(--pn-carta); border: 2px solid #cbd5e1; color: var(--pn-tenue);
+}
+.pn-iter li.fatto { color: var(--pn-ok); }
+.pn-iter li.fatto::before { background: #16a34a; }
+.pn-iter li.fatto::after { content: "\2713"; background: #16a34a; border-color: #16a34a; color: #fff; }
+.pn-iter li.qui { color: var(--pn-testo); font-weight: 700; }
+.pn-iter li.qui::after { background: var(--pn-mod); border-color: var(--pn-mod); color: var(--pn-mod-testo); box-shadow: 0 0 0 4px color-mix(in srgb, var(--pn-mod) 20%, transparent); }
+.pn-iter li a, .pn-iter li span { color: inherit; text-decoration: none; display: block; padding: 0 4px; }
+.pn-iter li small { display: block; font-weight: 400; color: var(--pn-tenue); }
+@media (max-width: 767.98px) {
+    .pn-iter { flex-direction: column; gap: 4px; }
+    .pn-iter li { text-align: left; padding: 3px 0 3px 36px; }
+    .pn-iter li::before { display: none; }
+    .pn-iter li::after { top: 0; left: 0; }
+}
+
+/* Filtri per fase (panoramica + filtro) */
+.pn-fasi { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 1rem; }
+.pn-fase {
+    --pn-fase: var(--pn-mod);
+    display: inline-flex; align-items: center; gap: 8px; padding: .4rem .85rem .4rem .45rem; border-radius: 10px; text-decoration: none;
+    background: var(--pn-carta); border: 1px solid var(--pn-bordo); color: var(--pn-testo); font-weight: 600; font-size: .88rem;
+}
+.pn-fase b { min-width: 30px; padding: 2px 8px; border-radius: 7px; text-align: center; background: var(--pn-morbido); background: color-mix(in srgb, var(--pn-fase) 14%, transparent); color: var(--pn-fase); }
+.pn-fase:hover { border-color: var(--pn-fase); color: var(--pn-testo); }
+.pn-fase.attiva { border-color: var(--pn-fase); box-shadow: inset 0 -3px 0 var(--pn-fase); }
+
+/* Etichette di stato */
+.pn-stato { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; font-size: .8rem; font-weight: 700; white-space: nowrap; }
+.pn-tono-ok { background: var(--pn-ok-bg); color: var(--pn-ok); }
+.pn-tono-attesa { background: var(--pn-attesa-bg); color: var(--pn-attesa); }
+.pn-tono-blocco { background: var(--pn-blocco-bg); color: var(--pn-blocco); }
+.pn-tono-info { background: var(--pn-info-bg); color: var(--pn-info); }
+.pn-tono-lavoro { background: var(--pn-lavoro-bg); color: var(--pn-lavoro); }
+.pn-tono-spento { background: var(--pn-spento-bg); color: var(--pn-spento); }
+
+/* Cose da fare */
+.pn-cose { background: var(--pn-carta); border: 1px solid var(--pn-bordo); border-radius: var(--pn-raggio); box-shadow: var(--pn-ombra); overflow: hidden; }
+.pn-cosa { --pn-cosa: var(--pn-mod); display: flex; align-items: center; gap: 14px; padding: 12px 16px; text-decoration: none; color: var(--pn-testo); border-top: 1px solid var(--pn-bordo); }
+.pn-cosa:first-child { border-top: 0; }
+.pn-cosa:hover, .pn-cosa:focus-visible { background: var(--pn-morbido); color: var(--pn-testo); }
+.pn-cosa-num { min-width: 42px; height: 42px; padding: 0 8px; border-radius: 11px; display: grid; place-items: center; font-weight: 800; font-size: 1.1rem; color: #fff; background: var(--pn-cosa); flex-shrink: 0; }
+.pn-cosa-testo { flex: 1; min-width: 0; }
+.pn-cosa-testo strong { display: block; }
+.pn-cosa-testo small { display: block; color: var(--pn-tenue); }
+.pn-cosa.avviso .pn-cosa-testo small { color: var(--pn-blocco); font-weight: 600; }
+.pn-cosa-vai { font-size: .85rem; font-weight: 700; color: var(--pn-tenue); white-space: nowrap; }
+.pn-cosa:hover .pn-cosa-vai { color: var(--pn-testo); }
+.pn-tutto-ok { padding: 1.4rem 1rem; text-align: center; color: var(--pn-ok); font-weight: 600; }
+
+/* Elenco vuoto */
+.pn-vuoto { text-align: center; padding: 2.5rem 1rem; color: var(--pn-tenue); }
+.pn-vuoto > .fa { font-size: 2rem; opacity: .45; margin-bottom: .6rem; }
+.pn-vuoto p { margin: 0 auto .8rem; max-width: 56ch; }
+
+/* 4. Tema scuro -------------------------------------------------------------- */
+[data-bs-theme="dark"] {
+    --pn-sfondo: #1a1d21; --pn-carta: #2b2f33; --pn-bordo: #3a3f46; --pn-testo: #e5e7eb; --pn-tenue: #a3adbb; --pn-morbido: #353a41;
+    --pn-ok: #86efac; --pn-ok-bg: #14361f; --pn-attesa: #fcd34d; --pn-attesa-bg: #3b2c0c; --pn-blocco: #fca5a5; --pn-blocco-bg: #3f1717;
+    --pn-info: #93c5fd; --pn-info-bg: #172a46; --pn-lavoro: #c4b5fd; --pn-lavoro-bg: #2a1f45; --pn-spento: #cbd5e1; --pn-spento-bg: #353a41;
+}
+[data-bs-theme="dark"] .pn-prossima-ok { background: #13261a; border-color: #166534; }
+[data-bs-theme="dark"] .pn-prossima-attesa { background: #2b220c; border-color: #92400e; }
+[data-bs-theme="dark"] #page-content-wrapper .table-hover > tbody > tr:hover > * { --bs-table-hover-bg: #32373d; }
+
+/* 5. Stampa ------------------------------------------------------------------- */
+@media print {
+    .pn-testata-azioni, .pn-schede, .pn-fasi, .pn-prossima-azioni { display: none !important; }
+}
