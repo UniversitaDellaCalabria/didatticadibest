@@ -73,7 +73,7 @@ if (isset($_POST['save_system_settings'])) {
 <!-- FRONT-END DELLA PAGINA -->
 <?php schede_sistema('sistema.php'); ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h4 class="fw-bold text-dark m-0"><i class="fa fa-envelope text-primary me-2"></i> Sistema Email & Promemoria</h4>
+    <div><h1 class="pn-titolo"><i class="fa fa-envelope me-2" aria-hidden="true"></i>Email e promemoria</h1><p class="pn-aiuto">Le email che il portale invia da solo, i backup e i controlli notturni.</p></div>
     
     <form method="POST" action="" class="m-0 text-end">
         <?php csrf_field(); ?>

@@ -328,7 +328,7 @@ $etichette_perm = ['full' => 'Admin area', 'eventi' => 'Eventi', 'iscritti' => '
 </style>
 
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-    <h4 class="fw-bold text-dark mb-0"><i class="fa fa-user-shield me-2 text-danger"></i>Utenti, gruppi e abilitazioni</h4>
+    <div><h1 class="pn-titolo"><i class="fa fa-user-shield me-2 text-danger" aria-hidden="true"></i>Utenti, gruppi e abilitazioni</h1><p class="pn-aiuto">Chi può entrare nel pannello e che cosa può gestire: ogni persona ha uno o più gruppi.</p></div>
     <button class="btn btn-sm btn-outline-danger fw-bold" style="border-radius:8px;" data-bs-toggle="modal" data-bs-target="#modCreaGruppo">
         <i class="fa fa-plus me-1"></i>Crea Gruppo
     </button>

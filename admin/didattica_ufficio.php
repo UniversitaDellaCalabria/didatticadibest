@@ -7,10 +7,10 @@ if (!defined('DIDATTICA_PANNELLO')) { http_response_code(403); exit('Accesso neg
 if ($fase === 'azioni') {
     // ── Ufficio didattico: operatori e sportello ──
     if (isset($_POST['salva_operatore'])) {
-        $err = aggiungi_operatore_ufficio($conn, (string)($_POST['persona_id'] ?? ''), (string)($_POST['ruolo'] ?? ''), (array)($_POST['compiti'] ?? []), (int)($_POST['ufficio_id'] ?? 0), (array)($_POST['corsi'] ?? []));
+        $err = aggiungi_operatore_ufficio($conn, (string)($_POST['persona_id'] ?? ''), (string)($_POST['ruolo'] ?? ''), (array)($_POST['compiti'] ?? []), (int)((array)($_POST['uffici'] ?? []))[0] ?: (int)($_POST['ufficio_id'] ?? 0), (array)($_POST['corsi'] ?? []), array_map('intval', (array)($_POST['uffici'] ?? [])));
         if (!$err) registra_log_audit($conn, "Ufficio didattico: operatore salvato", ["Persona" => $_POST['persona_id'] ?? '']);
         flash_set($err ?? "Operatore salvato: entra nel pannello Didattica con le sue credenziali Unical.", $err ? 'danger' : 'success');
-        admin_redirect("$base&tab=ufficio&r=" . time());
+        admin_redirect("$base&tab=ufficio&sez=persone&r=" . time());
     }
     if (isset($_POST['salva_ufficio'])) {
         $id_u = (int)($_POST['ufficio_id_mod'] ?? 0);
@@ -27,7 +27,7 @@ if ($fase === 'azioni') {
             registra_log_audit($conn, "Ufficio didattico: ufficio salvato", ["Ufficio" => $nome_u]);
             flash_set("Ufficio «" . $nome_u . "» salvato.");
         }
-        admin_redirect("$base&tab=ufficio&r=" . time());
+        admin_redirect("$base&tab=ufficio&sez=uffici&r=" . time());
     }
     if (isset($_POST['elimina_ufficio'])) {
         $id_u = (int)$_POST['elimina_ufficio'];
@@ -35,14 +35,14 @@ if ($fase === 'azioni') {
         ['operatori' => $n_op, 'moduli' => $in_iter] = $s_uff->usoUfficio($id_u);
         if ($n_op || $in_iter) flash_set("L'ufficio non si può eliminare: " . ($n_op ? "ha $n_op persone (spostale in un altro ufficio)" : '') . ($n_op && $in_iter ? ' e ' : '') . ($in_iter ? "è nell'iter di $in_iter moduli" : '') . ".", 'warning');
         else { $s_uff->eliminaUfficio($id_u); flash_set("Ufficio eliminato.", 'warning'); }
-        admin_redirect("$base&tab=ufficio&r=" . time());
+        admin_redirect("$base&tab=ufficio&sez=uffici&r=" . time());
     }
     if (isset($_POST['togli_operatore'])) {
         $id = (int)$_POST['togli_operatore'];
         \App\Core\App::per($conn)->get(\App\Didattica\ServizioUffici::class)->togliOperatore($id);
         registra_log_audit($conn, "Ufficio didattico: operatore tolto", ["ID" => $id]);
         flash_set("Operatore tolto dall'Ufficio didattico.", 'warning');
-        admin_redirect("$base&tab=ufficio&r=" . time());
+        admin_redirect("$base&tab=ufficio&sez=persone&r=" . time());
     }
     if (isset($_POST['crea_sportello'])) {
         $pag = (int)($_POST['pagina_id'] ?? 0);
@@ -50,7 +50,7 @@ if ($fase === 'azioni') {
         $rid = $ok_area ? crea_sportello_ufficio($conn, $pag, (string)($_POST['nome'] ?? ''), (string)($_POST['luogo'] ?? '')) : 0;
         if ($rid) registra_log_audit($conn, "Ufficio didattico: sportello di ricevimento creato", ["Risorsa" => $rid]);
         flash_set($rid ? "Sportello creato: ora imposta giorni e orari del ricevimento." : "Scegli un'area di Prenotazioni e risorse.", $rid ? 'success' : 'danger');
-        admin_redirect("$base&tab=ufficio&r=" . time());
+        admin_redirect("$base&tab=ufficio&sez=sportello&r=" . time());
     }
     return;
 }
@@ -59,7 +59,13 @@ if ($fase === 'azioni') {
     $persone = $conn->query("SELECT id, cognome, nome, email, ruolo, gruppo FROM personale_ateneo WHERE attivo = 1 AND email <> '' ORDER BY FIELD(gruppo, 'pta', 'docenti', 'altro'), cognome, nome")->fetch_all(MYSQLI_ASSOC);
     $corsi_sc = scelte_anagrafe_didattica($conn, 'corso_studio');
     $uffici = uffici_didattica($conn);
-    $html_profilo = function ($sel) use ($h, $uffici) { $o = '<option value="0">— nessun ufficio —</option>'; foreach ($uffici as $k => $u) $o .= '<option value="' . $k . '" data-corsi="' . (int)$u['segue_corsi'] . '"' . ((int)$k === (int)$sel ? ' selected' : '') . '>' . $h($u['nome']) . '</option>'; return $o; };
+    // Uffici della persona: più di uno si può scegliere (il primo della lista, tra quelli scelti, è il principale)
+    $html_profilo = function (array $sel) use ($h, $uffici) {
+        $nomi = array_map(fn($k) => $uffici[$k]['nome'] ?? '', array_filter($sel, fn($k) => isset($uffici[$k])));
+        $o = '<details class="dd-uffici"><summary class="form-select form-select-sm">' . ($nomi ? $h(mb_strimwidth(implode(' + ', $nomi), 0, 60, '…')) : '— nessun ufficio —') . '</summary><div class="dd-uffici-lista">';
+        foreach ($uffici as $k => $u) $o .= '<label class="form-check m-0"><input class="form-check-input" type="checkbox" name="uffici[]" value="' . (int)$k . '" data-corsi="' . (int)$u['segue_corsi'] . '"' . (in_array((int)$k, $sel, true) ? ' checked' : '') . '> ' . $h($u['nome']) . '</label>';
+        return $o . '</div></details>';
+    };
     $html_corsi = function (array $sel) use ($h, $corsi_sc) { $o = ''; foreach ($corsi_sc as $g => $cc) { $o .= '<optgroup label="' . $h($g) . '">'; foreach ($cc as $c) $o .= '<option' . (in_array($c, $sel, true) ? ' selected' : '') . '>' . $h($c) . '</option>'; $o .= '</optgroup>'; } return $o; };
     $gruppi_p = ['pta' => 'Personale tecnico-amministrativo', 'docenti' => 'Docenti', 'altro' => 'Altro personale'];
     $sportelli_uff = sportelli_ufficio_didattica($conn);
@@ -74,17 +80,25 @@ if ($fase === 'azioni') {
         foreach ($cons_tutti as $c) $o .= '<option value="' . (int)$c['id'] . '"' . ((int)$c['id'] === $cons ? ' selected' : '') . '>' . $h(mb_strimwidth($c['nome'], 0, 90, '…')) . '</option>';
         return $o . '</select>';
     };
+    // Tre sezioni al posto di tre blocchi uno sotto l'altro: Persone · Uffici · Sportello
+    $sez = in_array($_GET['sez'] ?? '', ['persone', 'uffici', 'sportello'], true) ? $_GET['sez'] : 'persone';
+    echo pn_schede([
+        'persone' => ['href' => "$base&tab=ufficio&sez=persone", 'testo' => 'Persone', 'icona' => 'fa-people-group', 'numero' => count($operatori)],
+        'uffici' => ['href' => "$base&tab=ufficio&sez=uffici", 'testo' => 'Uffici e iter', 'icona' => 'fa-sitemap', 'numero' => count($uffici)],
+        'sportello' => ['href' => "$base&tab=ufficio&sez=sportello", 'testo' => 'Sportello di ricevimento', 'icona' => 'fa-user-clock', 'numero' => count($sportelli_uff)],
+    ], $sez, 'Sezioni di Ufficio e ricevimento');
 ?>
+<?php if ($sez === 'uffici'): ?>
     <div class="card border-0 shadow-sm mb-3"><div class="card-body">
         <h5 class="fw-bold mb-1"><i class="fa fa-sitemap me-1 text-primary" aria-hidden="true"></i>Uffici</h5>
-        <p class="small text-secondary">Gli uffici dell'Ufficio didattico: assegna il personale qui sotto e scegli nei moduli quali uffici ricevono la pratica e in che ordine (iter). Gli uffici che <strong>smistano</strong> ricevono le pratiche nuove; in quelli che <strong>seguono i corsi</strong> ogni persona indica i suoi corsi di studio e le pratiche di quei corsi le vengono proposte per prime.
+        <p class="small text-secondary">Gli uffici dell'Ufficio didattico: assegna il personale qui sotto e scegli nei moduli quali uffici ricevono la pratica e in che ordine (iter). Gli uffici che <strong>ricevono le pratiche nuove</strong> (poi le assegnano a una persona); in quelli che <strong>seguono i corsi</strong> ogni persona indica i suoi corsi di studio e le pratiche di quei corsi le vengono proposte per prime.
             <br><strong>Flusso con il protocollo</strong> (es. convalida esami): l'ufficio di tipo <em>Protocollo</em> riceve le domande in PDF/A, registra numero e data e la pratica passa da sola all'ufficio di <em>corso di studio</em> del consiglio che ha il corso della pratica (i corsi si indicano nel consiglio, in Sedute e verbali → Consigli); il referente istruisce le convalide e, dopo la seduta, invia le pratiche alla <em>Segreteria studenti</em> scelta.</p>
-        <?php $n_per_uff = []; foreach ($operatori as $o) $n_per_uff[(int)$o['ufficio_id']] = ($n_per_uff[(int)$o['ufficio_id']] ?? 0) + 1;
+        <?php $n_per_uff = []; foreach ($operatori as $o) foreach ($o['_uffici'] as $k_u) $n_per_uff[(int)$k_u] = ($n_per_uff[(int)$k_u] ?? 0) + 1;
         foreach (array_merge(array_keys($uffici), ['nuovo']) as $k): ?>
             <form method="POST" id="fu<?php echo $k; ?>"><?php csrf_field(); ?><input type="hidden" name="ufficio_id_mod" value="<?php echo (int)$k; ?>"></form>
         <?php endforeach; ?>
         <div class="table-responsive"><table class="table table-sm align-middle small mb-2">
-            <thead class="table-light"><tr><th>Ufficio</th><th>Descrizione</th><th style="min-width:230px;">Nel flusso delle pratiche</th><th class="text-center">Smista</th><th class="text-center">Segue i corsi</th><th class="text-center">Ordine</th><th class="text-center">Persone</th><th></th></tr></thead><tbody>
+            <thead class="table-light"><tr><th>Ufficio</th><th>Descrizione</th><th style="min-width:230px;">Nel flusso delle pratiche</th><th class="text-center">Riceve le pratiche nuove</th><th class="text-center">Segue i corsi di studio</th><th class="text-center">Ordine</th><th class="text-center">Persone</th><th></th></tr></thead><tbody>
             <?php foreach ($uffici as $k => $u): $fid = 'fu' . $k; ?>
                 <tr>
                     <td><input form="<?php echo $fid; ?>" class="form-control form-control-sm fw-bold" name="nome_ufficio" value="<?php echo $h($u['nome']); ?>" maxlength="150" required aria-label="Nome dell'ufficio"></td>
@@ -110,18 +124,21 @@ if ($fase === 'azioni') {
             </tr>
         </tbody></table></div>
     </div></div>
+<?php endif; ?>
+<?php if ($sez === 'persone'): ?>
     <div class="row g-3">
-        <div class="col-lg-7">
+        <div class="col-12">
             <div class="card border-0 shadow-sm"><div class="card-body">
                 <h5 class="fw-bold mb-1"><i class="fa fa-people-group me-1 text-success" aria-hidden="true"></i>Operatori dell'Ufficio didattico</h5>
                 <p class="small text-secondary">Scelti dall'anagrafe di Ateneo: entrano nel pannello Didattica con le loro credenziali Unical e gestiscono pratiche, sedute, modulistica e ricevimento. Ognuno appartiene a un <strong>ufficio</strong> (vedi sopra), che decide il suo ruolo nell'iter delle pratiche. I compiti decidono chi riceve gli altri avvisi.</p>
-                <?php if (!$operatori): ?><div class="alert alert-light border small">Nessun operatore: aggiungi il personale dell'ufficio qui sotto.</div><?php endif; ?>
+                <?php if (!$operatori): ?><?php echo pn_vuoto("Nessun operatore: aggiungi qui sotto il personale dell'ufficio.", 'fa-people-group'); ?><?php endif; ?>
+                <div class="row g-2">
                 <?php foreach ($operatori as $o): ?>
-                    <form method="POST" class="border rounded p-2 mb-2">
+                    <div class="col-xl-6"><form method="POST" class="border rounded p-2 h-100">
                         <?php csrf_field(); ?><input type="hidden" name="persona_id" value="<?php echo $h($o['persona_id']); ?>">
                         <div class="d-flex flex-wrap gap-2 align-items-center">
                             <div class="flex-grow-1"><strong><?php echo $h($o['nominativo']); ?></strong> <span class="small text-secondary"><?php echo $h($o['email']); ?></span></div>
-                            <select class="form-select form-select-sm dd-prof" style="max-width:230px;" name="ufficio_id" aria-label="Ufficio"><?php echo $html_profilo((int)$o['ufficio_id']); ?></select>
+                            <div class="dd-prof" style="min-width:230px;max-width:300px;"><?php echo $html_profilo($o['_uffici']); ?></div>
                             <input type="text" class="form-control form-control-sm" style="max-width:180px;" name="ruolo" value="<?php echo $h($o['ruolo']); ?>" placeholder="Ruolo (es. Responsabile)" aria-label="Ruolo">
                         </div>
                         <div class="d-flex flex-wrap gap-3 align-items-center mt-1 small">
@@ -129,10 +146,11 @@ if ($fase === 'azioni') {
                             <span class="ms-auto d-flex gap-1"><button type="submit" name="salva_operatore" value="1" class="btn btn-sm btn-outline-primary py-0">Salva</button>
                                 <button type="submit" name="togli_operatore" value="<?php echo (int)$o['id']; ?>" class="btn btn-sm btn-outline-danger py-0" data-confirm="Togliere <?php echo $h($o['nominativo']); ?> dall'Ufficio didattico?" aria-label="Togli"><i class="fa fa-user-minus" aria-hidden="true"></i></button></span>
                         </div>
-                        <div class="dd-corsi mt-1"<?php echo empty($uffici[(int)$o['ufficio_id']]['segue_corsi']) ? ' hidden' : ''; ?>><label class="small fw-bold">Corsi di studio seguiti</label><select class="form-select form-select-sm" name="corsi[]" multiple size="4" aria-label="Corsi di studio seguiti"><?php echo $html_corsi(json_decode((string)$o['corsi'], true) ?: []); ?></select></div>
-                        <?php if (!empty($uffici[(int)$o['ufficio_id']]['segue_corsi']) && ($cs = json_decode((string)$o['corsi'], true))): ?><div class="small text-secondary mt-1"><i class="fa fa-graduation-cap me-1" aria-hidden="true"></i><?php echo $h(implode(' · ', $cs)); ?></div><?php endif; ?>
-                    </form>
+                        <div class="dd-corsi mt-1"<?php echo !array_filter($o['_uffici'], fn($k_u) => !empty($uffici[$k_u]['segue_corsi'])) ? ' hidden' : ''; ?>><label class="small fw-bold">Corsi di studio seguiti</label><select class="form-select form-select-sm" name="corsi[]" multiple size="4" aria-label="Corsi di studio seguiti"><?php echo $html_corsi(json_decode((string)$o['corsi'], true) ?: []); ?></select></div>
+                        <?php if (array_filter($o['_uffici'], fn($k_u) => !empty($uffici[$k_u]['segue_corsi'])) && ($cs = json_decode((string)$o['corsi'], true))): ?><div class="small text-secondary mt-1"><i class="fa fa-graduation-cap me-1" aria-hidden="true"></i><?php echo $h(implode(' · ', $cs)); ?></div><?php endif; ?>
+                    </form></div>
                 <?php endforeach; ?>
+                </div>
                 <form method="POST" class="bg-light rounded p-2 mt-3">
                     <?php csrf_field(); ?>
                     <h6 class="fw-bold small mb-2">Aggiungi un operatore dall'anagrafe</h6>
@@ -143,7 +161,7 @@ if ($fase === 'azioni') {
                         <?php endforeach; if ($g_corr !== null) echo '</optgroup>'; ?>
                     </select>
                     <div class="d-flex flex-wrap gap-3 align-items-center small">
-                        <select class="form-select form-select-sm dd-prof" style="max-width:230px;" name="ufficio_id" aria-label="Ufficio"><?php echo $html_profilo(0); ?></select>
+                        <div class="dd-prof" style="min-width:230px;max-width:300px;"><?php echo $html_profilo([]); ?></div>
                         <input type="text" class="form-control form-control-sm" style="max-width:200px;" name="ruolo" placeholder="Ruolo (facoltativo)" aria-label="Ruolo">
                         <?php foreach (COMPITI_UFFICIO as $k => $n): ?><label class="form-check m-0"><input class="form-check-input" type="checkbox" name="compiti[]" value="<?php echo $k; ?>"<?php echo $k !== 'bandi' ? ' checked' : ''; ?>> <?php echo $h($n); ?></label><?php endforeach; ?>
                         <button type="submit" name="salva_operatore" value="1" class="btn btn-sm btn-success fw-bold ms-auto"><i class="fa fa-user-plus me-1" aria-hidden="true"></i>Aggiungi</button>
@@ -153,7 +171,11 @@ if ($fase === 'azioni') {
                 </form>
             </div></div>
         </div>
-        <div class="col-lg-5">
+    </div>
+<?php endif; ?>
+<?php if ($sez === 'sportello'): ?>
+    <div class="row g-3">
+        <div class="col-lg-8 col-xl-6">
             <div class="card border-0 shadow-sm"><div class="card-body">
                 <h5 class="fw-bold mb-1"><i class="fa fa-user-clock me-1" style="color:#7c3aed;" aria-hidden="true"></i>Ricevimento dell'ufficio</h5>
                 <p class="small text-secondary">Sportello a appuntamenti per gli studenti: si prenota dalla pagina pubblica (anche dalla Modulistica); gli operatori impostano giorni, orari e assenze e vedono gli appuntamenti.</p>
@@ -187,13 +209,21 @@ if ($fase === 'azioni') {
             </div></div>
         </div>
     </div>
+<?php endif; ?>
     <script>
     (function () {
         document.querySelectorAll('.dd-tipo-uff').forEach(function (t) { t.addEventListener('change', function () { var c = t.parentNode.querySelector('.dd-cons-uff'); if (c) c.hidden = t.value !== 'cdl'; }); });
         var c = document.getElementById('opCerca'), s = document.getElementById('opPersona');
         if (!c || !s) return;
         c.addEventListener('input', function () { var q = c.value.toLowerCase(); Array.prototype.forEach.call(s.options, function (o) { o.hidden = q && o.text.toLowerCase().indexOf(q) === -1; }); });
-        document.querySelectorAll('.dd-prof').forEach(function (sp) { sp.addEventListener('change', function () { var d = sp.closest('form').querySelector('.dd-corsi'); if (d) d.hidden = !(sp.selectedOptions[0] && sp.selectedOptions[0].dataset.corsi === '1'); }); });
+        document.querySelectorAll('.dd-prof').forEach(function (sp) {
+            sp.addEventListener('change', function () {
+                var f = sp.closest('form'), d = f.querySelector('.dd-corsi'), sel = Array.prototype.slice.call(sp.querySelectorAll('input:checked'));
+                if (d) d.hidden = !sel.some(function (c) { return c.dataset.corsi === '1'; });
+                var nomi = sel.map(function (c) { return c.parentNode.textContent.trim(); }).join(' + ');
+                sp.querySelector('summary').textContent = nomi ? (nomi.length > 60 ? nomi.slice(0, 59) + '…' : nomi) : '— nessun ufficio —';
+            });
+        });
     })();
     </script>
 

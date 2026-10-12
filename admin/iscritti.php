@@ -342,13 +342,13 @@ $col_area_i = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
 <!-- FRONT-END DELLA PAGINA -->
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <div>
-        <h4 class="fw-bold text-dark mb-0">
+        <h1 class="pn-titolo">
             <?php if ($is_archivio): ?>
                 <i class="fa fa-archive me-2 text-secondary"></i>Archivio Iscritti
             <?php else: ?>
-                <i class="fa fa-users me-2" style="color:<?php echo $col_area_i; ?>"></i>Iscritti & Check-in
+                <i class="fa fa-users me-2" style="color:<?php echo $col_area_i; ?>"></i>Iscritti e presenze
             <?php endif; ?>
-        </h4>
+        </h1>
         <div class="text-muted mt-1" style="font-size:.8rem;"><?php echo htmlspecialchars($page_cfg['titolo'] ?? ''); ?> &mdash; <?php echo number_format($total_count); ?> iscritti trovati</div>
     </div>
     <div class="d-flex gap-2 flex-wrap align-items-center">
@@ -358,9 +358,9 @@ $col_area_i = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
         <?php else: ?>
             <a href="scanner.php?p_id=<?php echo $filtro_p; ?>" class="btn btn-sm fw-bold text-white" style="background:<?php echo $col_area_i; ?>;border-radius:8px;border:none;"><i class="fa fa-qrcode me-1"></i>Scanner</a>
             <a href="stampa_badge.php?p_id=<?php echo $filtro_p; ?>" class="btn btn-sm fw-bold" style="border-radius:8px;background:#f1f5f9;border:1px solid #e2e8f0;color:#334155;"><i class="fa fa-id-badge me-1" aria-hidden="true"></i>Stampa badge</a>
-            <a href="../cron_attestati.php" class="btn btn-sm btn-outline-success fw-bold" style="border-radius:8px;" data-confirm="Vuoi scansionare tutti gli eventi terminati e inviare le email agli studenti presenti?"><i class="fa fa-graduation-cap me-1"></i>Attestati</a>
-            <button type="button" class="btn btn-sm fw-bold" style="border-radius:8px;background:#f1f5f9;border:1px solid #e2e8f0;color:#334155;" data-bs-toggle="modal" data-bs-target="#modMailMassiva"><i class="fa fa-paper-plane me-1"></i>Mail Massiva</button>
-            <button type="button" class="btn btn-sm fw-bold text-white" style="background:<?php echo $col_area_i; ?>;border-radius:8px;border:none;" data-bs-toggle="modal" data-bs-target="#modPrenotazioneManuale"><i class="fa fa-user-plus me-1"></i>+ Manuale</button>
+            <a href="../cron_attestati.php" class="btn btn-sm btn-outline-success fw-bold" style="border-radius:8px;" data-confirm="Vuoi scansionare tutti gli eventi terminati e inviare le email agli studenti presenti?"><i class="fa fa-graduation-cap me-1"></i>Invia attestati</a>
+            <button type="button" class="btn btn-sm fw-bold" style="border-radius:8px;background:#f1f5f9;border:1px solid #e2e8f0;color:#334155;" data-bs-toggle="modal" data-bs-target="#modMailMassiva"><i class="fa fa-paper-plane me-1"></i>Scrivi a tutti</button>
+            <button type="button" class="btn btn-sm fw-bold text-white" style="background:<?php echo $col_area_i; ?>;border-radius:8px;border:none;" data-bs-toggle="modal" data-bs-target="#modPrenotazioneManuale"><i class="fa fa-user-plus me-1"></i>Aggiungi un iscritto</button>
         <?php endif; ?>
         <a href="stampa_lista_iscritti.php?p_id=<?php echo $filtro_p; ?>&f_turno=<?php echo $filtro_turno; ?>&f_stato=<?php echo urlencode($filtro_stato); ?>&f_cerca=<?php echo urlencode($filtro_cerca); ?>&f_data_da=<?php echo urlencode($filtro_data_da); ?>&f_data_fine=<?php echo urlencode($filtro_data_fine); ?><?php echo $is_archivio ? '&archivio=1' : ''; ?>" target="_blank" class="btn btn-sm btn-outline-secondary fw-bold" style="border-radius:8px;"><i class="fa fa-print me-1"></i>Stampa</a>
         <form method="POST" class="d-flex gap-1">
@@ -377,6 +377,14 @@ $col_area_i = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
     </div>
 </div>
 
+<?php
+// Stato in un clic: stessi filtri di sotto, cambia solo lo stato
+$chip_stati = ['' => 'Tutti', 'da_approvare' => 'Da approvare', 'confermata' => 'Confermati', 'in_attesa' => 'In lista di attesa', 'annullata' => 'Annullati', 'rifiutata' => 'Rifiutati'];
+$q_chip = array_filter(['p_id' => $filtro_p, 'archivio' => $is_archivio ? 1 : '', 'f_turno' => $filtro_turno ?: '', 'f_data_da' => $filtro_data_da, 'f_data_fine' => $filtro_data_fine, 'f_cerca' => $filtro_cerca], fn($v) => $v !== '' && $v !== null);
+echo '<nav class="pn-fasi" aria-label="Filtra per stato">';
+foreach ($chip_stati as $k_c => $n_c) echo '<a class="pn-fase' . ($filtro_stato === (string)$k_c ? ' attiva' : '') . '" href="iscritti.php?' . htmlspecialchars(http_build_query($q_chip + ($k_c !== '' ? ['f_stato' => $k_c] : []))) . '">' . htmlspecialchars($n_c) . '</a>';
+echo '</nav>';
+?>
 <div class="isc-wrap">
     <!-- FILTRI -->
     <div class="isc-filters">
@@ -385,7 +393,7 @@ $col_area_i = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
             <?php if ($is_archivio): ?><input type="hidden" name="archivio" value="1"><?php endif; ?>
 
             <select name="f_turno" class="form-select form-select-sm" style="max-width:220px;border-radius:8px;" onchange="document.getElementById('formFiltroTurno').submit();">
-                <option value="0">Tutti gli eventi</option>
+                <option value="0">Tutti gli eventi e i turni</option>
                 <?php foreach ($tutti_gli_eventi as $ev_m): ?>
                     <optgroup label="<?php echo mb_strimwidth(htmlspecialchars($ev_m['titolo']), 0, 40, '...'); ?>">
                         <?php foreach ($ev_m['turni'] as $t_m): ?>
@@ -400,18 +408,18 @@ $col_area_i = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
             <select name="f_stato" class="form-select form-select-sm" style="max-width:160px;border-radius:8px;" onchange="document.getElementById('formFiltroTurno').submit();">
                 <option value="">Tutti gli stati</option>
                 <option value="confermata"   <?php echo $filtro_stato==='confermata'   ? 'selected':'' ?>>Confermata</option>
-                <option value="in_attesa"    <?php echo $filtro_stato==='in_attesa'    ? 'selected':'' ?>>In Attesa</option>
+                <option value="in_attesa"    <?php echo $filtro_stato==='in_attesa'    ? 'selected':'' ?>>In lista d'attesa</option>
                 <option value="da_approvare" <?php echo $filtro_stato==='da_approvare' ? 'selected':'' ?>>Da Approvare</option>
                 <option value="annullata"    <?php echo $filtro_stato==='annullata'    ? 'selected':'' ?>>Annullata</option>
                 <option value="rifiutata"    <?php echo $filtro_stato==='rifiutata'    ? 'selected':'' ?>>Rifiutata</option>
             </select>
 
-            <input type="date" name="f_data_da" class="form-control form-control-sm" style="max-width:135px;border-radius:8px;" value="<?php echo htmlspecialchars($filtro_data_da); ?>" title="Data dal">
+            <input type="date" name="f_data_da" class="form-control form-control-sm" style="max-width:135px;border-radius:8px;" value="<?php echo htmlspecialchars($filtro_data_da); ?>" title="Dal giorno" aria-label="Dal giorno">
             <span class="text-muted">—</span>
-            <input type="date" name="f_data_fine" class="form-control form-control-sm" style="max-width:135px;border-radius:8px;" value="<?php echo htmlspecialchars($filtro_data_fine); ?>" title="Data al">
+            <input type="date" name="f_data_fine" class="form-control form-control-sm" style="max-width:135px;border-radius:8px;" value="<?php echo htmlspecialchars($filtro_data_fine); ?>" title="Al giorno" aria-label="Al giorno">
 
             <div class="input-group input-group-sm" style="max-width:220px;">
-                <input type="text" name="f_cerca" class="form-control" style="border-radius:8px 0 0 8px;" placeholder="Nome, email, codice..." value="<?php echo htmlspecialchars($filtro_cerca); ?>">
+                <input type="text" name="f_cerca" class="form-control" style="border-radius:8px 0 0 8px;" placeholder="Cerca per nome, email o codice" aria-label="Cerca per nome, email o codice" value="<?php echo htmlspecialchars($filtro_cerca); ?>">
                 <button type="submit" class="btn btn-outline-secondary" style="border-radius:0 8px 8px 0;"><i class="fa fa-search"></i></button>
             </div>
 

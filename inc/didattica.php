@@ -64,8 +64,8 @@ if (!function_exists('utente_gestisce_didattica')) {
 if (!function_exists('aggiungi_operatore_ufficio')) {
     // Aggiunge (o aggiorna) un operatore scelto dall'anagrafe di Ateneo. Ritorna un messaggio di errore o null.
     // $ufficio_id: ufficio dell'Ufficio didattico (didattica_uffici); $corsi: corsi di studio seguiti (uffici che seguono i corsi)
-    function aggiungi_operatore_ufficio($conn, string $persona_id, string $ruolo, array $compiti, int $ufficio_id = 0, array $corsi = []): ?string {
-        return \App\Core\App::per($conn)->get(\App\Didattica\ServizioUffici::class)->aggiungi($persona_id, $ruolo, $compiti, $ufficio_id, $corsi);
+    function aggiungi_operatore_ufficio($conn, string $persona_id, string $ruolo, array $compiti, int $ufficio_id = 0, array $corsi = [], array $uffici = []): ?string {
+        return \App\Core\App::per($conn)->get(\App\Didattica\ServizioUffici::class)->aggiungi($persona_id, $ruolo, $compiti, $ufficio_id, $corsi, $uffici);
     }
 }
 

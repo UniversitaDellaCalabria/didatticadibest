@@ -220,3 +220,34 @@ body { background-color: var(--pn-sfondo); color: var(--pn-testo); }
 /* Righe «etichetta … valore» dentro un riquadro */
 .pn-riga { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid var(--pn-bordo); font-size: .88rem; }
 .pn-riga > span:first-child { color: var(--pn-tenue); }
+
+/* Barra di salvataggio sempre in vista in fondo ai moduli lunghi */
+.pn-salva { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; position: sticky; bottom: 0; z-index: 5; margin: 1rem -1rem -1rem; padding: 12px 1rem; background: var(--pn-carta); border-top: 1px solid var(--pn-bordo); border-radius: 0 0 var(--pn-raggio) var(--pn-raggio); box-shadow: 0 -4px 10px rgba(15, 23, 42, .06); }
+.pn-nascosta { display: none !important; }
+
+/* Indice delle sezioni di una scheda lunga (evento, progetto): si costruisce da solo da assets/js/pannello.js */
+.pn-indice { position: sticky; top: 56px; z-index: 6; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 0 0 1rem; padding: 8px 10px; background: var(--pn-carta); border: 1px solid var(--pn-bordo); border-radius: var(--pn-raggio); box-shadow: var(--pn-ombra); }
+.pn-indice > span { font-size: .8rem; font-weight: 700; color: var(--pn-tenue); text-transform: uppercase; letter-spacing: .04em; margin-right: 4px; }
+.pn-indice a { padding: .25rem .75rem; border-radius: 999px; border: 1px solid var(--pn-bordo); background: var(--pn-carta); color: var(--pn-testo); text-decoration: none; font-size: .85rem; font-weight: 600; }
+.pn-indice a:hover { border-color: var(--pn-mod); }
+.pn-indice a.attiva { background: var(--pn-mod); border-color: var(--pn-mod); color: var(--pn-mod-testo); }
+.pj-sez { scroll-margin-top: 130px; }
+/* Pulsante «Salva» della scheda sempre in vista */
+.pn-salva-fisso { position: sticky; bottom: 0; z-index: 5; padding: 10px 0; background: var(--pn-sfondo); box-shadow: 0 -8px 8px -8px rgba(15, 23, 42, .15); }
+
+/* Guida «?» e accessibilità da tastiera */
+.pn-guida-btn { position: fixed; right: 18px; bottom: 18px; z-index: 40; width: 44px; height: 44px; border-radius: 50%; border: 0; background: var(--pn-mod); color: var(--pn-mod-testo); font-size: 1.25rem; font-weight: 800; box-shadow: 0 4px 12px rgba(15, 23, 42, .3); cursor: pointer; }
+.pn-guida { position: fixed; right: 18px; bottom: 72px; z-index: 40; width: min(340px, calc(100vw - 36px)); padding: 14px 16px; background: var(--pn-carta); color: var(--pn-testo); border: 1px solid var(--pn-bordo); border-radius: var(--pn-raggio); box-shadow: 0 8px 24px rgba(15, 23, 42, .25); font-size: .92rem; }
+.pn-guida[hidden] { display: none; }
+.pn-guida p { margin: .4rem 0; color: var(--pn-tenue); }
+.pn-guida ul { margin: 0; padding-left: 1.1rem; }
+.pn-salta { position: fixed; left: 8px; top: -60px; z-index: 100; padding: 8px 14px; background: #000; color: #fff; border-radius: 8px; }
+.pn-salta:focus { top: 8px; }
+#page-content-wrapper a:focus-visible, #page-content-wrapper button:focus-visible, #page-content-wrapper input:focus-visible, #page-content-wrapper select:focus-visible, #page-content-wrapper textarea:focus-visible { outline: 3px solid var(--pn-mod); outline-offset: 2px; }
+@media print { .pn-guida-btn, .pn-guida, .pn-salta, .pn-indice { display: none !important; } }
+
+/* Scelta di più uffici per una persona */
+.dd-uffici { position: relative; }
+.dd-uffici summary { cursor: pointer; list-style: none; }
+.dd-uffici summary::-webkit-details-marker { display: none; }
+.dd-uffici-lista { position: absolute; z-index: 20; left: 0; right: 0; margin-top: 2px; max-height: 260px; overflow: auto; padding: 8px 10px; background: var(--pn-carta); border: 1px solid var(--pn-bordo); border-radius: 8px; box-shadow: 0 8px 20px rgba(15, 23, 42, .18); display: grid; gap: 6px; min-width: 280px; }

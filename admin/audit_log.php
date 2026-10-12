@@ -15,7 +15,7 @@ $righe_log = \App\Core\App::get(\App\Sistema\RegistroAuditRepository::class)->ul
 
 <?php schede_sistema('audit_log.php'); ?>
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h4 class="fw-bold text-dark m-0"><i class="fa fa-user-secret text-danger me-2"></i> Registro Audit (System Log)</h4>
+    <div><h1 class="pn-titolo"><i class="fa fa-user-secret me-2" aria-hidden="true"></i>Registro delle operazioni</h1><p class="pn-aiuto">Chi ha fatto che cosa nel pannello, e quando.</p></div>
     <span class="badge bg-secondary">Ultime 1000 operazioni</span>
 </div>
 

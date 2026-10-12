@@ -41,7 +41,7 @@ final class ServizioFlussoConvalide implements FlussoPratica
 
     public function personeUfficio(int $uff_id): array
     {
-        return array_values(array_filter($this->ufficio->operatori(), fn ($o) => (int)$o['ufficio_id'] === $uff_id));
+        return array_values(array_filter($this->ufficio->operatori(), fn ($o) => in_array($uff_id, $o['_uffici'], true)));
     }
 
     public static function corsoPratica(array $p): string

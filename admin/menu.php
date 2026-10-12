@@ -119,7 +119,7 @@ $tutti_i_menu = \App\Core\App::get(\App\Portale\MenuRepository::class)->righe();
 </style>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h4 class="fw-bold text-dark m-0"><i class="fa fa-link text-primary me-2"></i> Costruttore Menu di Navigazione</h4>
+    <div><h1 class="pn-titolo"><i class="fa fa-link me-2" aria-hidden="true"></i>Menu di navigazione</h1><p class="pn-aiuto">Le voci del menu del sito pubblico: l&#39;ordine, i nomi e dove portano.</p></div>
     <span class="badge bg-secondary"><?= count($tutti_i_menu) ?> voci totali</span>
 </div>
 

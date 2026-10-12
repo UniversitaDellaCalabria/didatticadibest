@@ -33,6 +33,7 @@
 <script src="<?php echo url_vendor('cdnjs/ajax/libs/tinymce/6.8.3/tinymce.min.js'); ?>" integrity="sha384-1Miaw0hyo/w0cd9ZHUnc7Z8ACgtO+lphAEziGNW4z2C1h3nJfMVVEWA5MI031P+X" crossorigin="anonymous"></script>
 <script src="../assets/js/campo-scuola.js?v=3"></script>
 <script src="../assets/js/ricerca-personale.js?v=1"></script>
+<script src="../assets/js/pannello.js?v=1"></script>
 
 <script>
     tinymce.init({ selector: 'textarea.editor-html', plugins: 'table lists link code', toolbar: 'undo redo | bold italic underline | alignleft aligncenter alignright | bullist numlist | link code', menubar: false, height: 200 });

@@ -400,6 +400,8 @@ final class Definizioni
             // v37: ufficio di appartenenza (didattica_uffici) e corsi di studio seguiti (uffici che seguono i corsi)
             'ufficio_id' => "ADD COLUMN ufficio_id INT DEFAULT NULL",
             'corsi'   => "ADD COLUMN corsi TEXT DEFAULT NULL",
+            // v48: tutti gli uffici della persona (elenco JSON di id); ufficio_id resta quello principale
+            'uffici_json' => "ADD COLUMN uffici_json VARCHAR(255) DEFAULT NULL",
         ],
         'pratiche_eventi' => [
             // v36: note interne tra i referenti (non visibili allo studente) e nome di chi scrive

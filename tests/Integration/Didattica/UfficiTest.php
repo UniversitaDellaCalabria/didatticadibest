@@ -64,6 +64,20 @@ final class UfficiTest extends DidatticaBase
         $this->assertFalse($s->gestisce(null));
     }
 
+    public function testOperatoreInPiuUffici(): void
+    {
+        $s = $this->srv();
+        $a = $this->ufficio('Protocollo');
+        $b = $this->ufficio('Carriere');
+        $this->assertNull($s->aggiungi('m.verdi', '', ['pratiche'], $a, [], [$b, $b, 999]));
+        $o = $s->operatori()[0];
+        $this->assertSame([$a, $b], $o['_uffici'], 'principale per primo, senza doppioni né uffici inesistenti');
+        $this->assertSame('Protocollo + Carriere', $s->nomeUfficio($o));
+        $this->assertSame(['operatori' => 1, 'moduli' => 0], $s->usoUfficio($b), "conta anche chi ha l'ufficio come secondo");
+        $this->assertNull($s->aggiungi('m.verdi', '', ['pratiche'], $a));
+        $this->assertSame([$a], $s->operatori()[0]['_uffici'], 'si torna a un solo ufficio');
+    }
+
     public function testOperatoreDallAnagrafe(): void
     {
         $s = $this->srv();

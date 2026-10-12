@@ -97,7 +97,7 @@ $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
 </style>
 
 <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
-    <h4 class="fw-bold text-dark mb-0"><i class="fa fa-address-book me-2" style="color:#0f766e;" aria-hidden="true"></i>Anagrafi di Ateneo</h4>
+    <div><h1 class="pn-titolo"><i class="fa fa-address-book me-2" style="color:#0f766e;" aria-hidden="true"></i>Anagrafi di Ateneo</h1><p class="pn-aiuto">Docenti, personale, insegnamenti, corsi e strutture: da qui si scelgono le persone nei moduli del portale.</p></div>
     <form method="POST" class="m-0">
         <?php csrf_field(); ?>
         <button type="submit" name="sincronizza" value="1" class="btn btn-sm btn-outline-dark fw-bold" data-attesa="Aggiornamento in corso…"><i class="fa fa-rotate me-1" aria-hidden="true"></i>Aggiorna ora dal portale</button>

@@ -142,7 +142,7 @@ echo pn_testata($p['modulo_titolo'], 'fa-inbox', trim($p['cognome'] . ' ' . $p['
 $sed_url_p = !empty($p['seduta_id']) ? $base . '&tab=sedute&id=' . (int)$p['seduta_id'] : '';
 $btn_p = fn(string $href, string $t) => '<a href="' . $h($href) . '" class="btn fw-bold" style="background:var(--pn-mod);border-color:var(--pn-mod);color:var(--pn-mod-testo);">' . $t . ' <i class="fa fa-arrow-down ms-1" aria-hidden="true"></i></a>';
 $btn_sed = fn(string $t) => $sed_url_p ? '<a href="' . $h($sed_url_p) . '" class="btn fw-bold" style="background:var(--pn-mod);border-color:var(--pn-mod);color:var(--pn-mod-testo);">' . $t . ' <i class="fa fa-arrow-right ms-1" aria-hidden="true"></i></a>' : '';
-$mio_ufficio_p = $io_operatore && $uff_p && (int)$io_operatore['ufficio_id'] === (int)$uff_p['id'];
+$mio_ufficio_p = $io_operatore && $uff_p && in_array((int)$uff_p['id'], $io_operatore['_uffici'] ?? [], true);
 $btn_prendi = $mio_ufficio_p ? '<form method="POST" class="m-0">' . (new \App\Auth\Csrf(new \App\Auth\SessioneNativa()))->campo() . '<input type="hidden" name="pratica_id" value="' . (int)$p['id'] . '"><button type="submit" name="prendi_pratica" value="1" class="btn fw-bold" style="background:var(--pn-mod);border-color:var(--pn-mod);color:var(--pn-mod-testo);"><i class="fa fa-hand me-1" aria-hidden="true"></i>Prendi in carico</button></form>' : $btn_p('#assegna', 'Assegna');
 $prossima_p = match ($fase_p) {
     'protocollare' => (string)$p['protocollo'] === ''
@@ -167,7 +167,7 @@ echo pn_prossima($prossima_p[0], $prossima_p[1], $prossima_p[2], $prossima_p[3])
                 <?php if ($io_operatore && (int)$io_operatore['id'] !== (int)$p['assegnata_a'] && in_array((int)$io_operatore['id'], operatori_pratica($conn, (int)$p['id']), true)): ?> · <span class="badge bg-light text-dark border" title="Puoi aggiungere documenti e note: chi l'ha in carico viene avvisato"><i class="fa fa-clock-rotate-left me-1" aria-hidden="true"></i>l'hai avuta in carico</span><?php endif; ?></span>
         </div>
         <?php echo pn_iter(\App\Core\App::per($conn)->get(\App\Didattica\ServizioIter::class)->passiIter($p, $m_p), 'Iter della pratica'); ?>
-        <?php if (!$conclusa && $io_operatore && (int)$p['assegnata_a'] !== (int)$io_operatore['id'] && $uff_p && (int)$io_operatore['ufficio_id'] === (int)$uff_p['id']): ?>
+        <?php if (!$conclusa && $io_operatore && (int)$p['assegnata_a'] !== (int)$io_operatore['id'] && $uff_p && in_array((int)$uff_p['id'], $io_operatore['_uffici'] ?? [], true)): ?>
             <form method="POST" class="mt-2"><?php csrf_field(); ?><input type="hidden" name="pratica_id" value="<?php echo (int)$p['id']; ?>">
                 <button type="submit" name="prendi_pratica" value="1" class="btn btn-sm btn-success fw-bold"><i class="fa fa-hand me-1" aria-hidden="true"></i>Prendi in carico</button></form>
         <?php endif; ?>

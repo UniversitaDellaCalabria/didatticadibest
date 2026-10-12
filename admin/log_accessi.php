@@ -27,7 +27,7 @@ $righe = $log_accessi->pagina($f_cerca, $f_da, $f_fine, $per_page, $offset);
 
 <?php schede_sistema('log_accessi.php'); ?>
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-    <h4 class="fw-bold text-dark m-0"><i class="fa fa-sign-in-alt text-success me-2"></i> Log Accessi SSO</h4>
+    <div><h1 class="pn-titolo"><i class="fa fa-sign-in-alt me-2" aria-hidden="true"></i>Registro degli accessi</h1><p class="pn-aiuto">Gli accessi con SPID, CIE e credenziali Unical.</p></div>
     <span class="badge bg-secondary fs-6"><?php echo $total; ?> accessi totali</span>
 </div>
 

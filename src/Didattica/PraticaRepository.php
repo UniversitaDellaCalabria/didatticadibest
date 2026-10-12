@@ -188,7 +188,7 @@ final class PraticaRepository
             $where[] = "p.assegnata_a IS NULL AND p.ufficio_id IS NULL AND p.stato NOT IN ('accolta', 'respinta', 'chiusa')";
         } elseif ($carico === 'ufficio') {
             // Del mio ufficio: quelle che l'ufficio ha ora (anche senza una persona) e quelle assegnate a me
-            $where[] = '(p.ufficio_id = ' . (int) ($io['ufficio_id'] ?? -1) . ' OR p.assegnata_a = ' . (int) ($io['id'] ?? -1) . ')';
+            $where[] = '(p.ufficio_id IN (' . implode(',', array_map('intval', ($io['_uffici'] ?? []) ?: [-1])) . ') OR p.assegnata_a = ' . (int) ($io['id'] ?? -1) . ')';
         }
         if ($dal !== '') {
             $where[] = 'p.creata_il >= ?';

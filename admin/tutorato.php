@@ -143,10 +143,12 @@ $passi_html = function (array $i) use ($h) {
     return $o . '</ol>';
 };
 ?>
-<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
-    <h4 class="fw-bold text-dark mb-0"><i class="fa fa-user-graduate me-2" style="color:#047857;" aria-hidden="true"></i>Tutorato · lettere di incarico</h4>
-    <?php if (!firma_remota_disponibile()): ?><span class="small text-secondary"><i class="fa fa-circle-info me-1" aria-hidden="true"></i>Firma remota Aruba non configurata (.env): docente e direttore caricano il PDF firmato in PAdES.</span><?php endif; ?>
-</div>
+<?php
+echo pn_testata('Tutorato · lettere di incarico', 'fa-user-graduate',
+    'Per ogni bando: i vincitori, la lettera di incarico, la conferma dello studente, le firme e il protocollo.',
+    !firma_remota_disponibile() ? '<span class="small text-secondary"><i class="fa fa-circle-info me-1" aria-hidden="true"></i>Firma remota Aruba non configurata (.env): docente e direttore caricano il PDF firmato in PAdES.</span>' : '',
+    '<a href="didattica.php?p_id=' . (int)$filtro_p . '">Didattica</a> › Tutorato');
+?>
 
 <?php if (!empty($_GET['nuovo_bando']) || ($bando_sel && !empty($_GET['modifica']))):
     $b = $bando_sel ?: ['id' => 0, 'titolo' => '', 'anno_accademico' => anno_accademico_corrente() . '/' . (anno_accademico_corrente() + 1), 'decreto_bando' => '', 'decreto_bando_data' => '', 'decreto_commissione' => '', 'decreto_commissione_data' => '',
@@ -406,7 +408,7 @@ $passi_html = function (array $i) use ($h) {
     </div></div>
     <div class="card border-0 shadow-sm"><div class="table-responsive"><table class="table table-sm align-middle small mb-0">
         <thead class="table-light"><tr><th>Vincitore</th><th>Attività</th><th>Responsabile</th><th>Stato</th><th>Aggiornata</th></tr></thead><tbody>
-        <?php if (!$inc): ?><tr><td colspan="5" class="text-center text-muted py-4">Nessuna lettera: aggiungi i vincitori.</td></tr><?php endif; ?>
+        <?php if (!$inc): ?><tr><td colspan="5"><?php echo pn_vuoto("Nessuna lettera: aggiungi i vincitori con «Nuovo vincitore».", "fa-envelope-open-text"); ?></td></tr><?php endif; ?>
         <?php foreach ($inc as $x): ?>
             <tr><td><a class="fw-bold text-decoration-none" href="<?php echo $base; ?>&amp;incarico=<?php echo (int)$x['id']; ?>"><?php echo $h(trim($x['cognome'] . ' ' . $x['nome'])); ?></a><div class="text-secondary font-monospace" style="font-size:.7rem;"><?php echo $h($x['codice']); ?></div></td>
                 <td><?php echo $h(mb_strimwidth((string)$x['attivita'], 0, 80, '…')); ?><div class="text-secondary"><?php echo $h(rtrim(rtrim((string)$x['ore'], '0'), '.') . ' ore · € ' . number_format((float)$x['compenso'], 2, ',', '.')); ?></div></td>
@@ -425,7 +427,7 @@ $passi_html = function (array $i) use ($h) {
     </div>
     <div class="card border-0 shadow-sm"><div class="table-responsive"><table class="table table-sm align-middle small mb-0">
         <thead class="table-light"><tr><th>Bando</th><th>a.a.</th><th>Decreto</th><th class="text-center">Lettere</th><th class="text-center">Firmate</th></tr></thead><tbody>
-        <?php if (!$bandi): ?><tr><td colspan="5" class="text-center text-muted py-4">Nessun bando.</td></tr><?php endif; ?>
+        <?php if (!$bandi): ?><tr><td colspan="5"><?php echo pn_vuoto("Nessun bando: creane uno per inserire i vincitori e preparare le lettere.", "fa-user-graduate"); ?></td></tr><?php endif; ?>
         <?php foreach ($bandi as $b): ?>
             <tr><td><a class="fw-bold text-decoration-none" href="<?php echo $base; ?>&amp;bando=<?php echo (int)$b['id']; ?>"><?php echo $h($b['titolo']); ?></a></td><td><?php echo $h($b['anno_accademico']); ?></td>
                 <td><?php echo $h(decreto_testo($b['decreto_bando'], $b['decreto_bando_data'])); ?></td><td class="text-center"><?php echo (int)$b['n_incarichi']; ?></td><td class="text-center"><?php echo (int)$b['n_firmate']; ?></td></tr>

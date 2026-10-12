@@ -180,7 +180,7 @@ $_tmap = ['testata'=>'','slideshow'=>'','widgets'=>'','backup'=>''];
 $_tmap[array_key_exists($_st, $_tmap) ? $_st : 'testata'] = 'active show';
 ?>
 <div class="d-flex align-items-center mb-3 gap-2">
-    <h4 class="fw-bold text-dark mb-0"><i class="fa fa-cog me-2 text-danger"></i>Configurazione Globale</h4>
+    <div><h1 class="pn-titolo"><i class="fa fa-cog me-2 text-danger" aria-hidden="true"></i>Configurazione globale</h1><p class="pn-aiuto">Nome, logo, colori e testi che compaiono su tutto il sito.</p></div>
 </div>
 
 <ul class="nav nav-tabs mb-0" id="testataTabs" role="tablist">

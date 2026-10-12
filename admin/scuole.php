@@ -59,7 +59,7 @@ $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
 </style>
 
 <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
-    <h4 class="fw-bold text-dark mb-0"><i class="fa fa-school me-2" style="color:#0891b2;" aria-hidden="true"></i>Anagrafe scuole</h4>
+    <div><h1 class="pn-titolo"><i class="fa fa-school me-2" style="color:#0891b2;" aria-hidden="true"></i>Anagrafe scuole</h1><p class="pn-aiuto">Le scuole che aderiscono alla Formazione Scuola Lavoro, con i loro riferimenti.</p></div>
 </div>
 <p class="text-secondary small">Elenco ufficiale delle scuole italiane (open data del Ministero dell'Istruzione). Nei moduli di iscrizione il campo di tipo <strong>"Scuola (anagrafe del Ministero)"</strong> cerca qui mentre il docente scrive: ogni iscrizione viene collegata al codice meccanografico e report e statistiche contano ogni scuola una volta sola.</p>
 

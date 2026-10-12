@@ -89,7 +89,13 @@ if ($fase === 'azioni') {
             <div class="d-flex flex-wrap gap-1"><?php foreach ($modelli as $k => $mm): ?><button type="button" class="btn btn-sm btn-outline-success dd-modello" data-modello="<?php echo $k; ?>"><?php echo $h($mm[0]); ?></button><?php endforeach; ?></div>
         </div>
         <?php endif; ?>
-        <div class="row g-2">
+        <nav class="pn-passi" id="ddSezioni" aria-label="Parti del modulo">
+            <button type="button" class="pn-passo active" data-sez="info"><span class="pn-passo-n">1</span><span>Informazioni<small>titolo, file, chi può compilare</small></span></button>
+            <button type="button" class="pn-passo dd-online" data-sez="campi"><span class="pn-passo-n">2</span><span>Domande<small>i campi che compila lo studente</small></span></button>
+            <button type="button" class="pn-passo dd-online" data-sez="iter"><span class="pn-passo-n">3</span><span>Iter e domanda in PDF<small>chi riceve la pratica</small></span></button>
+            <button type="button" class="pn-passo dd-online" data-sez="verbale"><span class="pn-passo-n">4</span><span>Verbale<small>come compare in consiglio</small></span></button>
+        </nav>
+        <div class="row g-2" data-parte="info">
             <div class="col-md-6"><label class="form-label small fw-bold" for="mTit">Titolo <span class="text-danger">*</span></label><input type="text" class="form-control" id="mTit" name="titolo" value="<?php echo $h($f['titolo']); ?>" required maxlength="200"></div>
             <div class="col-md-3"><label class="form-label small fw-bold" for="mCat">Categoria</label><input type="text" class="form-control" id="mCat" name="categoria" value="<?php echo $h($f['categoria']); ?>" list="mCatList" placeholder="es. Tirocini, Piani di studio" maxlength="100">
                 <datalist id="mCatList"><?php foreach ($categorie as $c): ?><option value="<?php echo $h($c); ?>"><?php endforeach; ?></datalist></div>
@@ -109,7 +115,7 @@ if ($fase === 'azioni') {
             <div class="col-md-4 dd-online"><label class="form-label small fw-bold" for="mGg">Promemoria se la pratica è ferma da (giorni)</label><input type="number" min="0" max="90" class="form-control" id="mGg" name="giorni_promemoria" value="<?php echo (int)($f['giorni_promemoria'] ?? 7); ?>" style="max-width:120px;"><div class="form-text">Email a chi l'ha in carico (o a chi smista); 0 = nessun promemoria.</div></div>
         </div>
 
-        <fieldset class="dd-online mt-3 border rounded p-2">
+        <fieldset class="dd-online mt-3 border rounded p-2" data-parte="campi">
             <legend class="form-label small fw-bold float-none w-auto px-1 mb-1">Campi del modulo online</legend>
             <p class="small text-secondary mb-2">Nome, cognome, email e matricola si prendono dall'accesso. <strong>Dalle anagrafi</strong>: «Corso di studio», «Insegnamento del Dipartimento», «Insegnamento di Ateneo» (lo studente sceglie tipo di corso, corso, anno accademico di offerta e insegnamento, o lo scrive a mano) e «Docente». <strong>Tabella a righe</strong>: con <i class="fa fa-sliders" aria-hidden="true"></i> scegli nome e tipo di ogni colonna (es. Insegnamento dal catalogo, CFU e S.S.D. che si compilano da soli, Voto, Data). Con <i class="fa fa-sliders" aria-hidden="true"></i> imposti anche la <strong>logica</strong>: il campo compare solo se un'altra risposta ha un certo valore, oppure si compila in automatico. Spunta <strong>ufficio</strong> per i campi che compila solo l'ufficio nell'istruttoria. Opzioni separate da virgole.</p>
             <div class="dd-campo dd-testa small fw-bold text-secondary d-none d-lg-grid"><span>Domanda</span><span>Tipo</span><span>Opzioni / colonne</span><span></span><span></span><span>Aiuto (facoltativo)</span><span></span><span></span></div>
@@ -154,7 +160,7 @@ if ($fase === 'azioni') {
             <button type="button" class="btn btn-sm btn-outline-secondary fw-bold" id="ddAggiungi"><i class="fa fa-plus me-1" aria-hidden="true"></i>Aggiungi campo</button>
         </fieldset>
 
-        <fieldset class="dd-online mt-3 border rounded p-2">
+        <fieldset class="dd-online mt-3 border rounded p-2" data-parte="iter">
             <legend class="form-label small fw-bold float-none w-auto px-1 mb-1"><i class="fa fa-route me-1 text-primary" aria-hidden="true"></i>Iter della pratica</legend>
             <p class="small text-secondary mb-2">Chi riceve la pratica, in ordine, dopo lo smistamento del manager (es. tutor dell'internazionalizzazione → referente del corso → carriere studenti). Lo studente vede a che punto è. Nessun passo = un solo passo «Operatore».</p>
             <div class="d-flex flex-wrap gap-2 align-items-center">
@@ -168,7 +174,7 @@ if ($fase === 'azioni') {
         </fieldset>
 
         <?php $d_f = function_exists('config_domanda') ? config_domanda($f) : ['pdf' => false, 'bollo' => false, 'oggetto' => '', 'destinatario' => '', 'chiede' => '']; ?>
-        <fieldset class="dd-online mt-3 border rounded p-2">
+        <fieldset class="dd-online mt-3 border rounded p-2" data-parte="iter">
             <legend class="form-label small fw-bold float-none w-auto px-1 mb-1"><i class="fa fa-file-pdf me-1 text-danger" aria-hidden="true"></i>Domanda in PDF/A da protocollare</legend>
             <label class="form-check small mb-2"><input class="form-check-input" type="checkbox" name="d_pdf" value="1"<?php echo $d_f['pdf'] ? ' checked' : ''; ?>> All'invio il portale prepara la domanda in PDF/A-2b con il logo del Dipartimento: «Il/La sottoscritto/a … nato/a a … CHIEDE …», tabelle, dichiarazioni e metadati (chi, quando, come ha fatto l'accesso, impronta SHA-256)</label>
             <label class="form-check small mb-2"><input class="form-check-input" type="checkbox" name="d_bollo" value="1"<?php echo $d_f['bollo'] ? ' checked' : ''; ?>> Richiede la <strong>marca da bollo</strong>: chi protocolla spunta il pagamento e solo allora la pratica passa all'ufficio successivo</label>
@@ -180,7 +186,7 @@ if ($fase === 'azioni') {
             </div>
         </fieldset>
 
-        <fieldset class="dd-online mt-3 border rounded p-2">
+        <fieldset class="dd-online mt-3 border rounded p-2" data-parte="verbale">
             <legend class="form-label small fw-bold float-none w-auto px-1 mb-1"><i class="fa fa-file-word me-1 text-primary" aria-hidden="true"></i>Nel verbale del Consiglio</legend>
             <p class="small text-secondary mb-2">Segnaposto: <code>{STUDENTE}</code> (COGNOME NOME), <code>{NOME}</code>, <code>{COGNOME}</code>, <code>{MATRICOLA}</code>, <code>{MODULO}</code>, <code>{DATA}</code>, <code>{PROTOCOLLO}</code> e ogni domanda tra graffe, es. <code>{Corso di studio}</code>. <code>**testo**</code> = grassetto. Le tabelle a righe compaiono sotto il testo di ogni pratica.</p>
             <div class="row g-2">
@@ -199,9 +205,10 @@ if ($fase === 'azioni') {
                 <div class="col-12"><label class="form-label small fw-bold" for="vChi">Testo finale della sezione (facoltativo)</label><textarea class="form-control form-control-sm" id="vChi" name="v_chiusura" rows="2" placeholder="es. Il Consiglio approva."><?php echo $h($v_raw['chiusura'] ?? ''); ?></textarea></div>
             </div>
         </fieldset>
-        <div class="mt-3 d-flex gap-2">
-            <button type="submit" name="salva_modulo" value="1" class="btn btn-primary fw-bold"><i class="fa fa-save me-1" aria-hidden="true"></i>Salva</button>
+        <div class="pn-salva">
+            <button type="submit" name="salva_modulo" value="1" class="btn btn-primary fw-bold"><i class="fa fa-save me-1" aria-hidden="true"></i>Salva il modulo</button>
             <a href="<?php echo $base; ?>&amp;tab=moduli" class="btn btn-outline-secondary">Annulla</a>
+            <?php if ($f['id'] && $f['tipo'] === 'online'): ?><a class="btn btn-outline-secondary ms-auto" href="../modulo.php?id=<?php echo (int)$f['id']; ?>" target="_blank" rel="noopener"><i class="fa fa-eye me-1" aria-hidden="true"></i>Guarda come lo vede lo studente</a><?php endif; ?>
         </div>
     </div></form>
     <script>
@@ -215,6 +222,16 @@ if ($fase === 'azioni') {
             document.querySelectorAll('.dd-v-elenco').forEach(function (x) { x.hidden = stile.value !== 'elenco'; });
         }
         tipo.addEventListener('change', aggiorna); stile.addEventListener('change', aggiorna); aggiorna();
+
+        // ── Un blocco alla volta: Informazioni · Domande · Iter e domanda in PDF · Verbale ──
+        var bottoni = document.querySelectorAll('#ddSezioni [data-sez]');
+        function mostraParte(k) {
+            document.querySelectorAll('#ddForm [data-parte]').forEach(function (x) { x.classList.toggle('pn-nascosta', x.dataset.parte !== k); });
+            bottoni.forEach(function (b) { b.classList.toggle('active', b.dataset.sez === k); });
+        }
+        bottoni.forEach(function (b) { b.addEventListener('click', function () { mostraParte(b.dataset.sez); }); });
+        tipo.addEventListener('change', function () { if (tipo.value !== 'online') mostraParte('info'); });
+        mostraParte('info');
 
         // ── Colonne delle tabelle: righe nome + tipo, scritte nelle opzioni come "Nome:tipo" ──
         function leggiColonne(testo) {
@@ -336,21 +353,24 @@ if ($fase === 'azioni') {
     })();
     </script>
     <?php else: ?>
-        <a href="<?php echo $base; ?>&amp;tab=moduli&amp;nuovo=1" class="btn btn-primary btn-sm fw-bold mb-3"><i class="fa fa-plus-circle me-1" aria-hidden="true"></i>Nuovo modulo o documento</a>
+        <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+            <a href="<?php echo $base; ?>&amp;tab=moduli&amp;nuovo=1" class="btn btn-primary fw-bold"><i class="fa fa-plus-circle me-1" aria-hidden="true"></i>Nuovo modulo o documento</a>
+            <span class="small text-secondary">Un <strong>documento</strong> si scarica; un <strong>modulo online</strong> lo compila lo studente e apre una pratica.</span>
+        </div>
     <?php endif; ?>
 
     <?php if (!$moduli): ?>
-        <div class="card border-0 shadow-sm"><div class="card-body text-muted">Nessun modulo: crea il primo documento da scaricare o il primo modulo online (anche da un modello pronto: tesi, passaggi di corso, attività all'estero).</div></div>
+        <div class="card border-0 shadow-sm"><?php echo pn_vuoto("Nessun modulo: crea il primo documento da scaricare o il primo modulo online (anche da un modello pronto: tesi, passaggi di corso, attività all'estero).", 'fa-file-lines'); ?></div>
     <?php endif; ?>
     <?php foreach ($categorie as $cat): ?>
         <h6 class="fw-bold text-secondary text-uppercase mt-3 mb-2" style="font-size:.75rem;letter-spacing:.05em;"><?php echo $h($cat); ?></h6>
         <div class="card border-0 shadow-sm"><ul class="list-group list-group-flush small">
         <?php foreach ($moduli as $m): if ($m['categoria'] !== $cat) continue; $cm = campi_modulo($m['campi_json']); ?>
             <li class="list-group-item d-flex flex-wrap align-items-center gap-2">
-                <i class="fa <?php echo $m['tipo'] === 'online' ? 'fa-pen-to-square text-success' : 'fa-file-arrow-down text-primary'; ?>" aria-hidden="true"></i>
                 <strong><?php echo $h($m['titolo']); ?></strong>
-                <span class="text-secondary"><?php echo $m['tipo'] === 'online' ? 'Modulo online · ' . count(campi_studente($cm)) . ' campi' . (count(campi_ufficio($cm)) ? ' + ' . count(campi_ufficio($cm)) . ' dell\'ufficio' : '') . ' · ' . (int)$m['n_pratiche'] . ' pratiche' . ($m['n_aperte'] ? ' (' . (int)$m['n_aperte'] . ' aperte)' : '') : ($m['file_path'] ? 'Documento' : ($m['link'] ? 'Link' : 'Documento senza file')); ?></span>
-                <?php if (!(int)$m['attivo']): ?><span class="badge bg-secondary">non pubblicato</span><?php endif; ?>
+                <?php echo $m['tipo'] === 'online' ? pn_stato('Modulo online', 'ok', 'fa-pen-to-square') : pn_stato('Documento', 'info', 'fa-file-arrow-down'); ?>
+                <span class="text-secondary"><?php echo $m['tipo'] === 'online' ? count(campi_studente($cm)) . ' campi' . (count(campi_ufficio($cm)) ? ' + ' . count(campi_ufficio($cm)) . ' dell\'ufficio' : '') . ' · ' . (int)$m['n_pratiche'] . ' pratiche' . ($m['n_aperte'] ? ' (' . (int)$m['n_aperte'] . ' aperte)' : '') : ($m['file_path'] ? 'Documento' : ($m['link'] ? 'Link' : 'Documento senza file')); ?></span>
+                <?php if (!(int)$m['attivo']): ?><?php echo pn_stato('Non pubblicato', 'spento', 'fa-eye-slash'); ?><?php endif; ?>
                 <span class="ms-auto d-flex gap-1">
                     <?php if ($m['tipo'] === 'online' && $m['n_pratiche']): ?><a class="btn btn-sm btn-outline-dark py-0" href="<?php echo $base; ?>&amp;tab=pratiche&amp;modulo=<?php echo (int)$m['id']; ?>&amp;stato=tutte">Pratiche</a><?php endif; ?>
                     <?php if ($m['tipo'] === 'online'): ?><a class="btn btn-sm btn-outline-secondary py-0" href="../modulo.php?id=<?php echo (int)$m['id']; ?>" target="_blank" rel="noopener">Anteprima</a><?php endif; ?>

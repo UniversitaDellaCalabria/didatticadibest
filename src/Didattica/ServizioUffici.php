@@ -33,6 +33,7 @@ final class ServizioUffici
         $out = [];
         foreach ($this->operatori->tutti() as $x) {
             $x['_compiti'] = array_filter(explode(',', (string) $x['compiti']));
+            $x['_uffici'] = OperatoreRepository::uffici($x);
             if ($compito === null || in_array($compito, $x['_compiti'], true)) {
                 $out[] = $x;
             }
@@ -79,12 +80,14 @@ final class ServizioUffici
 
     /**
      * Aggiunge (o aggiorna) un operatore scelto dall'anagrafe di Ateneo. Ritorna un messaggio di errore o null.
-     * $ufficioId: ufficio dell'Ufficio didattico; $corsi: corsi di studio seguiti (uffici che seguono i corsi).
+     * $ufficioId: ufficio principale; $uffici: tutti gli uffici della persona (anche più di uno);
+     * $corsi: corsi di studio seguiti (uffici che seguono i corsi).
      *
      * @param list<string> $compiti
      * @param list<string> $corsi
+     * @param list<int|string> $uffici
      */
-    public function aggiungi(string $personaId, string $ruolo, array $compiti, int $ufficioId = 0, array $corsi = []): ?string
+    public function aggiungi(string $personaId, string $ruolo, array $compiti, int $ufficioId = 0, array $corsi = [], array $uffici = []): ?string
     {
         $p = $this->persone->persona($personaId);
         if (!$p) {
@@ -97,10 +100,18 @@ final class ServizioUffici
         $nom = trim($p['cognome'] . ' ' . $p['nome']);
         $comp = implode(',', array_values(array_intersect(array_keys(Costanti::COMPITI_UFFICIO), $compiti)));
         $ruolo = mb_substr(trim($ruolo), 0, 100);
-        $uffId = $this->uffici->idDa($ufficioId);
+        // Il principale è il primo scelto; gli altri uffici si aggiungono (solo id che esistono)
+        $tuttiId = [];
+        foreach (array_merge([$ufficioId], $uffici) as $x) {
+            if (($i = $this->uffici->idDa((int) $x)) !== null && !in_array($i, $tuttiId, true)) {
+                $tuttiId[] = $i;
+            }
+        }
+        $uffId = $tuttiId[0] ?? null;
+        $ufficiJson = count($tuttiId) > 1 ? (string) json_encode($tuttiId) : null;
         $corsiJson = $corsi ? (string) json_encode(array_values(array_unique(array_filter(array_map('trim', $corsi)))), JSON_UNESCAPED_UNICODE) : null;
 
-        return $this->operatori->salva($personaId, $email, $nom, $ruolo, $comp, $uffId, $corsiJson) ? null : 'Salvataggio non riuscito.';
+        return $this->operatori->salva($personaId, $email, $nom, $ruolo, $comp, $uffId, $corsiJson, $ufficiJson) ? null : 'Salvataggio non riuscito.';
     }
 
     /**
@@ -132,7 +143,13 @@ final class ServizioUffici
     /** @param array<string, mixed>|null $o */
     public function nomeUfficio(?array $o): string
     {
-        return ($o && !empty($o['ufficio_id'])) ? (string) ($this->uffici->tutti()[(int) $o['ufficio_id']]['nome'] ?? '') : '';
+        if (!$o) {
+            return '';
+        }
+        $tutti = $this->uffici->tutti();
+        $nomi = array_filter(array_map(fn (int $i): string => (string) ($tutti[$i]['nome'] ?? ''), OperatoreRepository::uffici($o)));
+
+        return implode(' + ', $nomi);
     }
 
     /**

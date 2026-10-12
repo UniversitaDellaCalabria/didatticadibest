@@ -512,6 +512,11 @@ aggiungi_operatore_ufficio($conn, 'car.prova', '', ['pratiche'], $uff['carriere'
 aggiungi_operatore_ufficio($conn, 'int.prova', '', ['pratiche'], $uff['internazionalizzazione']);
 $op = []; foreach (operatori_ufficio($conn) as $o) if ($o['ufficio_id']) $op[uffici_didattica($conn)[(int)$o['ufficio_id']]['chiave']] = (int)$o['id'];
 prova(isset($op['manager'], $op['referente_cdl'], $op['carriere'], $op['internazionalizzazione']), "personale assegnato agli uffici");
+aggiungi_operatore_ufficio($conn, 'int.prova', '', ['pratiche'], $uff['internazionalizzazione'], [], [$uff['carriere'], $uff['carriere'], 99999]);
+$o_multi = null; foreach (operatori_ufficio($conn) as $o) if ($o['persona_id'] === 'int.prova') $o_multi = $o;
+prova($o_multi && $o_multi['_uffici'] === [$uff['internazionalizzazione'], $uff['carriere']], "operatore in più uffici: principale per primo, senza doppioni né uffici inesistenti");
+prova(in_array((int)$o_multi['id'], array_map('intval', array_column(\App\Core\App::per($conn)->get(\App\Didattica\ServizioFlussoConvalide::class)->personeUfficio($uff['carriere']), 'id')), true), "l'operatore con due uffici compare anche nel secondo");
+aggiungi_operatore_ufficio($conn, 'int.prova', '', ['pratiche'], $uff['internazionalizzazione']);
 $q("INSERT INTO didattica_uffici (nome, smista, segue_corsi, ordine) VALUES ('Tirocini', 0, 0, 9)");
 $id_tir = (int)$conn->insert_id;
 prova(ufficio_didattica_id($conn, $id_tir) === null && ufficio_didattica_id($conn, 'carriere') === $uff['carriere'], "ufficio nuovo letto dopo l'aggiornamento; chiavi dei modelli riconosciute");

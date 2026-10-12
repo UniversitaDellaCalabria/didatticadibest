@@ -76,7 +76,7 @@ foreach ($stati_data as $sd) {
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
     <div>
         <div class="d-flex align-items-center gap-2 flex-wrap">
-            <h4 class="fw-bold mb-0 text-dark">Dashboard</h4>
+            <h1 class="pn-titolo">Dashboard dell'area</h1>
             <?php if (count($pagine_disponibili) > 1): ?>
                 <label for="dashArea" class="visually-hidden">Area da visualizzare</label>
                 <select id="dashArea" class="form-select form-select-sm fw-bold" style="width:auto;min-width:220px;border-color:<?php echo $colore_area; ?>;color:<?php echo $colore_area; ?>;" onchange="location.href='dashboard.php?p_id=' + this.value">

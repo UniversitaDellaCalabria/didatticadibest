@@ -362,10 +362,9 @@ form:not(.ev-form-classe) .ev-t-riga2 { grid-template-columns: repeat(3, 1fr); }
 @media (max-width: 767.98px) { .pj-riga, .pj-riga-2 { grid-template-columns: 1fr; padding-right:0; } }
 </style>
 
-<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
-    <h4 class="fw-bold text-dark mb-0"><i class="fa fa-calendar-alt me-2" style="color:<?php echo h($col_f); ?>" aria-hidden="true"></i><?php echo $nuovo ? 'Nuovo evento' : 'Modifica evento'; ?></h4>
-    <a href="eventi.php?p_id=<?php echo $filtro_p; ?><?php echo $filtro_ev ? '&f_ev=' . $filtro_ev : ''; ?>" class="btn btn-outline-secondary btn-sm fw-bold"><i class="fa fa-arrow-left me-1" aria-hidden="true"></i>Torna agli eventi</a>
-</div>
+<?php echo pn_testata($nuovo ? 'Nuovo evento' : 'Modifica evento', 'fa-calendar-alt',
+    'Compila le sezioni qui sotto (puoi saltare dall’una all’altra dall’indice) e poi premi «Salva», sempre in basso.',
+    '<a href="eventi.php?p_id=' . (int)$filtro_p . ($filtro_ev ? '&f_ev=' . (int)$filtro_ev : '') . '" class="btn btn-outline-secondary btn-sm fw-bold"><i class="fa fa-arrow-left me-1" aria-hidden="true"></i>Torna agli eventi</a>'); ?>
 
 <form method="POST" enctype="multipart/form-data" onsubmit="if (window.tinymce) tinymce.triggerSave();">
     <?php csrf_field(); ?>
@@ -756,7 +755,7 @@ $col_area = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
 </style>
 
 <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
-    <h4 class="fw-bold text-dark mb-0"><i class="fa fa-calendar-alt me-2" style="color:<?php echo $col_area; ?>"></i>Gestione Eventi e Turni</h4>
+    <div><h1 class="pn-titolo"><i class="fa fa-calendar-alt me-2" style="color:<?php echo $col_area; ?>" aria-hidden="true"></i>Eventi e turni</h1><p class="pn-aiuto">Gli eventi dell'area con le loro date e i posti disponibili. Scegli un evento dal filtro per vedere solo i suoi turni.</p></div>
     <div class="d-flex gap-2 align-items-center">
         <form method="GET" id="formFiltroEv" class="d-flex align-items-center gap-2 m-0">
             <input type="hidden" name="p_id" value="<?php echo $filtro_p; ?>">

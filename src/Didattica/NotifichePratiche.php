@@ -31,13 +31,13 @@ final class NotifichePratiche
         $ufficio = $this->ufficio->emailUfficio((string) ($p['email_ufficio'] ?? ''), 'pratiche');
         // Nuove pratiche: ai manager (che smistano) se ci sono; messaggi dello studente: a chi ha la pratica in carico
         $smistano = array_keys(array_filter($this->uffici->tutti(), fn ($u) => (int) $u['smista'] === 1));
-        $manager = array_column(array_filter($this->ufficio->operatori(), fn ($o) => in_array((int) $o['ufficio_id'], $smistano, true)), 'email');
+        $manager = array_column(array_filter($this->ufficio->operatori(), fn ($o) => array_intersect($o['_uffici'], $smistano)), 'email');
         $inCarico = !empty($p['assegnata_a']) ? $this->ufficio->operatore((int) $p['assegnata_a']) : null;
         if ($tipo === 'nuova' && $manager && trim((string) ($p['email_ufficio'] ?? '')) === '') {
             $ufficio = $manager;
         }
         // Pratica che parte da un ufficio (es. protocollo): avvisate le persone di quell'ufficio
-        if ($tipo === 'nuova' && !empty($p['ufficio_id']) && ($delUff = array_column(array_filter($this->ufficio->operatori(), fn ($o) => (int) $o['ufficio_id'] === (int) $p['ufficio_id']), 'email'))) {
+        if ($tipo === 'nuova' && !empty($p['ufficio_id']) && ($delUff = array_column(array_filter($this->ufficio->operatori(), fn ($o) => in_array((int) $p['ufficio_id'], $o['_uffici'], true)), 'email'))) {
             $ufficio = $delUff;
         }
         if ($tipo === 'msg_studente' && $inCarico) {

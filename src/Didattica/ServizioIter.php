@@ -92,7 +92,7 @@ final class ServizioIter
             }
         }
         $punti = function ($o) use ($uff, $corso) {
-            $s = $uff && (int) $o['ufficio_id'] === $uff ? 10 : 0;
+            $s = $uff && in_array($uff, $o['_uffici'], true) ? 10 : 0;
             if ($corso !== '' && in_array($corso, json_decode((string) ($o['corsi'] ?? ''), true) ?: [], true)) {
                 $s += 5;
             }
@@ -119,7 +119,9 @@ final class ServizioIter
         $m = $this->moduli->perId((int) $p['modulo_id']);
         $passo = max(1, min(count($this->iter($m, $p)), $passo));
         $stato = in_array($p['stato'], ['inviata'], true) ? 'in_lavorazione' : $p['stato'];
-        $uffOp = (int) $o['ufficio_id'] ?: null;
+        // Con più uffici vale quello del passo dell'iter, se la persona lo ha; altrimenti il suo principale
+        $uffPasso = max(0, $this->iter($m, $p)[$passo - 1] ?? 0);
+        $uffOp = ($uffPasso && in_array($uffPasso, $o['_uffici'], true)) ? $uffPasso : ((int) $o['ufficio_id'] ?: null);
         $this->pratiche->assegna($id, $opId, $passo, $stato, $uffOp);
         // Chi l'ha avuta resta tra gli operatori della pratica: continua a vederla e a integrarla
         $this->pratiche->ricordaOperatore($id, $opId, $passo, true);

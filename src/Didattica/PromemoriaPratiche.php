@@ -26,7 +26,7 @@ final class PromemoriaPratiche
             }
             $o = !empty($p['assegnata_a']) ? $this->ufficio->operatore((int) $p['assegnata_a']) : null;
             $smistano = array_keys(array_filter($this->uffici->tutti(), fn ($u) => (int) $u['smista'] === 1));
-            $dest = $o ? [$o['email']] : (array_column(array_filter($this->ufficio->operatori(), fn ($op) => in_array((int) $op['ufficio_id'], $smistano, true)), 'email') ?: $this->ufficio->emailUfficio((string) $p['email_ufficio']));
+            $dest = $o ? [$o['email']] : (array_column(array_filter($this->ufficio->operatori(), fn ($op) => array_intersect($op['_uffici'], $smistano)), 'email') ?: $this->ufficio->emailUfficio((string) $p['email_ufficio']));
             $giorni = (int) floor((time() - strtotime($p['aggiornata_il'] ?: $p['creata_il'])) / 86400);
             foreach ($dest as $e) {
                 $this->notifiche->invia(

@@ -43,7 +43,7 @@ foreach ($pagine_disponibili as $a) {
 </style>
 
 <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
-    <h4 class="fw-bold text-dark mb-0"><i class="fa fa-layer-group me-2 text-primary" aria-hidden="true"></i>Aree</h4>
+    <div><h1 class="pn-titolo"><i class="fa fa-layer-group me-2 text-primary" aria-hidden="true"></i>Aree</h1><p class="pn-aiuto">Le aree del portale (eventi, FSL, prenotazioni…): ognuna ha la sua pagina e i suoi gestori.</p></div>
     <?php if ($is_full_admin): ?>
         <a href="nuova_area.php?p_id=<?php echo $filtro_p; ?>" class="btn btn-primary btn-sm fw-bold"><i class="fa fa-plus-circle me-1" aria-hidden="true"></i>Nuova area</a>
     <?php endif; ?>

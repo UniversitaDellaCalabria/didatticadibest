@@ -23,19 +23,40 @@ final class OperatoreRepository
     /**
      * Aggiunge un operatore o, se l'email c'è già, ne aggiorna i dati. False se il salvataggio non riesce.
      */
-    public function salva(string $personaId, string $email, string $nominativo, string $ruolo, string $compiti, ?int $ufficioId, ?string $corsiJson): bool
+    public function salva(string $personaId, string $email, string $nominativo, string $ruolo, string $compiti, ?int $ufficioId, ?string $corsiJson, ?string $ufficiJson = null): bool
     {
         return $this->db->esegui(
-            'INSERT INTO ufficio_didattica (persona_id, email, nominativo, ruolo, compiti, ufficio_id, corsi) VALUES (?, ?, ?, ?, ?, ?, ?)
-             ON DUPLICATE KEY UPDATE persona_id = VALUES(persona_id), nominativo = VALUES(nominativo), ruolo = VALUES(ruolo), compiti = VALUES(compiti), ufficio_id = VALUES(ufficio_id), corsi = VALUES(corsi)',
-            [$personaId, $email, $nominativo, $ruolo, $compiti, $ufficioId, $corsiJson]
+            'INSERT INTO ufficio_didattica (persona_id, email, nominativo, ruolo, compiti, ufficio_id, corsi, uffici_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE persona_id = VALUES(persona_id), nominativo = VALUES(nominativo), ruolo = VALUES(ruolo), compiti = VALUES(compiti), ufficio_id = VALUES(ufficio_id), corsi = VALUES(corsi), uffici_json = VALUES(uffici_json)',
+            [$personaId, $email, $nominativo, $ruolo, $compiti, $ufficioId, $corsiJson, $ufficiJson]
         ) >= 0;
     }
 
-    /** Persone dell'Ufficio didattico che stanno nell'ufficio indicato. */
+    /** Persone dell'Ufficio didattico che stanno nell'ufficio indicato (anche se non è il loro ufficio principale). */
     public function contaDelloUfficio(int $ufficioId): int
     {
-        return (int) $this->db->valore('SELECT COUNT(*) FROM ufficio_didattica WHERE ufficio_id = ?', [$ufficioId]);
+        return count(array_filter($this->tutti(), fn (array $o): bool => in_array($ufficioId, self::uffici($o), true)));
+    }
+
+    /**
+     * Tutti gli uffici di un operatore: quello principale (ufficio_id) per primo, poi gli altri.
+     *
+     * @param array<string, mixed> $o riga di ufficio_didattica
+     * @return list<int>
+     */
+    public static function uffici(array $o): array
+    {
+        $ids = [];
+        if (!empty($o['ufficio_id'])) {
+            $ids[] = (int) $o['ufficio_id'];
+        }
+        foreach (json_decode((string) ($o['uffici_json'] ?? ''), true) ?: [] as $x) {
+            if ((int) $x > 0) {
+                $ids[] = (int) $x;
+            }
+        }
+
+        return array_values(array_unique($ids));
     }
 
     public function togli(int $id): void

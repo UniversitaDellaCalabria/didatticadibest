@@ -317,10 +317,9 @@ if ($mostra_form):
 @media (max-width: 767.98px) { .pj-riga, .pj-riga-info, .pj-riga-2, .pj-mod-riga, .pj-mod-riga2 { grid-template-columns: 1fr; padding-right:0; } .pj-riga-info { padding-bottom:.5rem; border-bottom:1px dashed #e2e8f0; } }
 </style>
 
-<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
-    <h4 class="fw-bold text-dark mb-0"><i class="fa fa-diagram-project me-2" style="color:<?php echo h($col_area); ?>" aria-hidden="true"></i><?php echo $converti ? 'Trasforma l\'evento in progetto' : ($id_modifica ? 'Modifica progetto' : 'Nuovo progetto'); ?></h4>
-    <a href="progetti.php?p_id=<?php echo $filtro_p; ?>" class="btn btn-outline-secondary btn-sm fw-bold"><i class="fa fa-arrow-left me-1" aria-hidden="true"></i>Torna ai progetti</a>
-</div>
+<?php echo pn_testata($converti ? 'Trasforma l’evento in progetto' : ($id_modifica ? 'Modifica progetto' : 'Nuovo progetto'), 'fa-diagram-project',
+    'Compila le sezioni qui sotto (puoi saltare dall’una all’altra dall’indice) e poi premi «Salva», sempre in basso.',
+    '<a href="progetti.php?p_id=' . (int)$filtro_p . '" class="btn btn-outline-secondary btn-sm fw-bold"><i class="fa fa-arrow-left me-1" aria-hidden="true"></i>Torna ai progetti</a>'); ?>
 
 <?php if ($converti): ?>
 <div class="alert alert-info border border-2 border-info shadow-sm"><i class="fa fa-diagram-project me-1" aria-hidden="true"></i><strong>Formazione Scuola Lavoro: questo evento sta per diventare un progetto.</strong> Completa la scheda del progetto (corso di laurea, periodo, moduli, edizioni, convenzione…) e salva. Le <strong>prenotazioni già ricevute restano</strong> e i turni dell'evento diventano le edizioni del progetto. Finché non salvi, l'evento resta com'è.</div>
@@ -746,7 +745,7 @@ $n_eventi_normali = $repo_eventi->contaNormali((int)$filtro_p);
 </style>
 
 <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
-    <h4 class="fw-bold text-dark mb-0"><i class="fa fa-diagram-project me-2" style="color:<?php echo h($col_area); ?>" aria-hidden="true"></i>Progetti</h4>
+    <div><h1 class="pn-titolo"><i class="fa fa-diagram-project me-2" style="color:<?php echo h($col_area); ?>" aria-hidden="true"></i>Progetti</h1><p class="pn-aiuto">Ogni progetto ha le sue edizioni, a cui ci si iscrive. Trascina per cambiare l'ordine.</p></div>
     <div class="d-flex gap-2 flex-wrap">
         <a href="form_builder.php?p_id=<?php echo $filtro_p; ?>" class="btn btn-outline-secondary btn-sm fw-bold"><i class="fa fa-list-check me-1" aria-hidden="true"></i>Modulo di iscrizione</a>
         <?php if ($puo_creare): ?>
