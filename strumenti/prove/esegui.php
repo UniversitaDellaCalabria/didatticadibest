@@ -136,7 +136,7 @@ if (class_exists('ZipArchive')) {
     $fa = genera_convenzione_precompilata($conn, 1, 'allegato');
     $xa = $fa ? (string)(new class { function leggi($f) { $z = new ZipArchive(); $z->open($f); $x = $z->getFromName('word/document.xml'); $z->close(); return $x; } })->leggi($fa) : '';
     $ta = strip_tags($xa);
-    prova($fa && !preg_match('/\{\{\w+\}\}/', $xa) && str_contains($ta, 'Numero di studenti: 20') && str_contains($ta, 'Tutor Dipartimento') && str_contains($ta, '2026/2027'), "Allegato A precompilato (A.A. 2026/2027)");
+    prova($fa && !preg_match('/\{\{\w+\}\}/', $xa) && str_contains($ta, 'Numero di studenti: 20') && str_contains($ta, 'Tutor Dipartimento') && !str_contains($ta, 'A.A.'), "Allegato A precompilato (senza anno accademico nel titolo)");
     if ($fa) @unlink($fa);
     prova(str_contains(html_istruzioni_convenzione([], true, 'FS-1'), 'Allegato A') && file_exists(RADICE_SITO . '/convenzione_precompilata.php'), "Allegato A nel modulo online (restano validi i link precompilati già inviati)");
 } else prova(false, "ZipArchive non disponibile: lancia con -d extension=zip");
@@ -792,9 +792,18 @@ prova(conferma_incarico_studente($conn, $it, $stud, ['metodo' => 'ateneo']) !== 
 prova(conferma_incarico_studente($conn, $it, ['id' => 5, 'codice_fiscale' => 'ALTRAPERSONA0000'], ['metodo' => 'spid']) !== null, "un'altra persona non conferma");
 $EMAIL = [];
 prova(segnala_errore_incarico($conn, $it, 'Il civico è 5') === null && in_array('carla.car@unical.it', array_column($EMAIL, 'a'), true), "segnalazione di un errore: email all'operatore del bando");
+// Se nel .env c'è CIFRATURA_CHIAVE la lettera si accetta solo dopo la dichiarazione individuale (passi 2 e 3)
+$dich_sv = \App\Core\App::per($conn)->get(\App\Tutorato\ServizioDichiarazione::class);
+if ($dich_sv->richiesta()) {
+    $li = incarico_tutorato($conn, $it);
+    $e2 = $dich_sv->salvaPasso($it, 2, ['telefono' => '333 1234567', 'email' => 'nuovo@unical.it', 'residenza_invariata' => '1', 'non_dipendente' => '1', 'irpef' => '23', 'iban' => 'IT60X0542811101000000123456', 'banca' => 'Banca di prova'], $li)[0];
+    $e3d = $dich_sv->salvaPasso($it, 3, ['inps' => 'gs35', 'inail' => ['didattica']], $li)[0];
+    prova(!$e2 && !$e3d && $dich_sv->stato($it)['completa'], 'dichiarazione individuale compilata (dati bancari cifrati)');
+}
 $EMAIL = [];
 $meta_spid = ['metodo' => 'spid', 'livello' => 2, 'idp' => 'https://id.lepida.it/idp/shibboleth', 'contesto' => 'https://www.spid.gov.it/SpidL2', 'spid_code' => 'LEPI0001ABCD', 'istante' => date('c'), 'sessione' => '_abc', 'ip' => '10.0.0.1'];
-prova(conferma_incarico_studente($conn, $it, $stud, $meta_spid) === null, "conferma con SPID");
+$e_conf = conferma_incarico_studente($conn, $it, $stud, $meta_spid);
+prova($e_conf === null, "conferma con SPID", (string)$e_conf);
 $inc = incarico_tutorato($conn, $it); $fs = json_decode($inc['studente_firma_json'], true);
 $pdf1 = (string)file_get_contents(pdf_corrente_incarico($inc));
 prova($inc['stato'] === 'confermata' && $fs['spid_code'] === 'LEPI0001ABCD' && $fs['livello'] === 2 && $fs['sha256_pdf'] === hash('sha256', $pdf1) && $fs['impronta'] === impronta_dati_incarico($inc), "dati SPID e impronte registrati con la conferma");
@@ -861,7 +870,7 @@ $e3 = registra_firma_fine($conn, $it, $firma_pades($pdf_f, $cert_doc), "caricato
 prova($e3 === null && incarico_tutorato($conn, $it)['fine_stato'] === 'firmata'
       && in_array('carla.car@unical.it', array_column($EMAIL, 'a'), true) && in_array('nuovo@unical.it', array_column($EMAIL, 'a'), true), "firma del docente: avviso «attività completate» all'operatore e al tutor");
 $m_op = array_values(array_filter($EMAIL, fn($e) => $e['a'] === 'carla.car@unical.it'))[0] ?? [];
-prova(str_starts_with($m_op['oggetto'] ?? '', 'Attività completate') && str_contains($m_op['corpo'] ?? '', 'Preparazione esame') && !str_contains($m_op['corpo'] ?? '', 'stechiometria') && count($m_op['allegati'] ?? []) === 1, "l'avviso ha il riepilogo delle ore approvate e il PDF firmato in allegato");
+prova(str_starts_with($m_op['oggetto'] ?? '', 'Fine attività firmata') && str_contains($m_op['corpo'] ?? '', 'Preparazione esame') && !str_contains($m_op['corpo'] ?? '', 'stechiometria') && count($m_op['allegati'] ?? []) === 1, "l'avviso ha il riepilogo delle ore approvate e il PDF firmato in allegato");
 prova(protocolla_fine_attivita($conn, $it, '', 'Carla') !== null && protocolla_fine_attivita($conn, $it, '8888/2026', 'Carla') === null && incarico_tutorato($conn, $it)['fine_stato'] === 'protocollata', "protocollo della fine attività");
 // Solleciti delle firme ferme: ogni FIRME_GIORNI_SOLLECITO giorni (5), al terzo lo sa l'operatore
 $ns = duplica_incarico($conn, $it);

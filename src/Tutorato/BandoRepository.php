@@ -34,6 +34,26 @@ final class BandoRepository
         ));
     }
 
+    /** Imposta il file PDF di uno dei decreti (colonna dalla lista consentita). */
+    public function impostaFile(int $id, string $colonna, string $percorso): void
+    {
+        if (in_array($colonna, FileTutorato::DECRETI, true)) {
+            $this->db->esegui("UPDATE tutorato_bandi SET $colonna = ? WHERE id = ?", [$percorso, $id]);
+        }
+    }
+
+    /** Estremi del decreto di approvazione atti. */
+    public function impostaDecretoAtti(int $id, string $numero, ?string $data): void
+    {
+        $this->db->esegui('UPDATE tutorato_bandi SET decreto_atti = ?, decreto_atti_data = ? WHERE id = ?', [$numero, $data, $id]);
+    }
+
+    /** Ufficio di Ateneo che paga i tutor del bando (null = nessuno). */
+    public function impostaUfficio(int $id, ?int $ufficioId): void
+    {
+        $this->db->esegui('UPDATE tutorato_bandi SET ufficio_ateneo_id = ? WHERE id = ?', [$ufficioId, $id]);
+    }
+
     /** @param list<mixed> $v titolo, anno, decreto bando e data, decreto commissione e data, direttore (persona, nome, email, cf), operatore, luogo */
     public function aggiorna(int $id, array $v): void
     {

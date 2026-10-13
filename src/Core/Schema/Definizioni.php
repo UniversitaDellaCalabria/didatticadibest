@@ -213,6 +213,26 @@ final class Definizioni
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         // v38: Tutorato – bandi (decreti, direttore) e lettere di incarico dei vincitori: conferma dello studente con SPID/CIE,
         // firma digitale PAdES del docente responsabile e del direttore, protocollo; tutorato_eventi = storico della lettera
+        // v53: uffici di Ateneo (non del Dipartimento: pagamenti…) con le persone scelte dall'anagrafe di Ateneo; una persona può stare in più uffici
+        'uffici_ateneo' => "CREATE TABLE IF NOT EXISTS uffici_ateneo (
+            id INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(150) NOT NULL DEFAULT '', descrizione VARCHAR(500) DEFAULT '', attivo TINYINT(1) NOT NULL DEFAULT 1,
+            creato_il DATETIME DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        'uffici_ateneo_persone' => "CREATE TABLE IF NOT EXISTS uffici_ateneo_persone (
+            id INT AUTO_INCREMENT PRIMARY KEY, ufficio_id INT NOT NULL, persona_id VARCHAR(80) DEFAULT NULL, email VARCHAR(150) NOT NULL DEFAULT '',
+            nominativo VARCHAR(200) NOT NULL DEFAULT '', struttura VARCHAR(255) DEFAULT '', creato_il DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_ufficio_email (ufficio_id, email), INDEX idx_email (email)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        // v53: dichiarazione individuale del tutor (modello «N. 6») compilata online: tutti i dati in un JSON CIFRATO (AES-256-GCM, chiave nel .env)
+        // e registro di chi apre i dati personali (IBAN…)
+        'tutorato_dichiarazioni' => "CREATE TABLE IF NOT EXISTS tutorato_dichiarazioni (
+            id INT AUTO_INCREMENT PRIMARY KEY, incarico_id INT NOT NULL, dati_cifrati MEDIUMTEXT DEFAULT NULL, iban_finale VARCHAR(8) DEFAULT '',
+            compilata_il DATETIME DEFAULT NULL, aggiornata_il DATETIME DEFAULT NULL, UNIQUE KEY uq_incarico (incarico_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        'tutorato_accessi_dati' => "CREATE TABLE IF NOT EXISTS tutorato_accessi_dati (
+            id INT AUTO_INCREMENT PRIMARY KEY, incarico_id INT NOT NULL, utente_id INT DEFAULT NULL, utente_email VARCHAR(150) DEFAULT '', azione VARCHAR(30) NOT NULL DEFAULT '',
+            creato_il DATETIME DEFAULT CURRENT_TIMESTAMP, INDEX idx_incarico (incarico_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         'tutorato_bandi' => "CREATE TABLE IF NOT EXISTS tutorato_bandi (
             id INT AUTO_INCREMENT PRIMARY KEY, titolo VARCHAR(255) NOT NULL DEFAULT '', anno_accademico VARCHAR(20) DEFAULT '',
             decreto_bando VARCHAR(100) DEFAULT '', decreto_bando_data DATE DEFAULT NULL, decreto_commissione VARCHAR(100) DEFAULT '', decreto_commissione_data DATE DEFAULT NULL,
@@ -366,7 +386,36 @@ final class Definizioni
             'verbale_sollecito_il'  => "ADD COLUMN verbale_sollecito_il DATETIME DEFAULT NULL",
             'verbale_solleciti'     => "ADD COLUMN verbale_solleciti TINYINT NOT NULL DEFAULT 0",
         ],
+        'tutorato_bandi' => [
+            // v53: ufficio di Ateneo che paga i tutor di questo bando e i tre decreti in PDF (bando, commissione, approvazione atti)
+            'ufficio_ateneo_id'        => "ADD COLUMN ufficio_ateneo_id INT DEFAULT NULL",
+            'decreto_bando_file'       => "ADD COLUMN decreto_bando_file VARCHAR(255) DEFAULT NULL",
+            'decreto_commissione_file' => "ADD COLUMN decreto_commissione_file VARCHAR(255) DEFAULT NULL",
+            'decreto_atti'             => "ADD COLUMN decreto_atti VARCHAR(100) NOT NULL DEFAULT ''",
+            'decreto_atti_data'        => "ADD COLUMN decreto_atti_data DATE DEFAULT NULL",
+            'decreto_atti_file'        => "ADD COLUMN decreto_atti_file VARCHAR(255) DEFAULT NULL",
+        ],
         'tutorato_incarichi' => [
+            // v53: UNILAV (PDF) con le ore a cui si riferisce, compenso ricalcolato sulle ore approvate, validazione del referente e pagamento
+            // (pagamento_stato: '' | in_ufficio | rimandata | pagata)
+            'unilav_file'            => "ADD COLUMN unilav_file VARCHAR(255) DEFAULT NULL",
+            'unilav_il'              => "ADD COLUMN unilav_il DATETIME DEFAULT NULL",
+            'unilav_ore'             => "ADD COLUMN unilav_ore DECIMAL(6,1) DEFAULT NULL",
+            'compenso_finale'        => "ADD COLUMN compenso_finale DECIMAL(10,2) DEFAULT NULL",
+            'fine_validata_il'       => "ADD COLUMN fine_validata_il DATETIME DEFAULT NULL",
+            'fine_validata_da'       => "ADD COLUMN fine_validata_da VARCHAR(255) NOT NULL DEFAULT ''",
+            'pagamento_stato'        => "ADD COLUMN pagamento_stato VARCHAR(12) NOT NULL DEFAULT ''",
+            'pagamento_passato_il'   => "ADD COLUMN pagamento_passato_il DATETIME DEFAULT NULL",
+            'pagamento_passato_da'   => "ADD COLUMN pagamento_passato_da VARCHAR(255) NOT NULL DEFAULT ''",
+            'pagamento_nota'         => "ADD COLUMN pagamento_nota VARCHAR(500) NOT NULL DEFAULT ''",
+            'pagamento_data'         => "ADD COLUMN pagamento_data DATE DEFAULT NULL",
+            'pagamento_riferimento'  => "ADD COLUMN pagamento_riferimento VARCHAR(100) NOT NULL DEFAULT ''",
+            'pagato_il'              => "ADD COLUMN pagato_il DATETIME DEFAULT NULL",
+            'pagato_da'              => "ADD COLUMN pagato_da VARCHAR(255) NOT NULL DEFAULT ''",
+            // v54: insegnamento dell'anagrafe di Ateneo (id e codice) e ambito disciplinare, dall'import della graduatoria (decreto di approvazione atti)
+            'insegnamento_id'        => "ADD COLUMN insegnamento_id INT DEFAULT NULL",
+            'insegnamento_codice'    => "ADD COLUMN insegnamento_codice VARCHAR(30) NOT NULL DEFAULT ''",
+            'ambito'                 => "ADD COLUMN ambito VARCHAR(150) NOT NULL DEFAULT ''",
             // v39: dati della dichiarazione di fine attività (insegnamento e corso del docente), periodo per i promemoria,
             // fine attività (richiesta del tutor, PDF da firmare dal docente, firma, protocollo) e solleciti
             'insegnamento_docente' => "ADD COLUMN insegnamento_docente VARCHAR(255) DEFAULT ''",
@@ -395,6 +444,30 @@ final class Definizioni
             // v37: protocollo della convenzione compilata online, riportato nei documenti
             'protocollo'      => "ADD COLUMN protocollo VARCHAR(100) NOT NULL DEFAULT ''",
             'protocollo_data' => "ADD COLUMN protocollo_data DATE DEFAULT NULL",
+            // v49: convenzione firmata in PAdES caricata dalla scuola (file in cartella bloccata al web), chi ha firmato e a che punto è l'iter
+            // ('' = non ancora caricata, 'caricata_scuola' = in attesa dell'ufficio)
+            'file_firmato'   => "ADD COLUMN file_firmato VARCHAR(255) DEFAULT NULL",
+            'firmatario'     => "ADD COLUMN firmatario VARCHAR(255) NOT NULL DEFAULT ''",
+            'firmata_il'     => "ADD COLUMN firmata_il DATETIME DEFAULT NULL",
+            'stato_iter'     => "ADD COLUMN stato_iter VARCHAR(20) NOT NULL DEFAULT ''",
+            // v50: iter dopo il caricamento: presa in carico dell'ufficio, rifiuto con motivo, convenzione protocollata e registrata (convenzione_id)
+            // stato_iter: '' | caricata_scuola | in_carico | rifiutata | protocollata
+            'in_carico_il'   => "ADD COLUMN in_carico_il DATETIME DEFAULT NULL",
+            'in_carico_da'   => "ADD COLUMN in_carico_da VARCHAR(255) NOT NULL DEFAULT ''",
+            'nota_ufficio'   => "ADD COLUMN nota_ufficio VARCHAR(500) NOT NULL DEFAULT ''",
+            'convenzione_id' => "ADD COLUMN convenzione_id INT DEFAULT NULL",
+            'protocollata_il' => "ADD COLUMN protocollata_il DATETIME DEFAULT NULL",
+            // v51: firma del Direttore: link personale, quando è stata mandata, PDF firmato (cartella delle convenzioni) e chi ha firmato
+            // stato_iter ora anche: da_firmare (dal Direttore) | firmata_direttore (da protocollare)
+            'token_direttore'      => "ADD COLUMN token_direttore VARCHAR(40) DEFAULT NULL",
+            'da_firmare_il'        => "ADD COLUMN da_firmare_il DATETIME DEFAULT NULL",
+            'file_definitivo'      => "ADD COLUMN file_definitivo VARCHAR(255) DEFAULT NULL",
+            'firmata_direttore_il' => "ADD COLUMN firmata_direttore_il DATETIME DEFAULT NULL",
+            'firmatario_direttore' => "ADD COLUMN firmatario_direttore VARCHAR(255) NOT NULL DEFAULT ''",
+            // v52: Allegato A caricato dalla scuola insieme alla convenzione e protocollo in entrata (registrato dall'ufficio senza ricaricare il file)
+            'file_allegato_scuola'     => "ADD COLUMN file_allegato_scuola VARCHAR(255) DEFAULT NULL",
+            'protocollo_ingresso'      => "ADD COLUMN protocollo_ingresso VARCHAR(80) NOT NULL DEFAULT ''",
+            'protocollo_ingresso_data' => "ADD COLUMN protocollo_ingresso_data DATE DEFAULT NULL",
         ],
         'ufficio_didattica' => [
             // v37: ufficio di appartenenza (didattica_uffici) e corsi di studio seguiti (uffici che seguono i corsi)
@@ -569,6 +642,10 @@ final class Definizioni
             'email_attestato_corpo'   => "ADD COLUMN email_attestato_corpo TEXT DEFAULT NULL",
             'email_sondaggio_oggetto' => "ADD COLUMN email_sondaggio_oggetto VARCHAR(255) DEFAULT ''",
             'email_sondaggio_corpo'   => "ADD COLUMN email_sondaggio_corpo TEXT DEFAULT NULL",
+            // v51: Direttore che firma le convenzioni FSL (nome, email per il link di firma, codice fiscale per controllare il certificato)
+            'conv_direttore_nome'  => "ADD COLUMN conv_direttore_nome VARCHAR(150) NOT NULL DEFAULT ''",
+            'conv_direttore_email' => "ADD COLUMN conv_direttore_email VARCHAR(150) NOT NULL DEFAULT ''",
+            'conv_direttore_cf'    => "ADD COLUMN conv_direttore_cf VARCHAR(16) NOT NULL DEFAULT ''",
         ],
         // v19: voce di menu nascondibile (usata da admin/menu.php, mancava dallo schema; nuove aree: voce creata nascosta)
         'menu_voci' => [

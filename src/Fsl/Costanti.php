@@ -12,6 +12,22 @@ final class Costanti
     public const URL_ALLEGATO = 'assets/modelli/Allegato_A_FSL_DiBEST.doc';
     public const PEC = 'dipartimento.best@pec.unical.it';
 
+    /** Email dell'ufficio che riceve sempre l'avviso quando una scuola carica la convenzione firmata (oltre agli utenti abilitati a FSL e convenzioni). */
+    public const EMAIL_UFFICIO = 'orientamento.dibest@unical.it';
+
+    /** Convenzione firmata caricata dalla scuola: cartella (bloccata al web), dimensione massima e stati dell'iter. */
+    public const DIR_FIRMATE = 'uploads/convenzioni_compilate/firmate/';
+    public const MAX_FIRMATA = 10 * 1024 * 1024;
+    public const ITER_CARICATA = 'caricata_scuola';
+    public const ITER_IN_CARICO = 'in_carico';
+    public const ITER_DA_FIRMARE = 'da_firmare';
+    public const ITER_FIRMATA = 'firmata_direttore';
+    public const ITER_RIFIUTATA = 'rifiutata';
+    public const ITER_PROTOCOLLATA = 'protocollata';
+
+    /** Convenzione firmata dal Direttore e protocollata: cartella (bloccata al web) del registro delle convenzioni. */
+    public const DIR_CONVENZIONI = 'uploads/convenzioni/';
+
     /** Cartella (bloccata al web) delle autorizzazioni della scuola caricate dai docenti prima dell'attività. */
     public const DIR_AUTORIZZAZIONI = 'uploads/autorizzazioni/';
 

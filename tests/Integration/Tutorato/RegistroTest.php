@@ -117,7 +117,7 @@ final class RegistroTest extends TutoratoBase
         $this->assertNull($r->registraFirmaFine($id, $this->firmato($fine), 'caricamento'));
         $this->assertSame('firmata', $this->lettera($id)['fine_stato']);
         $this->assertSame(['admin@x.it', 'luca@x.it'], array_column($this->mailer->inviate, 'a'));
-        $this->assertSame('Attività completate: Rossi Luca – 7 ore', $this->mailer->inviate[0]['oggetto']);
+        $this->assertSame('Fine attività firmata: da validare – Rossi Luca – 7 ore', $this->mailer->inviate[0]['oggetto']);
         $this->assertStringContainsString('<td style=\'padding:3px 8px;text-align:center;\'>4</td>', $this->mailer->inviate[0]['corpo'], 'riepilogo delle ore approvate');
         $this->assertStringNotContainsString('>1</td>', $this->mailer->inviate[0]['corpo'], 'la riga respinta non compare');
         $this->assertSame('Tutorato: attività completate', $this->mailer->inviate[1]['oggetto']);

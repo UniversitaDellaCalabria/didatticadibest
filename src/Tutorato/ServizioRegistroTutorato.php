@@ -236,11 +236,11 @@ final class ServizioRegistroTutorato
         foreach ($this->notifiche->emailOperatori($i) as $e) {
             $this->notifiche->invia(
                 $e,
-                "Attività completate: " . trim($i['cognome'] . ' ' . $i['nome']) . " – " . DatiLettera::oreTesto($i['ore_approvate']) . " ore",
+                "Fine attività firmata: da validare – " . trim($i['cognome'] . ' ' . $i['nome']) . " – " . DatiLettera::oreTesto($i['ore_approvate']) . " ore",
                 "<p>Il tutor <strong>" . $h(trim($i['nome'] . ' ' . $i['cognome'])) . "</strong> (" . $h($i['bando_titolo']) . ") ha completato le attività: <strong>" . DatiLettera::oreTesto($i['ore_approvate']) . " ore</strong> approvate su " . DatiLettera::oreTesto($i['ore']) . ".</p>"
-                . "<p>La dichiarazione di fine attività è firmata in PAdES dal docente responsabile: la trovi in allegato e nel pannello, da protocollare.</p>" . $tab,
-                $this->sito->urlBase() . '/admin/tutorato.php?incarico=' . $id,
-                'Apri nel pannello',
+                . "<p>La dichiarazione di fine attività è firmata in PAdES dal docente titolare (non serve il protocollo): controlla ore e documenti e passa la pratica all'ufficio pagamenti dalla vista «Da validare» del tutorato.</p>" . $tab,
+                $this->sito->urlBase() . '/admin/tutorato.php?vista=validare',
+                'Apri le pratiche da validare',
                 $file ? [['path' => $file, 'nome' => 'FINE_ATTIVITA_' . str_replace('LETTERA_INCARICO_', '', DatiLettera::nomeFile($i))]] : []
             );
         }
@@ -376,7 +376,7 @@ final class ServizioRegistroTutorato
     /**
      * Conservazione (CONSERVAZIONE_INCARICHI_MESI nel .env, 0 = mai; durata da concordare con il DPO): le lettere protocollate (con la
      * fine attività protocollata, se c'è) o annullate da più di $mesi mesi perdono i dati personali (nascita, residenza, contatti,
-     * metadati dell'accesso SPID/CIE), i PDF e il registro. Restano codice, nome e cognome, bando, ore, compenso, protocolli e storico:
+     * metadati dell'accesso SPID/CIE), i PDF (UNILAV compreso), il registro e la dichiarazione individuale con i dati bancari. Restano codice, nome e cognome, bando, ore, compenso, protocolli e storico:
      * gli originali firmati sono nel protocollo di Ateneo.
      */
     public function conserva(int $mesi): int
@@ -392,6 +392,7 @@ final class ServizioRegistroTutorato
             }
             $this->archivio->eliminaDellaLettera($i);
             $this->registro->eliminaDellaLettera((int)$i['id']);
+            $this->incarichi->eliminaDichiarazione((int)$i['id']);
             $this->incarichi->anonimizza((int)$i['id']);
             $this->incarichi->cancellaIpEventi((int)$i['id']);
             $this->lettere->evento((int)$i['id'], 'conservazione', "Dati personali, PDF e registro cancellati dopo $mesi mesi (conservazione)");

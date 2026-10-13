@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>File da caricare</title>
+<style>
+:root {
+  --bg: #f5f6f8; --carta: #ffffff; --testo: #1f2937; --tenue: #5b6474; --linea: #e2e5ea; --morbido: #f0f2f5;
+  --rosso: #b30000; --blu: #0056b3; --verde: #047857; --ambra: #b45309;
+  --okbg: #dcfce7; --ok: #15803d; --nuovobg: #dbeafe; --nuovo: #1d4ed8; --modbg: #fef3c7; --mod: #92400e; --dafarebg: #eef1f5; --dafare: #475569;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15181d; --carta: #1e2228; --testo: #e5e7eb; --tenue: #a3abb8; --linea: #343a43; --morbido: #262b33;
+    --okbg: #14361f; --ok: #4ade80; --nuovobg: #1e2a4a; --nuovo: #93c5fd; --modbg: #3b2c0c; --mod: #fbbf24; --dafarebg: #2a3039; --dafare: #cbd5e1; --blu: #7db7ff;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15181d; --carta: #1e2228; --testo: #e5e7eb; --tenue: #a3abb8; --linea: #343a43; --morbido: #262b33;
+  --okbg: #14361f; --ok: #4ade80; --nuovobg: #1e2a4a; --nuovo: #93c5fd; --modbg: #3b2c0c; --mod: #fbbf24; --dafarebg: #2a3039; --dafare: #cbd5e1; --blu: #7db7ff;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--testo); font: 16px/1.55 "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif; }
+a { color: var(--blu); }
+main { max-width: 1040px; margin: 0 auto; padding: 28px 16px 90px; }
+h1 { font-size: 1.8rem; margin: 0 0 4px; }
+h2 { font-size: 1.3rem; margin: 0; }
+h3 { font-size: 1rem; margin: 22px 0 8px; }
+.sotto { color: var(--tenue); margin: 0 0 16px; max-width: 70ch; }
+.barra { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+button { font: inherit; cursor: pointer; }
+.tema { font-size: .85rem; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--linea); background: var(--carta); color: var(--testo); }
+.carta { background: var(--carta); border: 1px solid var(--linea); border-radius: 14px; padding: 20px 22px; margin: 18px 0; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; font-size: .78rem; font-weight: 700; white-space: nowrap; }
+.chip.pronto { background: var(--okbg); color: var(--ok); }
+.chip.dafare { background: var(--dafarebg); color: var(--dafare); }
+.chip.nuovo { background: var(--nuovobg); color: var(--nuovo); }
+.chip.mod { background: var(--modbg); color: var(--mod); }
+.passi { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; }
+.passo { font-size: .8rem; font-weight: 700; padding: 2px 9px; border-radius: 6px; background: var(--morbido); color: var(--tenue); }
+.testa-pacchetto { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: flex-start; }
+.progresso { height: 10px; background: var(--morbido); border-radius: 99px; overflow: hidden; margin: 12px 0 4px; }
+.progresso span { display: block; height: 100%; background: var(--ok); width: 0; transition: width .2s; }
+.conta { font-size: .85rem; color: var(--tenue); }
+.cartella { font-family: Consolas, "Courier New", monospace; font-size: .8rem; font-weight: 700; color: var(--tenue); margin: 16px 0 4px; letter-spacing: .02em; }
+.file { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: center; padding: 9px 4px; border-top: 1px solid var(--linea); }
+.file:first-of-type { border-top: 0; }
+.file input { width: 20px; height: 20px; accent-color: var(--ok); }
+.file .nome { font-family: Consolas, "Courier New", monospace; font-size: .92rem; word-break: break-all; }
+.file .nome small { display: block; font-family: "Segoe UI", system-ui, sans-serif; color: var(--tenue); font-size: .8rem; margin-top: 1px; }
+.file.fatto .nome { text-decoration: line-through; color: var(--tenue); }
+.destra { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.copia { font-size: .75rem; padding: 3px 9px; border-radius: 6px; border: 1px solid var(--linea); background: var(--carta); color: var(--testo); }
+ol.dopo, ul.nota { margin: 6px 0 0; padding-left: 22px; }
+ol.dopo li, ul.nota li { margin: 6px 0; }
+code { font-family: Consolas, monospace; font-size: .86em; background: var(--morbido); padding: 1px 5px; border-radius: 5px; }
+.commit { position: relative; background: var(--morbido); border: 1px solid var(--linea); border-radius: 10px; padding: 12px 14px; font-family: Consolas, monospace; font-size: .85rem; white-space: pre-wrap; margin-top: 8px; }
+.avviso { border-left: 5px solid var(--ambra); background: var(--modbg); color: var(--testo); padding: 10px 14px; border-radius: 8px; margin: 14px 0; }
+details > summary { cursor: pointer; font-weight: 700; }
+.nonserve { color: var(--tenue); font-size: .9rem; }
+.prossimi { display: grid; gap: 8px; }
+.prossimo { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 10px 0; border-top: 1px solid var(--linea); }
+.prossimo:first-child { border-top: 0; }
+@media (max-width: 560px) { .file { grid-template-columns: 28px 1fr; } .destra { grid-column: 2; justify-content: flex-start; } }
+@media print { .tema, .copia { display: none; } body { background: #fff; color: #000; } }
+</style>
+</head>
+<body>
+<main>
+  <div class="barra">
+    <div>
+      <h1>File da caricare sul server</h1>
+      <p class="sotto">Un pacchetto per volta, nell'ordine in cui lavoriamo. Spunta ogni file dopo averlo caricato: le spunte restano salvate in questo browser. Aggiornato dopo ogni step.</p>
+    </div>
+    <button class="tema" id="tema" type="button">Tema chiaro/scuro</button>
+  </div>
+
+  <div class="carta" id="riepilogo">
+    <strong>Aggiornato il <span id="agg"></span></strong> · cartella del portale sul server: <code>/opt/lampp/htdocs/eventi</code> (mantieni le stesse sottocartelle che vedi qui sotto).
+    <div class="avviso" style="margin-top:12px;">
+      <strong>Come si fa.</strong> Carica i file nella stessa posizione (sovrascrivendo quelli che ci sono). Non servono altre azioni sul database: alla prima visita il portale aggiorna da solo lo schema. Se qualcosa «non funziona» dopo il rilascio, controlla prima che le spunte qui siano tutte presenti.
+    </div>
+    <div class="prossimi" id="elenco-pacchetti"></div>
+  </div>
+
+  <div id="pacchetti"></div>
+
+  <div class="carta">
+    <h2>Prossimi pacchetti</h2>
+    <p class="sotto" style="margin-top:4px;">Quando uno step sarà pronto comparirà qui sopra con la sua lista di file.</p>
+    <div class="prossimi" id="prossimi"></div>
+  </div>
+</main>
+
+<script>
+// ==========================================================================================
+// DATI — è la sola parte da aggiornare a ogni step (Claude lo fa per te).
+// ==========================================================================================
+var AGGIORNATO = "16/10/2026";
+
+var PACCHETTI = [
+  {
+    id: "fsl-convenzioni",
+    titolo: "Pacchetto 1 · Convenzioni FSL (A1–A4)",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare",
+    schema: "v54 (condiviso con i pacchetti 2 e 3)",
+    riassunto: "<strong>L'iter:</strong> la scuola carica la convenzione firmata in PAdES insieme all'Allegato A → arriva la notifica all'ufficio → registri il <strong>protocollo in entrata</strong> (solo il numero, senza ricaricare il file) → parte subito la notifica al <strong>Direttore</strong>, che firma dal portale (Aruba) o caricando il PDF → arriva la notifica a te → <strong>protocolli in via definitiva</strong>, carichi il PDF protocollato e le prenotazioni in attesa si confermano. Puoi sempre rifiutare con un motivo. La scuola vede convenzioni (anche scadute) e Allegato A nell'Area personale.",
+    passi: [["A1", "La scuola carica convenzione e Allegato A"], ["A2", "Protocollo in entrata, rifiuto, protocollo definitivo"], ["A3", "Documenti nell'Area personale"], ["A4", "Firma del Direttore"]],
+    cartelle: [
+      { cartella: "/ (radice del portale)", file: [
+        ["convenzione_online.php", "mod", "A1 A2 A4", "pagina della scuola: carica/sostituisci, stati dell'iter"],
+        ["area_personale.php", "mod", "A1 A2 A3", "tab «Programma FSL»: convenzioni e Allegato A della scuola"],
+        ["documento_scuola.php", "nuovo", "A3", "download protetto di convenzione e Allegato A"],
+        ["firma_convenzione.php", "nuovo", "A4", "pagina di firma del Direttore"]
+      ]},
+      { cartella: "admin/", file: [
+        ["admin/fsl.php", "mod", "A1 A2 A4", "presa in carico, rifiuto, Direttore, protocollo; tolto il selettore «Anno scolastico»; campo facoltativo «PDF con la segnatura di protocollo»"],
+        ["admin/convenzione_file.php", "mod", "A1 A4", "scarica il PDF della scuola e quello firmato dal Direttore"],
+        ["admin/inizio.php", "mod", "A1 A2", "Scrivania: «convenzioni da seguire»"],
+        ["admin/admin_header.php", "mod", "A1", "numero accanto a «Formazione Scuola Lavoro» nel menu"]
+      ]},
+      { cartella: "src/Fsl/", file: [
+        ["src/Fsl/ServizioConvenzioneFirmata.php", "nuovo", "A1 A2 A4", "caricamento, presa in carico, rifiuto, ricarico finale"],
+        ["src/Fsl/ServizioDocumentiScuola.php", "nuovo", "A3", "chi vede cosa nell'Area personale"],
+        ["src/Fsl/ServizioFirmaDirettore.php", "nuovo", "A4", "invio al Direttore, firma Aruba o PDF caricato"],
+        ["src/Fsl/ConvenzioneCompilataRepository.php", "mod", "A1 A2 A4", "nuove operazioni sul database"],
+        ["src/Fsl/NotificheConvenzioni.php", "mod", "A1 A2 A4", "le nuove email"],
+        ["src/Fsl/Costanti.php", "mod", "A1 A2 A4", "stati dell'iter, email dell'ufficio, cartelle"],
+        ["src/Fsl/ServizioConvenzioneOnline.php", "mod", "A2", "passa lo stato dell'iter all'Area personale"]
+      ]},
+      { cartella: "modelli_documenti/ (modelli Word precompilati: caricali in binario)", file: [
+        ["modelli_documenti/convenzione_precompilabile.docx", "mod", "A.A.", "tolto «A.A. 2026/2027» dal titolo della Convenzione"],
+        ["modelli_documenti/allegato_a_precompilabile.docx", "mod", "A.A.", "tolto «A.A. 2026/2027» dal titolo dell'Allegato A in Word"]
+      ]},
+      { cartella: "assets/modelli/ (modelli vuoti da scaricare)", file: [
+        ["assets/modelli/Convenzione_FSL_DiBEST.doc", "mod", "A.A.", "tolto «A.A. 2026/2027» dal titolo"],
+        ["assets/modelli/Allegato_A_FSL_DiBEST.doc", "mod", "A.A.", "tolto «A.A. 2026/2027» dal titolo"]
+      ]},
+      { cartella: "src/Core/Schema/", file: [
+        ["src/Core/Schema/Definizioni.php", "mod", "A1 A2 A4", "nuove colonne del database"],
+        ["src/Core/Schema/Migrazioni.php", "mod", "A1 A2 A4", "versione dello schema: 54 (tabelle e colonne di convenzioni e tutorato)"]
+      ]},
+      { cartella: "src/Portale/ e src/Sistema/", file: [
+        ["src/Portale/CoseDaFare.php", "mod", "A1 A2 A4 · D1", "conteggi per Scrivania e menu (anche tutorato da validare)"],
+        ["src/Sistema/ImpostazioniSistemaRepository.php", "mod", "A4", "salva il Direttore che firma le convenzioni"]
+      ]}
+    ],
+    dopo: [
+      "Apri una pagina qualunque del pannello: il portale crea da solo <code>cache/schema_v54.ok</code> (lo schema è lo stesso dei pacchetti 2 e 3: se li carichi insieme basta una volta) e aggiunge le colonne. Se nella cartella <code>cache/</code> non compare, ricarica una volta.",
+      "<strong>Admin → Formazione Scuola Lavoro → «Scuole e convenzioni» → filtro «Convenzioni in vigore»</strong>: in cima alla pagina apri il riquadro «Direttore che firma le convenzioni» e inserisci nome, email e (facoltativo) codice fiscale del Direttore. Finché manca, su «Scuole e convenzioni» compare un avviso giallo con il link diretto.",
+      "Controlla in PHP (<code>php.ini</code>) <code>upload_max_filesize</code> e <code>post_max_size</code>: almeno <code>10M</code>, meglio <code>20M</code>. Riavvia Apache se li cambi.",
+      "<strong>Aruba (facoltativo, per la firma dal portale):</strong> compila nel file <code>.env</code> <code>ARUBA_ARSS_URL</code>, <code>ARUBA_ARSS_DOMINIO</code>, <code>ARUBA_ARSS_CERTID</code> (te li dà Aruba). Senza, il Direttore scarica, firma e ricarica il PDF.",
+      "<strong>Prova veloce:</strong> con una scuola di prova carica un PDF firmato in PAdES e l'Allegato A dalla pagina della convenzione → in Admin deve comparire «Da prendere in carico» → inserisci il protocollo in entrata (il Direttore riceve l'email da solo) → firma del Direttore → protocollo definitivo e registrazione."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code> (3 file di prova nuovi e FslBase.php) e <code>documentazione/…</code> (questa mappa e il piano).",
+    commit: "FSL convenzioni: la scuola carica la convenzione firmata, presa in carico/rifiuto, firma del Direttore (Aruba o PDF), protocollo e conferma prenotazioni, documenti e storico nell'Area personale della scuola"
+  },
+  {
+    id: "tutorato-pagamenti",
+    titolo: "Pacchetto 2 · Tutorato: pagamenti (D1a–D1f)",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare",
+    schema: "v54 (condiviso)",
+    riassunto: "<strong>Uffici di Ateneo</strong> creati dall'admin con le persone dall'anagrafe · <strong>decreti in PDF</strong> (bando, commissione, approvazione atti) e <strong>UNILAV</strong> per tutor · <strong>dichiarazione individuale</strong> (modello N. 6) compilata online dallo studente, con IBAN <strong>cifrato</strong> · compenso calcolato (25 € lordi/ora, in lettera ÷ 1,24, ricalcolo se le ore sono meno) · fine attività firmata dal docente titolare <strong>senza protocollo</strong> · il referente valida e passa le pratiche (una o tutte) all'<strong>ufficio pagamenti</strong>, che paga e segna «pagato» (o rimanda con una nota) · il tutor vede tutto nell'Area personale e riceve l'email a pagamento disposto.",
+    passi: [["D1a", "Uffici di Ateneo"], ["D1b", "Decreti e UNILAV"], ["D1c", "Dichiarazione individuale online"], ["D1d", "Fine attività e validazione"], ["D1e", "Ufficio pagamenti"], ["D1f", "Area personale del tutor"]],
+    cartelle: [
+      { cartella: "/ (radice del portale)", file: [
+        ["pagamenti_tutorato.php", "nuovo", "D1e", "pagina dell'ufficio pagamenti: elenco, scheda, «pagato», «rimanda»"],
+        ["dichiarazione_tutorato.php", "nuovo", "D1c", "passi 2 e 3 della dichiarazione individuale (studente)"],
+        ["documento_tutorato.php", "nuovo", "D1b D1e D1f", "download protetto di decreti, UNILAV, lettera, registro, fine attività, dichiarazione"],
+        ["incarico.php", "mod", "D1c", "accettazione a passi: prima la dichiarazione, poi la conferma"],
+        ["area_personale.php", "mod", "D1e D1f · anche pacchetto 1", "«Il mio tutorato» con linea del tempo e documenti; card dell'ufficio pagamenti"],
+        ["privacy.php", "mod", "D1c", "informativa: IBAN cifrato e registro degli accessi"]
+      ]},
+      { cartella: "admin/", file: [
+        ["admin/uffici_ateneo.php", "nuovo", "D1a", "l'admin crea gli uffici e associa le persone dall'anagrafe"],
+        ["admin/tutorato.php", "mod", "D1b D1d D1e", "decreti PDF, ufficio del bando, UNILAV, compenso, vista «Da validare» e passaggio ai pagamenti"],
+        ["admin/admin_header.php", "mod", "D1a D1d · anche pacchetto 1", "voce «Uffici di Ateneo» e numero accanto a Tutorato"],
+        ["admin/inizio.php", "mod", "D1d · anche pacchetto 1", "Scrivania: pratiche di tutorato da validare; scheda «Uffici di Ateneo» in Gestione del portale"]
+      ]},
+      { cartella: "src/Ateneo/ (cartella nuova)", file: [
+        ["src/Ateneo/UfficioAteneoRepository.php", "nuovo", "D1a", "uffici e persone nel database"],
+        ["src/Ateneo/ServizioUfficiAteneo.php", "nuovo", "D1a", "regole: persone dall'anagrafe, più uffici per persona, avvisi"]
+      ]},
+      { cartella: "src/Infrastructure/Sicurezza/ (cartella nuova)", file: [
+        ["src/Infrastructure/Sicurezza/Cifratura.php", "nuovo", "D1c", "cifratura AES-256-GCM dei dati bancari (chiave nel .env)"]
+      ]},
+      { cartella: "src/Tutorato/", file: [
+        ["src/Tutorato/ServizioPagamenti.php", "nuovo", "D1d D1e D1f", "controlli, passaggio ai pagamenti, «pagato», rimandi, documenti"],
+        ["src/Tutorato/ServizioDichiarazione.php", "nuovo", "D1c", "salvataggio cifrato e registro di chi apre i dati"],
+        ["src/Tutorato/DichiarazioneIndividuale.php", "nuovo", "D1c", "campi, controllo dell'IBAN e PDF della dichiarazione"],
+        ["src/Tutorato/FileTutorato.php", "nuovo", "D1b", "decreti e UNILAV in PDF in cartella protetta"],
+        ["src/Tutorato/Compenso.php", "nuovo", "D1b", "25 € lordi/ora; in lettera il lordo ÷ 1,24"],
+        ["src/Tutorato/NotifichePagamenti.php", "nuovo", "D1d D1e", "email: ufficio, referente, docente, tutor"],
+        ["src/Tutorato/IncaricoRepository.php", "mod", "D1b D1d D1e", "nuove operazioni e colonne del bando"],
+        ["src/Tutorato/BandoRepository.php", "mod", "D1b", "decreti e ufficio del bando"],
+        ["src/Tutorato/ServizioIncarichi.php", "mod", "D1b D1c", "compenso automatico; la lettera si accetta dopo la dichiarazione"],
+        ["src/Tutorato/ServizioRegistroTutorato.php", "mod", "D1d", "fine attività firmata: niente protocollo, avviso «da validare»; conservazione dei dati"],
+        ["src/Tutorato/ArchivioIncarichi.php", "mod", "D1b", "cancella anche l'UNILAV alla conservazione"],
+        ["src/Tutorato/Registrazione.php", "mod", "D1b D1c", "registra FileTutorato e la cifratura"]
+      ]},
+      { cartella: "src/Core/Schema/ e src/Portale/ (anche pacchetto 1)", file: [
+        ["src/Core/Schema/Definizioni.php", "mod", "D1 · anche pacchetto 1", "tabelle uffici e dichiarazioni, colonne di bandi e lettere"],
+        ["src/Core/Schema/Migrazioni.php", "mod", "D1 · anche pacchetto 1", "versione dello schema: 54"]
+      ]}
+    ],
+    dopo: [
+      "Apri una pagina del pannello: il portale crea da solo <code>cache/schema_v54.ok</code> con le nuove tabelle.",
+      "<strong>.env — obbligatorio per la dichiarazione online:</strong> aggiungi la riga <code>CIFRATURA_CHIAVE=</code> seguita da una <strong>frase lunga e casuale</strong> (almeno 16 caratteri). Conservala anche fuori dal server: se si perde, i dati bancari già salvati non si leggono più. Finché manca, la dichiarazione non viene richiesta agli studenti (nel pannello del tutorato compare un avviso giallo).",
+      "<strong>Admin → Gestione del portale → Uffici di Ateneo</strong>: crea «Ufficio pagamenti tutorato» e aggiungi le persone (cercale nell'anagrafe di Ateneo).",
+      "<strong>Admin → Didattica → Tutorato → bando → «Decreti in PDF e ufficio pagamenti»</strong>: per ogni bando carica i tre decreti, indica il decreto di approvazione atti e scegli l'ufficio che paga.",
+      "Dopo il protocollo di una lettera il referente carica l'<strong>UNILAV</strong> dalla scheda della lettera (sezione «UNILAV, compenso e pagamento»).",
+      "<strong>Prova veloce</strong> con un tutor di prova: accetta con la dichiarazione online → firme → protocollo → UNILAV → registro → fine attività firmata dal docente → «Da validare e pagamenti» → passa all'ufficio → l'ufficio paga → email al tutor.",
+      "Avvisa il DPO: nuovo trattamento di dati bancari (IBAN cifrati, accessi registrati). L'informativa in <code>privacy.php</code> è già aggiornata."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code> e <code>documentazione/…</code>. Il file <code>.env.example</code> è solo un modello: il valore vero va nel <code>.env</code> del server.",
+    commit: "Tutorato: uffici di Ateneo, decreti e UNILAV, dichiarazione individuale online con IBAN cifrato, compenso automatico, validazione del referente, ufficio pagamenti e area personale del tutor"
+  },
+  {
+    id: "tutorato-import",
+    titolo: "Pacchetto 3 · Tutorato: import dei vincitori (D2)",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare",
+    schema: "v54 (condiviso)",
+    riassunto: "Dal Word del <strong>decreto di approvazione atti</strong> il portale legge la tabella dei vincitori (ART. 2), abbina ogni riga a un <strong>insegnamento dell'anagrafe di Ateneo</strong> (codice, corso di laurea, <strong>docente titolare</strong> modificabile) e crea le lettere in <strong>bozza</strong>. Nel decreto non ci sono codice fiscale, email e genere dei vincitori: si completano nell'anteprima o dopo nella lettera; una lettera con «dati da completare» non si può inviare.",
+    passi: [["D2", "Import dei vincitori dalla graduatoria (Word)"]],
+    cartelle: [
+      { cartella: "admin/", file: [
+        ["admin/tutorato.php", "mod", "D2 · anche pacchetto 2", "pulsante «Importa dalla graduatoria (Word)», anteprima modificabile, badge «dati da completare»"]
+      ]},
+      { cartella: "src/Tutorato/", file: [
+        ["src/Tutorato/ImportGraduatoria.php", "nuovo", "D2", "legge la tabella dei vincitori dal Word e i decreti citati"],
+        ["src/Tutorato/AbbinamentoInsegnamenti.php", "nuovo", "D2", "abbina corso e insegnamento all'anagrafe e trova il docente titolare"],
+        ["src/Tutorato/ServizioImportBando.php", "nuovo", "D2", "anteprima e creazione delle lettere in bozza"],
+        ["src/Tutorato/IncaricoRepository.php", "mod", "D2 · anche pacchetto 2", "dati dell'import (insegnamento, codice, ambito) e controllo dei doppioni"],
+        ["src/Tutorato/ServizioIncarichi.php", "mod", "D2 · anche pacchetto 2", "una bozza incompleta non si invia: elenca cosa manca"]
+      ]},
+      { cartella: "src/Core/Schema/ (anche pacchetti 1 e 2)", file: [
+        ["src/Core/Schema/Definizioni.php", "mod", "D2 · anche pacchetti 1 e 2", "colonne insegnamento_id, insegnamento_codice, ambito"],
+        ["src/Core/Schema/Migrazioni.php", "mod", "D2 · anche pacchetti 1 e 2", "versione dello schema: 54"]
+      ]}
+    ],
+    dopo: [
+      "Apri una pagina del pannello: il portale crea da solo <code>cache/schema_v54.ok</code>.",
+      "<strong>L'anagrafe degli insegnamenti deve essere aggiornata</strong> (Admin → Anagrafi → Insegnamenti) per l'anno del bando: da lì il portale prende insegnamento, codice, corso e docente titolare. Se per l'anno non ci sono dati usa il più recente.",
+      "<strong>Admin → Didattica → Tutorato → apri il bando → «Importa dalla graduatoria (Word)»</strong>: carica il .docx del decreto, controlla l'anteprima (insegnamento abbinato, docente titolare, genere, compenso) e premi «Crea le lettere in bozza».",
+      "Completa codice fiscale ed email di ogni vincitore dalla lettera (le bozze con «dati da completare» non si possono inviare) e poi invia le lettere come sempre.",
+      "L'<strong>ufficio che paga</strong> i tutor si indica nella scheda del bando («Decreti in PDF e ufficio pagamenti»), quando vuoi: serve prima di passare le pratiche ai pagamenti, non per importare."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code> e <code>documentazione/…</code>.",
+    commit: "Tutorato: import dei vincitori dal decreto di approvazione atti (Word) con abbinamento agli insegnamenti dell'anagrafe di Ateneo, codice, corso e docente titolare"
+  }
+];
+
+var PROSSIMI = [
+  ["D1 · Tutorato: pagamenti", "fatto: vedi Pacchetto 2"],
+  ["D2 · Tutorato: import dei vincitori del bando", "fatto: vedi Pacchetto 3"],
+  ["D3 · Tutorato: collaudo del flusso intero", "fatto: nessuna modifica ai file"],
+  ["C2 · Verbali compilati punto per punto", "da fare"],
+  ["C3 · Archivio dei verbali", "da fare"],
+  ["C4 · Pagina pubblica dei verbali con password", "da fare"],
+  ["C1 · Wizard delle pratiche studenti", "da fare"],
+  ["B1–B4 · Risorse: responsabile, campi, diario di bordo", "da fare"],
+  ["E1–E2 · Protocollo Titulus", "da fare (servono i parametri)"]
+];
+
+// ==========================================================================================
+// Resa della pagina
+// ==========================================================================================
+var LS = "dibest_file_caricati";
+function leggi() { try { return JSON.parse(localStorage.getItem(LS) || "{}"); } catch (e) { return {}; } }
+function salva(o) { try { localStorage.setItem(LS, JSON.stringify(o)); } catch (e) {} }
+function el(t, c, h) { var e = document.createElement(t); if (c) e.className = c; if (h !== undefined) e.innerHTML = h; return e; }
+function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]; }); }
+
+document.getElementById("agg").textContent = AGGIORNATO;
+var stato = leggi();
+
+PACCHETTI.forEach(function (p) {
+  var totale = 0;
+  p.cartelle.forEach(function (c) { totale += c.file.length; });
+  var box = el("section", "carta");
+  box.id = p.id;
+  box.innerHTML =
+    '<div class="testa-pacchetto"><div><h2>' + esc(p.titolo) + '</h2><div class="passi">' +
+    p.passi.map(function (s) { return '<span class="passo" title="' + esc(s[1]) + '">' + esc(s[0]) + " · " + esc(s[1]) + "</span>"; }).join("") +
+    '</div></div><div><span class="chip ' + p.stato + '">' + esc(p.statoTesto) + '</span> <span class="chip dafare">schema ' + esc(p.schema) + "</span></div></div>" +
+    '<p class="sotto" style="margin-top:12px;">' + p.riassunto + "</p>" +
+    '<div class="progresso"><span id="barra-' + p.id + '"></span></div><div class="conta" id="conta-' + p.id + '"></div>' +
+    "<h3>1 · File da caricare (" + totale + ")</h3>";
+  p.cartelle.forEach(function (c) {
+    box.appendChild(el("div", "cartella", esc(c.cartella)));
+    c.file.forEach(function (f) {
+      var chiave = p.id + "|" + f[0];
+      var riga = el("div", "file" + (stato[chiave] ? " fatto" : ""));
+      riga.innerHTML =
+        '<input type="checkbox" aria-label="Caricato: ' + esc(f[0]) + '"' + (stato[chiave] ? " checked" : "") + ">" +
+        '<div class="nome">' + esc(f[0]) + "<small>" + esc(f[3]) + "</small></div>" +
+        '<div class="destra"><span class="chip ' + f[1] + '">' + (f[1] === "nuovo" ? "NUOVO" : "MODIFICATO") + '</span><span class="conta">' + esc(f[2]) +
+        '</span><button type="button" class="copia">Copia percorso</button></div>';
+      riga.querySelector("input").addEventListener("change", function (e) {
+        stato[chiave] = e.target.checked; if (!e.target.checked) delete stato[chiave];
+        salva(stato); riga.classList.toggle("fatto", e.target.checked); aggiorna();
+      });
+      riga.querySelector(".copia").addEventListener("click", function (e) {
+        var b = e.target, t = f[0];
+        (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { b.textContent = "Copiato"; }, function () { b.textContent = t; });
+        setTimeout(function () { b.textContent = "Copia percorso"; }, 1800);
+      });
+      box.appendChild(riga);
+    });
+  });
+  box.appendChild(el("h3", "", "2 · Dopo il caricamento"));
+  var ol = el("ol", "dopo");
+  p.dopo.forEach(function (t) { ol.appendChild(el("li", "", t)); });
+  box.appendChild(ol);
+  box.appendChild(el("p", "nonserve", p.nonServe));
+  box.appendChild(el("h3", "", "3 · Messaggio di commit suggerito"));
+  var cm = el("div", "commit", esc(p.commit));
+  box.appendChild(cm);
+  document.getElementById("pacchetti").appendChild(box);
+  p._totale = totale;
+});
+
+function aggiorna() {
+  var lista = document.getElementById("elenco-pacchetti");
+  lista.innerHTML = "";
+  PACCHETTI.forEach(function (p) {
+    var fatti = 0;
+    p.cartelle.forEach(function (c) { c.file.forEach(function (f) { if (stato[p.id + "|" + f[0]]) fatti++; }); });
+    var perc = p._totale ? Math.round(fatti * 100 / p._totale) : 0;
+    document.getElementById("barra-" + p.id).style.width = perc + "%";
+    document.getElementById("conta-" + p.id).textContent = fatti + " di " + p._totale + " file caricati" + (fatti === p._totale ? " — tutto caricato" : "");
+    var r = el("div", "prossimo", '<span><a href="#' + p.id + '">' + esc(p.titolo) + "</a></span><span>" +
+      '<span class="chip ' + (fatti === p._totale ? "pronto" : "mod") + '">' + (fatti === p._totale ? "caricato" : fatti + "/" + p._totale) + "</span></span>");
+    lista.appendChild(r);
+  });
+}
+aggiorna();
+
+var pr = document.getElementById("prossimi");
+PROSSIMI.forEach(function (x) { pr.appendChild(el("div", "prossimo", "<span>" + esc(x[0]) + '</span><span class="chip dafare">' + esc(x[1]) + "</span>")); });
+
+// tema
+var radice = document.documentElement;
+try { var t = localStorage.getItem("dibest_tema"); if (t) radice.setAttribute("data-theme", t); } catch (e) {}
+document.getElementById("tema").addEventListener("click", function () {
+  var scuro = radice.getAttribute("data-theme") === "dark" || (!radice.getAttribute("data-theme") && matchMedia("(prefers-color-scheme: dark)").matches);
+  var nuovo = scuro ? "light" : "dark";
+  radice.setAttribute("data-theme", nuovo);
+  try { localStorage.setItem("dibest_tema", nuovo); } catch (e) {}
+});
+</script>
+</body>
+</html>

@@ -27,6 +27,7 @@ final class ServizioIncarichi
         private DocumentiIncarico $documenti,
         private ArchivioIncarichi $archivio,
         private NotificheIncarichi $notifiche,
+        private ServizioDichiarazione $dichiarazione,
         private VerificaPdfFirmato $verifica,
         private ServizioPersone $persone,
         private Sito $sito,
@@ -187,6 +188,10 @@ final class ServizioIncarichi
         $dataL = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) ($d['data_lettera'] ?? '')) ? $d['data_lettera'] : null;
         $ore = DatiLettera::numeroItaliano($d['ore'] ?? '');
         $compenso = DatiLettera::numeroItaliano($d['compenso'] ?? '');
+        // Compenso lasciato vuoto: si calcola dalle ore (25 € lordi all'ora; in lettera il lordo diviso per 1,24)
+        if ($compenso === null && $ore !== null && $ore > 0) {
+            $compenso = Compenso::lettera($ore);
+        }
         $docPid = trim((string) ($d['docente_persona_id'] ?? '')) ?: null;
         if ($docPid && ($p = $this->persone->persona($docPid))) {
             $f['docente_nome'] = $p['nome'];
@@ -257,6 +262,34 @@ final class ServizioIncarichi
     // ITER: STUDENTE (SPID/CIE) → DOCENTE (PAdES) → DIRETTORE (PAdES) → OPERATORE (protocollo)
     // ==============================================================================
 
+    /**
+     * Dati che servono alla lettera e mancano o non sono validi (vuoto = pronta da inviare).
+     *
+     * @param array<string, mixed> $i
+     * @return list<string>
+     */
+    public static function datiMancanti(array $i): array
+    {
+        $m = [];
+        if (trim((string) $i['cognome']) === '' || trim((string) $i['nome']) === '') {
+            $m[] = 'cognome e nome del vincitore';
+        }
+        if (!preg_match('/^[A-Z]{6}\d{2}[A-Z]\d{2}[A-Z]\d{3}[A-Z]$/', strtoupper((string) $i['codice_fiscale']))) {
+            $m[] = 'codice fiscale del vincitore';
+        }
+        if (!filter_var((string) $i['email'], FILTER_VALIDATE_EMAIL)) {
+            $m[] = 'email del vincitore';
+        }
+        if (trim((string) $i['attivita']) === '' || (float) $i['ore'] <= 0 || trim((string) $i['periodo']) === '') {
+            $m[] = 'attività, ore e periodo';
+        }
+        if (trim((string) $i['docente_cognome']) === '' || !filter_var((string) $i['docente_email'], FILTER_VALIDATE_EMAIL)) {
+            $m[] = 'docente responsabile (nome ed email)';
+        }
+
+        return $m;
+    }
+
     /** Passo 1: la lettera va allo studente (email con il link personale). Ritorna un errore o null. */
     public function invia(int $id, string $autore = ''): ?string
     {
@@ -266,6 +299,10 @@ final class ServizioIncarichi
         }
         if (!in_array($i['stato'], ['bozza', 'inviata'], true)) {
             return 'La lettera è già stata confermata dallo studente.';
+        }
+        // Le lettere create dall'import della graduatoria possono avere dati ancora da completare (codice fiscale, email, docente…)
+        if ($i['stato'] === 'bozza' && ($m = self::datiMancanti($i))) {
+            return 'Prima di inviare completa: ' . implode(', ', $m) . '.';
         }
         $tok = $i['token_studente'] ?: bin2hex(random_bytes(20));
         $dataL = $i['data_lettera'] ?: $this->orologio->adesso()->format('Y-m-d');
@@ -328,6 +365,10 @@ final class ServizioIncarichi
         }
         if ($err = $this->accessoValido($i, $utente, $meta)) {
             return $err;
+        }
+        // La dichiarazione individuale (modello N. 6) si compila prima di accettare: passi 2 e 3 (si richiede solo se la cifratura è configurata)
+        if (!$this->dichiarazione->soddisfatta($id)) {
+            return 'Prima di accettare compila la dichiarazione individuale: dati personali e pagamento, posizione contributiva.';
         }
         $ora = $this->orologio->adesso();
         $firma = ['metodo' => $meta['metodo'] ?? 'ateneo', 'livello' => $meta['livello'] ?? null, 'idp' => (string) ($meta['idp'] ?? ''), 'contesto' => (string) ($meta['contesto'] ?? ''),

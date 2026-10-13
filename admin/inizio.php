@@ -30,6 +30,7 @@ $funzioni_modulo = [
         $is_full_admin ? ['Testata e home', 'Logo, testata, carosello e widget della home', 'fa-image', 'testata.php'] : null,
         $is_full_admin ? ['Menu del sito', 'Voci del menu di navigazione del sito pubblico', 'fa-link', 'menu.php'] : null,
         $is_full_admin ? ['Utenti e abilitazioni', 'Amministratori, abilitati per area, per modulo e per la FSL', 'fa-users-cog', 'utenti.php'] : null,
+        $is_full_admin ? ['Uffici di Ateneo', 'Uffici che ricevono le pratiche (per esempio i pagamenti del tutorato) e persone dell’anagrafe che ne fanno parte', 'fa-building-columns', 'uffici_ateneo.php'] : null,
         $is_full_admin ? ['Sistema e registri', 'Email, backup, controllo notturno, registro operazioni e accessi', 'fa-gear', 'sistema.php'] : null,
     ])),
 ];
@@ -63,7 +64,13 @@ try {
         $vf = $cdf->verbaliInFirma($puo_didattica_tutto ? null : $consigli_referente);
         if ($vf > 0) $cose[] = ['didattica', $vf, $vf === 1 ? 'Verbale in attesa di firma' : 'Verbali in attesa di firma', 'Didattica · sedute dei consigli', 'didattica.php?tab=sedute', false];
     }
+    if ($puo_tutorato) {
+        $n_tv = $cdf->tutoratoDaValidare();
+        if ($n_tv > 0) $cose[] = ['didattica', $n_tv, $n_tv === 1 ? 'Pratica di tutorato da validare' : 'Pratiche di tutorato da validare', 'Didattica · fine attività firmata dal docente: da passare all\'ufficio pagamenti', 'tutorato.php?vista=validare', false];
+    }
     if ($puo_fsl_convenzioni) {
+        $n_cf = $cdf->convenzioniDaPrendereInCarico();
+        if ($n_cf > 0) $cose[] = ['fsl', $n_cf, $n_cf === 1 ? 'Convenzione della scuola da seguire' : 'Convenzioni delle scuole da seguire', 'Formazione Scuola Lavoro · caricate dalle scuole: da prendere in carico, far firmare al Direttore e protocollare', 'fsl.php?tab=convenzioni', true];
         $n_st = count(array_filter(\App\Core\App::per($conn)->get(\App\Fsl\ServizioConvenzioniScuole::class)->scuole(), fn($g) => $g['da_stipulare']));
         if ($n_st > 0) $cose[] = ['fsl', $n_st, $n_st === 1 ? 'Convenzione da stipulare' : 'Convenzioni da stipulare', 'Formazione Scuola Lavoro · scuole con prenotazioni ma senza convenzione valida', 'fsl.php?tab=stipulare', true];
     }

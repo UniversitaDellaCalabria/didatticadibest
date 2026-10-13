@@ -27,6 +27,22 @@ final class ImpostazioniSistemaRepository
     }
 
     /**
+     * Il Direttore che firma le convenzioni FSL: nome, email (a cui arriva il link di firma) e codice fiscale (controllo del certificato).
+     *
+     * @return array{nome: string, email: string, cf: string}
+     */
+    public function direttoreConvenzioni(): array
+    {
+        $r = $this->riga() ?: [];
+
+        return ['nome' => (string) ($r['conv_direttore_nome'] ?? ''), 'email' => (string) ($r['conv_direttore_email'] ?? ''), 'cf' => (string) ($r['conv_direttore_cf'] ?? '')];
+    }
+
+    public function salvaDirettoreConvenzioni(string $nome, string $email, string $cf): void
+    {
+        $this->db->esegui('UPDATE impostazioni_sistema SET conv_direttore_nome = ?, conv_direttore_email = ?, conv_direttore_cf = ? WHERE id = 1', [$nome, $email, $cf]);
+    }
+    /**
      * Salva server SMTP e modelli; se manca una colonna l'aggiornamento non avviene (come prima: nessun errore a schermo).
      *
      * @param array<string, string> $modelli valori di CAMPI_TESTO

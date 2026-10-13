@@ -408,7 +408,8 @@ $colore_lato = $modulo_corrente === 'portale' ? '#64748b' : $colore_modulo; // l
                 <?php if ($modulo_corrente === 'fsl' && $puo_fsl_convenzioni): ?>
                     <!-- ── Modulo Formazione Scuola Lavoro: pannello comune a tutte le aree FSL ── -->
                     <li class="nav-item mt-3 mb-1"><div class="text-secondary small fw-bold px-3 text-uppercase" style="font-size:.66rem;letter-spacing:.06em;">Tutte le aree FSL</div></li>
-                    <?php $voce_menu(['fsl.php', 'convenzione_file.php'], 'fsl.php', 'fa-briefcase', $puo_fsl ? 'Formazione Scuola Lavoro' : 'Convenzioni FSL'); ?>
+                    <?php $n_conv_firmate = 0; try { $n_conv_firmate = \App\Core\App::get(\App\Portale\CoseDaFare::class)->convenzioniDaPrendereInCarico(); } catch (\Throwable $e) { error_log('Menu, convenzioni: ' . $e->getMessage()); }
+                    $voce_menu(['fsl.php', 'convenzione_file.php'], 'fsl.php', 'fa-briefcase', $puo_fsl ? 'Formazione Scuola Lavoro' : 'Convenzioni FSL', false, $n_conv_firmate); ?>
                 <?php endif; ?>
 
                 <?php if ($modulo_corrente === 'didattica' && $puo_didattica): ?>
@@ -428,7 +429,7 @@ $colore_lato = $modulo_corrente === 'portale' ? '#64748b' : $colore_modulo; // l
                         $voce_menu([], 'didattica.php?tab=ufficio', 'fa-people-group', 'Ufficio e ricevimento', $tab_did === 'ufficio');
                         $voce_menu([], 'didattica.php?tab=statistiche', 'fa-chart-column', 'Statistiche', $tab_did === 'statistiche');
                     }
-                    if ($puo_tutorato) $voce_menu(['tutorato.php'], 'tutorato.php', 'fa-user-graduate', 'Tutorato · lettere di incarico'); ?>
+                    if ($puo_tutorato) { $n_tut_val = 0; try { $n_tut_val = \App\Core\App::get(\App\Portale\CoseDaFare::class)->tutoratoDaValidare(); } catch (\Throwable $e) { error_log('Menu, tutorato: ' . $e->getMessage()); } $voce_menu(['tutorato.php'], 'tutorato.php', 'fa-user-graduate', 'Tutorato · lettere di incarico', false, $n_tut_val); } ?>
                 <?php endif; ?>
 
                 <?php if ($modulo_corrente === 'portale'): ?>
@@ -452,6 +453,7 @@ $colore_lato = $modulo_corrente === 'portale' ? '#64748b' : $colore_modulo; // l
                             <?php $voce_menu(['menu.php'], 'menu.php', 'fa-link', 'Menu'); ?>
                         <?php $chiudi_gruppo(); ?>
                         <?php $voce_menu(['utenti.php'], 'utenti.php', 'fa-users-cog', 'Utenti e abilitazioni'); ?>
+                        <?php $voce_menu(['uffici_ateneo.php'], 'uffici_ateneo.php', 'fa-building-columns', 'Uffici di Ateneo'); ?>
                         <?php $voce_menu(['sistema.php', 'audit_log.php', 'log_accessi.php'], 'sistema.php', 'fa-gear', 'Sistema e registri'); ?>
                     <?php endif; ?>
                 <?php endif; ?>

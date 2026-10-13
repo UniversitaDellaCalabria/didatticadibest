@@ -73,7 +73,7 @@ final class ArchivioIncarichi
     public function eliminaDellaLettera(array $i): void
     {
         $radice = $this->sito->radice();
-        foreach (['file_pdf', 'fine_pdf'] as $k) {
+        foreach (['file_pdf', 'fine_pdf', 'unilav_file'] as $k) {
             $p = !empty($i[$k]) ? realpath($radice . '/' . $i[$k]) : false;
             $base = realpath($radice . '/' . $this->cartella);
             if ($p && $base && strpos($p, $base . DIRECTORY_SEPARATOR) === 0) {

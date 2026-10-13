@@ -332,7 +332,7 @@ final class ServizioConvenzioneOnline
      * e le attività dell'Allegato A con lo stato di ogni prenotazione. Chi ha più compilazioni le vede tutte, dalla più recente.
      *
      * @param list<int> $prenotazioniIds prenotazioni della persona
-     * @return list<array{token: string, scuola: string, convenzione: string, aggiornata: string, protocollo: string, attivita: list<array{titolo: string, turno: string, codice: string, stato: string, mia: bool}>}>
+     * @return list<array{token: string, scuola: string, convenzione: string, aggiornata: string, protocollo: string, iter: string, firmata_il: string, attivita: list<array{titolo: string, turno: string, codice: string, stato: string, mia: bool}>}>
      */
     public function dellePrenotazioni(array $prenotazioniIds): array
     {
@@ -351,6 +351,7 @@ final class ServizioConvenzioneOnline
             $out[] = [
                 'token' => (string) $cc['token'], 'scuola' => (string) (($dati['scuola']['denominazione'] ?? '') ?: 'Scuola'),
                 'convenzione' => (string) ($dati['convenzione'] ?? ''), 'aggiornata' => (string) ($cc['aggiornata_il'] ?? ''), 'protocollo' => (string) ($cc['protocollo'] ?? ''),
+                'iter' => (string) ($cc['stato_iter'] ?? ''), 'firmata_il' => (string) ($cc['firmata_il'] ?? ''),
                 'attivita' => $attivita,
             ];
         }

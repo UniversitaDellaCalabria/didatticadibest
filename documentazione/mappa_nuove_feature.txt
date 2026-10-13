@@ -1,0 +1,50 @@
+FORMAZIONE SCUOLA LAVORO
+Terminare tutto l'iter della formaziona scuola Lavoro:
+
+Scaricare la convenzione e l'allegato A precomppilati
+firmare pades la convenzione
+Inserire un campo per il caricamento della convenzione firmata.
+Notifica all'mministratore di avvenuto caricamento della convenzione. l'amministratore la scarica, la fa firmare al direttore, la protocolla e la ricarica in piattaforma.
+Convenzioni e allegato A disponibili nell'area personale della scuola
+
+
+PRENOTAZIONI E RISORSE
+Dobbiamo creare un sistema che alla risorsa creata venga collegato un utente che si occupa di quella risorsa, che sia un0'aula, un laboratorio o un auto. Inoltre dobbiamo prevedere che alla prenotazione della risolsa si possano inserire dei campi personalizzati. Infine potrebbe essere necessario creare per le auto, ad esempio, un diario di bordo che tenga traccia dei chilometri percorso, la penzina effettuata ecc.
+
+DIDATTICA
+Qui c'è la parte più lunga.
+
+Andiamo per step
+
+Pratiche studenti. Dobbiamo creare tutte le pratiche studenti e ad ogni pratica assegnare un iter di lavorazione con successiva inserimento nel verbale e estratto per gli studenti. Gli studenti devono tenere traccia dell'inter di lavorazione della pratica e agli operatori deve semrpe arrivare una notifica ogni qual volta gli viene assegnata una pratica, o lo studente integra la documentazione, ecc. 
+Dobbiamo secondo me creare un sistema che permetta ad un amministratore di creare la propria pratica, di inserire un iter di lavorazione con tutti gli attori coinvolti, di generare anche i campi necessari alla lavorazione della pratica da parte dei referenti come succede con le convalide e che queste poi finiscano nel verbale. Insomma il manager deve poter configurare tutto tramite una bella schermata (anche con wizard) delle pratiche.
+
+Verbali
+Qui la parte più interesante
+Dobbiamo prevedere una vera e propria comopilazione del verbale in modo che il verbale esca bello pulito e precompilato. Come per il modello allegato ci deve essere:
+- la prima parte in cui si dice ce il giorno ecc alle ore ecc si p riunito ecc
+- l'ordine del giorno
+- l'elenco dei docenti con le assenze/presenze
+
+- i campi per la parte testuale punto per punto (in base all'ordine del giorno)
+- le pratiche studenti (che deve andare in ordine in base all'ordine del giorno)
+- il download del word precompilato in modo che possa essere firmato dalle parti e ricaricato in piattaforma
+- in admin una parte in cui c'è l'elenco dei verbali con la consultazione (eventualmente da inserire anche quelli vecchi)
+- Una pagina pubblica in cui un utente esterno (con oppoertuna password da configurare in admin) può avere accesso ai verbali
+
+TUTORAGGIO 
+Qui l'iter che già abbiamo più o meno implemetato ma dobbiamo ampliarlo:
+
+l'admin inserire il bando con i dati dei vincitori gli insegnamenti ecc
+lo studente accede tramite SPID/CIE, accetta l'incarico  e compila la lettera di incarico. La firma sono i metadati di spid visibili sul documento sul pdf si vedono i metadati di SPID
+Notifica al docente responsabile dell'insegnamento che scarica, firma pades e ricarica in piattaforma
+Notifica al direttore che scarica, firma pades e ricarica in piattaforma
+Notifica all'amministratore all'ufficio protocollo che deve protocollare.
+Alla fine del tutoraggio notifica allo studente che lo invita a compilare il registro elle presenza.
+chiuso il registro delle presenze notifica al docente con la lettera di fine attività già precompilata coma data di fine è l'ultima data presente sul registro.
+L pratica passa all'ufficio che si occupa dei pagamenti. quindi l'iter è
+
+refereinte inserisce DD bando e DD commissione > notifica studente che accetta e compial lettera di incarico > firma docente > firma direttore > protocollo referente > compilazione registro > firma docente lettera fine attività > pratica all'uffio ateneo per i pagamenti
+
+
+In più da mettere in agenda (se possibile) un connettore per titulus il sistema di protocollo di cineca. Dimmi che parametri ti servono

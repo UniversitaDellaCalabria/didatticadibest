@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bozza grafica · Tutorato e pagamenti</title>
+<style>
+:root { --bg:#eef0f4; --testo:#1f2937; --tenue:#64748b; --linea:#e2e8f0; --rosso:#b30000; --blu:#0056b3; --verde:#15803d; --ambra:#b45309; --viola:#7c3aed; --ardesia:#1e293b; }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--testo); font:15px/1.5 "Segoe UI", system-ui, Arial, sans-serif; }
+.pagina { max-width: 1120px; margin: 0 auto; padding: 24px 16px 60px; }
+h1 { margin:0 0 4px; font-size:1.6rem; }
+.nota { color:var(--tenue); margin:0 0 20px; max-width: 80ch; }
+.titolo-schermo { margin: 34px 0 8px; display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; }
+.titolo-schermo b { background:var(--ardesia); color:#fff; padding:2px 10px; border-radius:6px; font-size:.85rem; }
+.titolo-schermo span { font-size:1.15rem; font-weight:700; }
+.titolo-schermo small { color:var(--tenue); }
+/* finestra */
+.schermo { background:#f4f6f9; border:1px solid #cbd5e1; border-radius:14px; overflow:hidden; box-shadow:0 10px 30px rgba(15,23,42,.10); }
+.barra { display:flex; align-items:center; gap:10px; background:#fff; border-bottom:1px solid var(--linea); padding:10px 16px; font-size:.85rem; color:var(--tenue); }
+.barra b { color:#0f172a; }
+.barra .url { margin-left:auto; border:1px solid var(--linea); border-radius:8px; padding:3px 10px; font-size:.78rem; background:#f8fafc; }
+.corpo { display:grid; grid-template-columns: 200px 1fr; min-height: 420px; }
+.corpo.solo { grid-template-columns: 1fr; }
+.lato { background:var(--ardesia); color:#cbd5e1; padding:14px 10px; font-size:.82rem; }
+.lato .gr { font-size:.65rem; text-transform:uppercase; letter-spacing:.08em; color:#8391a7; margin:14px 8px 4px; }
+.lato .v { padding:7px 10px; border-radius:7px; margin-bottom:2px; display:flex; justify-content:space-between; }
+.lato .v.on { background:var(--rosso); color:#fff; font-weight:600; }
+.lato .n { background:#fbbf24; color:#1f2937; border-radius:999px; padding:0 7px; font-size:.72rem; font-weight:700; }
+.area { padding:22px 26px; }
+.area h2 { margin:0 0 4px; font-size:1.25rem; }
+.area .sub { color:var(--tenue); margin:0 0 14px; font-size:.9rem; }
+/* componenti */
+.card { background:#fff; border:1px solid var(--linea); border-radius:12px; padding:16px 18px; margin-bottom:14px; }
+.card h3 { margin:0 0 8px; font-size:.95rem; }
+.passi { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+.passo { display:flex; align-items:center; gap:8px; padding:6px 12px; border-radius:999px; background:#e2e8f0; color:#475569; font-size:.82rem; font-weight:600; }
+.passo i { font-style:normal; width:22px; height:22px; border-radius:50%; background:#94a3b8; color:#fff; display:grid; place-items:center; font-size:.75rem; }
+.passo.ok { background:#dcfce7; color:#166534; } .passo.ok i { background:var(--verde); }
+.passo.on { background:var(--rosso); color:#fff; } .passo.on i { background:#fff; color:var(--rosso); }
+.griglia { display:grid; gap:12px; }
+.g2 { grid-template-columns: 1fr 1fr; } .g3 { grid-template-columns: repeat(3,1fr); } .g4 { grid-template-columns: repeat(4,1fr); }
+label { display:block; font-size:.78rem; font-weight:700; color:#334155; margin-bottom:3px; }
+.campo { border:1px solid #cbd5e1; border-radius:8px; padding:7px 10px; background:#fff; min-height:36px; font-size:.9rem; }
+.campo.pre { background:#f1f5f9; color:#475569; }
+.campo.mono { font-family:Consolas,monospace; letter-spacing:.04em; }
+.campo.err { border-color:#dc2626; }
+.aiuto { font-size:.76rem; color:var(--tenue); margin-top:3px; }
+.radio { display:flex; gap:10px; align-items:flex-start; padding:10px 12px; border:1px solid #cbd5e1; border-radius:10px; background:#fff; margin-bottom:8px; }
+.radio.sel { border-color:var(--rosso); background:#fff5f5; }
+.radio .pallino { width:16px; height:16px; border-radius:50%; border:2px solid #94a3b8; margin-top:3px; flex:none; }
+.radio.sel .pallino { border-color:var(--rosso); background:radial-gradient(var(--rosso) 45%, transparent 50%); }
+.check { display:flex; gap:8px; align-items:flex-start; margin:6px 0; font-size:.88rem; }
+.scatola { width:16px; height:16px; border:2px solid #94a3b8; border-radius:4px; margin-top:2px; flex:none; background:#fff; }
+.scatola.on { background:var(--rosso); border-color:var(--rosso); position:relative; }
+.scatola.on::after { content:"✓"; color:#fff; position:absolute; left:1px; top:-4px; font-size:.8rem; font-weight:700; }
+.btn { display:inline-block; padding:8px 16px; border-radius:8px; font-weight:700; font-size:.88rem; border:1px solid transparent; }
+.btn.r { background:var(--rosso); color:#fff; } .btn.v { background:var(--verde); color:#fff; } .btn.b { background:var(--blu); color:#fff; } .btn.c { background:#fff; border-color:#cbd5e1; color:#334155; }
+.btn.piccolo { padding:3px 10px; font-size:.78rem; }
+.chip { display:inline-block; padding:1px 9px; border-radius:999px; font-size:.74rem; font-weight:700; white-space:nowrap; }
+.chip.g { background:#e2e8f0; color:#475569; } .chip.vi { background:#ede9fe; color:#6d28d9; } .chip.am { background:#fef3c7; color:#92400e; } .chip.ve { background:#dcfce7; color:#166534; } .chip.bl { background:#dbeafe; color:#1d4ed8; } .chip.ro { background:#fee2e2; color:#b91c1c; }
+table { width:100%; border-collapse:collapse; font-size:.86rem; }
+th { text-align:left; font-size:.7rem; text-transform:uppercase; letter-spacing:.05em; color:var(--tenue); padding:6px 8px; border-bottom:1px solid var(--linea); }
+td { padding:8px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+.avviso { background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:10px 14px; font-size:.86rem; margin-bottom:14px; }
+.avviso.verde { background:#f0fdf4; border-color:#bbf7d0; } .avviso.blu { background:#eff6ff; border-color:#bfdbfe; }
+.doc { display:flex; justify-content:space-between; gap:10px; align-items:center; padding:8px 0; border-top:1px solid var(--linea); font-size:.88rem; }
+.doc:first-child { border-top:0; }
+.doc .ic { width:30px; height:34px; border-radius:5px; background:#fee2e2; color:#b91c1c; display:grid; place-items:center; font-size:.62rem; font-weight:800; flex:none; }
+.doc .nome { flex:1; margin-left:10px; } .doc small { color:var(--tenue); display:block; }
+.tempo { position:relative; padding-left:26px; }
+.tempo::before { content:""; position:absolute; left:8px; top:6px; bottom:6px; width:2px; background:#cbd5e1; }
+.tempo .p { position:relative; padding:5px 0 12px; font-size:.88rem; }
+.tempo .p::before { content:""; position:absolute; left:-24px; top:8px; width:14px; height:14px; border-radius:50%; background:#fff; border:3px solid #94a3b8; }
+.tempo .p.ok::before { border-color:var(--verde); background:var(--verde); } .tempo .p.on::before { border-color:var(--rosso); background:#fff; box-shadow:0 0 0 4px #fee2e2; }
+.tempo .p small { color:var(--tenue); display:block; }
+.percorso { display:flex; gap:6px; flex-wrap:wrap; align-items:stretch; }
+.tappa { flex:1; min-width:120px; background:#fff; border:1px solid var(--linea); border-top:4px solid var(--c,#94a3b8); border-radius:10px; padding:8px 10px; font-size:.8rem; }
+.tappa b { display:block; font-size:.86rem; } .tappa small { color:var(--tenue); }
+.freccia { align-self:center; color:#94a3b8; font-weight:700; }
+.mask { letter-spacing:.12em; }
+td .scatola, th .scatola { display:inline-block; min-width:16px; vertical-align:middle; }
+td:first-child, th:first-child { width:34px; }
+@media (max-width: 800px) { .corpo { grid-template-columns:1fr; } .lato { display:none; } .g2,.g3,.g4 { grid-template-columns:1fr; } }
+[data-slide] h1, [data-slide] .nota, [data-slide] .titolo-schermo { display:none; }
+[data-slide] .pagina { padding-top:16px; }
+[data-solo] section.s { display:none; }
+</style>
+</head>
+<body>
+<div class="pagina">
+<h1>Tutorato e pagamenti · bozza grafica</h1>
+<p class="nota">Schermate di esempio con dati inventati, per decidere insieme come devono essere prima di scrivere il codice. Non è il portale vero: i campi del modello <strong>«N. 6 – Dichiarazione individuale»</strong> sono quelli del documento che mi hai mandato.</p>
+
+<!-- ===================================================== 0. ITER -->
+<section class="s" id="s0">
+  <div class="titolo-schermo"><b>0</b><span>L'iter completo</span><small>chi fa cosa, in che ordine</small></div>
+  <div class="card">
+    <div class="percorso">
+      <div class="tappa" style="--c:#475569"><b>1 · Referente</b><small>crea il bando con i decreti (PDF) e inserisce i vincitori</small></div><div class="freccia">›</div>
+      <div class="tappa" style="--c:#0056b3"><b>2 · Studente</b><small>SPID/CIE: accetta la lettera e compila la <strong>dichiarazione individuale</strong></small></div><div class="freccia">›</div>
+      <div class="tappa" style="--c:#7c3aed"><b>3 · Docente → Direttore</b><small>firmano la lettera in PAdES</small></div><div class="freccia">›</div>
+      <div class="tappa" style="--c:#334155"><b>4 · Referente</b><small>protocolla la lettera, poi fa l'UNILAV e lo carica</small></div>
+    </div>
+    <div style="height:8px"></div>
+    <div class="percorso">
+      <div class="tappa" style="--c:#0f766e"><b>5 · Studente</b><small>compila il registro presenze</small></div><div class="freccia">›</div>
+      <div class="tappa" style="--c:#b45309"><b>6 · Docente titolare</b><small>approva le ore e firma in PAdES la lettera di fine attività (senza protocollo)</small></div><div class="freccia">›</div>
+      <div class="tappa" style="--c:#475569"><b>7 · Referente</b><small>controlla ore e compenso (ricalcolato se le ore sono meno), valida e passa la pratica (una, più o tutte) all'ufficio pagamenti</small></div><div class="freccia">›</div>
+      <div class="tappa" style="--c:#15803d"><b>8 · Ufficio pagamenti</b><small>vede tutto, paga e segna «pagato»; lo studente è avvisato</small></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================================================== 1. STUDENTE PASSO 2 -->
+<section class="s" id="s1">
+  <div class="titolo-schermo"><b>1</b><span>Studente: dichiarazione individuale online</span><small>durante l'accettazione dell'incarico · passo 2 di 4</small></div>
+  <div class="schermo">
+    <div class="barra"><b>Lettera di incarico di tutorato</b> · Bando tutorato I semestre 2026/27<span class="url">dibest2.unical.it/eventi/incarico.php</span></div>
+    <div class="corpo solo"><div class="area" style="max-width:900px;margin:0 auto;">
+      <div class="passi"><span class="passo ok"><i>✓</i>Lettera</span><span class="passo on"><i>2</i>Dati personali e pagamento</span><span class="passo"><i>3</i>Posizione contributiva</span><span class="passo"><i>4</i>Conferma</span></div>
+      <h2>Dichiarazione dei dati personali per assegni di tutorato</h2>
+      <p class="sub">Compili qui il modello «N. 6 – Dichiarazione individuale»: non c'è nessun foglio da stampare. I dati che il portale già conosce sono precompilati.</p>
+      <div class="card"><h3>I tuoi dati</h3>
+        <div class="griglia g3">
+          <div><label>Nome e cognome</label><div class="campo pre">Giulia Ferraro</div></div>
+          <div><label>Codice fiscale</label><div class="campo pre mono">FRRGLI99C45D086K</div></div>
+          <div><label>Nata il / a</label><div class="campo pre">05/03/1999 · Cosenza (CS)</div></div>
+          <div><label>Telefono *</label><div class="campo">347 1234567</div></div>
+          <div><label>Email *</label><div class="campo pre">giulia.ferraro@studenti.unical.it</div></div>
+        </div>
+        <div class="check"><span class="scatola on"></span>I dati di residenza sono invariati rispetto al precedente incarico</div>
+        <div class="griglia g4"><div style="grid-column:span 2"><label>Residente in via/piazza</label><div class="campo">Via Roma 12</div></div><div><label>Città</label><div class="campo">Rende</div></div><div><label>CAP · Prov.</label><div class="campo">87036 · CS</div></div></div>
+        <div class="aiuto">Se risiedi all'estero indica il codice identificativo estero.</div>
+      </div>
+      <div class="card"><h3>Posizione fiscale</h3>
+        <div class="check"><span class="scatola on"></span>Dichiaro di <strong>NON essere dipendente UNICAL</strong></div>
+        <div class="griglia g2"><div><label>Aliquota IRPEF massima dei tuoi redditi *</label><div class="campo">23 %</div></div></div>
+      </div>
+      <div class="card"><h3>Dove accreditare il compenso</h3>
+        <div class="avviso blu" style="margin-bottom:10px">Il compenso si paga <strong>solo con accredito su conto con IBAN</strong> intestato o cointestato a te.</div>
+        <div class="radio sel"><span class="pallino"></span><div style="flex:1"><strong>Accredito su c/c bancario o postale con IBAN</strong>
+          <div class="griglia g2" style="margin-top:10px">
+            <div style="grid-column:span 2"><label>IBAN *</label><div class="campo mono">IT60 X054 2811 1010 0000 0123 456</div><div class="aiuto">27 caratteri. Il portale controlla che sia scritto correttamente.</div></div>
+            <div><label>Istituto bancario / postale *</label><div class="campo">Banca Intesa Sanpaolo</div></div>
+            <div><label>Codice SWIFT/BIC <small>(solo conto estero)</small></label><div class="campo"> </div></div>
+            <div><label>Indirizzo filiale</label><div class="campo">Corso Mazzini 5</div></div><div><label>Città</label><div class="campo">Cosenza</div></div>
+          </div>
+          <div class="check"><span class="scatola"></span>L'IBAN è già in possesso dell'Ateneo (incarichi precedenti)</div></div></div>
+        <div class="aiuto">🔒 IBAN e dati bancari sono visibili solo a te e all'ufficio pagamenti, e si conservano cifrati.</div>
+      </div>
+      <p><span class="btn c">‹ Indietro</span> &nbsp; <span class="btn r">Continua ›</span></p>
+    </div></div>
+  </div>
+</section>
+
+<!-- ===================================================== 2. STUDENTE PASSO 3 -->
+<section class="s" id="s2">
+  <div class="titolo-schermo"><b>2</b><span>Studente: posizione contributiva</span><small>passo 3 di 4 · seconda parte del modello (INPS e INAIL)</small></div>
+  <div class="schermo">
+    <div class="barra"><b>Lettera di incarico di tutorato</b> · Bando tutorato I semestre 2026/27<span class="url">dibest2.unical.it/eventi/incarico.php</span></div>
+    <div class="corpo solo"><div class="area" style="max-width:900px;margin:0 auto;">
+      <div class="passi"><span class="passo ok"><i>✓</i>Lettera</span><span class="passo ok"><i>✓</i>Dati personali e pagamento</span><span class="passo on"><i>3</i>Posizione contributiva</span><span class="passo"><i>4</i>Conferma</span></div>
+      <h2>Titolarità di posizione contributiva a fini previdenziali</h2>
+      <p class="sub">Collaborazione individuale · Gestione Separata INPS (art. 2 c. 26 L. 335/95). Scegli la tua situazione.</p>
+      <div class="card"><h3>Aliquota contributiva INPS</h3>
+        <div class="radio sel"><span class="pallino"></span><div style="flex:1"><strong>35,03 %</strong> — non sono iscritto/a ad altra cassa previdenziale obbligatoria
+          <div class="griglia g2" style="margin-top:8px"><div><label>Imponibile teorico annuo (solo co.co.co.) €</label><div class="campo">0,00</div></div></div></div></div>
+        <div class="radio"><span class="pallino"></span><div><strong>24,00 %</strong> — sono già iscritto/a ad altra cassa previdenziale o titolare di pensione diretta
+          <div class="aiuto">Compariranno i campi: cassa o ente, dal / al, professione.</div></div></div>
+        <div class="radio"><span class="pallino"></span><div><strong>Sono dipendente di un Ente pubblico o privato</strong>
+          <div class="aiuto">Compariranno i campi: denominazione dell'ente, indirizzo, codice fiscale / P. IVA.</div></div></div>
+      </div>
+      <div class="card"><h3>Rischio INAIL: l'incarico rientra nell'ambito di</h3>
+        <div class="check"><span class="scatola on"></span>didattica e/o utilizzo di videoterminali</div>
+        <div class="check"><span class="scatola"></span>utilizzo di apparecchiature scientifiche in laboratorio</div>
+      </div>
+      <div class="avviso blu">ℹ️ Hai bisogno di cambiare qualcosa dopo? Prima della firma del docente puoi tornare indietro; poi serve scrivere all'ufficio.</div>
+      <p><span class="btn c">‹ Indietro</span> &nbsp; <span class="btn r">Continua ›</span></p>
+    </div></div>
+  </div>
+</section>
+
+<!-- ===================================================== 3. ADMIN UFFICI DI ATENEO -->
+<section class="s" id="s3">
+  <div class="titolo-schermo"><b>3</b><span>Amministratore: uffici di Ateneo</span><small>crea l'ufficio e associa le persone dall'anagrafe di Ateneo</small></div>
+  <div class="schermo">
+    <div class="barra"><b>Gestione del portale › Uffici di Ateneo</b><span class="url">dibest2.unical.it/eventi/admin/uffici_ateneo.php</span></div>
+    <div class="corpo">
+      <div class="lato"><div class="v">Scrivania</div><div class="gr">Gestione del portale</div><div class="v">Aree</div><div class="v">Anagrafi</div><div class="v on">Uffici di Ateneo</div><div class="v">Utenti e abilitazioni</div><div class="v">Sistema</div></div>
+      <div class="area">
+        <h2>Uffici di Ateneo</h2><p class="sub">Uffici che non sono del Dipartimento (pagamenti, personale…): ricevono pratiche da lavorare nel portale.</p>
+        <div class="card"><h3>Ufficio pagamenti tutorato <span class="chip ve">attivo</span></h3>
+          <div class="griglia g2"><div><label>Nome dell'ufficio *</label><div class="campo">Ufficio pagamenti tutorato</div></div><div><label>A cosa serve</label><div class="campo">Paga i tutorati dopo la validazione del referente</div></div></div>
+          <h3 style="margin-top:14px">Persone dell'ufficio</h3>
+          <table><tr><th>Nome</th><th>Struttura (dall'anagrafe di Ateneo)</th><th>Email</th><th></th></tr>
+            <tr><td><strong>Rossana Zicarelli</strong></td><td>Area Risorse Umane · Ufficio collaborazioni</td><td>r.zicarelli@unical.it</td><td><span class="btn c piccolo">Togli</span></td></tr>
+            <tr><td><strong>Tonia Romio</strong></td><td>Area Risorse Umane · Ufficio collaborazioni</td><td>t.romio@unical.it</td><td><span class="btn c piccolo">Togli</span></td></tr></table>
+          <div style="margin-top:12px"><label>Aggiungi una persona</label>
+            <div class="campo" style="max-width:420px">🔎 Cerca per cognome nell'anagrafe di Ateneo… <span style="color:#94a3b8">«zic»</span></div>
+            <div style="border:1px solid var(--linea);border-radius:8px;max-width:420px;background:#fff;margin-top:2px;font-size:.86rem"><div style="padding:6px 10px;background:#f1f5f9"><strong>Zicarelli Rossana</strong> · Area Risorse Umane</div><div style="padding:6px 10px">Zicaro Mario · Dip. Fisica</div></div>
+            <div class="aiuto">Accede con le sue credenziali Unical: non serve creare un account.</div></div>
+          <p style="margin-top:12px"><span class="btn r">Salva l'ufficio</span></p>
+        </div>
+        <span class="btn c">+ Nuovo ufficio</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================================================== 4. REFERENTE BANDO + DECRETI -->
+<section class="s" id="s4">
+  <div class="titolo-schermo"><b>4</b><span>Referente: il bando con i decreti</span><small>tre decreti in PDF per bando; l'UNILAV si carica per ogni tutor</small></div>
+  <div class="schermo">
+    <div class="barra"><b>Didattica › Tutorato › Bando tutorato I semestre 2026/27</b><span class="url">dibest2.unical.it/eventi/admin/tutorato.php?bando=7</span></div>
+    <div class="corpo">
+      <div class="lato"><div class="v">Scrivania <span class="n">4</span></div><div class="gr">Didattica</div><div class="v">Pratiche</div><div class="v">Sedute e verbali</div><div class="v on">Tutorato <span class="n">4</span></div></div>
+      <div class="area">
+        <h2>Bando tutorato I semestre 2026/27</h2><p class="sub">Anno accademico 2026/2027 · 12 vincitori</p>
+        <div class="card"><h3>Decreti del bando</h3>
+          <div class="doc"><span class="ic">PDF</span><div class="nome">Decreto del bando<small>D.D. n. 367 del 29/10/2025</small></div><span class="chip ve">caricato</span><span class="btn c piccolo">Sostituisci</span></div>
+          <div class="doc"><span class="ic">PDF</span><div class="nome">Decreto della commissione<small>D.D. n. 402 del 15/11/2025</small></div><span class="chip ve">caricato</span><span class="btn c piccolo">Sostituisci</span></div>
+          <div class="doc"><span class="ic" style="background:#f1f5f9;color:#64748b">—</span><div class="nome">Decreto di approvazione atti<small>numero e data, poi il PDF</small></div><span class="chip am">manca</span><span class="btn b piccolo">Carica PDF</span></div>
+        </div>
+        <div class="card"><h3>Vincitori e stato delle pratiche</h3>
+          <table><tr><th></th><th>Tutor</th><th>Insegnamento</th><th>Stato</th><th>UNILAV</th></tr>
+            <tr><td><span class="scatola"></span></td><td><strong>Ferraro Giulia</strong></td><td>Biologia cellulare</td><td><span class="chip vi">Al docente per la firma</span></td><td><span class="chip g">dopo la firma</span></td></tr>
+            <tr><td><span class="scatola"></span></td><td><strong>Greco Marco</strong></td><td>Chimica generale</td><td><span class="chip am">Firmata: da protocollare</span></td><td><span class="btn b piccolo">Carica UNILAV</span></td></tr>
+            <tr><td><span class="scatola"></span></td><td><strong>Basile Anna</strong></td><td>Fisiologia</td><td><span class="chip bl">Registro in compilazione</span></td><td><span class="chip ve">PDF ✓</span></td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================================================== 5. REFERENTE VALIDA E PASSA -->
+<section class="s" id="s5">
+  <div class="titolo-schermo"><b>5</b><span>Referente: valida e passa all'ufficio pagamenti</span><small>una pratica, alcune, o tutte con un clic</small></div>
+  <div class="schermo">
+    <div class="barra"><b>Didattica › Tutorato › Da validare</b><span class="url">dibest2.unical.it/eventi/admin/tutorato.php?vista=validare</span></div>
+    <div class="corpo">
+      <div class="lato"><div class="v">Scrivania <span class="n">4</span></div><div class="gr">Didattica</div><div class="v">Pratiche</div><div class="v">Sedute e verbali</div><div class="v on">Tutorato <span class="n">4</span></div></div>
+      <div class="area">
+        <h2>Da validare <span class="chip am">4</span></h2><p class="sub">Il docente titolare ha firmato la lettera di fine attività: controlla ore e documenti, poi passa la pratica ai pagamenti.</p>
+        <div class="avviso verde">✅ Seleziona le pratiche pronte e passale insieme: l'ufficio riceve <strong>una sola notifica</strong> con l'elenco.</div>
+        <div class="card" style="padding:0">
+          <table><tr><th><span class="scatola on"></span></th><th>Tutor</th><th>Ore approvate</th><th>Fine attività</th><th>Controlli</th><th></th></tr>
+            <tr><td><span class="scatola on"></span></td><td><strong>Basile Anna</strong><br><small style="color:#64748b">Fisiologia</small></td><td>40 / 40</td><td>firmata dal prof. Rossi · 10/01</td><td><span class="chip ve">tutto presente</span></td><td><span class="btn c piccolo">Apri</span></td></tr>
+            <tr><td><span class="scatola"></span></td><td><strong>Greco Marco</strong><br><small style="color:#64748b">Chimica generale</small></td><td><strong style="color:#b45309">38 / 40</strong></td><td>firmata dal prof. Neri · 12/01</td><td><span class="chip am">compenso ricalcolato · carica l'UNILAV aggiornato</span></td><td><span class="btn b piccolo">Apri</span></td></tr>
+            <tr><td><span class="scatola"></span></td><td><strong>Esposito Luca</strong><br><small style="color:#64748b">Zoologia</small></td><td>40 / 40</td><td>firmata dal prof. Bruni · 13/01</td><td><span class="chip ro">manca l'UNILAV</span></td><td><span class="btn c piccolo">Apri</span></td></tr>
+            <tr><td><span class="scatola on"></span></td><td><strong>Marino Sara</strong><br><small style="color:#64748b">Botanica</small></td><td>40 / 40</td><td>firmata dalla prof.ssa Villa · 13/01</td><td><span class="chip ve">tutto presente</span></td><td><span class="btn c piccolo">Apri</span></td></tr>
+          </table>
+        </div>
+        <div class="card" style="border-color:#fde68a;background:#fffbeb"><h3>Greco Marco: ha fatto 38 ore su 40</h3>
+          <div class="griglia g3"><div><label>Ore effettive</label><div class="campo">38</div></div><div><label>Lordo ente · 38 × € 25,00</label><div class="campo pre">€ 950,00</div></div><div><label>Compenso in lettera · ÷ 1,24</label><div class="campo pre"><strong>€ 766,13</strong> <small style="color:#64748b">(prima € 806,45)</small></div></div></div>
+          <div class="aiuto">Il calcolo è automatico. Serve caricare l'<strong>UNILAV modificato</strong> con le nuove ore prima di passare la pratica ai pagamenti.</div></div>
+        <p><span class="btn v">Passa le 2 selezionate all'Ufficio pagamenti tutorato</span> &nbsp; <span class="btn c">Seleziona tutte</span> &nbsp; <span class="btn c">Rimanda al docente…</span></p>
+        <div class="aiuto">Una pratica con un documento mancante non si può passare: il portale te lo segnala nella colonna «Controlli».</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================================================== 6. UFFICIO PAGAMENTI -->
+<section class="s" id="s6">
+  <div class="titolo-schermo"><b>6</b><span>Ufficio pagamenti: la scheda della pratica</span><small>tutto quello che serve per pagare, in una pagina</small></div>
+  <div class="schermo">
+    <div class="barra"><b>Ufficio pagamenti tutorato › Basile Anna</b><span class="url">dibest2.unical.it/eventi/admin/pagamenti_tutorato.php?id=31</span></div>
+    <div class="corpo">
+      <div class="lato"><div class="v">Scrivania <span class="n">3</span></div><div class="gr">Ufficio pagamenti</div><div class="v on">Da pagare <span class="n">3</span></div><div class="v">Pagati</div></div>
+      <div class="area">
+        <h2>Basile Anna · Tutorato di Fisiologia</h2><p class="sub">Bando 2026/27 · passata dal referente il 14/01 · <span class="chip bl">Da pagare</span></p>
+        <div class="griglia g2">
+          <div>
+            <div class="card"><h3>Documenti della pratica</h3>
+              <div class="doc"><span class="ic">PDF</span><div class="nome">Decreto del bando<small>D.D. n. 367 del 29/10/2025</small></div><span class="btn c piccolo">Apri</span></div>
+              <div class="doc"><span class="ic">PDF</span><div class="nome">Decreto della commissione<small>D.D. n. 402 del 15/11/2025</small></div><span class="btn c piccolo">Apri</span></div>
+              <div class="doc"><span class="ic">PDF</span><div class="nome">Decreto di approvazione atti<small>D.D. n. 415 del 02/12/2025</small></div><span class="btn c piccolo">Apri</span></div>
+              <div class="doc"><span class="ic">PDF</span><div class="nome">UNILAV<small>comunicazione del 20/12/2025</small></div><span class="btn c piccolo">Apri</span></div>
+              <div class="doc"><span class="ic">PDF</span><div class="nome">Lettera di incarico<small>firmata da studente, docente e Direttore · prot. 1881 del 22/12/2025</small></div><span class="btn c piccolo">Apri</span></div>
+              <div class="doc"><span class="ic">PDF</span><div class="nome">Registro delle presenze<small>40 ore · 18 giornate</small></div><span class="btn c piccolo">Apri</span></div>
+              <div class="doc"><span class="ic">PDF</span><div class="nome">Lettera di fine attività<small>firmata dal prof. Rossi (PAdES) · 10/01</small></div><span class="btn c piccolo">Apri</span></div>
+            </div>
+          </div>
+          <div>
+            <div class="card"><h3>Dichiarazione individuale (dati per il pagamento)</h3>
+              <dl style="margin:0;font-size:.86rem;display:grid;grid-template-columns:130px 1fr;gap:4px 10px">
+                <dt style="color:#64748b">Codice fiscale</dt><dd style="margin:0" class="mask">BSLNNA98H50D086Q</dd>
+                <dt style="color:#64748b">Pagamento</dt><dd style="margin:0">Accredito su c/c</dd>
+                <dt style="color:#64748b">IBAN</dt><dd style="margin:0"><span class="mask">IT60 X054 •••• •••• •••• 123 456</span> <span class="btn c piccolo">Mostra</span></dd>
+                <dt style="color:#64748b">Banca</dt><dd style="margin:0">Banca Intesa Sanpaolo · Cosenza</dd>
+                <dt style="color:#64748b">IRPEF</dt><dd style="margin:0">23 %</dd>
+                <dt style="color:#64748b">INPS</dt><dd style="margin:0">35,03 % (Gestione Separata)</dd>
+                <dt style="color:#64748b">INAIL</dt><dd style="margin:0">didattica / videoterminali</dd>
+              </dl>
+              <div class="aiuto" style="margin-top:8px">🔒 Ogni volta che si mostra l'IBAN resta scritto chi lo ha visto.</div>
+              <p style="margin:10px 0 0"><span class="btn c piccolo">Scarica la dichiarazione compilata (PDF)</span></p>
+            </div>
+            <div class="card"><h3>Compenso</h3><div class="griglia g2"><div><label>Lordo ente · 40 ore × € 25,00</label><div style="font-size:1.25rem;font-weight:800">€ 1.000,00</div></div><div><label>Compenso in lettera (÷ 1,24, al netto degli oneri)</label><div style="font-size:1.25rem;font-weight:800">€ 806,45</div></div></div>
+              <div class="aiuto">Ore approvate dal docente: 40 su 40.</div></div>
+            <div class="card" style="border-color:#bbf7d0;background:#f0fdf4"><h3>Segna come pagato</h3>
+              <div class="griglia g2"><div><label>Data del pagamento *</label><div class="campo">28/01/2026</div></div><div><label>Riferimento (mandato, n. ordinativo) *</label><div class="campo">Mandato 2026/00412</div></div></div>
+              <p style="margin:10px 0 0"><span class="btn v">Pagato: avvisa lo studente</span> &nbsp; <span class="btn c">Rimanda al referente…</span></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================================================== 7. TUTOR AREA PERSONALE -->
+<section class="s" id="s7">
+  <div class="titolo-schermo"><b>7</b><span>Il tutor: Area personale</span><small>vede a che punto è e ha tutti i suoi documenti</small></div>
+  <div class="schermo">
+    <div class="barra"><b>Area personale › Il mio tutorato</b><span class="url">dibest2.unical.it/eventi/area_personale.php</span></div>
+    <div class="corpo solo"><div class="area" style="max-width:960px;margin:0 auto;">
+      <h2>Tutorato di Fisiologia</h2><p class="sub">Bando tutorato I semestre 2026/27 · 40 ore · compenso in lettera € 806,45 (al netto degli oneri)</p>
+      <div class="griglia g2">
+        <div class="card"><h3>A che punto sei</h3>
+          <div class="tempo">
+            <div class="p ok">Incarico accettato e dichiarazione individuale compilata<small>12/12/2025 · accesso con SPID</small></div>
+            <div class="p ok">Lettera firmata dal docente e dal Direttore<small>protocollo 1881 del 22/12/2025</small></div>
+            <div class="p ok">Registro delle presenze compilato<small>40 ore approvate dal prof. Rossi</small></div>
+            <div class="p ok">Fine attività firmata e validata dal referente<small>14/01/2026</small></div>
+            <div class="p on">In pagamento presso l'ufficio<small>passata il 14/01/2026</small></div>
+            <div class="p">Pagamento disposto<small>ti avvisiamo con una email</small></div>
+          </div>
+        </div>
+        <div class="card"><h3>I tuoi documenti</h3>
+          <div class="doc"><span class="ic">PDF</span><div class="nome">Lettera di incarico firmata<small>prot. 1881</small></div><span class="btn c piccolo">Scarica</span></div>
+          <div class="doc"><span class="ic">PDF</span><div class="nome">Dichiarazione individuale<small>compilata il 12/12/2025</small></div><span class="btn c piccolo">Scarica</span></div>
+          <div class="doc"><span class="ic">PDF</span><div class="nome">Decreti del bando<small>bando · commissione · approvazione atti</small></div><span class="btn c piccolo">Apri</span></div>
+          <div class="doc"><span class="ic">PDF</span><div class="nome">UNILAV</div><span class="btn c piccolo">Scarica</span></div>
+          <div class="doc"><span class="ic">PDF</span><div class="nome">Registro presenze</div><span class="btn c piccolo">Scarica</span></div>
+          <div class="doc"><span class="ic">PDF</span><div class="nome">Lettera di fine attività</div><span class="btn c piccolo">Scarica</span></div>
+        </div>
+      </div>
+    </div></div>
+  </div>
+</section>
+</div>
+<script>
+// ?s=3 mostra una sola schermata (serve per gli screenshot); senza parametro le mostra tutte
+var m = /[?&]s=(\d)/.exec(location.search);
+if (/[?&]slide=1/.test(location.search)) document.body.setAttribute('data-slide', '1');
+if (m) { document.body.setAttribute('data-solo', m[1]); document.querySelectorAll('section.s').forEach(function (s) { s.style.display = s.id === 's' + m[1] ? 'block' : 'none'; }); }
+</script>
+</body>
+</html>

@@ -36,9 +36,33 @@ if (!$ctx) $nega("La prenotazione collegata non esiste più.");
 ['p0' => $p0, 'cfg' => $cfg, 'prenotate' => $prenotate, 'prenotabili' => $prenotabili, 'dati' => $dati, 's' => $s] = $ctx;
 
 // ── Documenti: genera e scarica ──
-if (isset($_GET['scarica']) && $dati) {
+if (isset($_GET['scarica']) && $_GET['scarica'] !== 'firmata' && $dati) {
     $doc_pronto = $conv_online->scarica((string)$_GET['scarica'], $cc, $ctx);
     if ($doc_pronto) invia_file_scaricabile($doc_pronto['file'], $doc_pronto['nome'], str_ends_with($doc_pronto['nome'], '.pdf') ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+}
+
+// ── Convenzione firmata: la scuola la scarica di nuovo, la carica o la sostituisce ──
+$conv_firmata = \App\Core\App::per($conn)->get(\App\Fsl\ServizioConvenzioneFirmata::class);
+if (($_GET['scarica'] ?? '') === 'firmata') {
+    $ff = $conv_firmata->fileDaScaricare((int)$cc['id']);
+    if (!$ff) $nega("Non c'è nessuna convenzione firmata caricata.");
+    while (ob_get_level() > 0) ob_end_clean();
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: attachment; filename="' . $ff['nome'] . '"');
+    header('Content-Length: ' . filesize($ff['percorso']));
+    header('X-Content-Type-Options: nosniff');
+    readfile($ff['percorso']);
+    exit;
+}
+$errore_firmata = null;
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['carica_firmata'])) {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    $errore_firmata = $conv_firmata->caricaDaUpload($cc, $_FILES['convenzione_firmata'] ?? null, $_FILES['allegato_a'] ?? null);
+    if ($errore_firmata === null) {
+        flash_set("Convenzione firmata ricevuta: l'ufficio la prende in carico e ti scriviamo appena è pronta.");
+        header('Location: convenzione_online.php?t=' . $cc['token'] . '&r=' . time() . '#firmata'); exit;
+    }
+    $cc = $conv_online->perToken($cc['token']) ?: $cc;
 }
 
 // ── Salvataggio del modulo ──
@@ -84,8 +108,8 @@ require_once 'header.php';
         <ol class="mb-2">
             <li>Apri i file e controlla i dati (nella Convenzione in Word i dati non ancora indicati restano come puntini da completare a mano).</li>
             <li>Il <strong>Dirigente Scolastico</strong> firma i documenti <strong>digitalmente in formato PAdES</strong> (PDF firmato; il formato CAdES .p7m non è accettato).</li>
-            <li>La scuola li invia dalla propria PEC a <a href="mailto:<?php echo $h($cfg['pec']); ?>?subject=<?php echo rawurlencode('Convenzione Formazione Scuola Lavoro – ' . ($s['denominazione'] ?? '')); ?>" class="fw-bold"><?php echo $h($cfg['pec']); ?></a>.</li>
-            <li>Il Dipartimento firma, registra la convenzione e <strong>conferma le prenotazioni</strong>: riceverete un'email.</li>
+            <li>La scuola <strong>carica qui sotto la convenzione firmata e l'Allegato A</strong> (la convenzione in PDF PAdES, l'Allegato A in PDF anche senza firma): l'ufficio riceve subito l'avviso. In alternativa si può inviare dalla PEC della scuola a <a href="mailto:<?php echo $h($cfg['pec']); ?>?subject=<?php echo rawurlencode('Convenzione Formazione Scuola Lavoro – ' . ($s['denominazione'] ?? '')); ?>" class="fw-bold"><?php echo $h($cfg['pec']); ?></a>.</li>
+            <li>Il Dipartimento la protocolla in entrata, la fa firmare dal Direttore, la protocolla in via definitiva e <strong>conferma le prenotazioni</strong>: riceverete un'email a ogni passaggio importante.</li>
         </ol>
         <?php if ($non_prenotate): ?>
             <div class="alert alert-warning small mb-0"><i class="fa fa-bell me-1" aria-hidden="true"></i><strong>Ricordati di prenotare</strong> le attività che hai inserito nell'Allegato A ma che non hai ancora prenotato:
@@ -95,6 +119,42 @@ require_once 'header.php';
         <?php endif; ?>
         <p class="small text-secondary mt-2 mb-0">Puoi tornare su questa pagina dal link che ti abbiamo inviato per email e correggere i dati qui sotto: i documenti si aggiornano.</p>
     </div></section>
+
+    <?php if (($dati['convenzione'] ?? '') !== 'si' || !empty($cc['file_firmato'])): // la scuola che ha già una convenzione valida non ne carica un'altra ?>
+    <?php $cv_caricabile = \App\Fsl\ServizioConvenzioneFirmata::caricabile($cc); ?>
+    <section id="firmata" class="card border-0 shadow-sm mb-4" style="border-left:5px solid #B30000 !important;"><div class="card-body">
+        <h2 class="h5 fw-bold"><i class="fa fa-file-circle-check me-1" style="color:#B30000;" aria-hidden="true"></i>Convenzione firmata</h2>
+        <?php if ($errore_firmata): ?><div class="alert alert-danger" role="alert"><i class="fa fa-triangle-exclamation me-1" aria-hidden="true"></i><?php echo $h($errore_firmata); ?></div><?php endif; ?>
+        <?php $it_sc = (string)($cc['stato_iter'] ?? ''); ?>
+        <?php if ($it_sc === 'rifiutata'): ?>
+            <div class="alert alert-warning mb-3" role="alert"><i class="fa fa-triangle-exclamation me-1" aria-hidden="true"></i><strong>Il Dipartimento non ha potuto accettare il file.</strong>
+                <?php if (!empty($cc['nota_ufficio'])): ?><div class="mt-1">Motivo: <?php echo nl2br($h($cc['nota_ufficio'])); ?></div><?php endif; ?>
+                <div class="mt-1">Correggi il documento e caricalo di nuovo qui sotto.</div></div>
+        <?php elseif ($it_sc === 'protocollata'): ?>
+            <div class="alert alert-success mb-3" role="status"><i class="fa fa-circle-check me-1" aria-hidden="true"></i><strong>La convenzione è attiva.</strong>
+                Firmata dal Direttore e protocollata<?php echo !empty($cc['protocollo']) ? ' (' . $h($cc['protocollo']) . ')' : ''; ?>. La trovi nell'Area personale, scheda «Programma FSL».</div>
+        <?php elseif (!empty($cc['file_firmato'])): ?>
+            <div class="alert alert-<?php echo $it_sc !== 'caricata_scuola' ? 'primary' : 'success'; ?> mb-3" role="status"><i class="fa fa-<?php echo $it_sc !== 'caricata_scuola' ? 'hand' : 'circle-check'; ?> me-1" aria-hidden="true"></i>
+                <strong>Convenzione firmata ricevuta</strong> il <?php echo $h(date('d/m/Y \a\l\l\e H:i', strtotime((string)$cc['firmata_il']))); ?><?php echo !empty($cc['firmatario']) ? ' (firma di ' . $h($cc['firmatario']) . ')' : ''; ?>.
+                <?php echo in_array($it_sc, ['in_carico', 'da_firmare', 'firmata_direttore'], true) ? "Il Dipartimento l'ha presa in carico" . (!empty($cc['protocollo_ingresso']) ? ' (protocollo in entrata ' . $h($cc['protocollo_ingresso']) . (!empty($cc['protocollo_ingresso_data']) ? ' del ' . $h(date('d/m/Y', strtotime((string)$cc['protocollo_ingresso_data']))) : '') . ')' : '') . ": la sta facendo firmare dal Direttore e protocollare. Ti scriviamo appena è pronta." : "Il Dipartimento la prenderà in carico a breve."; ?>
+                <a class="fw-bold ms-1" href="convenzione_online.php?t=<?php echo $h($cc['token']); ?>&amp;scarica=firmata">Scarica il file caricato</a></div>
+        <?php endif; ?>
+        <?php if ($cv_caricabile): ?>
+            <form method="POST" enctype="multipart/form-data" class="row g-2 align-items-end">
+                <?php csrf_field(); ?>
+                <div class="col-md-8"><label class="form-label small fw-bold" for="cvFirmata"><?php echo empty($cc['file_firmato']) ? 'Carica la convenzione firmata digitalmente in PAdES' : 'Hai sbagliato file? Carica la versione corretta'; ?> (PDF fino a 10 MB)</label>
+                    <input type="file" class="form-control" id="cvFirmata" name="convenzione_firmata" accept=".pdf,application/pdf" required>
+                    <div class="form-text">Deve essere il PDF firmato dal Dirigente Scolastico in formato <strong>PAdES</strong>, senza modifiche dopo la firma. I file .p7m non sono accettati.</div></div>
+                <div class="col-md-8"><label class="form-label small fw-bold" for="cvAllegatoA"><?php echo empty($cc['file_allegato_scuola']) ? 'Carica l\'Allegato A' : 'Allegato A (già caricato: scegli un file solo per sostituirlo)'; ?> (PDF fino a 10 MB)</label>
+                    <input type="file" class="form-control" id="cvAllegatoA" name="allegato_a" accept=".pdf,application/pdf"<?php echo empty($cc['file_allegato_scuola']) ? ' required' : ''; ?>>
+                    <div class="form-text">Puoi usare l'Allegato A in PDF scaricato qui sopra: non serve la firma digitale.</div></div>
+                <div class="col-md-4"><button type="submit" name="carica_firmata" value="1" class="btn btn-lg fw-bold text-white w-100" style="background:#B30000;"><i class="fa fa-upload me-1" aria-hidden="true"></i><?php echo empty($cc['file_firmato']) ? 'Carica la convenzione' : 'Sostituisci il file'; ?></button></div>
+            </form>
+        <?php elseif (empty($cc['file_firmato']) && $it_sc !== 'protocollata'): ?>
+            <p class="mb-0 text-secondary">La convenzione di questa scuola è già in lavorazione presso il Dipartimento.</p>
+        <?php endif; ?>
+    </div></section>
+    <?php endif; ?>
     <?php endif; ?>
 
     <form method="POST" enctype="multipart/form-data">

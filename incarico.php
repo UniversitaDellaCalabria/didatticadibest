@@ -46,7 +46,10 @@ require_once 'header.php';
     <?php else:
         $d = dati_lettera_incarico($i);
         $err_acc = $i['stato'] === 'inviata' ? accesso_valido_incarico($i, $user_info, $meta) : null;
-        $firma = json_decode((string)$i['studente_firma_json'], true) ?: null; ?>
+        $firma = json_decode((string)$i['studente_firma_json'], true) ?: null;
+        // Dichiarazione individuale (modello N. 6): passi 2 e 3, prima di accettare (si richiede solo se la cifratura è configurata)
+        $dich_sv = \App\Core\App::per($conn)->get(\App\Tutorato\ServizioDichiarazione::class);
+        $dich_richiesta = $dich_sv->richiesta(); $dich_st = $dich_sv->stato((int)$i['id']); $dich_ok = !$dich_richiesta || $dich_st['completa']; ?>
         <h1 class="fw-bold h3 mb-1">Lettera di incarico di tutorato</h1>
         <p class="text-secondary mb-3"><?php echo $h($i['bando_titolo']); ?> · <?php echo badge_stato_incarico($i['stato']); ?></p>
         <div class="row g-3">
@@ -69,6 +72,19 @@ require_once 'header.php';
                         <div class="alert alert-warning"><i class="fa fa-id-card me-1" aria-hidden="true"></i><?php echo $h($err_acc); ?>
                             <div class="mt-2"><a class="btn btn-sm btn-dark" href="esci.php">Esci e rientra con SPID o CIE</a></div></div>
                     <?php else: ?>
+                        <?php if ($dich_richiesta): ?>
+                        <div class="card border-0 shadow-sm mb-3" style="border-left:5px solid <?php echo $dich_ok ? '#047857' : '#b45309'; ?> !important;"><div class="card-body">
+                            <h2 class="h6 fw-bold"><i class="fa fa-file-pen me-1" aria-hidden="true"></i>Prima di accettare: la dichiarazione individuale</h2>
+                            <p class="small text-secondary mb-2">Il modello «N. 6» dell'Ateneo (dati personali, pagamento con IBAN, posizione contributiva) si compila qui, senza stampare niente.</p>
+                            <ol class="list-unstyled mb-0 small">
+                                <li class="mb-1"><i class="fa <?php echo $dich_st['passo2'] ? 'fa-circle-check text-success' : 'fa-circle text-secondary'; ?> me-1" aria-hidden="true"></i><strong>Passo 2</strong> · dati personali e pagamento <a class="btn btn-sm <?php echo $dich_st['passo2'] ? 'btn-outline-secondary' : 'btn-warning fw-bold'; ?> ms-1 py-0" href="dichiarazione_tutorato.php?t=<?php echo $h(urlencode($tok)); ?>&amp;passo=2"><?php echo $dich_st['passo2'] ? 'Rivedi' : 'Compila'; ?></a></li>
+                                <li><i class="fa <?php echo $dich_st['passo3'] ? 'fa-circle-check text-success' : 'fa-circle text-secondary'; ?> me-1" aria-hidden="true"></i><strong>Passo 3</strong> · posizione contributiva <a class="btn btn-sm <?php echo $dich_st['passo3'] ? 'btn-outline-secondary' : 'btn-warning fw-bold'; ?> ms-1 py-0" href="dichiarazione_tutorato.php?t=<?php echo $h(urlencode($tok)); ?>&amp;passo=3"><?php echo $dich_st['passo3'] ? 'Rivedi' : 'Compila'; ?></a></li>
+                            </ol>
+                        </div></div>
+                        <?php endif; ?>
+                        <?php if (!$dich_ok): ?>
+                        <div class="alert alert-secondary small"><i class="fa fa-lock me-1" aria-hidden="true"></i><strong>Passo 4 · Conferma.</strong> Si sblocca dopo aver compilato i passi 2 e 3.</div>
+                        <?php else: ?>
                         <form method="POST" class="card border-0 shadow-sm mb-3" style="border-left:5px solid #047857 !important;"><div class="card-body">
                             <?php csrf_field(); ?>
                             <h2 class="h6 fw-bold">Conferma e accetta</h2>
@@ -76,6 +92,7 @@ require_once 'header.php';
                             <label class="form-check mb-2"><input class="form-check-input" type="checkbox" name="accetto" value="1" required> Ho letto la lettera, i dati sono corretti e <strong>accetto l'incarico</strong> alle condizioni indicate.</label>
                             <button type="submit" name="conferma" value="1" class="btn btn-success fw-bold"><i class="fa fa-signature me-1" aria-hidden="true"></i>Confermo e accetto</button>
                         </div></form>
+                        <?php endif; ?>
                     <?php endif; ?>
                     <form method="POST" class="card border-0 shadow-sm"><div class="card-body">
                         <?php csrf_field(); ?>

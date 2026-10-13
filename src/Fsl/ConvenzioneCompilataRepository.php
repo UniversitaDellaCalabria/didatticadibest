@@ -90,6 +90,69 @@ final class ConvenzioneCompilataRepository
         $this->db->esegui('UPDATE convenzioni_compilate SET protocollo = ?, protocollo_data = ? WHERE id = ?', [$protocollo, $data, $id]);
     }
 
+    /** @return array<string, mixed>|null */
+    public function perId(int $id): ?array
+    {
+        return $this->db->riga('SELECT * FROM convenzioni_compilate WHERE id = ?', [$id]);
+    }
+
+    /** Convenzione firmata caricata dalla scuola (sostituisce la precedente): file, chi ha firmato e iter «caricata dalla scuola». */
+    public function salvaFirmata(int $id, string $file, string $firmatario, ?string $allegato = null): void
+    {
+        // un nuovo caricamento riparte da capo: niente presa in carico, motivo di rifiuto o protocollo in entrata del file precedente; l'Allegato A resta se non se ne carica un altro
+        $this->db->esegui("UPDATE convenzioni_compilate SET file_firmato = ?, firmatario = ?, firmata_il = NOW(), stato_iter = ?, in_carico_il = NULL, in_carico_da = '', nota_ufficio = '', protocollo_ingresso = '', protocollo_ingresso_data = NULL, file_allegato_scuola = COALESCE(?, file_allegato_scuola) WHERE id = ?", [$file, $firmatario, Costanti::ITER_CARICATA, $allegato, $id]);
+    }
+
+    /** L'ufficio ha registrato il protocollo in entrata della convenzione caricata dalla scuola: è presa in carico. */
+    public function protocolloIngresso(int $id, string $numero, ?string $data, string $da): void
+    {
+        $this->db->esegui("UPDATE convenzioni_compilate SET stato_iter = ?, in_carico_il = NOW(), in_carico_da = ?, nota_ufficio = '', protocollo_ingresso = ?, protocollo_ingresso_data = ? WHERE id = ?", [Costanti::ITER_IN_CARICO, mb_substr($da, 0, 255), $numero, $data, $id]);
+    }
+
+    /** L'ufficio rifiuta il file con un motivo: la scuola potrà caricarne un altro. */
+    public function rifiuta(int $id, string $nota): void
+    {
+        $this->db->esegui('UPDATE convenzioni_compilate SET stato_iter = ?, nota_ufficio = ? WHERE id = ?', [Costanti::ITER_RIFIUTATA, mb_substr($nota, 0, 500), $id]);
+    }
+
+    /** @return array<string, mixed>|null */
+    public function perTokenDirettore(string $token): ?array
+    {
+        return $token === '' ? null : $this->db->riga('SELECT * FROM convenzioni_compilate WHERE token_direttore = ?', [$token]);
+    }
+
+    /** Mandata al Direttore per la firma, con il suo link personale. */
+    public function daFirmare(int $id, string $token): void
+    {
+        $this->db->esegui('UPDATE convenzioni_compilate SET stato_iter = ?, token_direttore = ?, da_firmare_il = NOW() WHERE id = ?', [Costanti::ITER_DA_FIRMARE, $token, $id]);
+    }
+
+    /** Firma PAdES del Direttore registrata: il PDF firmato è pronto per il protocollo. */
+    public function segnaFirmataDirettore(int $id, string $file, string $firmatario): void
+    {
+        $this->db->esegui('UPDATE convenzioni_compilate SET stato_iter = ?, file_definitivo = ?, firmatario_direttore = ?, firmata_direttore_il = NOW() WHERE id = ?',
+            [Costanti::ITER_FIRMATA, $file, mb_substr($firmatario, 0, 255), $id]);
+    }
+    /** Convenzione firmata dal Direttore, protocollata e registrata (riga di convenzioni_scuole): iter concluso. */
+    public function segnaProtocollata(int $id, int $convenzioneId, string $protocollo, ?string $protocolloData): void
+    {
+        $this->db->esegui('UPDATE convenzioni_compilate SET stato_iter = ?, convenzione_id = ?, protocollo = ?, protocollo_data = ?, protocollata_il = NOW() WHERE id = ?',
+            [Costanti::ITER_PROTOCOLLATA, $convenzioneId, $protocollo, $protocolloData, $id]);
+    }
+
+    /**
+     * Email delle persone che ricevono l'avviso della convenzione caricata: amministratori e utenti abilitati a tutta la FSL o alle sole convenzioni.
+     *
+     * @return list<string>
+     */
+    public function emailAbilitati(): array
+    {
+        $righe = $this->db->righe("SELECT DISTINCT u.email FROM utenti u
+            WHERE u.email <> '' AND (u.ruolo_id = 1 OR u.id IN (SELECT utente_id FROM abilitazioni_ambito WHERE tipo IN ('fsl', 'fsl_convenzioni')))");
+
+        return array_values(array_filter(array_map(static fn (array $r): string => trim((string) $r['email']), $righe), static fn (string $e): bool => filter_var($e, FILTER_VALIDATE_EMAIL) !== false));
+    }
+
     /**
      * Le compilazioni dell'ultimo anno con i dati inseriti (pannello FSL).
      *

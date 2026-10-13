@@ -42,6 +42,18 @@ final class CoseDaFare
         return (int) $this->db->valore("SELECT COUNT(*) FROM didattica_sedute WHERE verbale_stato IN ('segretario', 'coordinatore')$filtro");
     }
 
+    /** Pratiche di tutorato con la fine attività firmata dal docente (o rimandate dall'ufficio pagamenti): da validare e passare ai pagamenti. */
+    public function tutoratoDaValidare(): int
+    {
+        return (int) $this->db->valore("SELECT COUNT(*) FROM tutorato_incarichi WHERE stato = 'protocollata' AND fine_stato IN ('firmata', 'protocollata') AND pagamento_stato IN ('', 'rimandata')");
+    }
+
+    /** Convenzioni firmate caricate dalle scuole e non ancora protocollate: da prendere in carico o da far firmare e registrare (FSL). */
+    public function convenzioniDaPrendereInCarico(): int
+    {
+        return (int) $this->db->valore("SELECT COUNT(*) FROM convenzioni_compilate WHERE stato_iter IN ('caricata_scuola', 'in_carico', 'firmata_direttore')");
+    }
+
     /**
      * Prenotazioni con messaggi dell'utente non ancora letti, per area.
      *

@@ -193,11 +193,13 @@ $all_pr_ids     = array_merge(array_column($prenotazioni_attive, 'id'), array_co
 $messaggi_per_pr = get_messaggi_per_prenotazioni($conn, $all_pr_ids);
 
 // Programma FSL: attività scelte e non ancora prenotate, e documenti (Allegato A, Convenzione) delle prenotazioni FSL già fatte
-$fsl_documenti = []; $fsl_programma = 0; $fsl_in_programma = [];
+$fsl_documenti = []; $fsl_programma = 0; $fsl_in_programma = []; $fsl_scuole = [];
 try {
     $fsl_documenti = \App\Core\App::per($conn)->get(\App\Fsl\ServizioConvenzioneOnline::class)->dellePrenotazioni(array_map('intval', $all_pr_ids));
     $fsl_programma = \App\Core\App::get(\App\Fsl\ServizioProgrammaFsl::class)->conta();
     if ($fsl_programma) $fsl_in_programma = \App\Core\App::get(\App\Fsl\ServizioProgrammaFsl::class)->elenco();
+    // Convenzioni (anche scadute) e Allegato A delle scuole a cui sono collegato: li vedono tutti i docenti della scuola
+    $fsl_scuole = \App\Core\App::per($conn)->get(\App\Fsl\ServizioDocumentiScuola::class)->perUtente((int)$u_id, (string)($user_info['email'] ?? ''));
 } catch (\Throwable $e_fsl) { error_log('[Area personale] programma FSL non disponibile: ' . $e_fsl->getMessage()); }
 
 // Stats rapide per l'header
@@ -402,6 +404,59 @@ require_once 'header.php';
         </a>
     <?php endif; ?>
 
+    <?php
+    // Tutorato: ufficio pagamenti (persone degli uffici di Ateneo) e «Il mio tutorato» del tutor, con i suoi documenti
+    $uff_pag = []; $mio_tutorato = []; $n_da_pagare = 0;
+    try {
+        $pag_sv = \App\Core\App::per($conn)->get(\App\Tutorato\ServizioPagamenti::class);
+        $uff_pag = \App\Core\App::per($conn)->get(\App\Ateneo\ServizioUfficiAteneo::class)->ufficiDellUtente($user_info ?? null);
+        $n_da_pagare = $uff_pag ? $pag_sv->daPagare($user_info ?? null) : 0;
+        if (!empty($user_info['id'])) $mio_tutorato = \App\Core\App::per($conn)->get(\App\Tutorato\IncaricoRepository::class)->delTutor((string)($user_info['codice_fiscale'] ?? ''), (string)($user_info['email'] ?? ''));
+    } catch (\Throwable $e_tut) { error_log('[Area personale] tutorato non disponibile: ' . $e_tut->getMessage()); }
+    if ($uff_pag): ?>
+        <a href="pagamenti_tutorato.php" class="card border-0 shadow-sm mb-4 text-decoration-none" style="border-radius: 12px; border-left: 5px solid #15803d !important;">
+            <div class="card-body d-flex align-items-center gap-3 flex-wrap">
+                <i class="fa fa-euro-sign fs-3" style="color:#15803d;" aria-hidden="true"></i>
+                <div class="flex-grow-1"><div class="fw-bold text-dark">Ufficio pagamenti del tutorato</div>
+                    <div class="small text-secondary"><?php echo htmlspecialchars(implode(' · ', array_column($uff_pag, 'nome'))); ?><?php echo $n_da_pagare ? ' · <strong class="text-danger">' . (int)$n_da_pagare . ' da pagare</strong>' : ' · niente da pagare'; ?></div></div>
+                <span class="btn btn-sm fw-bold text-white" style="background:#15803d;">Apri</span>
+            </div>
+        </a>
+    <?php endif;
+    foreach ($mio_tutorato as $mt):
+        $ps_t = (string)$mt['pagamento_stato']; $dst = \App\Core\App::per($conn)->get(\App\Tutorato\ServizioDichiarazione::class)->stato((int)$mt['id']);
+        $firmata_t = in_array($mt['stato'], ['firmata', 'protocollata'], true); $fine_t = in_array((string)$mt['fine_stato'], ['firmata', 'protocollata'], true);
+        $tappe_t = [
+            ['Incarico accettato' . ($dst['completa'] ? ' e dichiarazione individuale compilata' : ''), !in_array($mt['stato'], ['bozza', 'inviata', 'annullata'], true), $mt['confermata_il'] ? 'accettato il ' . date('d/m/Y', strtotime($mt['confermata_il'])) : ''],
+            ['Lettera firmata dal docente e dal Direttore', $firmata_t, $mt['protocollo'] !== '' ? 'protocollo ' . $mt['protocollo'] : ''],
+            ['Registro delle presenze', $mt['fine_stato'] !== '' || $fine_t, $mt['ore_approvate'] !== null ? \App\Tutorato\DatiLettera::oreTesto($mt['ore_approvate']) . ' ore approvate' : ''],
+            ['Fine attività firmata dal docente titolare', $fine_t, $mt['fine_firmata_il'] ? date('d/m/Y', strtotime($mt['fine_firmata_il'])) : ''],
+            ['Validata dal referente e passata ai pagamenti', in_array($ps_t, ['in_ufficio', 'pagata'], true), $mt['pagamento_passato_il'] && in_array($ps_t, ['in_ufficio', 'pagata'], true) ? date('d/m/Y', strtotime($mt['pagamento_passato_il'])) : ''],
+            ['Pagamento disposto', $ps_t === 'pagata', $ps_t === 'pagata' ? date('d/m/Y', strtotime($mt['pagamento_data'])) : 'ti avvisiamo con una email'],
+        ];
+        $prima_non_fatta = null; foreach ($tappe_t as $k => $tp) if (!$tp[1]) { $prima_non_fatta = $k; break; } ?>
+        <div class="card border-0 shadow-sm mb-4" style="border-radius: 12px; border-left: 5px solid #0f766e !important;"><div class="card-body">
+            <h2 class="h6 fw-bold mb-0"><i class="fa fa-user-graduate me-1" style="color:#0f766e;" aria-hidden="true"></i>Il mio tutorato · <?php echo htmlspecialchars($mt['bando_titolo']); ?></h2>
+            <div class="small text-secondary mb-3"><?php echo htmlspecialchars(\App\Tutorato\DatiLettera::oreTesto($mt['ore'])); ?> ore · <?php echo htmlspecialchars(mb_strimwidth((string)preg_replace('/\s+/', ' ', (string)$mt['attivita']), 0, 80, '…')); ?></div>
+            <div class="row g-3">
+                <div class="col-md-6"><div class="small fw-bold mb-2">A che punto sei</div>
+                    <ol class="list-unstyled mb-0 small">
+                    <?php foreach ($tappe_t as $k => [$tt, $fatto_t, $dett_t]): ?>
+                        <li class="mb-2 d-flex gap-2"><i class="fa <?php echo $fatto_t ? 'fa-circle-check text-success' : ($k === $prima_non_fatta ? 'fa-location-dot text-danger' : 'fa-circle text-secondary opacity-50'); ?> mt-1" aria-hidden="true"></i>
+                            <span<?php echo $k === $prima_non_fatta ? ' class="fw-bold"' : ''; ?>><?php echo htmlspecialchars($tt); ?><?php echo $dett_t !== '' ? '<span class="d-block text-secondary fw-normal" style="font-size:.78rem;">' . htmlspecialchars($dett_t) . '</span>' : ''; ?></span></li>
+                    <?php endforeach; ?>
+                    </ol></div>
+                <div class="col-md-6"><div class="small fw-bold mb-2">I tuoi documenti</div>
+                    <?php $docs_t = array_filter($pag_sv->documenti($mt), fn($d) => $d['disponibile']);
+                    foreach ($docs_t as $d): ?>
+                        <div class="d-flex justify-content-between align-items-center gap-2 border-bottom py-1 small"><span><i class="fa fa-file-pdf text-danger me-1" aria-hidden="true"></i><?php echo htmlspecialchars($d['etichetta']); ?></span>
+                            <a class="btn btn-sm btn-outline-secondary py-0" href="documento_tutorato.php?i=<?php echo (int)$mt['id']; ?>&amp;f=<?php echo htmlspecialchars($d['chiave']); ?>" target="_blank" rel="noopener">Apri</a></div>
+                    <?php endforeach; ?>
+                    <?php if (!$docs_t): ?><div class="small text-secondary">I documenti compaiono qui man mano che la pratica avanza.</div><?php endif; ?>
+                    <?php if ($firmata_t): ?><a class="btn btn-sm btn-outline-success fw-bold mt-2" href="registro_tutorato.php?id=<?php echo (int)$mt['id']; ?>"><i class="fa fa-clipboard-list me-1" aria-hidden="true"></i>Registro delle attività</a><?php endif; ?></div>
+            </div>
+        </div></div>
+    <?php endforeach; ?>
     <!-- MENU A TAB (RESTYLING COLORI) -->
     <ul class="nav nav-pills nav-fill gap-2 p-1 bg-light rounded-pill border mb-4 shadow-sm custom-tabs" id="pills-tab" role="tablist">
         <li class="nav-item" role="presentation">
@@ -414,7 +469,7 @@ require_once 'header.php';
                 <i class="fa fa-history me-1"></i> Storico & Attestati (<?php echo count($prenotazioni_passate); ?>)
             </button>
         </li>
-        <?php if ($fsl_documenti || $fsl_programma): ?>
+        <?php if ($fsl_documenti || $fsl_programma || $fsl_scuole): ?>
         <li class="nav-item" role="presentation">
             <button class="nav-link rounded-pill fw-bold" id="pills-fsl-tab" data-bs-toggle="pill" data-bs-target="#pills-fsl" type="button" role="tab">
                 <i class="fa fa-clipboard-list me-1"></i> Programma FSL<?php echo $fsl_programma ? ' (' . $fsl_programma . ')' : ''; ?>
@@ -852,7 +907,7 @@ require_once 'header.php';
         </div>
 
         <!-- TAB: PROGRAMMA FSL (attività da prenotare, Allegato A e Convenzione) -->
-        <?php if ($fsl_documenti || $fsl_programma): ?>
+        <?php if ($fsl_documenti || $fsl_programma || $fsl_scuole): ?>
         <div class="tab-pane fade" id="pills-fsl" role="tabpanel" tabindex="0">
             <?php if ($fsl_programma): ?>
                 <div class="card border-0 shadow-sm rounded-4 mb-4" style="border-left:5px solid #B30000 !important;"><div class="card-body">
@@ -863,7 +918,32 @@ require_once 'header.php';
                 </div></div>
             <?php endif; ?>
 
-            <?php if (!$fsl_documenti): ?>
+            <?php if ($fsl_scuole): $badge_conv = ['valida' => ['success', 'In vigore'], 'in_scadenza' => ['warning', 'In scadenza'], 'scaduta' => ['secondary', 'Scaduta'], 'futura' => ['info', 'Non ancora valida']]; ?>
+                <?php foreach ($fsl_scuole as $sc_fsl): $k_sc = urlencode($sc_fsl['codice']); ?>
+                <div class="card border-0 shadow-sm rounded-4 mb-4" style="border-left:5px solid #15803d !important;"><div class="card-body">
+                    <h2 class="h5 fw-bold"><i class="fa fa-file-contract me-1 text-success" aria-hidden="true"></i>Convenzioni e Allegato A · <?php echo htmlspecialchars($sc_fsl['nome']); ?></h2>
+                    <p class="small text-secondary mb-2">Li vedono e li scaricano tutti i docenti collegati alla scuola.</p>
+                    <?php if ($sc_fsl['allegato']): ?>
+                        <a class="btn btn-success btn-sm fw-bold mb-3" href="documento_scuola.php?k=<?php echo $k_sc; ?>&amp;f=allegato"><i class="fa fa-file-pdf me-1" aria-hidden="true"></i>Allegato A aggiornato (PDF)</a>
+                    <?php endif; ?>
+                    <?php if ($sc_fsl['convenzioni']): ?>
+                    <div class="table-responsive"><table class="table table-sm align-middle mb-0">
+                        <thead><tr><th>Convenzione</th><th>Stato</th><th>Protocollo</th><th></th></tr></thead><tbody>
+                        <?php foreach ($sc_fsl['convenzioni'] as $cv_sc): [$col_cv, $et_cv] = $badge_conv[$cv_sc['stato']] ?? ['secondary', $cv_sc['stato']]; ?>
+                            <tr><td>Valida <?php echo htmlspecialchars($cv_sc['validita']); ?></td>
+                                <td><span class="badge bg-<?php echo $col_cv; ?><?php echo $col_cv === 'warning' ? ' text-dark' : ''; ?>"><?php echo htmlspecialchars($et_cv); ?></span></td>
+                                <td class="small"><?php echo $cv_sc['protocollo'] !== '' ? htmlspecialchars($cv_sc['protocollo']) : '—'; ?></td>
+                                <td class="text-nowrap">
+                                    <?php if ($cv_sc['file']): ?><a class="btn btn-outline-success btn-sm fw-bold" href="documento_scuola.php?k=<?php echo $k_sc; ?>&amp;c=<?php echo (int)$cv_sc['id']; ?>&amp;f=conv"><i class="fa fa-file-pdf me-1" aria-hidden="true"></i>Convenzione firmata</a><?php endif; ?>
+                                    <?php if ($cv_sc['allegato']): ?><a class="btn btn-outline-secondary btn-sm fw-bold" href="documento_scuola.php?k=<?php echo $k_sc; ?>&amp;c=<?php echo (int)$cv_sc['id']; ?>&amp;f=all"><i class="fa fa-file-pdf me-1" aria-hidden="true"></i>Allegato A</a><?php endif; ?>
+                                    <?php if (!$cv_sc['file'] && !$cv_sc['allegato']): ?><span class="small text-secondary">file non caricato</span><?php endif; ?></td></tr>
+                        <?php endforeach; ?>
+                    </tbody></table></div>
+                    <?php else: ?><p class="small text-secondary mb-0">Nessuna convenzione registrata per questa scuola.</p><?php endif; ?>
+                </div></div>
+                <?php endforeach; ?>
+            <?php endif; ?>
+            <?php if (!$fsl_documenti && !$fsl_scuole): ?>
                 <div class="alert alert-light border text-center text-muted p-4 rounded-4"><i class="fa fa-file-signature fs-3 d-block mb-2 opacity-50"></i>Quando prenoterai le attività dal programma, qui troverai sempre l'<strong>Allegato A</strong> (PDF) e la <strong>Convenzione</strong> (Word) già compilati.</div>
             <?php endif; ?>
             <?php
@@ -886,9 +966,11 @@ require_once 'header.php';
                         <a class="btn btn-success btn-sm fw-bold" href="convenzione_online.php?t=<?php echo $tk_fsl; ?>&amp;scarica=allegato_pdf"><i class="fa fa-file-pdf me-1" aria-hidden="true"></i>Allegato A (PDF)</a>
                         <a class="btn <?php echo $d_fsl['convenzione'] === 'si' ? 'btn-outline-success' : 'btn-success'; ?> btn-sm fw-bold" href="convenzione_online.php?t=<?php echo $tk_fsl; ?>&amp;scarica=convenzione_sola"><i class="fa fa-file-word me-1" aria-hidden="true"></i>Convenzione (Word)</a>
                         <a class="btn btn-outline-secondary btn-sm fw-bold" href="convenzione_online.php?t=<?php echo $tk_fsl; ?>"><i class="fa fa-pen me-1" aria-hidden="true"></i>Correggi i dati, logo e attività</a>
+                        <?php if ($d_fsl['convenzione'] !== 'si'): ?><a class="btn btn-sm fw-bold text-white" style="background:#B30000;" href="convenzione_online.php?t=<?php echo $tk_fsl; ?>#firmata"><i class="fa fa-upload me-1" aria-hidden="true"></i><?php echo $d_fsl['iter'] === \App\Fsl\Costanti::ITER_CARICATA ? 'Sostituisci la convenzione firmata' : 'Carica la convenzione firmata'; ?></a><?php endif; ?>
                     </div>
                     <?php if ($d_fsl['convenzione'] === 'si'): ?><p class="small text-secondary mt-2 mb-0">La scuola ha già la convenzione con il Dipartimento: serve solo l'Allegato A.</p>
-                    <?php else: ?><p class="small text-secondary mt-2 mb-0">Dopo la firma digitale PAdES del Dirigente, la scuola invia i documenti via PEC al Dipartimento.</p><?php endif; ?>
+                    <?php elseif ($d_fsl['iter'] === \App\Fsl\Costanti::ITER_CARICATA): ?><p class="small mt-2 mb-0"><i class="fa fa-circle-check text-success me-1" aria-hidden="true"></i><strong>Convenzione firmata ricevuta</strong> il <?php echo htmlspecialchars(date('d/m/Y', strtotime($d_fsl['firmata_il']))); ?>: il Dipartimento la prende in carico (firma del Direttore e protocollo). Finché non è presa in carico puoi sostituire il file con il pulsante «Sostituisci la convenzione firmata».</p>
+                    <?php else: ?><p class="small text-secondary mt-2 mb-0">Dopo la firma digitale PAdES del Dirigente, <a href="convenzione_online.php?t=<?php echo $tk_fsl; ?>#firmata" class="fw-bold">carica qui la convenzione firmata</a>.</p><?php endif; ?>
                 </div></div>
             <?php endforeach; ?>
         </div>
