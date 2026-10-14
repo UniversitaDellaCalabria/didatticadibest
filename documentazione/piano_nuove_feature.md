@@ -11,7 +11,7 @@
 2. **PHP 8.2** necessario in locale (qui: `C:\\xampp\\php\\php.exe`; cambia percorso sull'altro PC). Composer solo per sviluppo (`composer install`, poi `composer test`).
 3. **Prove automatiche** (da lanciare prima e dopo ogni step): `composer test` = PHPUnit (`tests/Unit`, `tests/Integration`) + `php strumenti/prove/esegui.php` (prove del portale, oggi \~1200 ok). Le prove del database usano un MariaDB temporaneo (`strumenti/locale/`, `tests/Integration/DatabaseDiProva.php`).
 4. **Leggi prima**: questo file (§1–§3), poi `MIGRATION\_PLAN.md` (architettura a classi in `src/`, `App\\…`) e `documentazione/mappa\_pannello.html` (come è fatto il pannello admin e le regole grafiche).
-5. **Frase per far ripartire Claude**: *«Leggi documentazione/piano\_nuove\_feature.md, guarda il Registro di avanzamento (§8) e riprendi dal primo step non fatto. Prima di scrivere codice fai la «Verifica iniziale» dello step.»*
+5. **Frase per far ripartire Claude**: *«Leggi documentazione/piano\_nuove\_feature.md, guarda il Registro di avanzamento (§8) e riprendi dal prossimo step (oggi il collaudo G). Titulus e firma Aruba sono in attesa dell'Ateneo: non toccarli. Prima di scrivere codice fai la «Verifica iniziale» dello step.»*
 
 ### Regole del progetto (non si discutono, vedi anche la memoria di Claude)
 
@@ -100,7 +100,9 @@ D9 - **Ufficio pagamenti**: è una persona/ufficio dell'Ateneo senza account sul
  Fase 4  C2→C3→C4   Verbali: testi per punto, archivio, pagina pubblica
  Fase 5  C1         Wizard delle pratiche studenti
  Fase 6  B1→B2→B3→B4 Prenotazioni e risorse: responsabile, campi, diario di bordo
- Fase 7  E1→E2      Titulus (interfaccia già prima, implementazione quando arrivano i parametri)
+ Fase 7  E1→E2      Titulus e firma digitale Aruba: IN ATTESA della risposta dell'Ateneo (parametri §6)
+ Fase 8  G          Collaudo end-to-end di pratiche, verbali e risorse (come D3 per il tutorato)
+ Fase 9  F1→F2→F3→F4 Nuove idee approvate: cruscotto del Direttore, prenotazioni ricorrenti e liste d'attesa, backup, guide per ruolo
 ```
 
 * **Perché E1 (interfaccia «Protocollo») conviene PRIMA di A e D**: tutorato e convenzioni oggi chiedono il numero a mano; se si crea subito un'interfaccia con l'implementazione «manuale», quando arriva Titulus basta cambiare un'impostazione. Se preferisci non toccare nulla finché non ci sono i parametri, A e D restano a mano e E1 si fa dopo.
@@ -260,6 +262,29 @@ Oggi: `risorse` (aula/laboratorio/sportello/altro), `prenotazioni\_risorse` (slo
 
 \---
 
+### BLOCCO G — Collaudo (prossimo step)
+
+* Provare con l'ambiente locale (`strumenti/locale/avvia.sh`) i flussi interi, come per il tutorato (D3), senza scrivere funzioni nuove: **pratiche** (modulo costruito dall'admin → studente → iter con firma del relatore e del Direttore → seduta → verbale → esiti), **verbali** (testi per punto, archivio con import di PDF, pagina pubblica con password) e **risorse** (responsabile, approvazione, campi, contatori, diario di bordo, cruscotto, scadenze).
+* Correggere quello che emerge e scrivere nel Registro cosa è stato provato. Controllare anche la resa su telefono delle pagine pubbliche e del diario di bordo.
+
+### BLOCCO F — Nuove idee approvate (dopo il collaudo)
+
+#### F1 — Cruscotto unico per il Direttore
+
+* Una pagina che raccoglie le cose in sospeso: pratiche ferme oltre il tempo del passo, verbali da firmare, convenzioni FSL in scadenza o da firmare, scadenze delle risorse (bollo, assicurazione…), pagamenti del tutorato fermi. Riusa `src/Portale/CoseDaFare.php` e i servizi già esistenti: niente tabelle nuove, solo una vista che aggrega.
+
+#### F2 — Prenotazioni ricorrenti e liste d'attesa per le risorse
+
+* Ricorrenza oltre la «ripetizione settimanale» già presente (es. ogni martedì per un periodo, o due volte al mese) e **lista d'attesa**: se lo slot è occupato ci si mette in coda e, se la prenotazione viene annullata o rifiutata, il primo in coda riceve l'avviso. Prima si guarda dal cruscotto B4 quali risorse sono davvero molto richieste.
+
+#### F3 — Backup e ripristino dei file caricati
+
+* Copia periodica (cron) di `uploads/` (verbali, incarichi, convenzioni, allegati delle pratiche) e del database, con controllo dello spazio e avviso all'admin; istruzioni di ripristino. Da concordare dove si salva la copia (server dell'Ateneo o altro).
+
+#### F4 — Guide per ruolo («Come si fa»)
+
+* Una pagina breve per ogni ruolo, scritta in modo semplice e con le schermate: **referente di consiglio** (componenti, seduta guidata, verbale), **relatore** (firma di una pratica dal link personale), **responsabile di risorsa** (approvare, cruscotto, scadenze, diario di bordo), **tutor** (registro delle attività, fine attività), **studente** (come fare una pratica e seguirla). Raggiungibili dal «?» delle pagine e dall'Area personale; in PDF per chi le vuole stampare. Si scrive dopo il collaudo, quando i flussi sono stabili.
+
 ### BLOCCO E — Connettore Titulus (Cineca)
 
 #### E0 — Raccogliere i parametri *(subito, tempi lunghi)*
@@ -362,8 +387,13 @@ Mettili in `documentazione/materiali/` (cartella da creare, su Drive) con questi
 |B2|Campi personalizzati prenotazione|**fatto in locale (da caricare)**|18/10/2026|Schema v60. Campi: stesso formato e controlli dei moduli della didattica (`CampiModulo`/`LetturaRisposte`) con soli tipi semplici; editor nella scheda della risorsa, copia da un'altra risorsa, risposte nell'elenco, nel CSV, nelle email e nella pagina del responsabile. CONTATORI (richiesta dell'utente, esempio i campioni di un laboratorio): modalità «per periodo» (capacità per giorno/settimana/mese, si ricarica da sola) e «scorta» (carichi/rettifiche con registro movimenti), minimo e massimo per prenotazione, obbligatorio sì/no; scalano anche con la richiesta in attesa di approvazione (decisione dell'utente) e tornano se rifiutata/annullata (il disponibile si calcola dalle prenotazioni attive); controllo dentro il blocco del calendario (niente doppie prenotazioni dell'ultima quantità); le serie settimanali saltano le date senza quantità. Modulo pubblico con «ne restano N» per il giorno scelto. Prove: 30 in esegui.php|
 |B3|Diario di bordo|**fatto in locale (da caricare)**|18/10/2026|Schema v61. Tipo di risorsa «Auto o mezzo»; diario attivabile per qualunque risorsa. Campi di partenza dal modulo cartaceo dell'utente (data, conducente, partenza, arrivo, ore, km iniziali e finali, litri, segnalazioni), modificabili dall'admin con ruoli (km, litri, data…) che reggono controlli e totali anche se rinominati. Lo compila chi ha prenotato, gli altri conducenti indicati alla prenotazione (scelti dall'anagrafe) o un responsabile; i km iniziali si propongono dall'ultimo viaggio e non possono scendere; km percorsi calcolati; verifica del responsabile (una correzione la azzera); promemoria col cron esistente; blocco delle nuove prenotazioni se manca il diario (opzione, spenta di default); registro, totali ed Excel (con riepilogo per mese). Pagina `diario_bordo.php` pensata anche per telefono. Prove: 30 in esegui.php (1013 totali)|
 |B4|Report risorse|**fatto in locale (da caricare)**|19/10/2026|Schema v62. Pacchetto 9 della mappa. Tabella `risorse_scadenze` (bollo, assicurazione, tagliando… con preavviso, inserite dall'admin nella scheda «Scadenze» della risorsa; avviso al responsabile prima e dopo la data con il cron dei promemoria, una volta sola; rinnovo dal cruscotto). Pagina `risorse_cruscotto.php` per responsabili e amministratori: prenotazioni per stato, ore e utilizzo, % rifiuti, fasce orarie, persone, mesi, contatori, km e consumo l/100 km, Excel. Nuovi: `src/Risorse/{ScadenzaRisorsaRepository,ServizioScadenzeRisorsa,CruscottoRisorsa}.php`, `risorse_cruscotto.php`. Modificati: `risorse_responsabile.php`, `admin/risorse.php`, `RisorsaRepository`, `NotificheRisorse`, `PromemoriaPrenotazioni`, schema, `RisorseIntegrazioneTest`. esegui.php: 1033 prove OK|
-|E1|Interfaccia Protocollo|da fare|||
-|E2|Titulus|da fare||Servono parametri|
+|E1|Interfaccia Protocollo|in attesa|||Insieme alla firma digitale Aruba: si riprende quando l'Ateneo risponde|
+|E2|Titulus|in attesa||Servono parametri||
+|G|Collaudo pratiche, verbali, risorse|da fare|||Prossimo step|
+|F1|Cruscotto del Direttore|da fare||||
+|F2|Ricorrenti e liste d'attesa|da fare||||
+|F3|Backup e ripristino|da fare||||
+|F4|Guide per ruolo|da fare||||
 
 **Stati**: `da fare` · `in corso` · `fatto in locale (da caricare)` · `in produzione`.
 Per ogni step chiuso scrivere: data, file toccati, versione schema, cosa è stato provato, cosa va caricato sul server.
