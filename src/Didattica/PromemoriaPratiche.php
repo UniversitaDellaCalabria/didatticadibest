@@ -14,7 +14,8 @@ final class PromemoriaPratiche
         private NotifichePratiche $notifiche,
         private ModuloRepository $moduli,
         private ServizioIter $iter,
-        private FirmaPratica $firme
+        private FirmaPratica $firme,
+        private ServizioConfermeDocenti $conferme
     )
     {
     }
@@ -26,7 +27,7 @@ final class PromemoriaPratiche
     public function invia(): int
     {
         // Chi deve ancora firmare riceve il suo promemoria; per le altre pratiche vale il tempo massimo del passo (o quello del modulo)
-        $n = $this->firme->solleciti();
+        $n = $this->firme->solleciti() + $this->conferme->solleciti();
         $h = fn ($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
         foreach ($this->pratiche->candidatePromemoria() as $x) {
             $gg = $this->iter->giorniPasso($this->moduli->perId((int) $x['modulo_id']), (int) $x['passo']);

@@ -237,6 +237,14 @@ final class Definizioni
             firmato_da VARCHAR(200) DEFAULT '', motivo VARCHAR(500) DEFAULT '', solleciti TINYINT NOT NULL DEFAULT 0, sollecito_il DATETIME DEFAULT NULL,
             UNIQUE KEY uq_token (token), INDEX idx_pratica (pratica_id, stato)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        // v64: conferme dei docenti sugli attestati (frequenza alle lezioni, esame sostenuto): ogni docente riceve un link personale, vede le sue righe e
+        // le conferma o le rifiuta nel portale (senza firma digitale); stato: attesa | confermata | rifiutata | annullata. accesso_json = come è entrato (SSO/SPID/CIE)
+        'pratiche_conferme' => "CREATE TABLE IF NOT EXISTS pratiche_conferme (
+            id INT AUTO_INCREMENT PRIMARY KEY, pratica_id INT NOT NULL, passo TINYINT NOT NULL DEFAULT 0, nome VARCHAR(200) NOT NULL DEFAULT '', email VARCHAR(150) NOT NULL DEFAULT '',
+            token VARCHAR(40) NOT NULL, stato VARCHAR(10) NOT NULL DEFAULT 'attesa', richiesta_il DATETIME DEFAULT CURRENT_TIMESTAMP, esito_il DATETIME DEFAULT NULL,
+            motivo VARCHAR(500) DEFAULT '', accesso_json TEXT DEFAULT NULL, solleciti TINYINT NOT NULL DEFAULT 0, sollecito_il DATETIME DEFAULT NULL,
+            UNIQUE KEY uq_token (token), INDEX idx_pratica (pratica_id, stato), INDEX idx_email (email)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         // v57: pagina pubblica dei verbali con password: accessi (una password per gruppo di esterni, con i consigli che possono vedere e la scadenza)
         // e registro di chi è entrato e cosa ha scaricato (IP con l'ultimo numero azzerato)
         'verbali_accessi' => "CREATE TABLE IF NOT EXISTS verbali_accessi (

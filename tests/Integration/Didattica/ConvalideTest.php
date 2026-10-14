@@ -38,9 +38,10 @@ final class ConvalideTest extends DidatticaBase
         $this->assertSame(['Ufficio CdS Scienze Geologiche', 'cdl_2', 12], [$uffici[1]['nome'], $uffici[1]['chiave'], $uffici[1]['ordine']]);
         $this->assertSame(['Ufficio CdS Biologia, Scienze e Tecnologie Biologiche, Health Biotechnology', 'cdl_1', 14], [$uffici[2]['nome'], $uffici[2]['chiave'], $uffici[2]['ordine']]);
         $this->assertSame('Ufficio del Consiglio nuovo', $uffici[3]['nome'], 'per i consigli nuovi: «Ufficio del <consiglio>»');
-        $this->assertCount(4, $uffici);
+        $this->assertSame(['attestati', ''], [$uffici[4]['chiave'], $uffici[4]['tipo']], 'ufficio degli attestati (manager) si crea con le pratiche del portale');
+        $this->assertCount(5, $uffici);
         $f->preparaFlusso();
-        $this->assertSame(4, (int) $this->db->valore('SELECT COUNT(*) FROM didattica_uffici'), 'una sola volta');
+        $this->assertSame(5, (int) $this->db->valore('SELECT COUNT(*) FROM didattica_uffici'), 'una sola volta');
         $m = $this->db->riga("SELECT * FROM didattica_moduli WHERE chiave = 'convalida_esami'");
         $this->assertSame(['Richiesta di convalida/riconoscimento esami', 0, 'studenti', '["protocollo","@cdl","@segreteria"]'], [$m['titolo'], $m['attivo'], $m['destinatari'], $m['iter_json']]);
         $campi = json_decode($m['campi_json'], true);

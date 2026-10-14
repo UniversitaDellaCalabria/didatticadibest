@@ -190,7 +190,7 @@ final class CertificatoIscrizioneTest extends DidatticaBase
         $this->assertStringContainsString('già stato avvisato', (string) $marche->avvisaMarche($id, 1, 'Marco'));
         // 2. pagamento: serve la spunta e il certificato in PDF
         $this->assertStringContainsString('Spunta', $marche->registraPagamento($id, $this->pdfCaricato(), false, 1)[0]);
-        $this->assertStringContainsString('Carica il certificato', $marche->registraPagamento($id, null, true, 1)[0]);
+        $this->assertStringContainsString('Carica il documento', $marche->registraPagamento($id, null, true, 1)[0]);
         $this->assertStringContainsString('deve essere un PDF', $marche->registraPagamento($id, $this->pdfCaricato('certificato.docx'), true, 1)[0]);
         $this->assertNull($this->pratica($id)['bollo_il'], 'nulla è stato registrato');
         // senza il Direttore indicato la firma non parte, ma lo dice
@@ -238,5 +238,58 @@ final class CertificatoIscrizioneTest extends DidatticaBase
         $this->assertFalse($this->servizio(ServizioMarcheBollo::class)->inAttesa(['modulo_id' => (int) $this->m['id'], 'stato' => 'inviata', 'passo' => 1]), 'il protocollo non è il passo del pagamento');
         $this->assertFalse($this->servizio(ServizioIter::class)->passoPagamento($this->m, ['stato' => 'chiusa', 'passo' => 2]));
         $this->assertFalse($this->servizio(ServizioIter::class)->passoPagamento($this->m, ['stato' => 'bozza', 'passo' => 2]));
+    }
+
+    public function testCertificatoDiLaureaEDiplomaSupplementPreparati(): void
+    {
+        $iter = $this->servizio(ServizioIter::class);
+        $this->assertSame(3, (int) $this->db->valore("SELECT COUNT(*) FROM didattica_moduli WHERE chiave IN ('certificato_iscrizione', 'certificato_laurea', 'diploma_supplement')"));
+        $laurea = $this->db->riga("SELECT * FROM didattica_moduli WHERE chiave = 'certificato_laurea'");
+        $this->assertSame(['Richiesta Certificato di Laurea', 0, 0], [$laurea['titolo'], (int) $laurea['attivo'], (int) $laurea['in_verbale']]);
+        $this->assertSame([false, true, false], array_column($iter->definizione($laurea), 'pagamento'), 'stesso iter del certificato di iscrizione: marche da bollo');
+        $campi = json_decode((string) $laurea['campi_json'], true);
+        $etichette = array_column($campi, 'etichetta');
+        foreach (['Laureato nell\'A.A.', 'In data', 'Con voto', 'Al Corso di Laurea in', 'Matricola'] as $e) {
+            $this->assertContains($e, $etichette);
+        }
+        $multi = array_values(array_filter($campi, fn ($c) => $c['tipo'] === 'multicheck'))[0];
+        $this->assertSame(ModelliPratiche::CERTIFICATI_LAUREA, $multi['opzioni']);
+        $this->assertCount(7, $multi['opzioni']);
+        $ds = $this->db->riga("SELECT * FROM didattica_moduli WHERE chiave = 'diploma_supplement'");
+        $this->assertSame([false, false, false], array_column($iter->definizione($ds), 'pagamento'), 'il Diploma Supplement non ha la marca da bollo');
+        $this->assertSame([false, true, false], array_column($iter->definizione($ds), 'documento'), 'l\'ufficio carica il documento da far firmare');
+        $this->assertStringContainsString('documento da firmare', $iter->passi($ds)[2]);
+        $this->assertNotContains('multicheck', array_column(json_decode((string) $ds['campi_json'], true), 'tipo'));
+    }
+
+    public function testDiplomaSupplementSenzaPagamentoVaAlDirettore(): void
+    {
+        $this->db->esegui("INSERT INTO impostazioni_sistema (id, conv_direttore_nome, conv_direttore_email) VALUES (1, 'Mario Bianchi', 'direttore@x.it')");
+        $this->db->esegui("UPDATE didattica_moduli SET attivo = 1 WHERE chiave = 'diploma_supplement'");
+        $m = $this->db->riga("SELECT * FROM didattica_moduli WHERE chiave = 'diploma_supplement'");
+        $id = $this->servizioPratiche()->crea($m, $this->studente, [
+            ['etichetta' => 'Al Corso di Laurea in', 'tipo' => 'corso_studio', 'valore' => 'Corso di laurea in Biologia'],
+            ['etichetta' => 'Matricola', 'tipo' => 'text', 'valore' => '245678'],
+        ]);
+        [$err] = $this->servizio(ServizioFlussoConvalide::class)->registraProtocollo($id, '11/2026', '2026-10-05', 1, 'Anna');
+        $this->assertNull($err);
+        $marche = $this->servizio(ServizioMarcheBollo::class);
+        $p = $this->pratica($id);
+        $this->assertSame([2, $this->cdl], [$p['passo'], $p['ufficio_id']]);
+        $this->assertTrue($marche->inAttesaDocumento($p));
+        $this->assertFalse($marche->inAttesa($p), 'nessun pagamento');
+        $this->assertStringContainsString('non è in attesa del pagamento', $marche->registraPagamento($id, $this->pdfCaricato(), true, 1)[0]);
+        $this->assertStringContainsString('Carica il documento', $marche->caricaDocumento($id, null, 1)[0]);
+        $this->assertStringContainsString('deve essere un PDF', $marche->caricaDocumento($id, $this->pdfCaricato('d.txt'), 1)[0]);
+        $this->mailer->inviate = [];
+        [$err, $msg] = $marche->caricaDocumento($id, $this->pdfCaricato(), 1, 'Marco');
+        $this->assertNull($err);
+        $this->assertStringContainsString('Documento caricato', $msg);
+        $p = $this->pratica($id);
+        $this->assertSame(3, (int) $p['passo'], 'passo della firma del Direttore');
+        $this->assertNull($p['bollo_il'], 'nessun pagamento registrato');
+        $this->assertContains('direttore@x.it', array_column($this->mailer->inviate, 'a'));
+        $this->assertStringContainsString('Documento_', (string) $this->db->valore('SELECT nome_allegato FROM pratiche_eventi WHERE pratica_id = ? AND interno = 1 AND allegato IS NOT NULL', [$id]));
+        $this->assertStringContainsString('non è nel passo', $marche->caricaDocumento($id, $this->pdfCaricato(), 1)[0], 'non si carica due volte');
     }
 }

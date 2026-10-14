@@ -4,7 +4,9 @@ require_once __DIR__ . '/middleware.php';
 
 $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
 $m = modulo_didattica($conn, (int)($_GET['id'] ?? 0));
-if (!$m || $m['tipo'] !== 'online' || !(int)$m['attivo']) {
+// Anteprima per chi gestisce la Didattica: si vede il modulo anche se non è pubblicato (o non è aperto a chi lo guarda), ma non si invia
+$anteprima = (int)($_GET['anteprima'] ?? 0) === 1 && utente_gestisce_didattica($conn, $user_info);
+if (!$m || $m['tipo'] !== 'online' || (!(int)$m['attivo'] && !$anteprima)) {
     http_response_code(404);
     $page_cfg['titolo'] = 'Modulo non trovato';
     require_once 'header.php';
@@ -15,22 +17,25 @@ $campi = campi_studente(campi_modulo($m['campi_json'])); // i campi dell'ufficio
 $puo = utente_destinatario_modulo($conn, $m, $user_info);
 [$aperto, $periodo] = periodo_modulo($m);
 if (!$aperto) $puo = false;
+if ($anteprima) { $puo = true; $aperto = true; }
 $errori = [];
 // Bozza da riprendere o pratica già inviata che nessuno ha ancora preso in carico (?pratica=): si compila di nuovo lo stesso modulo
 $pr = null;
-if ($puo && (int)($_GET['pratica'] ?? 0) > 0) {
+if ($puo && !$anteprima && (int)($_GET['pratica'] ?? 0) > 0) {
     $pr = pratica($conn, (int)$_GET['pratica']);
     if (!$pr || (int)$pr['utente_id'] !== (int)$user_info['id'] || (int)$pr['modulo_id'] !== (int)$m['id']) { $pr = null; flash_set("Pratica non trovata.", 'danger'); header('Location: pratiche.php'); exit; }
     if (!pratica_modificabile($pr)) { flash_set("La pratica è già stata presa in carico dall'ufficio: non si può più modificare. Puoi scrivere all'ufficio da qui.", 'warning'); header('Location: pratiche.php?id=' . (int)$pr['id']); exit; }
 }
 $e_bozza = $pr && $pr['stato'] === 'bozza';
 $vecchie = $pr ? (json_decode((string)$pr['risposte_json'], true) ?: []) : [];
-if ($puo && $_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['invia_modulo']) || isset($_POST['salva_bozza']))) {
+if ($puo && !$anteprima && $_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['invia_modulo']) || isset($_POST['salva_bozza']))) {
     csrf_verify($_POST['csrf_token'] ?? '');
     if (!check_rate_limit($conn, 'modulo_didattica', 40, 3600)) $errori[] = "Troppi invii in poco tempo: riprova più tardi.";
     else {
         [$risposte, $errori] = leggi_risposte_modulo($campi, $conn);
         if ($pr) $errori = errori_senza_allegati_presenti($errori, $campi, $vecchie);
+        // Attestati: i docenti indicati devono essere nell'anagrafe (a loro arriva la richiesta di conferma); la bozza si salva comunque
+        if (!$errori && !isset($_POST['salva_bozza'])) $errori = controlla_docenti_modulo($conn, $m, $risposte);
         if (isset($_POST['salva_bozza']) && !$pr || isset($_POST['salva_bozza']) && $e_bozza) {
             // Bozza: nessun controllo sui campi obbligatori, si riprende e si invia quando si vuole
             $id = salva_bozza_pratica($conn, $m, $user_info, $risposte, $e_bozza ? (int)$pr['id'] : 0);
@@ -64,6 +69,7 @@ require_once 'header.php';
 <?php $con_tabelle = in_array('tabella', array_column($campi, 'tipo'), true); ?>
 <div class="container my-4" style="max-width: <?php echo $con_tabelle ? 1180 : 920; ?>px;">
     <nav aria-label="Percorso" class="mb-3 small"><a href="index.php">Home</a> <span class="text-secondary mx-1">/</span> <a href="modulistica.php">Modulistica</a> <span class="text-secondary mx-1">/</span> <span class="text-secondary"><?php echo $h($m['titolo']); ?></span></nav>
+    <?php if ($anteprima): ?><div class="alert alert-info d-flex flex-wrap align-items-center gap-2" role="status"><i class="fa fa-eye" aria-hidden="true"></i><span><strong>Anteprima</strong> per chi gestisce la Didattica: il modulo <?php echo (int)$m['attivo'] ? 'è pubblicato' : '<strong>non è ancora pubblicato</strong> (gli studenti non lo vedono)'; ?>. Da qui non si può inviare.</span><a class="btn btn-sm btn-outline-secondary ms-auto" href="admin/didattica.php?tab=moduli"><i class="fa fa-arrow-left me-1" aria-hidden="true"></i>Torna ai moduli</a></div><?php endif; ?>
     <h1 class="fw-bold h2 mb-2"><?php echo $h($m['titolo']); ?></h1>
     <?php if (trim(strip_tags((string)$m['descrizione'])) !== ''): ?><div class="mb-3"><?php echo strip_tags((string)$m['descrizione'], '<p><br><strong><em><ul><ol><li><a>'); ?></div><?php endif; ?>
     <?php if ($m['file_path']): ?><p><a href="<?php echo $h($m['file_path']); ?>" download><i class="fa fa-download me-1" aria-hidden="true"></i>Scarica il documento</a></p><?php endif; ?>
@@ -90,8 +96,8 @@ require_once 'header.php';
                 <button type="submit" name="invia_modulo" value="1" class="btn btn-success fw-bold invia-modulo"><i class="fa fa-floppy-disk me-1" aria-hidden="true"></i>Salva le modifiche</button>
                 <a href="pratiche.php?id=<?php echo (int)$pr['id']; ?>" class="btn btn-outline-secondary">Annulla</a>
                 <?php else: ?>
-                <button type="submit" name="invia_modulo" value="1" class="btn btn-success fw-bold invia-modulo"><i class="fa fa-paper-plane me-1" aria-hidden="true"></i>Invia la richiesta</button>
-                <button type="submit" name="salva_bozza" value="1" class="btn btn-outline-secondary fw-bold salva-bozza" formnovalidate><i class="fa fa-pen me-1" aria-hidden="true"></i>Salva come bozza</button>
+                <button type="submit" name="invia_modulo" value="1" class="btn btn-success fw-bold invia-modulo"<?php echo $anteprima ? ' disabled title="Anteprima: non si può inviare"' : ''; ?>><i class="fa fa-paper-plane me-1" aria-hidden="true"></i>Invia la richiesta</button>
+                <button type="submit" name="salva_bozza" value="1" class="btn btn-outline-secondary fw-bold salva-bozza" formnovalidate<?php echo $anteprima ? ' disabled title="Anteprima: non si può salvare"' : ''; ?>><i class="fa fa-pen me-1" aria-hidden="true"></i>Salva come bozza</button>
                 <?php endif; ?>
             </div>
             <?php if ($pr && !$e_bozza): ?><div class="form-text">Puoi modificare la richiesta finché l'ufficio non la prende in carico.</div>

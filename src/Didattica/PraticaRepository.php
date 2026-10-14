@@ -21,7 +21,7 @@ final class PraticaRepository
      */
     public function perId(int $id): ?array
     {
-        return $this->db->riga('SELECT p.*, m.titolo AS modulo_titolo, m.email_ufficio, m.categoria, m.in_verbale, (SELECT COUNT(*) FROM pratiche_firme f WHERE f.pratica_id = p.id AND f.stato = "attesa") AS firme_attesa FROM pratiche p JOIN didattica_moduli m ON m.id = p.modulo_id WHERE p.id = ?', [$id]);
+        return $this->db->riga('SELECT p.*, m.titolo AS modulo_titolo, m.email_ufficio, m.categoria, m.in_verbale, (SELECT COUNT(*) FROM pratiche_firme f WHERE f.pratica_id = p.id AND f.stato = "attesa") AS firme_attesa, (SELECT COUNT(*) FROM pratiche_conferme c WHERE c.pratica_id = p.id) AS conferme_n FROM pratiche p JOIN didattica_moduli m ON m.id = p.modulo_id WHERE p.id = ?', [$id]);
     }
 
     /**
@@ -149,6 +149,12 @@ final class PraticaRepository
         return $this->db->esegui("DELETE FROM pratiche WHERE id = ? AND stato = 'bozza'", [$id]) > 0;
     }
 
+    /** Numero e data del protocollo (in uscita, per gli attestati). */
+    public function impostaProtocollo(int $id, string $numero, string $data): void
+    {
+        $this->db->esegui('UPDATE pratiche SET protocollo = ?, protocollo_data = ?, aggiornata_il = NOW() WHERE id = ?', [mb_substr($numero, 0, 100), $data, $id]);
+    }
+
     /** Le marche da bollo sono state caricate in Esse3: lo studente è stato avvisato. */
     public function segnaMarche(int $id, string $da): void
     {
@@ -187,7 +193,8 @@ final class PraticaRepository
         return $this->db->righe(
             "SELECT p.id, p.passo, p.modulo_id, DATEDIFF(NOW(), COALESCE(p.aggiornata_il, p.creata_il)) AS giorni_fermi,
                     IF(p.promemoria_il IS NULL, NULL, DATEDIFF(NOW(), p.promemoria_il)) AS giorni_dal_promemoria
-             FROM pratiche p WHERE p.stato IN ('inviata', 'in_lavorazione') AND NOT EXISTS (SELECT 1 FROM pratiche_firme f WHERE f.pratica_id = p.id AND f.stato = 'attesa')"
+             FROM pratiche p WHERE p.stato IN ('inviata', 'in_lavorazione') AND NOT EXISTS (SELECT 1 FROM pratiche_firme f WHERE f.pratica_id = p.id AND f.stato = 'attesa')
+               AND NOT EXISTS (SELECT 1 FROM pratiche_conferme c WHERE c.pratica_id = p.id AND c.stato = 'attesa')"
         );
     }
 

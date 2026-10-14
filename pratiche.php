@@ -65,6 +65,16 @@ require_once 'header.php';
                 <a class="btn btn-success fw-bold" href="allegato_pratica.php?p=<?php echo (int)$p['id']; ?>&amp;e=<?php echo (int)$doc_pronto['id']; ?>"><i class="fa fa-file-pdf me-1" aria-hidden="true"></i>Scarica il PDF</a>
             </div></div>
         <?php endif; ?>
+        <?php $svc_conf = \App\Core\App::per($conn)->get(\App\Didattica\ServizioConfermeDocenti::class); $conf_s = $svc_conf->dellaPratica((int)$p['id']); ?>
+        <?php if ($conf_s): ?>
+            <div class="card border-0 shadow-sm mb-3" style="border-left:5px solid #0056B3 !important;"><div class="card-body">
+                <h2 class="h6 fw-bold mb-2"><i class="fa fa-user-check me-1 text-primary" aria-hidden="true"></i>Conferma dei docenti</h2>
+                <ul class="list-unstyled small mb-0">
+                <?php foreach ($conf_s as $c_x): ?><li class="mb-1"><?php echo $c_x['stato'] === 'confermata' ? '<i class="fa fa-circle-check text-success me-1" aria-hidden="true"></i>' : ($c_x['stato'] === 'rifiutata' ? '<i class="fa fa-circle-xmark text-danger me-1" aria-hidden="true"></i>' : '<i class="fa fa-hourglass-half text-warning me-1" aria-hidden="true"></i>'); ?>
+                    <strong><?php echo $h($svc_conf->nomeVisibile((string)$c_x['nome'])); ?></strong> · <?php echo $c_x['stato'] === 'confermata' ? 'ha confermato il ' . date('d/m/Y H:i', strtotime($c_x['esito_il'])) : ($c_x['stato'] === 'rifiutata' ? 'non conferma: ' . $h($c_x['motivo']) : 'in attesa di conferma'); ?></li><?php endforeach; ?>
+                </ul>
+            </div></div>
+        <?php endif; ?>
         <?php if ($richiesta && $richiesta['tipo'] === 'autodichiarazione'): ?>
             <form method="POST" class="card border-0 shadow-sm mb-3" style="border-left:5px solid #b45309 !important;"><div class="card-body">
                 <?php csrf_field(); ?>

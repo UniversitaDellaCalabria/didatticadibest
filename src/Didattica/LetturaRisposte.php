@@ -157,6 +157,9 @@ final class LetturaRisposte
                 if ($col['tipo'] === 'data' && preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $v, $m)) {
                     $v = "$m[3]/$m[2]/$m[1]";
                 }
+                if ($col['tipo'] === 'ora' && $v !== '' && !preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $v)) {
+                    $v = '';
+                }
                 if ($col['tipo'] === 'scelta' && $v !== '' && $col['scelte'] && !in_array($v, $col['scelte'], true)) {
                     $v = '';
                 }

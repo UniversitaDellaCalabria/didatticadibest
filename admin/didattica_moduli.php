@@ -270,7 +270,7 @@ if ($fase === 'azioni') {
             <button type="submit" name="salva_modulo" value="1" class="btn btn-outline-primary fw-bold" id="ddBozza"><i class="fa fa-pen-ruler me-1" aria-hidden="true"></i>Salva come bozza</button>
             <button type="submit" name="salva_modulo" value="1" class="btn btn-primary fw-bold" id="ddPubblica"><i class="fa fa-earth-europe me-1" aria-hidden="true"></i>Salva e pubblica</button>
             <a href="<?php echo $base; ?>&amp;tab=moduli" class="btn btn-outline-secondary">Annulla</a>
-            <?php if ($f['id'] && $f['tipo'] === 'online'): ?><a class="btn btn-outline-secondary ms-auto" href="../modulo.php?id=<?php echo (int)$f['id']; ?>" target="_blank" rel="noopener"><i class="fa fa-eye me-1" aria-hidden="true"></i>Guarda come lo vede lo studente</a><?php endif; ?>
+            <?php if ($f['id'] && $f['tipo'] === 'online'): ?><a class="btn btn-outline-secondary ms-auto" href="../modulo.php?id=<?php echo (int)$f['id']; ?>&amp;anteprima=1" target="_blank" rel="noopener"><i class="fa fa-eye me-1" aria-hidden="true"></i>Guarda come lo vede lo studente</a><?php endif; ?>
         </div>
     </div></form>
     <script>
@@ -328,25 +328,28 @@ if ($fase === 'azioni') {
                 + '<select class="form-select form-select-sm dd-it-tipo" name="iter_tipo[]" style="max-width:300px;" aria-label="Tipo di passo"></select>'
                 + '<select class="form-select form-select-sm dd-it-uff" name="iter_uff[]" style="max-width:290px;" aria-label="Ufficio"></select>'
                 + '<select class="form-select form-select-sm dd-it-campo" name="iter_campo[]" style="max-width:260px;" aria-label="Domanda con il nome del docente"></select>'
+                + '<input type="text" class="form-control form-control-sm dd-it-colonna" name="iter_colonna[]" style="max-width:200px;" placeholder="Colonna del docente" aria-label="Colonna della tabella con il nome del docente">'
                 + '<select class="form-select form-select-sm dd-it-pag" name="iter_pag[]" style="max-width:300px;" aria-label="Attesa del pagamento delle marche da bollo"></select>'
                 + '<label class="small text-nowrap m-0">ricorda dopo <input type="number" min="0" max="90" class="form-control form-control-sm d-inline-block dd-it-gg" name="iter_gg[]" style="width:64px;" aria-label="Giorni"> giorni</label>'
                 + '<span class="ms-auto d-flex gap-1"><button type="button" class="btn btn-sm btn-outline-secondary py-0 dd-it-su" aria-label="Sposta in su"><i class="fa fa-arrow-up" aria-hidden="true"></i></button><button type="button" class="btn btn-sm btn-outline-secondary py-0 dd-it-giu" aria-label="Sposta in giù"><i class="fa fa-arrow-down" aria-hidden="true"></i></button><button type="button" class="btn btn-sm btn-outline-danger py-0 dd-it-togli" aria-label="Togli il passo"><i class="fa fa-times" aria-hidden="true"></i></button></span>';
             var t = r.querySelector('.dd-it-tipo'), u = r.querySelector('.dd-it-uff'), c = r.querySelector('.dd-it-campo');
-            t.appendChild(opt('ufficio', 'Un ufficio', d.t === 'ufficio')); t.appendChild(opt('persona', 'Firma di una persona indicata nel modulo', d.t === 'persona')); t.appendChild(opt('direttore', 'Firma del Direttore', d.t === 'direttore'));
+            t.appendChild(opt('ufficio', 'Un ufficio', d.t === 'ufficio')); t.appendChild(opt('persona', 'Firma di una persona indicata nel modulo', d.t === 'persona')); t.appendChild(opt('direttore', 'Firma del Direttore', d.t === 'direttore')); t.appendChild(opt('conferma', 'Conferma dei docenti indicati nel modulo (attestati)', d.t === 'conferma'));
             u.appendChild(opt('', '— scegli l\'ufficio —', false));
             UFFICI.forEach(function (x) { u.appendChild(opt(x.id, x.nome, d.t === 'ufficio' && String(d.u) === x.id)); });
             var g = document.createElement('optgroup'); g.label = 'Scelto con la pratica';
             g.appendChild(opt('@cdl', 'Ufficio del corso di studio (referente, dopo il protocollo)', d.u === '@cdl')); g.appendChild(opt('@segreteria', 'Segreteria studenti (scelta dal referente)', d.u === '@segreteria')); u.appendChild(g);
-            var pg = r.querySelector('.dd-it-pag'); pg.appendChild(opt('0', 'Passo normale', !d.pagamento)); pg.appendChild(opt('1', 'Attesa del pagamento delle marche da bollo', !!d.pagamento));
-            c.dataset.val = d.campo || ''; r.querySelector('.dd-it-gg').value = d.gg ? d.gg : '';
+            var pg = r.querySelector('.dd-it-pag'); pg.appendChild(opt('0', 'Passo normale', !d.pagamento && !d.documento && !d.genera && !d.uscita)); pg.appendChild(opt('1', 'Attesa del pagamento delle marche da bollo', !!d.pagamento)); pg.appendChild(opt('2', 'L\'ufficio carica il documento da far firmare', !!d.documento)); pg.appendChild(opt('3', 'Il portale prepara l\'attestato: l\'ufficio lo controlla e lo manda al Direttore', !!d.genera)); pg.appendChild(opt('4', 'Protocollo in uscita: numero, data e PDF firmato e protocollato', !!d.uscita));
+            c.dataset.val = d.campo || ''; r.querySelector('.dd-it-colonna').value = d.colonna || ''; r.querySelector('.dd-it-gg').value = d.gg ? d.gg : '';
             adegua(r); return r;
         }
-        function adegua(r) { var t = r.querySelector('.dd-it-tipo').value; r.querySelector('.dd-it-uff').hidden = t !== 'ufficio'; r.querySelector('.dd-it-campo').hidden = t !== 'persona'; r.querySelector('.dd-it-pag').hidden = t !== 'ufficio'; }
+        function adegua(r) { var t = r.querySelector('.dd-it-tipo').value; r.querySelector('.dd-it-uff').hidden = t !== 'ufficio'; r.querySelector('.dd-it-campo').hidden = t !== 'persona' && t !== 'conferma'; r.querySelector('.dd-it-colonna').hidden = t !== 'conferma'; r.querySelector('.dd-it-pag').hidden = t !== 'ufficio'; }
         function numeraIter() { boxIter.querySelectorAll('.dd-it-n').forEach(function (n, i) { n.textContent = i + 1; }); }
         function aggiornaCampiDocente() {
-            var doc = [];
-            box.querySelectorAll('.dd-campo').forEach(function (r) { var e = r.querySelector('[name="c_etichetta[]"]').value.trim(); if (e && r.querySelector('.dd-tipo').value === 'docente' && !r.querySelector('.dd-uff').checked) doc.push(e); });
+            var doc0 = [];
+            var tab = [];
+            box.querySelectorAll('.dd-campo').forEach(function (r) { var e = r.querySelector('[name="c_etichetta[]"]').value.trim(), tp = r.querySelector('.dd-tipo').value; if (e && tp === 'docente' && !r.querySelector('.dd-uff').checked) doc0.push(e); if (e && tp === 'tabella' && !r.querySelector('.dd-uff').checked) tab.push(e); });
             boxIter.querySelectorAll('.dd-it-campo').forEach(function (c) {
+                var conf = c.closest('.dd-iter-riga').querySelector('.dd-it-tipo').value === 'conferma', doc = conf ? doc0.concat(tab) : doc0;
                 var v = c.dataset.val !== undefined && c.dataset.val !== '' ? c.dataset.val : c.value; c.innerHTML = '';
                 c.appendChild(opt('', doc.length ? '— scegli la domanda —' : '— aggiungi una domanda «Docente» al passo 2 —', false));
                 doc.forEach(function (e) { c.appendChild(opt(e, e, e === v)); });
@@ -553,7 +556,7 @@ if ($fase === 'azioni') {
                 <?php if (!(int)$m['attivo']): ?><?php echo pn_stato('Non pubblicato', 'spento', 'fa-eye-slash'); ?><?php endif; ?>
                 <span class="ms-auto d-flex gap-1">
                     <?php if ($m['tipo'] === 'online' && $m['n_pratiche']): ?><a class="btn btn-sm btn-outline-dark py-0" href="<?php echo $base; ?>&amp;tab=pratiche&amp;modulo=<?php echo (int)$m['id']; ?>&amp;stato=tutte">Pratiche</a><?php endif; ?>
-                    <?php if ($m['tipo'] === 'online'): ?><a class="btn btn-sm btn-outline-secondary py-0" href="../modulo.php?id=<?php echo (int)$m['id']; ?>" target="_blank" rel="noopener">Anteprima</a><?php endif; ?>
+                    <?php if ($m['tipo'] === 'online'): ?><a class="btn btn-sm btn-outline-secondary py-0" href="../modulo.php?id=<?php echo (int)$m['id']; ?>&amp;anteprima=1" target="_blank" rel="noopener">Anteprima</a><?php endif; ?>
                     <a class="btn btn-sm btn-outline-primary py-0" href="<?php echo $base; ?>&amp;tab=moduli&amp;modifica=<?php echo (int)$m['id']; ?>">Modifica</a>
                     <form method="POST" class="m-0"><?php csrf_field(); ?><button type="submit" name="duplica_modulo" value="<?php echo (int)$m['id']; ?>" class="btn btn-sm btn-outline-secondary py-0" title="Crea una copia non pubblicata da ritoccare"><i class="fa fa-copy me-1" aria-hidden="true"></i>Copia</button></form>
                     <form method="POST" class="m-0"><?php csrf_field(); ?><button type="submit" name="elimina_modulo" value="<?php echo (int)$m['id']; ?>" class="btn btn-sm btn-outline-danger py-0" data-confirm="Eliminare il modulo? Se ha pratiche viene solo nascosto." aria-label="Elimina"><i class="fa fa-trash" aria-hidden="true"></i></button></form>

@@ -138,8 +138,10 @@ final class HtmlCampi
                 continue;
             }
             $out .= '<datalist id="dl_' . $tipo . '">';
+            // Gli insegnamenti portano il loro docente titolare (come «Cognome Nome» dell'anagrafe): il modulo lo propone da solo (campi-pratica.js)
+            $docenti = $tipo === 'insegnamento' ? $this->scelte->docentiPerInsegnamento() : [];
             foreach ($this->scelte->per($tipo) as $v) {
-                $out .= '<option value="' . $h($v) . '">';
+                $out .= '<option value="' . $h($v) . '"' . (!empty($docenti[$v]) ? ' data-docente="' . $h($docenti[$v]) . '"' : '') . '>';
             }
             $out .= '</datalist>';
         }
@@ -273,6 +275,7 @@ final class HtmlCampi
             case 'data':
                 $iso = preg_match('#^(\d{2})/(\d{2})/(\d{4})$#', $v, $m) ? "$m[3]-$m[2]-$m[1]" : $v;
                 return '<input type="date" class="form-control form-control-sm"' . $nv($iso) . '>';
+            case 'ora': return '<input type="time" class="form-control form-control-sm"' . $nv($v) . ' style="min-width:100px;">';
             case 'anno_accademico':
                 $o = '<option value=""></option>';
                 foreach ($this->anniAccademici() as $a) {

@@ -175,7 +175,7 @@ abstract class DidatticaBase extends DatabaseDiProva
                 )
                 SQL,
             'utenti' => "CREATE TABLE utenti (id INT PRIMARY KEY, nome VARCHAR(100) DEFAULT '', cognome VARCHAR(100) DEFAULT '', email VARCHAR(150) DEFAULT '', ruolo_id INT DEFAULT 5, ruoli_secondari VARCHAR(100) DEFAULT '', persona_id VARCHAR(80) DEFAULT NULL)",
-            'personale_ateneo' => "CREATE TABLE personale_ateneo (id VARCHAR(80) PRIMARY KEY, nome VARCHAR(100) DEFAULT '', cognome VARCHAR(100) DEFAULT '', email VARCHAR(150) DEFAULT '', ruolo VARCHAR(100) DEFAULT '')",
+            'personale_ateneo' => "CREATE TABLE personale_ateneo (id VARCHAR(80) PRIMARY KEY, nome VARCHAR(100) DEFAULT '', cognome VARCHAR(100) DEFAULT '', email VARCHAR(150) DEFAULT '', ruolo VARCHAR(100) DEFAULT '', docente TINYINT NOT NULL DEFAULT 0, attivo TINYINT NOT NULL DEFAULT 1)",
             'didattica_consigli' => <<<'SQL'
                 CREATE TABLE `didattica_consigli` (
                   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -247,6 +247,25 @@ abstract class DidatticaBase extends DatabaseDiProva
                   `conv_direttore_email` varchar(150) NOT NULL DEFAULT '',
                   `conv_direttore_cf` varchar(16) NOT NULL DEFAULT '',
                   PRIMARY KEY (`id`)
+                )
+                SQL,
+            'pratiche_conferme' => <<<'SQL'
+                CREATE TABLE `pratiche_conferme` (
+                  `id` int(11) NOT NULL AUTO_INCREMENT,
+                  `pratica_id` int(11) NOT NULL,
+                  `passo` tinyint(4) NOT NULL DEFAULT 0,
+                  `nome` varchar(200) NOT NULL DEFAULT '',
+                  `email` varchar(150) NOT NULL DEFAULT '',
+                  `token` varchar(40) NOT NULL,
+                  `stato` varchar(10) NOT NULL DEFAULT 'attesa',
+                  `richiesta_il` datetime DEFAULT current_timestamp(),
+                  `esito_il` datetime DEFAULT NULL,
+                  `motivo` varchar(500) DEFAULT '',
+                  `accesso_json` text DEFAULT NULL,
+                  `solleciti` tinyint(4) NOT NULL DEFAULT 0,
+                  `sollecito_il` datetime DEFAULT NULL,
+                  PRIMARY KEY (`id`),
+                  UNIQUE KEY `uq_token` (`token`)
                 )
                 SQL,
             'pratiche_firme' => <<<'SQL'

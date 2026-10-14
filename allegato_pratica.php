@@ -7,6 +7,16 @@ $p = pratica($conn, (int)($_GET['p'] ?? 0));
 $nega = function () { while (ob_get_level() > 0) ob_end_clean(); http_response_code(404); exit('File non trovato.'); };
 if (!$p || ((int)$p['utente_id'] !== (int)$_SESSION['utente_id'] && !utente_vede_pratica($conn, $user_info, $p))) $nega();
 
+// Anteprima dell'attestato preparato dal portale (solo chi gestisce la Didattica)
+if (isset($_GET['attestato']) && utente_gestisce_didattica($conn, $user_info)) {
+    $pdf_att = \App\Core\App::per($conn)->get(\App\Didattica\ServizioAttestati::class)->pdf((int)$p['id']);
+    if (!$pdf_att) $nega();
+    while (ob_get_level() > 0) ob_end_clean();
+    header('Content-Type: application/pdf'); header('Content-Disposition: inline; filename="Anteprima_attestato_' . preg_replace('/[^A-Za-z0-9_-]/', '', (string)$p['codice']) . '.pdf"');
+    header('Content-Length: ' . strlen($pdf_att)); header('X-Content-Type-Options: nosniff');
+    echo $pdf_att; exit;
+}
+
 $file = null; $nome = 'allegato';
 if (isset($_GET['r'])) {
     $r = (json_decode((string)$p['risposte_json'], true) ?: [])[(int)$_GET['r']] ?? null;

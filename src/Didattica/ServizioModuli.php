@@ -153,7 +153,7 @@ final class ServizioModuli
 
     /**
      * L'iter dal modulo del pannello: righe parallele iter_tipo[] (ufficio | persona | direttore), iter_uff[], iter_campo[] (la domanda di tipo docente),
-     * iter_pag[] (1 = il passo è l'attesa del pagamento delle marche da bollo) e iter_gg[] (giorni del promemoria del passo). Senza queste righe vale il vecchio elenco iter[] di uffici. Ritorna il JSON (null = nessun passo).
+     * iter_pag[] (1 = attesa del pagamento delle marche da bollo, 2 = l'ufficio carica il documento da firmare) e iter_gg[] (giorni del promemoria del passo). Senza queste righe vale il vecchio elenco iter[] di uffici. Ritorna il JSON (null = nessun passo).
      *
      * @param array<string, mixed> $post
      */
@@ -167,18 +167,18 @@ final class ServizioModuli
                 $gg = max(0, min(90, (int) ($post['iter_gg'][$i] ?? 0)));
                 if ($t === 'direttore') {
                     $passi[] = ['t' => 'direttore'] + ($gg ? ['gg' => $gg] : []);
-                } elseif ($t === 'persona') {
+                } elseif ($t === 'persona' || $t === 'conferma') {
                     $campo = mb_substr(trim((string) ($post['iter_campo'][$i] ?? '')), 0, 200);
                     if ($campo !== '') {
-                        $passi[] = ['t' => 'persona', 'campo' => $campo] + ($gg ? ['gg' => $gg] : []);
+                        $passi[] = ['t' => $t, 'campo' => $campo] + ($t === 'conferma' ? ['colonna' => mb_substr(trim((string) ($post['iter_colonna'][$i] ?? '')), 0, 100)] : []) + ($gg ? ['gg' => $gg] : []);
                     }
                 } else {
                     $x = $post['iter_uff'][$i] ?? '';
                     // «@cdl» / «@segreteria»: l'ufficio si sceglie con la pratica (corso di studio, segreteria indicata dal referente)
                     $u = in_array($x, ['@cdl', '@segreteria'], true) ? $x : (($idU = $this->uffici->idDa((int) $x)) && !(int) ($uffici[$idU]['smista'] ?? 0) ? $idU : null);
                     if ($u !== null) {
-                        $pag = (int) ($post['iter_pag'][$i] ?? 0) === 1;
-                        $passi[] = ($gg || $pag) ? ['t' => 'ufficio', 'u' => $u] + ($gg ? ['gg' => $gg] : []) + ($pag ? ['pagamento' => 1] : []) : $u;
+                        $az = (int) ($post['iter_pag'][$i] ?? 0);
+                        $passi[] = ($gg || $az) ? ['t' => 'ufficio', 'u' => $u] + ($gg ? ['gg' => $gg] : []) + ($az === 1 ? ['pagamento' => 1] : []) + ($az === 2 ? ['documento' => 1] : []) + ($az === 3 ? ['genera' => 1] : []) + ($az === 4 ? ['uscita' => 1] : []) : $u;
                     }
                 }
             }

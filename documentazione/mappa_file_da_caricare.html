@@ -559,6 +559,96 @@ var PACCHETTI = [
     ],
     nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
     commit: "Pratiche: bozza, modifica fino alla presa in carico, passo di attesa del pagamento delle marche da bollo e prima pratica «Richiesta Certificato di Iscrizione» con firma del Direttore"
+  },
+  {
+    id: "certificati-laurea-ds",
+    titolo: "Pacchetto 11 · Certificato di laurea, Diploma Supplement e anteprima dei moduli",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare (dopo il pacchetto 10)",
+    schema: "v63 (nessuna novità)",
+    riassunto: "Le altre due pratiche dei certificati, con i campi di Uniticket: <strong>«Richiesta Certificato di Laurea»</strong> (stesso iter del certificato di iscrizione, con le marche da bollo) e <strong>«Richiesta Diploma Supplement»</strong> (senza marca da bollo: l'ufficio del corso <strong>carica il documento</strong> e il Direttore lo firma). In più, l'<strong>anteprima dei moduli</strong> ora si vede anche se il modulo non è pubblicato.",
+    passi: [["C1", "Certificato di laurea, Diploma Supplement, anteprima dei moduli"]],
+    cartelle: [
+      { cartella: "/ (radice del portale)", file: [
+        ["modulo.php", "mod", "C1 · anche pacchetto 10", "anteprima per chi gestisce la Didattica anche se il modulo non è pubblicato (si vede ma non si invia)"]
+      ]},
+      { cartella: "admin/", file: [
+        ["admin/didattica_moduli.php", "mod", "C1 · anche pacchetto 10", "i pulsanti «Anteprima» aprono il modulo anche se non pubblicato; nell'iter il nuovo passo «L'ufficio carica il documento da far firmare»"],
+        ["admin/didattica_pratiche.php", "mod", "C1 · anche pacchetto 10", "riquadro «Documento da firmare» (carica il PDF e passa al Direttore)"]
+      ]},
+      { cartella: "src/Didattica/", file: [
+        ["src/Didattica/ModelliPratiche.php", "mod", "C1 · anche pacchetto 10", "crea anche «Richiesta Certificato di Laurea» e «Richiesta Diploma Supplement» (inattivi)"],
+        ["src/Didattica/ServizioMarcheBollo.php", "mod", "C1 · anche pacchetto 10", "caricamento del documento da firmare (senza pagamento)"],
+        ["src/Didattica/ServizioIter.php", "mod", "C1 · anche pacchetto 10", "passo «documento da firmare»"],
+        ["src/Didattica/ServizioModuli.php", "mod", "C1 · anche pacchetto 10", "salva il passo «documento da firmare»"]
+      ]}
+    ],
+    dopo: [
+      "Apri una pagina del pannello: il portale prepara da solo i due moduli nuovi (inattivi). Lo schema non cambia (resta v63).",
+      "<strong>Admin → Didattica → Moduli e documenti</strong>: ora la lista ha anche <strong>Richiesta Certificato di Laurea</strong> e <strong>Richiesta Diploma Supplement</strong>. Il pulsante <strong>Anteprima</strong> li apre anche se non sono pubblicati (in alto si legge «Anteprima… non è ancora pubblicato»): controlla i campi e poi attivali.",
+      "<strong>Diploma Supplement:</strong> dopo il protocollo la pratica arriva all'ufficio del corso, che nel riquadro <strong>«Documento da firmare»</strong> carica il PDF e lo passa al Direttore. Nessun pagamento.",
+      "<strong>Corso di laurea:</strong> anche sul Diploma Supplement ho chiesto il corso (su Uniticket non si vedeva), perché serve a mandare la pratica all'ufficio giusto. Se vuoi toglierlo o cambiarlo, lo fai dal costruttore del modulo."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Pratiche: certificato di laurea e Diploma Supplement (senza marca da bollo, con documento caricato dall'ufficio e firma del Direttore) e anteprima dei moduli anche se non pubblicati"
+  },
+  {
+    id: "attestati",
+    titolo: "Pacchetto 12 · Attestato di frequenza e di esame sostenuto, con la conferma dei docenti",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare (dopo i pacchetti 10 e 11)",
+    schema: "v64",
+    riassunto: "I due attestati senza ticket: lo studente compila (per la <strong>frequenza</strong> aggiunge le lezioni a una tabella, in bozza finché vuole); ogni <strong>docente conferma nel portale</strong> le sue righe (senza firma digitale, con traccia di chi e quando); l'<strong>Ufficio attestati</strong> controlla l'attestato in PDF preparato dal portale e lo manda al <strong>Direttore</strong> che firma in PAdES; poi si registra il <strong>protocollo in uscita</strong> e lo studente scarica il PDF protocollato. Il docente titolare si propone da solo dall'insegnamento scelto.",
+    passi: [["C1", "Attestati: frequenza alle lezioni ed esame sostenuto"]],
+    cartelle: [
+      { cartella: "/ (radice del portale)", file: [
+        ["conferma_attestato.php", "nuovo", "C1", "la pagina del docente: vede le sue righe e preme «Confermo» o «Non confermo»"],
+        ["allegato_pratica.php", "mod", "C1", "anteprima dell'attestato in PDF per l'ufficio"],
+        ["modulo.php", "mod", "C1 · anche pacchetti 10 e 11", "controlla che i docenti indicati siano nell'anagrafe"],
+        ["pratiche.php", "mod", "C1 · anche pacchetto 10", "riquadro «Conferma dei docenti» per lo studente"]
+      ]},
+      { cartella: "inc/ e assets/js/", file: [
+        ["inc/didattica.php", "mod", "C1 · anche pacchetto 10", "controllo dei docenti"],
+        ["assets/js/campi-pratica.js", "mod", "C1 · anche pacchetto 10", "il docente titolare si compila da solo scegliendo l'insegnamento"]
+      ]},
+      { cartella: "admin/", file: [
+        ["admin/didattica_pratiche.php", "mod", "C1 · anche pacchetti 10 e 11", "riquadri «Conferma dei docenti», «Attestato da controllare» (anteprima e Al Direttore) e «Protocollo in uscita»"],
+        ["admin/didattica_moduli.php", "mod", "C1 · anche pacchetti 10 e 11", "nel costruttore: passo «Conferma dei docenti», «attestato da controllare» e «protocollo in uscita»"]
+      ]},
+      { cartella: "src/Didattica/", file: [
+        ["src/Didattica/AttestatoPdf.php", "nuovo", "C1", "il PDF/A dell'attestato (frequenza ed esame)"],
+        ["src/Didattica/ServizioAttestati.php", "nuovo", "C1", "dati dell'attestato, invio al Direttore, protocollo in uscita"],
+        ["src/Didattica/ServizioConfermeDocenti.php", "nuovo", "C1", "conferme dei docenti: link, conferma, rifiuto con motivo, riavvio dopo la correzione, promemoria"],
+        ["src/Didattica/ConfermaPraticaRepository.php", "nuovo", "C1", "le conferme nel database"],
+        ["src/Didattica/ModelliPratiche.php", "mod", "C1 · anche pacchetti 10 e 11", "crea «Attestato Esame sostenuto», «Attestato Frequenza Lezione» e l'Ufficio attestati"],
+        ["src/Didattica/ServizioIter.php", "mod", "C1 · anche pacchetti 10 e 11", "nuovi passi dell'iter: conferma, attestato da controllare, protocollo in uscita"],
+        ["src/Didattica/ServizioModuli.php", "mod", "C1 · anche pacchetti 10 e 11", "salva i nuovi passi"],
+        ["src/Didattica/ServizioFlussoConvalide.php", "mod", "C1 · anche pacchetti 10 e 11", "avvia le conferme; riparte dopo un rifiuto"],
+        ["src/Didattica/ServizioPratiche.php", "mod", "C1 · anche pacchetto 10", "lo studente corregge dopo il rifiuto di un docente"],
+        ["src/Didattica/PraticaRepository.php", "mod", "C1 · anche pacchetto 10", "protocollo in uscita e conferme"],
+        ["src/Didattica/PromemoriaPratiche.php", "mod", "C1", "promemoria anche ai docenti che non hanno risposto"],
+        ["src/Didattica/FirmaPratica.php", "mod", "C1", "il documento firmato resta interno finché non c'è il protocollo in uscita"],
+        ["src/Didattica/ScelteAnagrafe.php", "mod", "C1", "docente titolare proposto per ogni insegnamento"],
+        ["src/Didattica/HtmlCampi.php", "mod", "C1 · anche pacchetto 10", "colonna «ora» e proposta del docente"],
+        ["src/Didattica/CampiModulo.php", "mod", "C1", "colonna «ora»"],
+        ["src/Didattica/LetturaRisposte.php", "mod", "C1", "controllo delle ore"],
+        ["src/Didattica/Costanti.php", "mod", "C1 · anche pacchetto 10", "passo di conferma, tipo di colonna «ora»"]
+      ]},
+      { cartella: "src/Core/Schema/ (anche pacchetti 1-11)", file: [
+        ["src/Core/Schema/Definizioni.php", "mod", "C1 · anche pacchetti 1-11", "tabella delle conferme dei docenti"],
+        ["src/Core/Schema/Migrazioni.php", "mod", "C1 · anche pacchetti 1-11", "versione dello schema: 64"]
+      ]}
+    ],
+    dopo: [
+      "Apri una pagina del pannello: il portale crea da solo <code>cache/schema_v64.ok</code>, i due moduli (inattivi) e <strong>l'Ufficio attestati</strong>.",
+      "<strong>Ufficio attestati:</strong> Didattica → Ufficio e ricevimento: aggiungi nell'ufficio «Ufficio attestati» le persone che seguono gli attestati (di solito il manager dell'Ufficio didattico). A loro arrivano le pratiche dopo le conferme e dopo la firma del Direttore.",
+      "<strong>Direttore</strong> (nome ed email): già indicato per le convenzioni e le altre firme (FSL → Scuole e convenzioni).",
+      "<strong>Moduli:</strong> Didattica → Moduli e documenti: guarda <strong>Attestato Frequenza Lezione</strong> e <strong>Attestato Esame sostenuto</strong> con «Anteprima» (anche non pubblicati) e attivali.",
+      "<strong>Anagrafe:</strong> i docenti devono essere nell'anagrafe del personale con la loro email (lo studente li sceglie dall'elenco; se non c'è il portale lo dice e non invia).",
+      "<strong>Prova veloce:</strong> da studente compila l'attestato di frequenza con due lezioni di docenti diversi e invia; ogni docente conferma dal link; come ufficio attestati guarda l'anteprima PDF e manda al Direttore; dopo la firma registra numero, data e PDF protocollato: lo studente lo scarica."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Pratiche: attestati di frequenza alle lezioni e di esame sostenuto con conferma dei docenti nel portale, attestato in PDF/A, firma del Direttore e protocollo in uscita"
   }
 ];
 

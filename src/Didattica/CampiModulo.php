@@ -119,6 +119,9 @@ final class CampiModulo
         if (preg_match('/^data$/u', $n)) {
             return 'data';
         }
+        if (preg_match('/^(dalle|alle)\s+ore|^ora$/u', $n)) {
+            return 'ora';
+        }
         if (preg_match('/^s\.?\s?s\.?\s?d\.?$/u', $n)) {
             return 'ssd';
         }

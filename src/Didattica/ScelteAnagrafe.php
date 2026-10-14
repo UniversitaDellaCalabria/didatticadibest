@@ -19,6 +19,44 @@ final class ScelteAnagrafe
     {
     }
 
+    /**
+     * Il docente titolare di ogni insegnamento proposto (stessa scritta della lista «insegnamento»): «Cognome Nome» come nell'anagrafe del personale,
+     * riconosciuto dal nome senza badare all'ordine; vuoto se non si trova con sicurezza.
+     *
+     * @return array<string, string>
+     */
+    public function docentiPerInsegnamento(): array
+    {
+        if (isset($this->cache['_docenti_ins'])) {
+            return $this->cache['_docenti_ins'];
+        }
+        $chiave = static function (string $s): string {
+            $t = array_filter(explode(' ', \App\Tutorato\AbbinamentoInsegnamenti::norma($s)));
+            sort($t);
+
+            return implode(' ', $t);
+        };
+        $mappa = [];
+        foreach ($this->per('docente') as $d) {
+            $k = $chiave((string) $d);
+            $mappa[$k] = isset($mappa[$k]) ? '' : (string) $d; // omonimi: nessuna proposta
+        }
+        $out = [];
+        foreach ($this->corsi->insegnamentiPerCorso() as $corso => $ins) {
+            foreach ($ins as $i) {
+                $nome = $i['nome'] . ($i['partizione'] !== '' ? ' (' . $i['partizione'] . ')' : '') . ' – ' . $corso;
+                foreach (preg_split('/[;\/]/', (string) ($i['docente'] ?? '')) ?: [] as $parte) {
+                    if (trim($parte) !== '' && !empty($mappa[$chiave($parte)])) {
+                        $out[$nome] = $mappa[$chiave($parte)];
+                        break;
+                    }
+                }
+            }
+        }
+
+        return $this->cache['_docenti_ins'] = $out;
+    }
+
     /** @return array<int|string, mixed> */
     public function per(string $tipo): array
     {

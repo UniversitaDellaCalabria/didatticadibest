@@ -40,7 +40,7 @@ final class Costanti
     /** Tipi delle colonne delle tabelle a righe ("Nome:tipo" nelle opzioni; senza tipo si riconosce dal nome). */
     public const TIPI_COLONNA_TABELLA = [
         'testo' => 'Testo', 'insegnamento' => 'Insegnamento (catalogo di Ateneo)', 'insegnamento_dip' => 'Insegnamento del Dipartimento', 'cfu' => 'CFU',
-        'voto' => 'Voto', 'ssd' => 'S.S.D.', 'data' => 'Data', 'numero' => 'Numero', 'docente' => 'Docente (anagrafe)', 'anno_accademico' => 'Anno accademico', 'scelta' => 'Tendina',
+        'voto' => 'Voto', 'ssd' => 'S.S.D.', 'data' => 'Data', 'ora' => 'Ora', 'numero' => 'Numero', 'docente' => 'Docente (anagrafe)', 'anno_accademico' => 'Anno accademico', 'scelta' => 'Tendina',
         'codice' => 'Codice insegnamento', 'denominazione' => 'Insegnamento scritto a mano (altro Ateneo)',
         'piano' => 'Piano di studi: da inserire come a scelta (con l\'eventuale insegnamento da eliminare)',
     ];
@@ -72,9 +72,11 @@ final class Costanti
     /** Passi dell'iter che non sono un ufficio: firma di una persona indicata nel modulo (es. il relatore) e firma del Direttore. */
     public const ITER_PERSONA = -3;
     public const ITER_DIRETTORE = -4;
+    /** Passo di conferma dei docenti indicati nel modulo (attestati di frequenza e di esame sostenuto). */
+    public const ITER_CONFERMA = -5;
 
     /** Tipi di passo dell'iter di un modulo. */
-    public const TIPI_PASSO = ['ufficio' => 'Un ufficio', 'persona' => 'Firma di una persona indicata nel modulo (es. il relatore)', 'direttore' => 'Firma del Direttore'];
+    public const TIPI_PASSO = ['ufficio' => 'Un ufficio', 'persona' => 'Firma di una persona indicata nel modulo (es. il relatore)', 'direttore' => 'Firma del Direttore', 'conferma' => 'Conferma dei docenti indicati nel modulo (attestati)'];
 
     /** Uffici con un tipo (didattica_uffici.tipo). */
     public const TIPI_UFFICIO = [

@@ -243,8 +243,11 @@ final class FirmaPratica
         $pr = $this->pratiche->perId((int) $f['pratica_id']);
         $chi = ($info['nome'] ?? '') !== '' ? $info['nome'] : (string) $f['nome'];
         $this->firme->segnaFirmata((int) $f['id'], $this->allegati->cartella() . $nome, $chi . ' (' . $come . ')');
+        // Se dopo la firma c'è ancora il protocollo in uscita, il documento firmato non è per lo studente: lo vede quando l'ufficio carica quello protocollato
+        $m = $pr ? $this->moduli->perId((int) $pr['modulo_id']) : null;
+        $ancoraUscita = $m && $this->iter->haPassoDopo('uscita', $m, (int) $f['passo']);
         $this->storico->evento((int) $f['pratica_id'], 'attivita', 'ufficio', 0, null, 'Documento firmato da ' . $chi . ' (' . $come . ').', $this->allegati->cartella() . $nome,
-            'Firmato_' . ($f['tipo'] === 'direttore' ? 'direttore' : 'firmatario') . '_' . ($pr['codice'] ?? $f['pratica_id']) . '.pdf', false);
+            'Firmato_' . ($f['tipo'] === 'direttore' ? 'direttore' : 'firmatario') . '_' . ($pr['codice'] ?? $f['pratica_id']) . '.pdf', $ancoraUscita);
 
         return null;
     }

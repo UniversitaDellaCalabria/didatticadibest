@@ -78,6 +78,32 @@ if ($fase === 'azioni') {
         }
         admin_redirect("$base&tab=pratiche&id=$id&r=" . time());
     }
+    // ── Attestati: conferma dei docenti (rimanda i link), attestato controllato e mandato al Direttore, protocollo in uscita ──
+    if (isset($_POST['rimanda_conferme']) || isset($_POST['attestato_al_direttore']) || isset($_POST['protocollo_uscita'])) {
+        $id = (int)$_POST['pratica_id'];
+        $att = \App\Core\App::per($conn)->get(\App\Didattica\ServizioAttestati::class);
+        if (isset($_POST['rimanda_conferme'])) {
+            $n_c = \App\Core\App::per($conn)->get(\App\Didattica\ServizioConfermeDocenti::class)->reinvia($id);
+            flash_set($n_c ? "Email con il link di conferma rimandata ai docenti che non hanno ancora risposto ($n_c)." : 'Nessun docente in attesa.', $n_c ? 'success' : 'warning');
+        } elseif (isset($_POST['attestato_al_direttore'])) {
+            [$err, $msg] = $att->mandaAlDirettore($id, $uid, $autore_nome);
+            if (!$err) registra_log_audit($conn, "Pratica: attestato mandato al Direttore", ["Pratica" => $id]);
+            flash_set($err ?? $msg, $err ? 'danger' : 'success');
+        } else {
+            [$err, $msg] = $att->protocolloUscita($id, (string)($_POST['protocollo'] ?? ''), (string)($_POST['protocollo_data'] ?? ''), $_FILES['pdf_protocollato'] ?? null, $uid, $autore_nome);
+            if (!$err) registra_log_audit($conn, "Pratica: protocollo in uscita registrato", ["Pratica" => $id, "Protocollo" => $_POST['protocollo'] ?? '']);
+            flash_set($err ?? $msg, $err ? 'danger' : 'success');
+        }
+        admin_redirect("$base&tab=pratiche&id=$id&r=" . time());
+    }
+    // ── Passo «documento da firmare» (certificati senza marca da bollo): l'ufficio carica il PDF e la pratica passa al Direttore ──
+    if (isset($_POST['documento_caricato'])) {
+        $id = (int)$_POST['pratica_id'];
+        [$err, $msg] = \App\Core\App::per($conn)->get(\App\Didattica\ServizioMarcheBollo::class)->caricaDocumento($id, $_FILES['documento'] ?? null, $uid, $autore_nome);
+        if (!$err) registra_log_audit($conn, "Pratica: documento caricato e mandato alla firma", ["Pratica" => $id]);
+        flash_set($err ?? $msg, $err ? 'danger' : 'success');
+        admin_redirect("$base&tab=pratiche&id=$id&r=" . time());
+    }
     // ── Iter: passo successivo e firme (persona indicata nel modulo, Direttore) ──
     if (isset($_POST['avanza_pratica']) || isset($_POST['invia_firma']) || isset($_POST['rimanda_firma'])) {
         $id = (int)$_POST['pratica_id']; $p = pratica($conn, $id);
@@ -162,6 +188,12 @@ if ($fase === 'azioni') {
         $conclusa = in_array($p['stato'], ['accolta', 'respinta', 'chiusa'], true);
         $svc_marche = \App\Core\App::per($conn)->get(\App\Didattica\ServizioMarcheBollo::class);
         $in_pagamento = !$conclusa && $svc_marche->inAttesa($p);
+        $in_documento = !$conclusa && !$in_pagamento && $svc_marche->inAttesaDocumento($p);
+        $svc_att = \App\Core\App::per($conn)->get(\App\Didattica\ServizioAttestati::class);
+        $svc_conf = \App\Core\App::per($conn)->get(\App\Didattica\ServizioConfermeDocenti::class);
+        $in_genera = !$conclusa && $svc_att->inGenera($p);
+        $in_uscita = !$conclusa && $svc_att->inUscita($p);
+        $conf_p = $svc_conf->dellaPratica((int)$p['id']);
         $richiesta = json_decode((string)($p['richiesta_json'] ?? ''), true) ?: null;
         $tipi_ev = ['richiesta' => ['fa-people-arrows', 'Richiesta a un operatore'], 'passaggio' => ['fa-route', 'Passaggio'], 'attivita' => ['fa-paperclip', 'Attività'], 'autodich' => ['fa-file-signature', 'Autodichiarazione'], 'messaggio' => ['fa-comment', ''], 'stato' => ['fa-flag', '']];
 ?>
@@ -197,6 +229,16 @@ if ($in_pagamento) {
         : (empty($p['bollo_il'])
             ? ['Si aspetta il pagamento', 'Lo studente è stato avvisato. Quando il pagamento risulta, spuntalo e carica il certificato di Esse3: la pratica passa alla firma del Direttore.', $btn_p('#marche', 'Registra il pagamento'), 'attesa']
             : ['Pagamento registrato', 'Il pagamento risulta ma la pratica non è ancora passata alla firma: usa «Passa al passo successivo».', '', 'attesa']);
+}
+if ($in_genera) {
+    $prossima_p = ['Controlla l\'attestato e mandalo al Direttore', 'Tutti i docenti hanno confermato. Guarda l\'anteprima dell\'attestato e, se è giusto, mandalo al Direttore per la firma.', $btn_p('#attestato', 'Vai all\'attestato'), 'attesa'];
+} elseif ($in_uscita) {
+    $prossima_p = ['Registra il protocollo in uscita', 'Il Direttore ha firmato: protocolla l\'attestato, mandalo all\'azienda e carica qui il PDF firmato e protocollato. Lo studente lo scarica da qui.', $btn_p('#uscita', 'Protocollo in uscita'), 'attesa'];
+} elseif ($conf_p && array_filter($conf_p, fn($c) => $c['stato'] === 'attesa')) {
+    $prossima_p = ['Si aspetta la conferma dei docenti', 'Ogni docente ha ricevuto il suo link: la pratica prosegue appena tutti confermano (se uno non conferma, torna allo studente). Puoi rimandare le email dal riquadro dell\'iter.', '', 'attesa'];
+}
+if ($in_documento) {
+    $prossima_p = ['Carica il documento da firmare', 'Carica il PDF generato da Esse3 (o preparato dall\'ufficio) dal riquadro qui sotto: la pratica passa al Direttore per la firma.', $btn_p('#documento', 'Carica il documento'), 'attesa'];
 }
 echo pn_prossima($prossima_p[0], $prossima_p[1], $prossima_p[2], $prossima_p[3]);
 ?>
@@ -244,6 +286,52 @@ echo pn_prossima($prossima_p[0], $prossima_p[1], $prossima_p[2], $prossima_p[3])
         </form>
         <?php endif; ?>
     </div></div>
+
+    <?php if ($conf_p): ?>
+    <div class="card border-0 shadow-sm mb-3" style="border-left:4px solid #0056B3 !important;"><div class="card-body">
+        <h6 class="fw-bold mb-2"><i class="fa fa-user-check me-1 text-primary" aria-hidden="true"></i>Conferma dei docenti</h6>
+        <ul class="list-unstyled small mb-2">
+        <?php foreach ($conf_p as $c_x): ?><li class="mb-1"><?php echo $c_x['stato'] === 'confermata' ? '<i class="fa fa-circle-check text-success me-1" aria-hidden="true"></i>' : ($c_x['stato'] === 'rifiutata' ? '<i class="fa fa-circle-xmark text-danger me-1" aria-hidden="true"></i>' : '<i class="fa fa-hourglass-half text-warning me-1" aria-hidden="true"></i>'); ?>
+            <strong><?php echo $h($svc_conf->nomeVisibile((string)$c_x['nome'])); ?></strong> (<?php echo $h($c_x['email']); ?>) · <?php echo $c_x['stato'] === 'confermata' ? 'confermato il ' . date('d/m/Y H:i', strtotime($c_x['esito_il'])) : ($c_x['stato'] === 'rifiutata' ? 'non conferma: ' . $h($c_x['motivo']) : 'in attesa dal ' . date('d/m/Y', strtotime($c_x['richiesta_il']))); ?></li><?php endforeach; ?>
+        </ul>
+        <?php if (array_filter($conf_p, fn($c) => $c['stato'] === 'attesa')): ?><form method="POST" class="m-0"><?php csrf_field(); ?><input type="hidden" name="pratica_id" value="<?php echo (int)$p['id']; ?>"><button type="submit" name="rimanda_conferme" value="1" class="btn btn-sm btn-outline-secondary"><i class="fa fa-envelope me-1" aria-hidden="true"></i>Rimanda l'email ai docenti in attesa</button></form><?php endif; ?>
+    </div></div>
+    <?php endif; ?>
+
+    <?php if ($in_genera): ?>
+    <form method="POST" id="attestato" class="card border-0 shadow-sm mb-3" style="border-left:4px solid #b45309 !important;"><div class="card-body">
+        <?php csrf_field(); ?><input type="hidden" name="pratica_id" value="<?php echo (int)$p['id']; ?>">
+        <h6 class="fw-bold mb-1"><i class="fa fa-file-circle-check me-1" style="color:#b45309;" aria-hidden="true"></i>Attestato da controllare</h6>
+        <p class="small text-secondary mb-2">Il portale ha preparato l'attestato con i dati dello studente, le righe e le conferme dei docenti. Controllalo e mandalo al Direttore: riceve l'email con il link per firmarlo in PAdES.</p>
+        <div class="d-flex flex-wrap gap-2 align-items-center"><a class="btn btn-sm btn-outline-danger fw-bold" href="../allegato_pratica.php?p=<?php echo (int)$p['id']; ?>&amp;attestato=1" target="_blank" rel="noopener"><i class="fa fa-file-pdf me-1" aria-hidden="true"></i>Anteprima dell'attestato (PDF)</a>
+            <button type="submit" name="attestato_al_direttore" value="1" class="btn btn-sm btn-success fw-bold" data-confirm="L'attestato è giusto? Va al Direttore per la firma."><i class="fa fa-signature me-1" aria-hidden="true"></i>Controllato: manda al Direttore</button></div>
+        <div class="form-text mt-2">Se c'è un errore, scrivi allo studente dalla scheda «Storico e messaggi»: puoi chiedergli un'integrazione e le conferme ripartono.</div>
+    </div></form>
+    <?php endif; ?>
+
+    <?php if ($in_uscita): ?>
+    <form method="POST" enctype="multipart/form-data" id="uscita" class="card border-0 shadow-sm mb-3" style="border-left:4px solid #15803d !important;"><div class="card-body">
+        <?php csrf_field(); ?><input type="hidden" name="pratica_id" value="<?php echo (int)$p['id']; ?>">
+        <h6 class="fw-bold mb-1"><i class="fa fa-paper-plane me-1" style="color:#15803d;" aria-hidden="true"></i>Protocollo in uscita</h6>
+        <p class="small text-secondary mb-2">Il Direttore ha firmato. 1. Scarica l'attestato firmato dalla scheda «Storico e messaggi» · 2. protocollalo in uscita e mandalo all'azienda<?php $pec_a = $svc_att->destinatario($p); echo $pec_a !== '' ? ' (<strong>' . $h($pec_a) . '</strong>)' : ''; ?> · 3. registra qui numero e data e carica il PDF firmato e protocollato: lo studente lo scarica e riceve l'email.</p>
+        <div class="row g-2 align-items-end">
+            <div class="col-md-3"><label class="form-label small fw-bold mb-0" for="ucNum">Numero di protocollo</label><input class="form-control form-control-sm" id="ucNum" name="protocollo" maxlength="100" required></div>
+            <div class="col-md-2"><label class="form-label small fw-bold mb-0" for="ucData">Data</label><input type="date" class="form-control form-control-sm" id="ucData" name="protocollo_data" value="<?php echo date('Y-m-d'); ?>" max="<?php echo date('Y-m-d'); ?>" required></div>
+            <div class="col-md-5"><label class="form-label small fw-bold mb-0" for="ucPdf">PDF firmato e protocollato</label><input type="file" class="form-control form-control-sm" id="ucPdf" name="pdf_protocollato" accept=".pdf,application/pdf" required></div>
+            <div class="col-md-2"><button type="submit" name="protocollo_uscita" value="1" class="btn btn-sm btn-success fw-bold w-100"><i class="fa fa-check me-1" aria-hidden="true"></i>Concludi</button></div>
+        </div>
+    </div></form>
+    <?php endif; ?>
+
+    <?php if ($in_documento): ?>
+    <form method="POST" enctype="multipart/form-data" id="documento" class="card border-0 shadow-sm mb-3" style="border-left:4px solid #b45309 !important;"><div class="card-body">
+        <?php csrf_field(); ?><input type="hidden" name="pratica_id" value="<?php echo (int)$p['id']; ?>">
+        <h6 class="fw-bold mb-1"><i class="fa fa-file-arrow-up me-1" style="color:#b45309;" aria-hidden="true"></i>Documento da firmare</h6>
+        <p class="small text-secondary mb-2">Non è dovuta la marca da bollo. Carica il documento in PDF (generato da Esse3 o preparato dall'ufficio): il Direttore riceve l'email con il link per firmarlo in PAdES; quando firma e ricarica, lo studente può scaricarlo e stamparlo e tu ricevi l'avviso.</p>
+        <div class="row g-2 align-items-end"><div class="col-md-8"><label class="form-label small fw-bold mb-0" for="docPdf">Documento (PDF)</label><input type="file" class="form-control form-control-sm" id="docPdf" name="documento" accept=".pdf,application/pdf" required></div>
+            <div class="col-md-4"><button type="submit" name="documento_caricato" value="1" class="btn btn-sm btn-success fw-bold w-100"><i class="fa fa-signature me-1" aria-hidden="true"></i>Al Direttore</button></div></div>
+    </div></form>
+    <?php endif; ?>
 
     <?php if ($in_pagamento): ?>
     <div id="marche" class="card border-0 shadow-sm mb-3" style="border-left:4px solid #b45309 !important;"><div class="card-body">

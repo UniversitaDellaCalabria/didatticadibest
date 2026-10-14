@@ -97,8 +97,13 @@ final class ServizioPratiche
             return true;
         }
 
+        // Un docente non ha confermato (attestati): lo studente corregge e le conferme ripartono
+        if (($p['stato'] ?? '') === 'integrazione') {
+            return !empty((json_decode((string) ($p['richiesta_json'] ?? ''), true) ?: [])['conferma']);
+        }
+
         return in_array($p['stato'] ?? '', ['inviata', 'in_lavorazione'], true) && empty($p['assegnata_a']) && (string) ($p['protocollo'] ?? '') === ''
-            && empty($p['firme_attesa']) && empty($p['seduta_id']) && (int) ($p['passo'] ?? 0) <= 1 && empty($p['bollo_il']);
+            && empty($p['firme_attesa']) && empty($p['conferme_n']) && empty($p['seduta_id']) && (int) ($p['passo'] ?? 0) <= 1 && empty($p['bollo_il']);
     }
 
     /**
@@ -225,7 +230,7 @@ final class ServizioPratiche
         }
         $risposte = self::conservaAllegati($risposte, json_decode((string) $p['risposte_json'], true) ?: []);
         $this->pratiche->aggiornaRisposte($id, (string) json_encode($risposte, JSON_UNESCAPED_UNICODE), self::matricola($u));
-        $this->evento($id, 'attivita', 'studente', (int) $u['id'], null, 'Richiesta modificata dallo studente prima della presa in carico.');
+        $this->evento($id, 'attivita', 'studente', (int) $u['id'], null, $p['stato'] === 'integrazione' ? 'Richiesta corretta dallo studente dopo il rifiuto di un docente.' : 'Richiesta modificata dallo studente prima della presa in carico.');
         $this->flusso->rigenera($id, $m);
 
         return null;

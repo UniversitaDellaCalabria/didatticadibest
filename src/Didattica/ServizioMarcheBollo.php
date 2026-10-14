@@ -88,16 +88,9 @@ final class ServizioMarcheBollo
         if (!$conferma) {
             return ['Spunta che il pagamento della marca da bollo risulta.', ''];
         }
-        if (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
-            return ['Carica il certificato in PDF generato da Esse3: è il documento che firma il Direttore.', ''];
-        }
-        $tmp = (string) ($file['tmp_name'] ?? '');
-        if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || strtolower(pathinfo((string) ($file['name'] ?? ''), PATHINFO_EXTENSION)) !== 'pdf' || !is_file($tmp)) {
-            return ['Il certificato deve essere un PDF (fino a 10 MB).', ''];
-        }
-        $rel = $this->allegati->salvaPdf((string) file_get_contents($tmp));
-        if (!$rel) {
-            return ['Il file non è un PDF valido (fino a 10 MB).', ''];
+        [$rel, $errFile] = $this->salvaCertificato($file);
+        if ($rel === null) {
+            return [$errFile, ''];
         }
         $this->pratiche->segnaBollo($id, $autoreNome);
         // Il certificato da firmare resta interno: lo studente vede il documento firmato quando è pronto
@@ -106,5 +99,57 @@ final class ServizioMarcheBollo
         [$err, $msg] = $this->flusso->trasmettiAlPasso($id, (int) $p['passo'], $uid, $autoreNome);
 
         return [$err, $err ? '' : 'Pagamento registrato. ' . $msg];
+    }
+
+    /**
+     * La pratica è nel passo in cui l'ufficio carica il documento da far firmare (certificati senza marca da bollo, es. il Diploma Supplement).
+     *
+     * @param array<string, mixed> $p
+     */
+    public function inAttesaDocumento(array $p): bool
+    {
+        return $this->iter->passoDocumento($this->moduli->perId((int) $p['modulo_id']), $p);
+    }
+
+    /**
+     * L'ufficio carica il documento (PDF) e la pratica passa alla firma del Direttore. Ritorna [errore|null, messaggio].
+     *
+     * @param array<string, mixed>|null $file elemento di $_FILES
+     * @return array{0: ?string, 1: string}
+     */
+    public function caricaDocumento(int $id, ?array $file, int $uid, string $autoreNome = ''): array
+    {
+        $p = $this->pratiche->perId($id);
+        if (!$p || !$this->inAttesaDocumento($p)) {
+            return ['La pratica non è nel passo in cui si carica il documento da firmare.', ''];
+        }
+        [$rel, $errFile] = $this->salvaCertificato($file);
+        if ($rel === null) {
+            return [$errFile, ''];
+        }
+        $this->storico->evento($id, 'attivita', 'ufficio', $uid, null, 'Documento caricato dall\'ufficio, da firmare.', $rel, 'Documento_' . $p['codice'] . '.pdf', true, $autoreNome);
+        [$err, $msg] = $this->flusso->trasmettiAlPasso($id, (int) $p['passo'], $uid, $autoreNome);
+
+        return [$err, $err ? '' : 'Documento caricato. ' . $msg];
+    }
+
+    /**
+     * Controlla e salva il PDF caricato dall'ufficio. Ritorna [percorso, null] oppure [null, errore].
+     *
+     * @param array<string, mixed>|null $file
+     * @return array{0: ?string, 1: ?string}
+     */
+    private function salvaCertificato(?array $file): array
+    {
+        if (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+            return [null, 'Carica il documento in PDF: è quello che firma il Direttore.'];
+        }
+        $tmp = (string) ($file['tmp_name'] ?? '');
+        if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || strtolower(pathinfo((string) ($file['name'] ?? ''), PATHINFO_EXTENSION)) !== 'pdf' || !is_file($tmp)) {
+            return [null, 'Il documento deve essere un PDF (fino a 10 MB).'];
+        }
+        $rel = $this->allegati->salvaPdf((string) file_get_contents($tmp));
+
+        return $rel ? [$rel, null] : [null, 'Il file non è un PDF valido (fino a 10 MB).'];
     }
 }

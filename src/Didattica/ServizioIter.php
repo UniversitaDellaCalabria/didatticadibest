@@ -19,12 +19,12 @@ final class ServizioIter
 
     /**
      * I passi dell'iter del modulo, normalizzati. Nel JSON un passo è un ufficio (id, chiave o «@cdl» / «@segreteria») oppure un oggetto:
-     * {"t": "ufficio", "u": …, "gg": N, "pagamento": 1}, {"t": "persona", "campo": «domanda di tipo docente», "gg": N}, {"t": "direttore", "gg": N};
+     * {"t": "ufficio", "u": …, "gg": N, "pagamento": 1 | "documento": 1}, {"t": "persona", "campo": «domanda di tipo docente», "gg": N}, {"t": "direttore", "gg": N}, {"t": "conferma", "campo": «domanda o tabella con i docenti», "colonna": «colonna della tabella con il docente», "gg": N};
      * «gg» = giorni dopo i quali si ricorda il passo (0 = quelli del modulo); «pagamento» = passo di attesa del pagamento delle marche da bollo (l'ufficio le
-     * carica in Esse3, avvisa lo studente e spunta il pagamento). I passi non validi (ufficio sparito, di smistamento) si saltano.
+     * carica in Esse3, avvisa lo studente e spunta il pagamento); «documento» = passo in cui l'ufficio carica il documento (PDF) che firma il Direttore, senza pagamento; «genera» = passo in cui il portale prepara l'attestato in PDF (l'ufficio lo controlla e lo manda al Direttore); «uscita» = passo del protocollo in uscita (numero, data e PDF protocollato). I passi non validi (ufficio sparito, di smistamento) si saltano.
      *
      * @param array<string, mixed>|null $m
-     * @return list<array{t: string, u: int|string|null, campo: string, gg: int, pagamento: bool}>
+     * @return list<array{t: string, u: int|string|null, campo: string, colonna: string, gg: int, pagamento: bool, documento: bool, genera: bool, uscita: bool}>
      */
     public function definizione(?array $m): array
     {
@@ -32,26 +32,29 @@ final class ServizioIter
         foreach (json_decode((string) ($m['iter_json'] ?? ''), true) ?: [] as $x) {
             $t = is_array($x) ? (string) ($x['t'] ?? 'ufficio') : 'ufficio';
             $gg = is_array($x) ? max(0, min(90, (int) ($x['gg'] ?? 0))) : 0;
+            $base = ['t' => '', 'u' => null, 'campo' => '', 'colonna' => '', 'gg' => $gg, 'pagamento' => false, 'documento' => false, 'genera' => false, 'uscita' => false];
             if ($t === 'direttore') {
-                $out[] = ['t' => 'direttore', 'u' => null, 'campo' => '', 'gg' => $gg, 'pagamento' => false];
+                $out[] = ['t' => 'direttore'] + $base;
                 continue;
             }
-            if ($t === 'persona') {
+            if ($t === 'persona' || $t === 'conferma') {
                 $campo = trim((string) ($x['campo'] ?? ''));
                 if ($campo !== '') {
-                    $out[] = ['t' => 'persona', 'u' => null, 'campo' => $campo, 'gg' => $gg, 'pagamento' => false];
+                    $out[] = ['t' => $t, 'campo' => $campo, 'colonna' => $t === 'conferma' ? trim((string) ($x['colonna'] ?? '')) : ''] + $base;
                 }
                 continue;
             }
             $u = self::voceUfficio($x);
             $pag = is_array($x) && !empty($x['pagamento']);
+            $az = ['pagamento' => $pag, 'documento' => is_array($x) && !empty($x['documento']) && !$pag, 'genera' => is_array($x) && !empty($x['genera']) && !$pag,
+                   'uscita' => is_array($x) && !empty($x['uscita']) && !$pag];
             if ($u === '@cdl' || $u === '@segreteria') {
-                $out[] = ['t' => 'ufficio', 'u' => $u, 'campo' => '', 'gg' => $gg, 'pagamento' => $pag];
+                $out[] = ['t' => 'ufficio', 'u' => $u] + $az + $base;
                 continue;
             }
             $id = $this->uffici->idDa($u);
             if ($id && !(int) ($this->uffici->tutti()[$id]['smista'] ?? 0)) {
-                $out[] = ['t' => 'ufficio', 'u' => $id, 'campo' => '', 'gg' => $gg, 'pagamento' => $pag];
+                $out[] = ['t' => 'ufficio', 'u' => $id] + $az + $base;
             }
         }
 
@@ -77,6 +80,48 @@ final class ServizioIter
         }
 
         return !empty($this->definizione($m)[(int) $p['passo'] - 1]['pagamento']);
+    }
+
+    /**
+     * Il passo attuale ha il flag indicato («genera», «uscita») e la pratica non è conclusa.
+     *
+     * @param array<string, mixed>|null $m
+     * @param array<string, mixed> $p
+     */
+    public function passoCon(string $flag, ?array $m, array $p): bool
+    {
+        if (in_array($p['stato'] ?? '', ['bozza', 'accolta', 'respinta', 'chiusa'], true) || (int) ($p['passo'] ?? 0) < 1) {
+            return false;
+        }
+
+        return !empty($this->definizione($m)[(int) $p['passo'] - 1][$flag]);
+    }
+
+    /** Dopo il passo indicato (1 = primo) c'è un passo con il flag (es. «uscita»: il documento firmato non è ancora per lo studente). */
+    public function haPassoDopo(string $flag, ?array $m, int $passo): bool
+    {
+        foreach (array_slice($this->definizione($m), $passo) as $d) {
+            if (!empty($d[$flag])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Il passo dell'iter in cui si trova la pratica è quello in cui l'ufficio carica il documento da far firmare al Direttore (e la pratica non è conclusa).
+     *
+     * @param array<string, mixed>|null $m
+     * @param array<string, mixed> $p
+     */
+    public function passoDocumento(?array $m, array $p): bool
+    {
+        if (in_array($p['stato'] ?? '', ['bozza', 'accolta', 'respinta', 'chiusa'], true) || (int) ($p['passo'] ?? 0) < 1) {
+            return false;
+        }
+
+        return !empty($this->definizione($m)[(int) $p['passo'] - 1]['documento']);
     }
 
     /**
@@ -107,6 +152,7 @@ final class ServizioIter
             $it[] = match (true) {
                 $d['t'] === 'persona' => Costanti::ITER_PERSONA,
                 $d['t'] === 'direttore' => Costanti::ITER_DIRETTORE,
+                $d['t'] === 'conferma' => Costanti::ITER_CONFERMA,
                 $d['u'] === '@cdl' => !empty($p['cdl_id']) ? (int) $p['cdl_id'] : Costanti::ITER_CDL,
                 $d['u'] === '@segreteria' => !empty($p['segreteria_id']) ? (int) $p['segreteria_id'] : Costanti::ITER_SEGRETERIA,
                 default => (int) $d['u'],
@@ -131,6 +177,7 @@ final class ServizioIter
             $out[$i + 1] = match (true) {
                 $id === Costanti::ITER_PERSONA => 'Firma: ' . ($def[$i]['campo'] ?? 'persona indicata'),
                 $id === Costanti::ITER_DIRETTORE => 'Firma del Direttore',
+                $id === Costanti::ITER_CONFERMA => 'Conferma dei docenti',
                 $id === Costanti::ITER_CDL => 'Ufficio del corso di studio',
                 $id === Costanti::ITER_SEGRETERIA => 'Segreteria studenti',
                 $id > 0 => (string) ($this->uffici->tutti()[$id]['nome'] ?? 'Ufficio didattico'),
@@ -138,6 +185,12 @@ final class ServizioIter
             };
             if (!empty($def[$i]['pagamento'])) {
                 $out[$i + 1] .= ' · marche da bollo';
+            } elseif (!empty($def[$i]['documento'])) {
+                $out[$i + 1] .= ' · documento da firmare';
+            } elseif (!empty($def[$i]['genera'])) {
+                $out[$i + 1] .= ' · attestato da controllare';
+            } elseif (!empty($def[$i]['uscita'])) {
+                $out[$i + 1] .= ' · protocollo in uscita';
             }
         }
         // Pratiche che vanno prima al protocollo: non c'è uno smistamento

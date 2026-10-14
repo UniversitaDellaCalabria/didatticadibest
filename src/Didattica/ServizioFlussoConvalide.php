@@ -31,7 +31,8 @@ final class ServizioFlussoConvalide implements FlussoPratica
         private ConsiglioRepository $consigli,
         private SedutaRepository $sedute,
         private DomandaPdfa $domanda,
-        private FirmaPratica $firme
+        private FirmaPratica $firme,
+        private ServizioConfermeDocenti $conferme
     ) {
     }
 
@@ -106,6 +107,7 @@ final class ServizioFlussoConvalide implements FlussoPratica
         }
         // Le altre pratiche dell'elenco del Dipartimento (moduli inattivi da rivedere e attivare)
         (new ModelliPratiche($this->db))->prepara();
+        $this->uffici->tutti(true);
     }
 
     public function creaModuloConvalida(): int
@@ -163,6 +165,12 @@ final class ServizioFlussoConvalide implements FlussoPratica
         if ($this->domanda->config($m)['pdf']) {
             $this->domanda->genera($id);
         }
+        // Un docente non aveva confermato e lo studente ha corretto: i docenti ricevono di nuovo la richiesta
+        $p = $this->pratiche->perId($id);
+        $rq = $p ? (json_decode((string) ($p['richiesta_json'] ?? ''), true) ?: []) : [];
+        if ($p && $p['stato'] === 'integrazione' && !empty($rq['conferma']) && ($err = $this->conferme->riavvia($id))) {
+            $this->storico->evento($id, 'messaggio', 'ufficio', 0, null, 'La conferma dei docenti non è ripartita: ' . $err, null, null, true);
+        }
     }
 
     public function avvia(int $id, array $m, array $u): void
@@ -179,6 +187,10 @@ final class ServizioFlussoConvalide implements FlussoPratica
         // Iter che comincia con una firma (es. il relatore firma prima del protocollo): la richiesta parte subito
         if (in_array($primo, [Costanti::ITER_PERSONA, Costanti::ITER_DIRETTORE], true) && ($err = $this->firme->avvia($id, 1))) {
             $this->storico->evento($id, 'messaggio', 'ufficio', 0, null, 'La firma non è partita: ' . $err, null, null, true);
+        }
+        // Iter che comincia con la conferma dei docenti (attestati): i docenti ricevono subito il loro link
+        if ($primo === Costanti::ITER_CONFERMA && ($err = $this->conferme->avvia($id, 1))) {
+            $this->storico->evento($id, 'messaggio', 'ufficio', 0, null, 'La conferma dei docenti non è partita: ' . $err, null, null, true);
         }
     }
 
@@ -208,6 +220,10 @@ final class ServizioFlussoConvalide implements FlussoPratica
         if (in_array($dopo, [Costanti::ITER_PERSONA, Costanti::ITER_DIRETTORE], true)) {
             $err = $this->firme->avvia($id, $idx + 1);
             return $err ? [$err, ''] : [null, 'La pratica è stata mandata alla firma.'];
+        }
+        if ($dopo === Costanti::ITER_CONFERMA) {
+            $err = $this->conferme->avvia($id, $idx + 1);
+            return $err ? [$err, ''] : [null, 'La pratica è stata mandata alla conferma dei docenti.'];
         }
         $extra = [];
         if ($dopo === Costanti::ITER_CDL) {
@@ -314,6 +330,10 @@ final class ServizioFlussoConvalide implements FlussoPratica
         if (in_array($dopo, [Costanti::ITER_PERSONA, Costanti::ITER_DIRETTORE], true)) {
             $err = $this->firme->avvia($id, $pos + 2);
             return [null, $err ? "Protocollo registrato. La firma non è partita: " . $err : "Protocollo registrato: la pratica è stata mandata alla firma."];
+        }
+        if ($dopo === Costanti::ITER_CONFERMA) {
+            $err = $this->conferme->avvia($id, $pos + 2);
+            return [null, $err ? "Protocollo registrato. La conferma dei docenti non è partita: " . $err : "Protocollo registrato: la pratica è stata mandata alla conferma dei docenti."];
         }
         $extra = [];
         if ($dopo === Costanti::ITER_CDL) {

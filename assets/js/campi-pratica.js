@@ -35,6 +35,22 @@
         }
     });
 
+    // ── Docente titolare proposto dall'insegnamento scelto (campo «Docente» della stessa riga o dello stesso modulo) ──
+    document.addEventListener('change', function (e) {
+        var el = e.target;
+        if (!el || el.tagName !== 'INPUT') return;
+        var box = el.closest('.campo-pratica');
+        var inIns = el.dataset.col === 'insegnamento' || el.dataset.col === 'insegnamento_dip' || (box && box.dataset.tipo === 'insegnamento');
+        if (!inIns) return;
+        var dl = document.getElementById('dl_insegnamento'), doc = '';
+        if (!dl) return;
+        Array.prototype.forEach.call(dl.options, function (o) { if (o.value === el.value) doc = o.dataset.docente || ''; });
+        if (!doc) return;
+        var tr = el.closest('tr');
+        var dest = tr ? tr.querySelector('input[data-col="docente"]') : (el.form && el.form.querySelector('.campo-pratica[data-tipo="docente"] input'));
+        if (dest && (dest.value.trim() === '' || dest.dataset.proposto === '1')) { dest.value = doc; dest.dataset.proposto = '1'; }
+    });
+
     // ── Logica dei campi ─────────────────────────────────────────────────────
     function valoreCampo(form, nome) {
         var box = form.querySelector('.campo-pratica[data-nome="' + nome + '"]');

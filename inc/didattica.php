@@ -283,6 +283,13 @@ if (!function_exists('salva_bozza_pratica')) {
     }
 }
 
+if (!function_exists('controlla_docenti_modulo')) {
+    // Moduli con la conferma dei docenti (attestati): ogni docente indicato deve essere nell'anagrafe con una email. Ritorna gli errori da mostrare.
+    function controlla_docenti_modulo($conn, array $m, array $risposte): array {
+        return \App\Core\App::per($conn)->get(\App\Didattica\ServizioConfermeDocenti::class)->controllaDocenti($m, $risposte);
+    }
+}
+
 if (!function_exists('cambia_stato_pratica')) {
     // $richiesta (solo per 'integrazione'): ['tipo' => 'documenti'|'autodichiarazione', 'testo' => …] da mostrare allo studente
     function cambia_stato_pratica($conn, int $id, string $stato, string $nota, int $uid, string $autore_nome = '', ?array $richiesta = null): bool {
