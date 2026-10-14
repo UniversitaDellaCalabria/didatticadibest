@@ -98,7 +98,7 @@ details > summary { cursor: pointer; font-weight: 700; }
 // ==========================================================================================
 // DATI — è la sola parte da aggiornare a ogni step (Claude lo fa per te).
 // ==========================================================================================
-var AGGIORNATO = "20/10/2026";
+var AGGIORNATO = "21/10/2026";
 
 var PACCHETTI = [
   {
@@ -479,7 +479,8 @@ var PACCHETTI = [
         ["risorse_responsabile.php", "mod", "B4", "pulsante «Cruscotto» e avviso delle scadenze su ogni risorsa (ripete le modifiche del pacchetto 8)"]
       ]},
       { cartella: "admin/", file: [
-        ["admin/risorse.php", "mod", "B4", "scheda «Scadenze» della risorsa: aggiungi, modifica, elimina (ripete le modifiche del pacchetto 8)"]
+        ["admin/risorse.php", "mod", "B4", "scheda «Scadenze» della risorsa: aggiungi, modifica, elimina (ripete le modifiche del pacchetto 8)"],
+        ["admin/inizio.php", "mod", "correzione", "«Cose da fare» della scrivania: ogni gruppo è indipendente, se uno dà errore gli altri (es. convenzioni da stipulare) compaiono lo stesso"]
       ]},
       { cartella: "src/Risorse/", file: [
         ["src/Risorse/ScadenzaRisorsaRepository.php", "nuovo", "B4", "scadenze nel database"],
@@ -504,6 +505,60 @@ var PACCHETTI = [
     ],
     nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
     commit: "Risorse: cruscotto del responsabile (prenotazioni, utilizzo, fasce, persone, quantità, km e consumi) con Excel e scadenze di bollo, assicurazione e tagliando con avvisi via email e rinnovo"
+  },
+  {
+    id: "certificato-iscrizione",
+    titolo: "Pacchetto 10 · Pratiche: bozza, modifica e marche da bollo — Certificato di iscrizione",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare",
+    schema: "v63",
+    riassunto: "La prima pratica dell'elenco, <strong>«Richiesta Certificato di Iscrizione»</strong>, con i campi di Uniticket, e tre novità valide per <strong>tutte le pratiche</strong>: lo studente può <strong>salvare in bozza</strong> e riprendere, può <strong>modificare finché l'ufficio non la prende in carico</strong>, e il nuovo passo <strong>«attesa del pagamento»</strong> (la segreteria carica le marche in Esse3, avvisa lo studente, spunta il pagamento e carica il certificato; poi firma il Direttore e lo studente lo stampa).",
+    passi: [["C1", "Prima pratica: certificato di iscrizione, bozza, modifica, marche da bollo"]],
+    cartelle: [
+      { cartella: "/ (radice del portale)", file: [
+        ["modulo.php", "mod", "C1", "«Salva come bozza», «Salva le modifiche» e ripresa di una bozza o di una pratica non ancora presa in carico"],
+        ["pratiche.php", "mod", "C1", "bozze nell'elenco (Riprendi, elimina), «Modifica la richiesta», riquadro «Il documento firmato è pronto» con Scarica il PDF"]
+      ]},
+      { cartella: "inc/ e assets/js/", file: [
+        ["inc/didattica.php", "mod", "C1", "funzioni per bozza, invio, modifica e valori iniziali"],
+        ["assets/js/campi-pratica.js", "mod", "C1", "la bozza si salva anche con campi mancanti"]
+      ]},
+      { cartella: "admin/", file: [
+        ["admin/didattica_pratiche.php", "mod", "C1", "riquadro «Marche da bollo» (avvisa lo studente, spunta il pagamento, certificato di Esse3, passa al Direttore); le bozze non compaiono"],
+        ["admin/didattica_moduli.php", "mod", "C1", "nel costruttore, per un passo «Un ufficio»: «Attesa del pagamento delle marche da bollo»"]
+      ]},
+      { cartella: "src/Didattica/", file: [
+        ["src/Didattica/ServizioMarcheBollo.php", "nuovo", "C1", "avviso marche caricate e registrazione del pagamento"],
+        ["src/Didattica/ModelliPratiche.php", "nuovo", "C1", "crea la pratica «Richiesta Certificato di Iscrizione» (inattiva) con i campi di Uniticket, iter e domanda in PDF/A"],
+        ["src/Didattica/ServizioPratiche.php", "mod", "C1", "bozza, invio della bozza, modifica fino alla presa in carico, eliminazione bozza"],
+        ["src/Didattica/PraticaRepository.php", "mod", "C1", "bozze, marche e bollo; le bozze restano fuori dagli elenchi degli operatori"],
+        ["src/Didattica/ServizioIter.php", "mod", "C1", "passo di attesa del pagamento"],
+        ["src/Didattica/ServizioModuli.php", "mod", "C1", "salva il passo di pagamento"],
+        ["src/Didattica/ServizioFlussoConvalide.php", "mod", "C1", "fine iter: lo studente è avvisato del documento firmato; crea le pratiche preparate; rifà la domanda dopo una modifica"],
+        ["src/Didattica/FlussoPratica.php", "mod", "C1", "rifacimento della domanda"],
+        ["src/Didattica/NotifichePratiche.php", "mod", "C1", "email «Puoi pagare le marche da bollo» e «Il tuo documento è pronto»"],
+        ["src/Didattica/AllegatiPratiche.php", "mod", "C1", "salvataggio del certificato in PDF"],
+        ["src/Didattica/HtmlCampi.php", "mod", "C1", "valori da rimettere nei campi riprendendo una bozza"],
+        ["src/Didattica/Costanti.php", "mod", "C1", "stato «Bozza»"]
+      ]},
+      { cartella: "src/ (altri)", file: [
+        ["src/Portale/CoseDaFare.php", "mod", "C1", "le bozze non contano tra le pratiche da smistare"],
+        ["src/Iscrizioni/AreaPersonaleRepository.php", "mod", "C1", "le bozze non contano tra le pratiche aperte"]
+      ]},
+      { cartella: "src/Core/Schema/ (anche pacchetti 1-9)", file: [
+        ["src/Core/Schema/Definizioni.php", "mod", "C1 · anche pacchetti 1-9", "colonne marche_il e marche_da"],
+        ["src/Core/Schema/Migrazioni.php", "mod", "C1 · anche pacchetti 1-9", "versione dello schema: 63"]
+      ]}
+    ],
+    dopo: [
+      "Apri una pagina del pannello: il portale crea da solo <code>cache/schema_v63.ok</code> e prepara il modulo <strong>«Richiesta Certificato di Iscrizione»</strong> (inattivo).",
+      "<strong>Admin → Didattica → Moduli e documenti</strong>: apri il modulo, controlla i campi e l'iter (Protocollo → ufficio del corso di studio con attesa del pagamento → Firma del Direttore) e <strong>attivalo</strong>.",
+      "Il <strong>Direttore</strong> (nome ed email) si indica una volta sola in Formazione Scuola Lavoro → Scuole e convenzioni → «Direttore che firma le convenzioni»: vale anche per le pratiche.",
+      "L'<strong>ufficio che carica le marche</strong> è l'ufficio del corso di studio (stesso delle convalide): le persone che lo compongono si indicano in Didattica → Ufficio e ricevimento, con i corsi che seguono.",
+      "<strong>Prova veloce:</strong> da studente apri il modulo, salva una bozza e riprendila, invia; con l'operatore del protocollo prendila in carico (da quel momento lo studente non può più modificare); poi dal riquadro «Marche da bollo» avvisa lo studente, spunta il pagamento e carica un PDF."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Pratiche: bozza, modifica fino alla presa in carico, passo di attesa del pagamento delle marche da bollo e prima pratica «Richiesta Certificato di Iscrizione» con firma del Direttore"
   }
 ];
 
@@ -522,6 +577,7 @@ var PROSSIMI = [
   ["F2 · Prenotazioni ricorrenti e liste d'attesa per le risorse", "da fare"],
   ["F3 · Backup e ripristino dei file caricati e del database", "da fare"],
   ["F4 · Guide per ruolo («Come si fa»): referente, relatore, responsabile di risorsa, tutor, studente", "da fare dopo il collaudo"],
+  ["F5 · Assistente IA interno per i verbali (testi e vocali, gratis, dentro il server)", "da valutare: prima la prova sul server, comandi nel piano (F5)"],
   ["E1–E2 · Protocollo Titulus", "in attesa della risposta dell'Ateneo (servono i parametri, §6 del piano)"],
   ["Firma digitale remota (Aruba) in produzione", "in attesa dell'Ateneo: finché non ci sono le variabili ARUBA_* nel .env si carica il PDF firmato a mano"]
 ];

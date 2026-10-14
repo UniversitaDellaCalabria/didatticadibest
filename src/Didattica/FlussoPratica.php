@@ -12,4 +12,11 @@ interface FlussoPratica
      * @param array<string, mixed> $utente
      */
     public function avvia(int $pratica, array $modulo, array $utente): void;
+
+    /**
+     * Le risposte sono cambiate prima che qualcuno prendesse in carico la pratica: si rifà la domanda in PDF/A.
+     *
+     * @param array<string, mixed> $modulo
+     */
+    public function rigenera(int $pratica, array $modulo): void;
 }

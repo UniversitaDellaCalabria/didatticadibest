@@ -25,7 +25,7 @@ final class CoseDaFare
     public function praticheDaSmistare(): array
     {
         $r = $this->db->riga("SELECT COUNT(*) AS n, DATEDIFF(NOW(), MIN(creata_il)) AS giorni FROM pratiche
-            WHERE assegnata_a IS NULL AND ufficio_id IS NULL AND stato NOT IN ('accolta', 'respinta', 'chiusa')");
+            WHERE assegnata_a IS NULL AND ufficio_id IS NULL AND stato NOT IN ('bozza', 'accolta', 'respinta', 'chiusa')");
 
         return ['n' => (int) ($r['n'] ?? 0), 'giorni' => max(0, (int) ($r['giorni'] ?? 0))];
     }

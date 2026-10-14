@@ -16,21 +16,47 @@ $puo = utente_destinatario_modulo($conn, $m, $user_info);
 [$aperto, $periodo] = periodo_modulo($m);
 if (!$aperto) $puo = false;
 $errori = [];
-if ($puo && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['invia_modulo'])) {
+// Bozza da riprendere o pratica già inviata che nessuno ha ancora preso in carico (?pratica=): si compila di nuovo lo stesso modulo
+$pr = null;
+if ($puo && (int)($_GET['pratica'] ?? 0) > 0) {
+    $pr = pratica($conn, (int)$_GET['pratica']);
+    if (!$pr || (int)$pr['utente_id'] !== (int)$user_info['id'] || (int)$pr['modulo_id'] !== (int)$m['id']) { $pr = null; flash_set("Pratica non trovata.", 'danger'); header('Location: pratiche.php'); exit; }
+    if (!pratica_modificabile($pr)) { flash_set("La pratica è già stata presa in carico dall'ufficio: non si può più modificare. Puoi scrivere all'ufficio da qui.", 'warning'); header('Location: pratiche.php?id=' . (int)$pr['id']); exit; }
+}
+$e_bozza = $pr && $pr['stato'] === 'bozza';
+$vecchie = $pr ? (json_decode((string)$pr['risposte_json'], true) ?: []) : [];
+if ($puo && $_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['invia_modulo']) || isset($_POST['salva_bozza']))) {
     csrf_verify($_POST['csrf_token'] ?? '');
-    if (!check_rate_limit($conn, 'modulo_didattica', 20, 3600)) $errori[] = "Troppi invii in poco tempo: riprova più tardi.";
+    if (!check_rate_limit($conn, 'modulo_didattica', 40, 3600)) $errori[] = "Troppi invii in poco tempo: riprova più tardi.";
     else {
         [$risposte, $errori] = leggi_risposte_modulo($campi, $conn);
-        if (!$errori) {
-            $id = crea_pratica($conn, $m, $user_info, $risposte);
-            if ($id) { flash_set("Richiesta inviata: ti abbiamo mandato una conferma per email. Qui puoi seguirne lo stato."); header('Location: pratiche.php?id=' . $id); exit; }
-            $errori[] = "Non è stato possibile salvare la richiesta: riprova.";
-        } else {
+        if ($pr) $errori = errori_senza_allegati_presenti($errori, $campi, $vecchie);
+        if (isset($_POST['salva_bozza']) && !$pr || isset($_POST['salva_bozza']) && $e_bozza) {
+            // Bozza: nessun controllo sui campi obbligatori, si riprende e si invia quando si vuole
+            $id = salva_bozza_pratica($conn, $m, $user_info, $risposte, $e_bozza ? (int)$pr['id'] : 0);
+            if ($id) { flash_set("Bozza salvata: la trovi tra le tue pratiche e puoi riprenderla e inviarla quando vuoi."); header('Location: modulo.php?id=' . (int)$m['id'] . '&pratica=' . $id); exit; }
+            $errori[] = "Non è stato possibile salvare la bozza: riprova.";
+        } elseif (!$errori) {
+            if ($e_bozza) {
+                if (invia_bozza_pratica($conn, (int)$pr['id'], $m, $user_info, $risposte)) { flash_set("Richiesta inviata: ti abbiamo mandato una conferma per email. Qui puoi seguirne lo stato."); header('Location: pratiche.php?id=' . (int)$pr['id']); exit; }
+                $errori[] = "Non è stato possibile inviare la richiesta: riprova.";
+            } elseif ($pr) {
+                $err_m = modifica_pratica($conn, (int)$pr['id'], $m, $user_info, $risposte);
+                if (!$err_m) { flash_set("Richiesta modificata: l'ufficio vedrà i dati aggiornati."); header('Location: pratiche.php?id=' . (int)$pr['id']); exit; }
+                $errori[] = $err_m;
+            } else {
+                $id = crea_pratica($conn, $m, $user_info, $risposte);
+                if ($id) { flash_set("Richiesta inviata: ti abbiamo mandato una conferma per email. Qui puoi seguirne lo stato e, finché l'ufficio non la prende in carico, modificarla."); header('Location: pratiche.php?id=' . $id); exit; }
+                $errori[] = "Non è stato possibile salvare la richiesta: riprova.";
+            }
+        }
+        if ($errori) {
             // Allegati già salvati di un invio non andato a buon fine: si eliminano
-            foreach ($risposte as $r) if (!empty($r['file']) && is_file(RADICE_SITO . '/' . $r['file'])) @unlink(RADICE_SITO . '/' . $r['file']);
+            foreach ($risposte as $r) if (!empty($r['file']) && is_file(RADICE_SITO . '/' . $r['file']) && !in_array($r['file'], array_column($vecchie, 'file'), true)) @unlink(RADICE_SITO . '/' . $r['file']);
         }
     }
 }
+$iniziali = $pr ? valori_iniziali_pratica($conn, $campi, $vecchie) : [];
 
 $page_cfg['titolo'] = $m['titolo'];
 require_once 'header.php';
@@ -55,10 +81,22 @@ require_once 'header.php';
             <?php echo html_datalist_didattica($conn, $campi); ?>
             <?php // Campi brevi affiancati; con più sezioni (titoli) il modulo va a pagine (assets/js/campi-pratica.js) ?>
             <div class="pagine-modulo"><div class="row gx-4">
-            <?php foreach ($campi as $c): echo html_campo_pratica($c, $c['tipo'] === 'file' ? '' : ($_SERVER['REQUEST_METHOD'] === 'POST' ? valori_post_campo($c) : valore_iniziale_campo($c, $user_info)), $conn, true); endforeach; ?>
+            <?php foreach ($campi as $c): echo html_campo_pratica($c, $c['tipo'] === 'file' ? '' : ($_SERVER['REQUEST_METHOD'] === 'POST' ? valori_post_campo($c) : (array_key_exists($c['nome'], $iniziali) ? $iniziali[$c['nome']] : valore_iniziale_campo($c, $user_info))), $conn, true); endforeach; ?>
             </div></div>
             <?php if (!$campi): ?><p class="text-secondary">Il modulo non ha domande: invia la richiesta e l'ufficio ti contatterà.</p><?php endif; ?>
-            <button type="submit" name="invia_modulo" value="1" class="btn btn-success fw-bold mt-2 invia-modulo"><i class="fa fa-paper-plane me-1" aria-hidden="true"></i>Invia la richiesta</button>
+            <?php $allegati_presenti = array_filter($vecchie, fn($r) => !empty($r['file'])); if ($allegati_presenti): ?><div class="small text-secondary mb-2"><i class="fa fa-paperclip me-1" aria-hidden="true"></i>Allegati già caricati: <?php echo $h(implode(', ', array_map(fn($r) => (string)($r['nome_file'] ?? ''), $allegati_presenti))); ?>. Restano se non ne scegli di nuovi.</div><script>document.querySelectorAll('input[type=file][required]').forEach(function (i) { i.required = false; });</script><?php endif; ?>
+            <div class="d-flex flex-wrap gap-2 align-items-center mt-2">
+                <?php if ($pr && !$e_bozza): ?>
+                <button type="submit" name="invia_modulo" value="1" class="btn btn-success fw-bold invia-modulo"><i class="fa fa-floppy-disk me-1" aria-hidden="true"></i>Salva le modifiche</button>
+                <a href="pratiche.php?id=<?php echo (int)$pr['id']; ?>" class="btn btn-outline-secondary">Annulla</a>
+                <?php else: ?>
+                <button type="submit" name="invia_modulo" value="1" class="btn btn-success fw-bold invia-modulo"><i class="fa fa-paper-plane me-1" aria-hidden="true"></i>Invia la richiesta</button>
+                <button type="submit" name="salva_bozza" value="1" class="btn btn-outline-secondary fw-bold salva-bozza" formnovalidate><i class="fa fa-pen me-1" aria-hidden="true"></i>Salva come bozza</button>
+                <?php endif; ?>
+            </div>
+            <?php if ($pr && !$e_bozza): ?><div class="form-text">Puoi modificare la richiesta finché l'ufficio non la prende in carico.</div>
+            <?php elseif ($e_bozza): ?><div class="form-text">Questa è una bozza: non è ancora arrivata all'ufficio. La puoi riprendere dalle tue pratiche.</div>
+            <?php else: ?><div class="form-text">Con «Salva come bozza» la richiesta resta con te: la riprendi e la invii quando vuoi. Dopo l'invio puoi ancora modificarla finché l'ufficio non la prende in carico.</div><?php endif; ?>
         </form>
         <?php echo js_tabelle_pratica(); ?>
     <?php endif; ?>

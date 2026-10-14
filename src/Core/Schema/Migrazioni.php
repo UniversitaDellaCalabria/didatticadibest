@@ -16,7 +16,7 @@ use Closure;
  */
 final class Migrazioni
 {
-    public const VERSIONE = 62;
+    public const VERSIONE = 63;
 
     /**
      * @param list<string> $gruppiPersonale gruppi assegnati al login in base al ruolo in Ateneo (GRUPPI_PERSONALE)

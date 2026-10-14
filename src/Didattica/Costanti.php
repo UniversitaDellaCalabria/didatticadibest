@@ -9,6 +9,7 @@ final class Costanti
 {
     /** Stato della pratica => [nome, colore, icona]. */
     public const STATI_PRATICA = [
+        'bozza'          => ['Bozza', '#64748b', 'fa-pen'],
         'inviata'        => ['Inviata', '#0056B3', 'fa-paper-plane'],
         'in_lavorazione' => ['In lavorazione', '#7c3aed', 'fa-gears'],
         'integrazione'   => ['Integrazione richiesta', '#b45309', 'fa-circle-exclamation'],

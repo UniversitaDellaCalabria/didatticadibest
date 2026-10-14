@@ -218,7 +218,7 @@ echo pn_percorso([
                 <td class="fw-semibold"><?php echo $h($x['scuola_nome']); ?></td><td><?php echo $h($x['titolo']); ?><div class="text-secondary"><?php echo $h($x['area']); ?></div></td>
                 <td class="text-nowrap"><?php echo $d($x['al']); ?></td>
                 <td><?php echo $h(trim($x['nome'] . ' ' . $x['cognome'])); ?><div class="text-secondary"><?php echo $h($x['email']); ?></div></td>
-                <td class="text-nowrap"><a class="btn btn-sm btn-outline-secondary fw-bold py-0" href="iscritti.php?p_id=<?php echo (int)$x['pagina_id']; ?>&f_cerca=<?php echo urlencode($x['codice_prenotazione']); ?>">Apri l'iscrizione</a></td>
+                <td class="text-nowrap"><a class="btn btn-sm btn-outline-secondary fw-bold py-0" href="iscritti.php?p_id=<?php echo (int)$x['pagina_id']; ?><?php echo !empty($x['archiviato']) ? '&archivio=1' : ''; ?>&f_cerca=<?php echo urlencode($x['codice_prenotazione']); ?>">Apri l'iscrizione</a></td>
             </tr>
         <?php endforeach; ?>
         </tbody>

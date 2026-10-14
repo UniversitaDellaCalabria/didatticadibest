@@ -8,6 +8,13 @@ $uid = (int)$_SESSION['utente_id'];
 $id = (int)($_GET['id'] ?? 0);
 $p = $id ? pratica($conn, $id) : null;
 if ($p && (int)$p['utente_id'] !== $uid) $p = null; // solo le proprie
+// Le bozze si riprendono dal modulo
+if ($p && $p['stato'] === 'bozza') { header('Location: modulo.php?id=' . (int)$p['modulo_id'] . '&pratica=' . (int)$p['id']); exit; }
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['elimina_bozza'])) {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    flash_set(elimina_bozza_pratica($conn, (int)($_POST['pratica_id'] ?? 0), $uid) ? 'Bozza eliminata.' : 'Non è stato possibile eliminare la bozza.', 'info');
+    header('Location: pratiche.php?r=' . time()); exit;
+}
 
 if ($p && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['autodichiarazione'])) {
     csrf_verify($_POST['csrf_token'] ?? '');
@@ -44,12 +51,20 @@ require_once 'header.php';
         $etichette_ev = ['passaggio' => 'Passaggio', 'attivita' => 'Attività', 'autodich' => 'Autodichiarazione']; ?>
         <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
             <div><h1 class="fw-bold h3 mb-0"><?php echo $h($p['modulo_titolo']); ?></h1><div class="small text-secondary font-monospace"><?php echo $h($p['codice']); ?> · inviata il <?php echo date('d/m/Y H:i', strtotime($p['creata_il'])); ?><?php echo ($p['protocollo'] ?? '') !== '' ? ' · prot. ' . $h($p['protocollo']) . (!empty($p['protocollo_data']) ? ' del ' . date('d/m/Y', strtotime($p['protocollo_data'])) : '') : ''; ?></div></div>
-            <div class="fs-6"><?php echo badge_stato_pratica($p['stato']); ?></div>
+            <div class="fs-6 d-flex flex-wrap gap-2 align-items-center"><?php echo badge_stato_pratica($p['stato']); ?><?php if (pratica_modificabile($p)): ?><a href="modulo.php?id=<?php echo (int)$p['modulo_id']; ?>&amp;pratica=<?php echo (int)$p['id']; ?>" class="btn btn-sm btn-outline-primary fw-bold"><i class="fa fa-pen me-1" aria-hidden="true"></i>Modifica la richiesta</a><?php endif; ?></div>
         </div>
         <div class="card border-0 shadow-sm mb-3"><div class="card-body">
             <h2 class="h6 fw-bold mb-2">A che punto è la tua pratica</h2>
             <?php echo html_iter_pratica($conn, $p, $m_p); ?>
         </div></div>
+        <?php $doc_pronto = null; foreach (array_reverse($eventi) as $e_d) { if (!empty($e_d['allegato']) && str_starts_with((string)$e_d['nome_allegato'], 'Firmato_direttore_')) { $doc_pronto = $e_d; break; } } ?>
+        <?php if ($doc_pronto): ?>
+            <div class="card border-0 shadow-sm mb-3" style="border-left:5px solid #15803d !important;"><div class="card-body d-flex flex-wrap align-items-center gap-3">
+                <div class="flex-grow-1"><h2 class="h6 fw-bold mb-1"><i class="fa fa-circle-check me-1" style="color:#15803d;" aria-hidden="true"></i>Il documento firmato è pronto</h2>
+                    <div class="small text-secondary">Firmato digitalmente dal Direttore il <?php echo date('d/m/Y', strtotime($doc_pronto['creato_il'])); ?>. Scaricalo e stampalo: la firma digitale (PAdES) è valida anche sul documento stampato come copia analogica.</div></div>
+                <a class="btn btn-success fw-bold" href="allegato_pratica.php?p=<?php echo (int)$p['id']; ?>&amp;e=<?php echo (int)$doc_pronto['id']; ?>"><i class="fa fa-file-pdf me-1" aria-hidden="true"></i>Scarica il PDF</a>
+            </div></div>
+        <?php endif; ?>
         <?php if ($richiesta && $richiesta['tipo'] === 'autodichiarazione'): ?>
             <form method="POST" class="card border-0 shadow-sm mb-3" style="border-left:5px solid #b45309 !important;"><div class="card-body">
                 <?php csrf_field(); ?>
@@ -103,7 +118,12 @@ require_once 'header.php';
         <p class="text-secondary">Le richieste inviate con i moduli online. Per una nuova richiesta vai alla <a href="modulistica.php">Modulistica</a>.</p>
         <?php if (!$mie): ?><div class="alert alert-light border">Non hai ancora inviato richieste.</div><?php endif; ?>
         <div class="list-group">
-        <?php foreach ($mie as $x): ?>
+        <?php foreach ($mie as $x): $e_b = $x['stato'] === 'bozza'; ?>
+            <?php if ($e_b): ?><div class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <span><strong><?php echo $h($x['modulo_titolo']); ?></strong><span class="d-block small text-secondary font-monospace"><?php echo $h($x['codice']); ?> · salvata il <?php echo date('d/m/Y H:i', strtotime($x['aggiornata_il'] ?: $x['creata_il'])); ?> · non ancora inviata</span></span>
+                <span class="d-flex gap-2 align-items-center"><?php echo badge_stato_pratica('bozza'); ?><a href="modulo.php?id=<?php echo (int)$x['modulo_id']; ?>&amp;pratica=<?php echo (int)$x['id']; ?>" class="btn btn-sm btn-primary fw-bold">Riprendi</a>
+                    <form method="POST" class="m-0" onsubmit="return confirm('Eliminare la bozza?');"><?php csrf_field(); ?><input type="hidden" name="pratica_id" value="<?php echo (int)$x['id']; ?>"><button type="submit" name="elimina_bozza" value="1" class="btn btn-sm btn-outline-danger" aria-label="Elimina la bozza"><i class="fa fa-trash" aria-hidden="true"></i></button></form></span>
+            </div><?php continue; endif; ?>
             <a href="pratiche.php?id=<?php echo (int)$x['id']; ?>" class="list-group-item list-group-item-action d-flex flex-wrap justify-content-between align-items-center gap-2">
                 <span><strong><?php echo $h($x['modulo_titolo']); ?></strong><span class="d-block small text-secondary font-monospace"><?php echo $h($x['codice']); ?> · aggiornata il <?php echo date('d/m/Y H:i', strtotime($x['aggiornata_il'] ?: $x['creata_il'])); ?></span></span>
                 <?php echo badge_stato_pratica($x['stato']); ?>

@@ -104,6 +104,8 @@ final class ServizioFlussoConvalide implements FlussoPratica
         if (!$this->db->valore("SELECT id FROM didattica_moduli WHERE chiave = 'convalida_esami'")) {
             $this->creaModuloConvalida();
         }
+        // Le altre pratiche dell'elenco del Dipartimento (moduli inattivi da rivedere e attivare)
+        (new ModelliPratiche($this->db))->prepara();
     }
 
     public function creaModuloConvalida(): int
@@ -156,6 +158,13 @@ final class ServizioFlussoConvalide implements FlussoPratica
         return (int)$this->db->valore("SELECT id FROM didattica_moduli WHERE chiave = 'convalida_esami'");
     }
 
+    public function rigenera(int $id, array $m): void
+    {
+        if ($this->domanda->config($m)['pdf']) {
+            $this->domanda->genera($id);
+        }
+    }
+
     public function avvia(int $id, array $m, array $u): void
     {
         if ($this->domanda->config($m)['pdf']) {
@@ -188,6 +197,11 @@ final class ServizioFlussoConvalide implements FlussoPratica
         }
         $dopo = $this->iter->iter($m, $p)[$idx] ?? null;
         if ($dopo === null) {
+            // Documento firmato dal Direttore (certificato, attestato): lo studente è avvisato e lo scarica dalla pratica
+            if ($this->db->valore("SELECT id FROM pratiche_eventi WHERE pratica_id = ? AND interno = 0 AND nome_allegato LIKE 'Firmato\_direttore\_%' LIMIT 1", [$id])) {
+                $this->notifiche->documentoPronto($p);
+                $this->storico->evento($id, 'attivita', 'ufficio', 0, null, 'Il documento firmato dal Direttore è pronto: lo studente è stato avvisato e può scaricarlo.');
+            }
             $this->firme->avvisaOperatori($p, 'Iter concluso: pratica ' . $p['codice'], '<p>La pratica <strong>' . htmlspecialchars((string)$p['codice']) . '</strong> ha concluso tutti i passi dell\'iter: puoi chiuderla.</p>');
             return [null, "Non ci sono altri passi nell'iter: concludi la pratica."];
         }

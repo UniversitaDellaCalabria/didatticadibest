@@ -328,6 +328,7 @@ if ($fase === 'azioni') {
                 + '<select class="form-select form-select-sm dd-it-tipo" name="iter_tipo[]" style="max-width:300px;" aria-label="Tipo di passo"></select>'
                 + '<select class="form-select form-select-sm dd-it-uff" name="iter_uff[]" style="max-width:290px;" aria-label="Ufficio"></select>'
                 + '<select class="form-select form-select-sm dd-it-campo" name="iter_campo[]" style="max-width:260px;" aria-label="Domanda con il nome del docente"></select>'
+                + '<select class="form-select form-select-sm dd-it-pag" name="iter_pag[]" style="max-width:300px;" aria-label="Attesa del pagamento delle marche da bollo"></select>'
                 + '<label class="small text-nowrap m-0">ricorda dopo <input type="number" min="0" max="90" class="form-control form-control-sm d-inline-block dd-it-gg" name="iter_gg[]" style="width:64px;" aria-label="Giorni"> giorni</label>'
                 + '<span class="ms-auto d-flex gap-1"><button type="button" class="btn btn-sm btn-outline-secondary py-0 dd-it-su" aria-label="Sposta in su"><i class="fa fa-arrow-up" aria-hidden="true"></i></button><button type="button" class="btn btn-sm btn-outline-secondary py-0 dd-it-giu" aria-label="Sposta in giù"><i class="fa fa-arrow-down" aria-hidden="true"></i></button><button type="button" class="btn btn-sm btn-outline-danger py-0 dd-it-togli" aria-label="Togli il passo"><i class="fa fa-times" aria-hidden="true"></i></button></span>';
             var t = r.querySelector('.dd-it-tipo'), u = r.querySelector('.dd-it-uff'), c = r.querySelector('.dd-it-campo');
@@ -336,10 +337,11 @@ if ($fase === 'azioni') {
             UFFICI.forEach(function (x) { u.appendChild(opt(x.id, x.nome, d.t === 'ufficio' && String(d.u) === x.id)); });
             var g = document.createElement('optgroup'); g.label = 'Scelto con la pratica';
             g.appendChild(opt('@cdl', 'Ufficio del corso di studio (referente, dopo il protocollo)', d.u === '@cdl')); g.appendChild(opt('@segreteria', 'Segreteria studenti (scelta dal referente)', d.u === '@segreteria')); u.appendChild(g);
+            var pg = r.querySelector('.dd-it-pag'); pg.appendChild(opt('0', 'Passo normale', !d.pagamento)); pg.appendChild(opt('1', 'Attesa del pagamento delle marche da bollo', !!d.pagamento));
             c.dataset.val = d.campo || ''; r.querySelector('.dd-it-gg').value = d.gg ? d.gg : '';
             adegua(r); return r;
         }
-        function adegua(r) { var t = r.querySelector('.dd-it-tipo').value; r.querySelector('.dd-it-uff').hidden = t !== 'ufficio'; r.querySelector('.dd-it-campo').hidden = t !== 'persona'; }
+        function adegua(r) { var t = r.querySelector('.dd-it-tipo').value; r.querySelector('.dd-it-uff').hidden = t !== 'ufficio'; r.querySelector('.dd-it-campo').hidden = t !== 'persona'; r.querySelector('.dd-it-pag').hidden = t !== 'ufficio'; }
         function numeraIter() { boxIter.querySelectorAll('.dd-it-n').forEach(function (n, i) { n.textContent = i + 1; }); }
         function aggiornaCampiDocente() {
             var doc = [];

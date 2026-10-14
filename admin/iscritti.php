@@ -103,6 +103,14 @@ $filtro_stato = (isset($_GET['f_stato']) && in_array($_GET['f_stato'], $_stati_c
 $filtro_cerca = trim($_GET['f_cerca'] ?? '');
 $filtro_data_da   = (isset($_GET['f_data_da'])   && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['f_data_da']))   ? $_GET['f_data_da']   : '';
 $filtro_data_fine = (isset($_GET['f_data_fine']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['f_data_fine'])) ? $_GET['f_data_fine'] : '';
+// Un link con il codice di una prenotazione (dal pannello FSL, dai promemoria…) apre da solo l'archivio se l'attività è archiviata
+if (!$is_archivio && preg_match('/^[A-Z]{2}-[A-Z0-9]{6,}$/i', $filtro_cerca)) {
+    $st_ar = $conn->prepare("SELECT 1 FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id WHERE pr.codice_prenotazione = ? AND e.pagina_id = ? AND e.archiviato = 1 LIMIT 1");
+    $st_ar->bind_param('si', $filtro_cerca, $filtro_p);
+    $st_ar->execute();
+    if ($st_ar->get_result()->fetch_row()) $is_archivio = 1;
+    $st_ar->close();
+}
 $url_suffix = $is_archivio ? "&archivio=1" : "";
 $url_suffix .= !empty($filtro_data_da)   ? "&f_data_da="   . urlencode($filtro_data_da)   : "";
 $url_suffix .= !empty($filtro_data_fine) ? "&f_data_fine=" . urlencode($filtro_data_fine) : "";

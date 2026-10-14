@@ -37,6 +37,18 @@ final class AllegatiPratiche
         return $fn ? $this->cartella . $fn : null;
     }
 
+    /** Salva un PDF già letto (es. un certificato caricato dall'ufficio) nella cartella degli allegati con un nome casuale. Ritorna il percorso, null se non riesce. */
+    public function salvaPdf(string $contenuto): ?string
+    {
+        if (!str_starts_with($contenuto, '%PDF') || strlen($contenuto) > 10 * 1024 * 1024) {
+            return null;
+        }
+        $this->proteggi();
+        $nome = bin2hex(random_bytes(16)) . '.pdf';
+
+        return @file_put_contents($this->sito->radice() . '/' . $this->cartella . $nome, $contenuto) === false ? null : $this->cartella . $nome;
+    }
+
     /** Crea la cartella (se manca) con il file che la blocca al web. */
     public function proteggi(): void
     {

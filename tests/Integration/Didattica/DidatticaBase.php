@@ -21,11 +21,13 @@ use App\Infrastructure\Mail\Mailer;
 use App\Infrastructure\Pdf\VerificaFirme;
 use App\Infrastructure\Storage\Upload;
 use App\Sistema\FileEnv;
+use App\Tutorato\FirmaRemota;
 use App\Tutorato\VerificaPdfFirmato;
 use Tests\Doppi\AnagrafiClientApiFinto;
 use Tests\Doppi\AuthSessioneInMemoria;
 use Tests\Doppi\ClientFinto;
 use Tests\Doppi\DidatticaModuliAree;
+use Tests\Doppi\FirmaRemotaFinta;
 use Tests\Doppi\FirmeFinte;
 use Tests\Doppi\MailerFinto;
 use Tests\Doppi\OrologioFisso;
@@ -140,6 +142,8 @@ abstract class DidatticaBase extends DatabaseDiProva
                   `accesso_json` text DEFAULT NULL,
                   `bollo_il` datetime DEFAULT NULL,
                   `bollo_da` varchar(200) DEFAULT '',
+                  `marche_il` datetime DEFAULT NULL,
+                  `marche_da` varchar(200) DEFAULT '',
                   PRIMARY KEY (`id`),
                   UNIQUE KEY `uq_codice` (`codice`)
                 )
@@ -236,6 +240,15 @@ abstract class DidatticaBase extends DatabaseDiProva
                   PRIMARY KEY (`id`)
                 )
                 SQL,
+            'impostazioni_sistema' => <<<'SQL'
+                CREATE TABLE `impostazioni_sistema` (
+                  `id` int(11) NOT NULL,
+                  `conv_direttore_nome` varchar(150) NOT NULL DEFAULT '',
+                  `conv_direttore_email` varchar(150) NOT NULL DEFAULT '',
+                  `conv_direttore_cf` varchar(16) NOT NULL DEFAULT '',
+                  PRIMARY KEY (`id`)
+                )
+                SQL,
             'pratiche_firme' => <<<'SQL'
                 CREATE TABLE `pratiche_firme` (
                   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -318,6 +331,7 @@ abstract class DidatticaBase extends DatabaseDiProva
         $c->istanza(IndirizzoClient::class, new ClientFinto());
         $c->istanza(Sessione::class, $this->sessione);
         $c->istanza(VerificaFirme::class, new FirmeFinte());
+        $c->istanza(FirmaRemota::class, new FirmaRemotaFinta());
         $this->envFile = tempnam(sys_get_temp_dir(), 'env') ?: '';
         file_put_contents($this->envFile, "FIRME_GIORNI_SOLLECITO=5\n");
         $c->istanza(FileEnv::class, new FileEnv($this->envFile));

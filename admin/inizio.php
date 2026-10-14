@@ -55,31 +55,37 @@ $cose = [];
 $col_mod = fn(string $k) => MODULI_PORTALE[$k]['colore'] ?? '#334155';
 try {
     $cdf = \App\Core\App::per($conn)->get(\App\Portale\CoseDaFare::class);
-    if ($puo_didattica_tutto) {
+    // Ogni gruppo è a sé: se uno non riesce (tabella o colonna non ancora create dopo un caricamento a metà) gli altri compaiono lo stesso e l'errore va nel log
+    $sicuro = function (string $nome, callable $f) {
+        try { $f(); } catch (\Throwable $e) { error_log("Scrivania, cose da fare ($nome): " . $e->getMessage()); }
+    };
+    if ($puo_didattica_tutto) $sicuro('pratiche', function () use (&$cose, $cdf) {
         $sm = $cdf->praticheDaSmistare();
         if ($sm['n'] > 0) $cose[] = ['didattica', $sm['n'], $sm['n'] === 1 ? 'Pratica da assegnare' : 'Pratiche da assegnare',
             'Didattica · ' . ($sm['giorni'] >= 3 ? 'la più vecchia aspetta da ' . $sm['giorni'] . ' giorni' : 'arrivate da poco'), 'didattica.php?tab=pratiche&carico=smistare', $sm['giorni'] >= 7];
-    }
-    if ($puo_didattica) {
+    });
+    if ($puo_didattica) $sicuro('verbali', function () use (&$cose, $cdf, $puo_didattica_tutto, $consigli_referente) {
         $vf = $cdf->verbaliInFirma($puo_didattica_tutto ? null : $consigli_referente);
         if ($vf > 0) $cose[] = ['didattica', $vf, $vf === 1 ? 'Verbale in attesa di firma' : 'Verbali in attesa di firma', 'Didattica · sedute dei consigli', 'didattica.php?tab=sedute', false];
-    }
-    if ($puo_tutorato) {
+    });
+    if ($puo_tutorato) $sicuro('tutorato', function () use (&$cose, $cdf) {
         $n_tv = $cdf->tutoratoDaValidare();
         if ($n_tv > 0) $cose[] = ['didattica', $n_tv, $n_tv === 1 ? 'Pratica di tutorato da validare' : 'Pratiche di tutorato da validare', 'Didattica · fine attività firmata dal docente: da passare all\'ufficio pagamenti', 'tutorato.php?vista=validare', false];
-    }
-    if ($puo_fsl_convenzioni) {
+    });
+    if ($puo_fsl_convenzioni) $sicuro('convenzioni caricate', function () use (&$cose, $cdf) {
         $n_cf = $cdf->convenzioniDaPrendereInCarico();
         if ($n_cf > 0) $cose[] = ['fsl', $n_cf, $n_cf === 1 ? 'Convenzione della scuola da seguire' : 'Convenzioni delle scuole da seguire', 'Formazione Scuola Lavoro · caricate dalle scuole: da prendere in carico, far firmare al Direttore e protocollare', 'fsl.php?tab=convenzioni', true];
+    });
+    if ($puo_fsl_convenzioni) $sicuro('convenzioni da stipulare', function () use (&$cose, $conn) {
         $n_st = count(array_filter(\App\Core\App::per($conn)->get(\App\Fsl\ServizioConvenzioniScuole::class)->scuole(), fn($g) => $g['da_stipulare']));
         if ($n_st > 0) $cose[] = ['fsl', $n_st, $n_st === 1 ? 'Convenzione da stipulare' : 'Convenzioni da stipulare', 'Formazione Scuola Lavoro · scuole con prenotazioni ma senza convenzione valida', 'fsl.php?tab=stipulare', true];
-    }
-    if ($puo_fsl) {
+    });
+    if ($puo_fsl) $sicuro('elenchi studenti', function () use (&$cose, $conn) {
         $pf = \App\Core\App::per($conn)->get(\App\Fsl\ServizioPannelloFsl::class);
         $anno_f = $pf->annoCorrente();
         $n_el = count(\App\Fsl\PercorsoFsl::contatori($pf->riepilogo("$anno_f-09-01", ($anno_f + 1) . '-08-31')['righe'], date('Y-m-d'))['elenchi_mancanti']);
         if ($n_el > 0) $cose[] = ['fsl', $n_el, $n_el === 1 ? 'Elenco studenti mancante' : 'Elenchi studenti mancanti', 'Formazione Scuola Lavoro · attività finite: senza elenco non partono gli attestati', 'fsl.php?tab=riepilogo#elenchi', false];
-    }
+    });
     // Messaggi e prenotazioni da approvare: nelle aree che l'utente gestisce per intero
     $aree_mie = array_values(array_filter($pagine_disponibili, fn($a) => $is_full_admin || in_array((int)$u_id_curr, ids_gestori_da_campi($a['gestore_utente_id'] ?? 0, $a['gestori_utenti_ids'] ?? '', $a['permessi_gestori_json'] ?? ''), true)));
     $ids_mie = array_map(fn($a) => (int)$a['id'], $aree_mie);

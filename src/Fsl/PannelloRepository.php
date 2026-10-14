@@ -23,7 +23,7 @@ final class PannelloRepository
     {
         return $this->db->righe(
             "SELECT pr.id, pr.stato, pr.presente, pr.scuola_codice, pr.convenzione, pr.dati_custom_json, pr.nome, pr.cognome, pr.email, pr.codice_prenotazione,
-                    t.data_turno, t.nome_turno, e.id AS evento_id, e.pagina_id, e.titolo, e.tipo, pe.titolo AS area, pd.data_inizio AS pd_inizio, pd.data_fine AS pd_fine,
+                    t.data_turno, t.nome_turno, e.id AS evento_id, e.pagina_id, e.archiviato, e.titolo, e.tipo, pe.titolo AS area, pd.data_inizio AS pd_inizio, pd.data_fine AS pd_fine,
                     (SELECT COUNT(*) FROM partecipanti_prenotazione pp WHERE pp.prenotazione_id = pr.id) AS n_elenco,
                     v.media AS val_media, v.id AS val_id, pr.valutazione_inviata, pr.attestato_inviato, pd.attestati AS pd_attestati, pd.per_scuole AS pd_per_scuole
              FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id JOIN pagine_eventi pe ON e.pagina_id = pe.id

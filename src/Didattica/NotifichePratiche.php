@@ -77,6 +77,45 @@ final class NotifichePratiche
         }
     }
 
+    /**
+     * Allo studente: l'ufficio ha caricato le marche da bollo in Esse3 e può procedere al pagamento.
+     *
+     * @param array<string, mixed> $p
+     */
+    public function marcheCaricate(array $p): void
+    {
+        if (!filter_var($p['email'] ?? '', FILTER_VALIDATE_EMAIL)) {
+            return;
+        }
+        $h = fn ($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
+        $this->invia(
+            $p['email'],
+            'Puoi pagare le marche da bollo: ' . $p['modulo_titolo'],
+            '<p>Gentile ' . $h($p['nome']) . ',</p><p>per la tua pratica <strong>' . $h($p['codice']) . '</strong> (' . $h($p['modulo_titolo']) . ') l\'ufficio ha <strong>caricato le marche da bollo in Esse3</strong>: '
+            . 'puoi procedere al pagamento dalla sezione <em>Segreteria &gt; Situazione tasse</em>.</p><p>Quando il pagamento risulta, la pratica prosegue e il documento viene firmato dal Direttore.</p>'
+            . $this->bottone($this->sito->urlBase() . '/pratiche.php?id=' . (int) $p['id'], 'Apri la pratica')
+        );
+    }
+
+    /**
+     * Allo studente: il documento firmato dal Direttore è pronto, si può scaricare e stampare.
+     *
+     * @param array<string, mixed> $p
+     */
+    public function documentoPronto(array $p): void
+    {
+        if (!filter_var($p['email'] ?? '', FILTER_VALIDATE_EMAIL)) {
+            return;
+        }
+        $h = fn ($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
+        $this->invia(
+            $p['email'],
+            'Il tuo documento è pronto: ' . $p['modulo_titolo'],
+            '<p>Gentile ' . $h($p['nome']) . ',</p><p>il documento richiesto con la pratica <strong>' . $h($p['codice']) . '</strong> (' . $h($p['modulo_titolo']) . ') è stato <strong>firmato digitalmente dal Direttore</strong>: '
+            . 'puoi scaricarlo e stamparlo dalla pagina della pratica.</p>'
+            . $this->bottone($this->sito->urlBase() . '/pratiche.php?id=' . (int) $p['id'], 'Scarica il documento')
+        );
+    }
     /** Link alla pratica nel pannello Didattica. */
     public function linkPannello(int $id): string
     {

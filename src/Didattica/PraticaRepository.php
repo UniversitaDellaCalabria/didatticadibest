@@ -116,6 +116,52 @@ final class PraticaRepository
     }
 
     /**
+     * Nuova pratica in «bozza» (salvata dallo studente e non ancora inviata). Ritorna l'id (0 se non riesce).
+     */
+    public function inserisciBozza(int $moduloId, int $utenteId, string $codice, ?string $nome, ?string $cognome, string $email, string $matricola, string $risposteJson): int
+    {
+        return $this->db->inserisci(
+            "INSERT INTO pratiche (modulo_id, utente_id, codice, nome, cognome, email, matricola, risposte_json, stato, aggiornata_il) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'bozza', NOW())",
+            [$moduloId, $utenteId, $codice, $nome, $cognome, $email, $matricola, $risposteJson]
+        );
+    }
+
+    /** Nuove risposte (bozza o pratica ancora modificabile). */
+    public function aggiornaRisposte(int $id, string $risposteJson, string $matricola): void
+    {
+        $this->db->esegui('UPDATE pratiche SET risposte_json = ?, matricola = ?, aggiornata_il = NOW() WHERE id = ?', [$risposteJson, $matricola, $id]);
+    }
+
+    /** La bozza diventa una pratica «inviata»: data, indirizzo e accesso sono quelli dell'invio. */
+    public function inviaBozza(int $id, string $ip, string $accessoJson): void
+    {
+        $this->db->esegui("UPDATE pratiche SET stato = 'inviata', creata_il = NOW(), aggiornata_il = NOW(), ip_invio = ?, accesso_json = ? WHERE id = ? AND stato = 'bozza'", [$ip, $accessoJson, $id]);
+    }
+
+    /** La bozza si cancella (una pratica inviata no). Ritorna se è stata cancellata. */
+    public function eliminaBozza(int $id): bool
+    {
+        if (!$this->db->valore("SELECT id FROM pratiche WHERE id = ? AND stato = 'bozza'", [$id])) {
+            return false;
+        }
+        $this->db->esegui('DELETE FROM pratiche_eventi WHERE pratica_id = ?', [$id]);
+
+        return $this->db->esegui("DELETE FROM pratiche WHERE id = ? AND stato = 'bozza'", [$id]) > 0;
+    }
+
+    /** Le marche da bollo sono state caricate in Esse3: lo studente è stato avvisato. */
+    public function segnaMarche(int $id, string $da): void
+    {
+        $this->db->esegui('UPDATE pratiche SET marche_il = NOW(), marche_da = ?, aggiornata_il = NOW() WHERE id = ?', [mb_substr($da, 0, 200), $id]);
+    }
+
+    /** Pagamento della marca da bollo verificato dall'operatore. */
+    public function segnaBollo(int $id, string $da): void
+    {
+        $this->db->esegui('UPDATE pratiche SET bollo_il = NOW(), bollo_da = ?, aggiornata_il = NOW() WHERE id = ?', [mb_substr($da, 0, 200), $id]);
+    }
+
+    /**
      * Pratiche aperte senza movimenti da più dei giorni indicati nel modulo e senza un promemoria recente: id e giorni del modulo.
      *
      * @return list<array<string, string|null>>
@@ -157,7 +203,7 @@ final class PraticaRepository
      */
     public function inviateTra(string $dal, string $al): array
     {
-        return $this->db->righe('SELECT p.*, m.titolo AS modulo_titolo, m.iter_json FROM pratiche p JOIN didattica_moduli m ON m.id = p.modulo_id WHERE p.creata_il BETWEEN ? AND ?', ["$dal 00:00:00", "$al 23:59:59"]);
+        return $this->db->righe('SELECT p.*, m.titolo AS modulo_titolo, m.iter_json FROM pratiche p JOIN didattica_moduli m ON m.id = p.modulo_id WHERE p.stato <> \'bozza\' AND p.creata_il BETWEEN ? AND ?', ["$dal 00:00:00", "$al 23:59:59"]);
     }
 
     /**
@@ -185,7 +231,7 @@ final class PraticaRepository
      */
     public function elenco(string $stato, int $modulo, string $seduta, string $carico, string $dal, string $al, string $q, ?array $io): array
     {
-        $where = ['1=1'];
+        $where = ["p.stato <> 'bozza'"];
         $par = [];
         if ($stato === 'aperte') {
             $where[] = "p.stato IN ('inviata', 'in_lavorazione', 'integrazione')";
@@ -206,7 +252,7 @@ final class PraticaRepository
         } elseif ($carico === 'seguite') {
             $where[] = 'p.id IN (SELECT pratica_id FROM pratiche_operatori WHERE operatore_id = ' . (int) ($io['id'] ?? -1) . ') AND (p.assegnata_a IS NULL OR p.assegnata_a <> ' . (int) ($io['id'] ?? -1) . ')';
         } elseif ($carico === 'smistare') {
-            $where[] = "p.assegnata_a IS NULL AND p.ufficio_id IS NULL AND p.stato NOT IN ('accolta', 'respinta', 'chiusa')";
+            $where[] = "p.assegnata_a IS NULL AND p.ufficio_id IS NULL AND p.stato NOT IN ('bozza', 'accolta', 'respinta', 'chiusa')";
         } elseif ($carico === 'ufficio') {
             // Del mio ufficio: quelle che l'ufficio ha ora (anche senza una persona) e quelle assegnate a me
             $where[] = '(p.ufficio_id IN (' . implode(',', array_map('intval', ($io['_uffici'] ?? []) ?: [-1])) . ') OR p.assegnata_a = ' . (int) ($io['id'] ?? -1) . ')';

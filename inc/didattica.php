@@ -251,6 +251,38 @@ if (!function_exists('crea_pratica')) {
     }
 }
 
+if (!function_exists('salva_bozza_pratica')) {
+    // Salva le risposte come bozza (senza controlli sui campi obbligatori); con $id aggiorna una bozza già salvata. Ritorna l'id (0 se non riesce).
+    function salva_bozza_pratica($conn, array $m, array $u, array $risposte, int $id = 0): int {
+        return \App\Core\App::per($conn)->get(\App\Didattica\ServizioPratiche::class)->salvaBozza($m, $u, $risposte, $id);
+    }
+    // La bozza diventa una pratica inviata e parte l'iter
+    function invia_bozza_pratica($conn, int $id, array $m, array $u, array $risposte): bool {
+        return \App\Core\App::per($conn)->get(\App\Didattica\ServizioPratiche::class)->inviaBozza($id, $m, $u, $risposte);
+    }
+    // Lo studente cambia le risposte finché nessuno ha preso in carico la pratica. Ritorna un errore o null.
+    function modifica_pratica($conn, int $id, array $m, array $u, array $risposte): ?string {
+        return \App\Core\App::per($conn)->get(\App\Didattica\ServizioPratiche::class)->modifica($id, $m, $u, $risposte);
+    }
+    function elimina_bozza_pratica($conn, int $id, int $uid): bool {
+        return \App\Core\App::per($conn)->get(\App\Didattica\ServizioPratiche::class)->eliminaBozza($id, $uid);
+    }
+    // Bozza o pratica inviata che nessuno ha ancora preso in carico
+    function pratica_modificabile(array $p): bool {
+        return \App\Didattica\ServizioPratiche::modificabile($p);
+    }
+    function conserva_allegati_pratica(array $nuove, array $vecchie): array {
+        return \App\Didattica\ServizioPratiche::conservaAllegati($nuove, $vecchie);
+    }
+    function errori_senza_allegati_presenti(array $errori, array $campi, array $vecchie): array {
+        return \App\Didattica\ServizioPratiche::senzaErroriAllegati($errori, $campi, $vecchie);
+    }
+    // Valori da rimettere nei campi riprendendo una bozza o modificando una pratica (nome del campo => valore)
+    function valori_iniziali_pratica($conn, array $campi, array $risposte): array {
+        return \App\Core\App::get(\App\Didattica\HtmlCampi::class)->valoriIniziali($campi, $risposte);
+    }
+}
+
 if (!function_exists('cambia_stato_pratica')) {
     // $richiesta (solo per 'integrazione'): ['tipo' => 'documenti'|'autodichiarazione', 'testo' => …] da mostrare allo studente
     function cambia_stato_pratica($conn, int $id, string $stato, string $nota, int $uid, string $autore_nome = '', ?array $richiesta = null): bool {

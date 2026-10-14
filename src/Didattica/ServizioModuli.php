@@ -152,8 +152,8 @@ final class ServizioModuli
     }
 
     /**
-     * L'iter dal modulo del pannello: righe parallele iter_tipo[] (ufficio | persona | direttore), iter_uff[], iter_campo[] (la domanda di tipo docente)
-     * e iter_gg[] (giorni del promemoria del passo). Senza queste righe vale il vecchio elenco iter[] di uffici. Ritorna il JSON (null = nessun passo).
+     * L'iter dal modulo del pannello: righe parallele iter_tipo[] (ufficio | persona | direttore), iter_uff[], iter_campo[] (la domanda di tipo docente),
+     * iter_pag[] (1 = il passo è l'attesa del pagamento delle marche da bollo) e iter_gg[] (giorni del promemoria del passo). Senza queste righe vale il vecchio elenco iter[] di uffici. Ritorna il JSON (null = nessun passo).
      *
      * @param array<string, mixed> $post
      */
@@ -177,7 +177,8 @@ final class ServizioModuli
                     // «@cdl» / «@segreteria»: l'ufficio si sceglie con la pratica (corso di studio, segreteria indicata dal referente)
                     $u = in_array($x, ['@cdl', '@segreteria'], true) ? $x : (($idU = $this->uffici->idDa((int) $x)) && !(int) ($uffici[$idU]['smista'] ?? 0) ? $idU : null);
                     if ($u !== null) {
-                        $passi[] = $gg ? ['t' => 'ufficio', 'u' => $u, 'gg' => $gg] : $u;
+                        $pag = (int) ($post['iter_pag'][$i] ?? 0) === 1;
+                        $passi[] = ($gg || $pag) ? ['t' => 'ufficio', 'u' => $u] + ($gg ? ['gg' => $gg] : []) + ($pag ? ['pagamento' => 1] : []) : $u;
                     }
                 }
             }

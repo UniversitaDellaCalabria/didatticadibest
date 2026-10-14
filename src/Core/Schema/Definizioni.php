@@ -431,6 +431,9 @@ final class Definizioni
             // v43: marca da bollo verificata da chi protocolla (moduli che la richiedono): quando e da chi
             'bollo_il'             => "ADD COLUMN bollo_il DATETIME DEFAULT NULL",
             'bollo_da'             => "ADD COLUMN bollo_da VARCHAR(200) DEFAULT ''",
+            // v63: marche da bollo caricate in Esse3 dalla segreteria (passo «attesa del pagamento»): quando lo studente è stato avvisato e da chi
+            'marche_il'            => "ADD COLUMN marche_il DATETIME DEFAULT NULL",
+            'marche_da'            => "ADD COLUMN marche_da VARCHAR(200) DEFAULT ''",
         ],
         'didattica_uffici' => [
             // v42: tipo dell'ufficio nel flusso delle pratiche (protocollo, ufficio di un corso di studio, segreteria studenti)

@@ -273,7 +273,7 @@ final class AreaPersonaleRepository
     public function riepilogoPratiche(int $utenteId): ?array
     {
         return Righe::riga($this->db->riga(
-            "SELECT COUNT(*) AS n, SUM(stato = 'integrazione') AS integr, SUM(stato NOT IN ('accolta', 'respinta', 'chiusa')) AS aperte FROM pratiche WHERE utente_id = ?",
+            "SELECT COUNT(*) AS n, SUM(stato = 'integrazione') AS integr, SUM(stato NOT IN ('bozza', 'accolta', 'respinta', 'chiusa')) AS aperte FROM pratiche WHERE utente_id = ?",
             [$utenteId]
         ));
     }

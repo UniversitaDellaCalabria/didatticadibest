@@ -63,6 +63,21 @@ if ($fase === 'azioni') {
         flash_set($err ?? $msg, $err ? 'danger' : (str_contains($msg, 'a mano') || str_contains($msg, 'bollo') ? 'warning' : 'success'));
         admin_redirect("$base&tab=pratiche&id=$id&r=" . time());
     }
+    // ── Passo «attesa del pagamento»: marche da bollo caricate in Esse3, pagamento verificato + certificato da firmare ──
+    if (isset($_POST['marche_caricate']) || isset($_POST['pagamento_registrato'])) {
+        $id = (int)$_POST['pratica_id'];
+        $marche = \App\Core\App::per($conn)->get(\App\Didattica\ServizioMarcheBollo::class);
+        if (isset($_POST['marche_caricate'])) {
+            $err = $marche->avvisaMarche($id, $uid, $autore_nome);
+            if (!$err) registra_log_audit($conn, "Pratica: marche da bollo caricate", ["Pratica" => $id]);
+            flash_set($err ?? "Lo studente è stato avvisato: può procedere al pagamento delle marche da bollo.", $err ? 'danger' : 'success');
+        } else {
+            [$err, $msg] = $marche->registraPagamento($id, $_FILES['certificato'] ?? null, !empty($_POST['pagato']), $uid, $autore_nome);
+            if (!$err) registra_log_audit($conn, "Pratica: pagamento delle marche da bollo registrato", ["Pratica" => $id]);
+            flash_set($err ?? $msg, $err ? 'danger' : 'success');
+        }
+        admin_redirect("$base&tab=pratiche&id=$id&r=" . time());
+    }
     // ── Iter: passo successivo e firme (persona indicata nel modulo, Direttore) ──
     if (isset($_POST['avanza_pratica']) || isset($_POST['invia_firma']) || isset($_POST['rimanda_firma'])) {
         $id = (int)$_POST['pratica_id']; $p = pratica($conn, $id);
@@ -145,6 +160,8 @@ if ($fase === 'azioni') {
         $passo_dopo = min(count($passi) - 1, max(1, (int)$p['passo'] + 1));
         $o_carico = $p['assegnata_a'] ? operatore_ufficio($conn, (int)$p['assegnata_a']) : null;
         $conclusa = in_array($p['stato'], ['accolta', 'respinta', 'chiusa'], true);
+        $svc_marche = \App\Core\App::per($conn)->get(\App\Didattica\ServizioMarcheBollo::class);
+        $in_pagamento = !$conclusa && $svc_marche->inAttesa($p);
         $richiesta = json_decode((string)($p['richiesta_json'] ?? ''), true) ?: null;
         $tipi_ev = ['richiesta' => ['fa-people-arrows', 'Richiesta a un operatore'], 'passaggio' => ['fa-route', 'Passaggio'], 'attivita' => ['fa-paperclip', 'Attività'], 'autodich' => ['fa-file-signature', 'Autodichiarazione'], 'messaggio' => ['fa-comment', ''], 'stato' => ['fa-flag', '']];
 ?>
@@ -174,6 +191,13 @@ $prossima_p = match ($fase_p) {
     'segreteria'   => ['La pratica è alla segreteria studenti', 'Ha ricevuto l\'estratto e il verbale: qui non c\'è altro da fare.', '', 'attesa'],
     default        => ['Pratica conclusa', 'Stato finale: «' . (STATI_PRATICA[$p['stato']][0] ?? $p['stato']) . '». Lo studente è stato avvisato.', '', 'ok'],
 };
+if ($in_pagamento) {
+    $prossima_p = empty($p['marche_il'])
+        ? ['Carica le marche da bollo in Esse3', 'Carica le 2 marche da bollo su Esse3 (Segreteria > Situazione tasse) e avvisa lo studente dal riquadro qui sotto: può procedere al pagamento.', $btn_p('#marche', 'Vai alle marche da bollo'), 'attesa']
+        : (empty($p['bollo_il'])
+            ? ['Si aspetta il pagamento', 'Lo studente è stato avvisato. Quando il pagamento risulta, spuntalo e carica il certificato di Esse3: la pratica passa alla firma del Direttore.', $btn_p('#marche', 'Registra il pagamento'), 'attesa']
+            : ['Pagamento registrato', 'Il pagamento risulta ma la pratica non è ancora passata alla firma: usa «Passa al passo successivo».', '', 'attesa']);
+}
 echo pn_prossima($prossima_p[0], $prossima_p[1], $prossima_p[2], $prossima_p[3]);
 ?>
 
@@ -220,6 +244,25 @@ echo pn_prossima($prossima_p[0], $prossima_p[1], $prossima_p[2], $prossima_p[3])
         </form>
         <?php endif; ?>
     </div></div>
+
+    <?php if ($in_pagamento): ?>
+    <div id="marche" class="card border-0 shadow-sm mb-3" style="border-left:4px solid #b45309 !important;"><div class="card-body">
+        <h6 class="fw-bold mb-1"><i class="fa fa-receipt me-1" style="color:#b45309;" aria-hidden="true"></i>Marche da bollo</h6>
+        <p class="small text-secondary mb-2">1. Carica le 2 marche da bollo su Esse3 · 2. avvisa lo studente · 3. quando il pagamento risulta, spuntalo e carica il certificato generato da Esse3: passa al Direttore per la firma.</p>
+        <form method="POST" class="mb-3"><?php csrf_field(); ?><input type="hidden" name="pratica_id" value="<?php echo (int)$p['id']; ?>">
+            <?php if (!empty($p['marche_il'])): ?><div class="small text-success fw-bold"><i class="fa fa-circle-check me-1" aria-hidden="true"></i>Marche caricate e studente avvisato il <?php echo date('d/m/Y H:i', strtotime($p['marche_il'])); ?><?php echo $p['marche_da'] !== '' ? ' da ' . $h($p['marche_da']) : ''; ?></div>
+            <?php else: ?><button type="submit" name="marche_caricate" value="1" class="btn btn-sm fw-bold text-white" style="background:#b45309;" data-confirm="Hai caricato le 2 marche da bollo su Esse3? Lo studente riceve un'email per procedere al pagamento."><i class="fa fa-bell me-1" aria-hidden="true"></i>Marche caricate su Esse3: avvisa lo studente</button><?php endif; ?>
+        </form>
+        <?php if (!empty($p['marche_il']) && empty($p['bollo_il'])): ?>
+        <form method="POST" enctype="multipart/form-data" class="row g-2 align-items-end"><?php csrf_field(); ?><input type="hidden" name="pratica_id" value="<?php echo (int)$p['id']; ?>">
+            <div class="col-md-5"><label class="form-label small fw-bold mb-0" for="mbCert">Certificato generato da Esse3 (PDF)</label><input type="file" class="form-control form-control-sm" id="mbCert" name="certificato" accept=".pdf,application/pdf" required></div>
+            <div class="col-md-5"><label class="form-check small fw-bold m-0"><input class="form-check-input" type="checkbox" name="pagato" value="1" required> Il pagamento risulta: <?php echo $h(\App\Didattica\ServizioMarcheBollo::DICITURA); ?></label></div>
+            <div class="col-md-2"><button type="submit" name="pagamento_registrato" value="1" class="btn btn-sm btn-success fw-bold w-100"><i class="fa fa-signature me-1" aria-hidden="true"></i>Al Direttore</button></div>
+            <div class="col-12 form-text">Il Direttore riceve l'email con il link per firmare in PAdES il certificato; quando firma e ricarica, lo studente può scaricarlo e stamparlo e tu ricevi l'avviso.</div>
+        </form>
+        <?php elseif (!empty($p['bollo_il'])): ?><div class="small text-success fw-bold"><i class="fa fa-circle-check me-1" aria-hidden="true"></i>Pagamento verificato il <?php echo date('d/m/Y H:i', strtotime($p['bollo_il'])); ?><?php echo $p['bollo_da'] !== '' ? ' da ' . $h($p['bollo_da']) : ''; ?></div><?php endif; ?>
+    </div></div>
+    <?php endif; ?>
 
     <?php if ($da_protocollare): ?>
     <form method="POST" id="protocollo" class="card border-0 shadow-sm mb-3" style="border-left:4px solid #b45309 !important;"><div class="card-body">
@@ -363,7 +406,7 @@ echo pn_prossima($prossima_p[0], $prossima_p[1], $prossima_p[2], $prossima_p[3])
                     <label class="form-label small fw-bold" for="ddNota">Nota per lo studente (facoltativa)</label>
                     <textarea class="form-control form-control-sm mb-2" id="ddNota" name="nota" rows="3" maxlength="2000" placeholder="Es. esito, motivo, prossimi passi"></textarea>
                     <div class="d-grid gap-1">
-                        <?php foreach (STATI_PRATICA as $k => [$n, $col, $ico]): if ($k === $p['stato'] || in_array($k, ['inviata', 'integrazione'], true)) continue; ?>
+                        <?php foreach (STATI_PRATICA as $k => [$n, $col, $ico]): if ($k === $p['stato'] || in_array($k, ['bozza', 'inviata', 'integrazione'], true)) continue; ?>
                             <button type="submit" name="stato_pratica" value="<?php echo $k; ?>" class="btn btn-sm fw-bold text-white text-start" style="background:<?php echo $col; ?>;"><i class="fa <?php echo $ico; ?> me-1" aria-hidden="true"></i><?php echo $n; ?></button>
                         <?php endforeach; ?>
                     </div>
@@ -416,7 +459,7 @@ echo pn_prossima($prossima_p[0], $prossima_p[1], $prossima_p[2], $prossima_p[3])
                 <?php foreach ($moduli as $m): if ($m['tipo'] !== 'online') continue; ?><option value="<?php echo (int)$m['id']; ?>"<?php echo $f_mod === (int)$m['id'] ? ' selected' : ''; ?>><?php echo $h($m['titolo']); ?></option><?php endforeach; ?></select></div>
             <div class="col-md-2"><label class="form-label small fw-bold mb-0" for="fSt">Stato</label><select class="form-select" id="fSt" name="stato">
                 <option value="aperte"<?php echo $f_stato === 'aperte' ? ' selected' : ''; ?>>Aperte</option>
-                <?php foreach (STATI_PRATICA as $k => [$n]): ?><option value="<?php echo $k; ?>"<?php echo $f_stato === $k ? ' selected' : ''; ?>><?php echo $n; ?></option><?php endforeach; ?>
+                <?php foreach (STATI_PRATICA as $k => [$n]): if ($k === 'bozza') continue; ?><option value="<?php echo $k; ?>"<?php echo $f_stato === $k ? ' selected' : ''; ?>><?php echo $n; ?></option><?php endforeach; ?>
                 <option value="tutte"<?php echo $f_stato === 'tutte' ? ' selected' : ''; ?>>Tutte</option></select></div>
             <div class="col-md-4"><label class="form-label small fw-bold mb-0" for="fQ">Cerca</label><input type="search" class="form-control" id="fQ" name="q" value="<?php echo $h($f_q); ?>" placeholder="Nome, matricola o codice della pratica"></div>
             <div class="col-md-2"><button class="btn btn-primary fw-bold w-100" style="background:var(--pn-mod);border-color:var(--pn-mod);color:var(--pn-mod-testo);"><i class="fa fa-filter me-1" aria-hidden="true"></i>Filtra</button></div>

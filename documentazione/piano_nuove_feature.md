@@ -285,6 +285,39 @@ Oggi: `risorse` (aula/laboratorio/sportello/altro), `prenotazioni\_risorse` (slo
 
 * Una pagina breve per ogni ruolo, scritta in modo semplice e con le schermate: **referente di consiglio** (componenti, seduta guidata, verbale), **relatore** (firma di una pratica dal link personale), **responsabile di risorsa** (approvare, cruscotto, scadenze, diario di bordo), **tutor** (registro delle attività, fine attività), **studente** (come fare una pratica e seguirla). Raggiungibili dal «?» delle pagine e dall'Area personale; in PDF per chi le vuole stampare. Si scrive dopo il collaudo, quando i flussi sono stabili.
 
+#### F5 — Assistente IA interno per i verbali *(da valutare)*
+
+* **Idea**: bozza del testo di un punto del verbale ricavata da testi inviati dai docenti e da vocali, con IA **gratuita e dentro il server** (niente dati fuori dall'Ateneo). La bozza è sempre rivista e approvata da una persona (referente) prima di entrare nel verbale; si salva da dove viene (file, modello, chi ha approvato). L'IA non deve decidere esiti, votazioni, numeri o CFU: li propone e li evidenzia da verificare.
+* **Server (controllato il 20/10/2026)**: Ubuntu 24.04, Xeon E-2124G a 4 core (AVX2, niente hyperthreading), **15 GB di RAM** (14 liberi), nessuna scheda grafica utile (solo Intel UHD P630), 1,3 TB liberi, accesso root, carico basso. Python 3.12; Docker, Ollama e ffmpeg non installati.
+* **Scelte**: riassunti con **Ollama + Qwen 2.5 7B** (5 GB di RAM; alternativa più veloce ma peggiore: modello da 3B); vocali con **faster-whisper** (modello «small» o «medium»). Tutto open source, licenze gratuite.
+* **Tempi stimati su questo server**: bozza da un testo di 1-2 pagine 2-5 minuti; vocale di 5 minuti 3-5 minuti («small») o 10-15 («medium»); seduta intera di un'ora 1-3 ore (da far girare di notte).
+* **Come convive col portale**: un solo lavoro IA alla volta in coda (tabella dei lavori + cron già esistente), al massimo 3 core su 4, priorità bassa, audio lunghi solo di notte, servizio in ascolto solo su 127.0.0.1. Chi carica vede «in elaborazione» e riceve l'avviso a bozza pronta.
+* **Due fasi**: (1) **da testi**; (2) **da audio**, dopo il parere del DPO (voci registrate, conservazione e cancellazione automatica dell'audio, informativa ai componenti).
+* **Se diventa un uso frequente**: serve una macchina con scheda grafica (trascrizione 10-20 volte più veloce, modelli più grandi).
+* **Prova preliminare sul server (nessuna modifica al portale)**: si installa tutto in cartelle separate e si prova su un testo e un vocale di esempio, poi si valuta la qualità. Comandi (utente con sudo):
+
+```bash
+# 1) Ollama (servizio locale) e modello per i riassunti
+curl -fsSL https://ollama.com/install.sh | sh
+ollama pull qwen2.5:7b-instruct
+# prova su un testo (misura anche il tempo)
+time ollama run qwen2.5:7b-instruct "Riassumi in stile verbale di consiglio di dipartimento, in italiano formale: <incolla qui il testo del docente>"
+
+# 2) Trascrizione dei vocali
+sudo apt install -y ffmpeg python3-venv
+python3 -m venv ~/ia/venv
+~/ia/venv/bin/pip install faster-whisper
+# prova su un vocale (sostituisci il file); il modello si scarica la prima volta
+time ~/ia/venv/bin/python -c "from faster_whisper import WhisperModel; m = WhisperModel('small', device='cpu', compute_type='int8', cpu_threads=3); s, i = m.transcribe('/percorso/vocale.m4a', language='it'); print(' '.join(x.text for x in s))"
+
+# 3) Controllo che il servizio sia solo locale e quanta RAM usa
+ss -ltnp | grep 11434
+free -h
+```
+
+* **Per togliere tutto** se la qualità non convince: `sudo systemctl disable --now ollama`, poi `sudo rm -rf /usr/local/bin/ollama /usr/share/ollama ~/.ollama ~/ia`.
+* **Da concordare prima di costruirlo**: chi approva la bozza (referente o anche Presidente), se le sedute si registrano già e con quale consenso, parere del DPO per la fase audio.
+
 ### BLOCCO E — Connettore Titulus (Cineca)
 
 #### E0 — Raccogliere i parametri *(subito, tempi lunghi)*
@@ -387,6 +420,7 @@ Mettili in `documentazione/materiali/` (cartella da creare, su Drive) con questi
 |B2|Campi personalizzati prenotazione|**fatto in locale (da caricare)**|18/10/2026|Schema v60. Campi: stesso formato e controlli dei moduli della didattica (`CampiModulo`/`LetturaRisposte`) con soli tipi semplici; editor nella scheda della risorsa, copia da un'altra risorsa, risposte nell'elenco, nel CSV, nelle email e nella pagina del responsabile. CONTATORI (richiesta dell'utente, esempio i campioni di un laboratorio): modalità «per periodo» (capacità per giorno/settimana/mese, si ricarica da sola) e «scorta» (carichi/rettifiche con registro movimenti), minimo e massimo per prenotazione, obbligatorio sì/no; scalano anche con la richiesta in attesa di approvazione (decisione dell'utente) e tornano se rifiutata/annullata (il disponibile si calcola dalle prenotazioni attive); controllo dentro il blocco del calendario (niente doppie prenotazioni dell'ultima quantità); le serie settimanali saltano le date senza quantità. Modulo pubblico con «ne restano N» per il giorno scelto. Prove: 30 in esegui.php|
 |B3|Diario di bordo|**fatto in locale (da caricare)**|18/10/2026|Schema v61. Tipo di risorsa «Auto o mezzo»; diario attivabile per qualunque risorsa. Campi di partenza dal modulo cartaceo dell'utente (data, conducente, partenza, arrivo, ore, km iniziali e finali, litri, segnalazioni), modificabili dall'admin con ruoli (km, litri, data…) che reggono controlli e totali anche se rinominati. Lo compila chi ha prenotato, gli altri conducenti indicati alla prenotazione (scelti dall'anagrafe) o un responsabile; i km iniziali si propongono dall'ultimo viaggio e non possono scendere; km percorsi calcolati; verifica del responsabile (una correzione la azzera); promemoria col cron esistente; blocco delle nuove prenotazioni se manca il diario (opzione, spenta di default); registro, totali ed Excel (con riepilogo per mese). Pagina `diario_bordo.php` pensata anche per telefono. Prove: 30 in esegui.php (1013 totali)|
 |B4|Report risorse|**fatto in locale (da caricare)**|19/10/2026|Schema v62. Pacchetto 9 della mappa. Tabella `risorse_scadenze` (bollo, assicurazione, tagliando… con preavviso, inserite dall'admin nella scheda «Scadenze» della risorsa; avviso al responsabile prima e dopo la data con il cron dei promemoria, una volta sola; rinnovo dal cruscotto). Pagina `risorse_cruscotto.php` per responsabili e amministratori: prenotazioni per stato, ore e utilizzo, % rifiuti, fasce orarie, persone, mesi, contatori, km e consumo l/100 km, Excel. Nuovi: `src/Risorse/{ScadenzaRisorsaRepository,ServizioScadenzeRisorsa,CruscottoRisorsa}.php`, `risorse_cruscotto.php`. Modificati: `risorse_responsabile.php`, `admin/risorse.php`, `RisorsaRepository`, `NotificheRisorse`, `PromemoriaPrenotazioni`, schema, `RisorseIntegrazioneTest`. esegui.php: 1033 prove OK|
+|C1b|Pratica «Certificato di iscrizione» (prima dell'elenco Uniticket): bozza, modifica fino alla presa in carico, attesa del pagamento delle marche da bollo|**fatto in locale (da caricare)**|21/10/2026|Schema v63. Pacchetto 10 della mappa. Campi da `cert_iscr.pdf` di Uniticket. Iter: protocollo → ufficio del corso (carica marche in Esse3, avvisa lo studente, spunta pagamento «marca da bollo assolta virtualmente», carica il certificato di Esse3) → Direttore firma PAdES → lo studente scarica e stampa, operatore avvisato. Non va in verbale. Provato con PHPUnit (8 test nuovi) e di persona sul portale locale. Aperto: dove scrivere la dicitura sul PDF|
 |E1|Interfaccia Protocollo|in attesa|||Insieme alla firma digitale Aruba: si riprende quando l'Ateneo risponde|
 |E2|Titulus|in attesa||Servono parametri||
 |G|Collaudo pratiche, verbali, risorse|da fare|||Prossimo step|
@@ -394,6 +428,7 @@ Mettili in `documentazione/materiali/` (cartella da creare, su Drive) con questi
 |F2|Ricorrenti e liste d'attesa|da fare||||
 |F3|Backup e ripristino|da fare||||
 |F4|Guide per ruolo|da fare||||
+|F5|Assistente IA interno per i verbali|da valutare|||Prima la prova sul server (comandi in F5), poi si decide|
 
 **Stati**: `da fare` · `in corso` · `fatto in locale (da caricare)` · `in produzione`.
 Per ogni step chiuso scrivere: data, file toccati, versione schema, cosa è stato provato, cosa va caricato sul server.

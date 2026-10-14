@@ -99,6 +99,7 @@
         form.addEventListener('input', function () { aggiornaLogica(form); });
         form.addEventListener('change', function () { aggiornaLogica(form); });
         form.addEventListener('submit', function (e) {
+            if (e.submitter && e.submitter.name === 'salva_bozza') return; // la bozza si salva anche incompleta
             // Scelte multiple obbligatorie: almeno una casella (solo se il campo è visibile)
             var manca = Array.prototype.find.call(form.querySelectorAll('fieldset[data-almeno-uno]'), function (fs) {
                 var box = fs.closest('.campo-pratica');
@@ -336,6 +337,7 @@
             mostraPagina(corrente + 1); cont.scrollIntoView({ block: 'start' });
         });
         form.addEventListener('submit', function (e) {
+            if (e.submitter && e.submitter.name === 'salva_bozza') return; // la bozza si salva anche incompleta
             for (var i = 0; i < pagine.length; i++) {
                 var el = primoNonValido(pagine[i]);
                 if (el) { e.preventDefault(); e.stopImmediatePropagation(); mostraPagina(i); segnala(el); return; }

@@ -71,6 +71,48 @@ final class HtmlCampi
         return $righe;
     }
 
+    /**
+     * Valori da rimettere nei campi quando si riprende una bozza o si modifica una pratica: dalle risposte salvate, nello stesso formato di
+     * valoriPostCampo (testo, scelte multiple come testo, tabelle come righe). I campi allegato restano vuoti (il file già caricato si mantiene).
+     *
+     * @param list<array<string, mixed>> $campi
+     * @param list<array<string, mixed>> $risposte
+     * @return array<string, mixed> nome del campo => valore
+     */
+    public function valoriIniziali(array $campi, array $risposte): array
+    {
+        $per = [];
+        foreach ($risposte as $r) {
+            $per[mb_strtolower((string) ($r['etichetta'] ?? ''))] = $r;
+        }
+        $out = [];
+        foreach ($campi as $c) {
+            $r = $per[mb_strtolower((string) $c['etichetta'])] ?? null;
+            if (!$r || !empty($r['nascosto']) || $c['tipo'] === 'file') {
+                continue;
+            }
+            if ($c['tipo'] !== 'tabella') {
+                $out[$c['nome']] = (string) ($r['valore'] ?? '');
+                continue;
+            }
+            $righe = [];
+            foreach ((array) ($r['righe'] ?? []) as $riga) {
+                $nuova = [];
+                foreach ($c['colonne'] as $j => $col) {
+                    $v = (string) (((array) $riga)[$j] ?? '');
+                    if ($col['tipo'] === 'data' && preg_match('#^(\d{2})/(\d{2})/(\d{4})$#', $v, $m)) {
+                        $v = "$m[3]-$m[2]-$m[1]";
+                    }
+                    $nuova[$j] = $v;
+                }
+                $righe[] = $nuova;
+            }
+            $out[$c['nome']] = $righe;
+        }
+
+        return $out;
+    }
+
     public function datalist(array $campi): string
     {
         $h = fn ($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');

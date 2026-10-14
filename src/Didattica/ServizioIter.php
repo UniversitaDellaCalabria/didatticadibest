@@ -19,11 +19,12 @@ final class ServizioIter
 
     /**
      * I passi dell'iter del modulo, normalizzati. Nel JSON un passo è un ufficio (id, chiave o «@cdl» / «@segreteria») oppure un oggetto:
-     * {"t": "ufficio", "u": …, "gg": N}, {"t": "persona", "campo": «domanda di tipo docente», "gg": N}, {"t": "direttore", "gg": N};
-     * «gg» = giorni dopo i quali si ricorda il passo (0 = quelli del modulo). I passi non validi (ufficio sparito, di smistamento) si saltano.
+     * {"t": "ufficio", "u": …, "gg": N, "pagamento": 1}, {"t": "persona", "campo": «domanda di tipo docente», "gg": N}, {"t": "direttore", "gg": N};
+     * «gg» = giorni dopo i quali si ricorda il passo (0 = quelli del modulo); «pagamento» = passo di attesa del pagamento delle marche da bollo (l'ufficio le
+     * carica in Esse3, avvisa lo studente e spunta il pagamento). I passi non validi (ufficio sparito, di smistamento) si saltano.
      *
      * @param array<string, mixed>|null $m
-     * @return list<array{t: string, u: int|string|null, campo: string, gg: int}>
+     * @return list<array{t: string, u: int|string|null, campo: string, gg: int, pagamento: bool}>
      */
     public function definizione(?array $m): array
     {
@@ -32,24 +33,25 @@ final class ServizioIter
             $t = is_array($x) ? (string) ($x['t'] ?? 'ufficio') : 'ufficio';
             $gg = is_array($x) ? max(0, min(90, (int) ($x['gg'] ?? 0))) : 0;
             if ($t === 'direttore') {
-                $out[] = ['t' => 'direttore', 'u' => null, 'campo' => '', 'gg' => $gg];
+                $out[] = ['t' => 'direttore', 'u' => null, 'campo' => '', 'gg' => $gg, 'pagamento' => false];
                 continue;
             }
             if ($t === 'persona') {
                 $campo = trim((string) ($x['campo'] ?? ''));
                 if ($campo !== '') {
-                    $out[] = ['t' => 'persona', 'u' => null, 'campo' => $campo, 'gg' => $gg];
+                    $out[] = ['t' => 'persona', 'u' => null, 'campo' => $campo, 'gg' => $gg, 'pagamento' => false];
                 }
                 continue;
             }
             $u = self::voceUfficio($x);
+            $pag = is_array($x) && !empty($x['pagamento']);
             if ($u === '@cdl' || $u === '@segreteria') {
-                $out[] = ['t' => 'ufficio', 'u' => $u, 'campo' => '', 'gg' => $gg];
+                $out[] = ['t' => 'ufficio', 'u' => $u, 'campo' => '', 'gg' => $gg, 'pagamento' => $pag];
                 continue;
             }
             $id = $this->uffici->idDa($u);
             if ($id && !(int) ($this->uffici->tutti()[$id]['smista'] ?? 0)) {
-                $out[] = ['t' => 'ufficio', 'u' => $id, 'campo' => '', 'gg' => $gg];
+                $out[] = ['t' => 'ufficio', 'u' => $id, 'campo' => '', 'gg' => $gg, 'pagamento' => $pag];
             }
         }
 
@@ -60,6 +62,21 @@ final class ServizioIter
     public static function voceUfficio(mixed $x): mixed
     {
         return is_array($x) ? ($x['u'] ?? null) : $x;
+    }
+
+    /**
+     * Il passo dell'iter in cui si trova la pratica è l'attesa del pagamento delle marche da bollo (e la pratica non è conclusa).
+     *
+     * @param array<string, mixed>|null $m
+     * @param array<string, mixed> $p
+     */
+    public function passoPagamento(?array $m, array $p): bool
+    {
+        if (in_array($p['stato'] ?? '', ['bozza', 'accolta', 'respinta', 'chiusa'], true) || (int) ($p['passo'] ?? 0) < 1) {
+            return false;
+        }
+
+        return !empty($this->definizione($m)[(int) $p['passo'] - 1]['pagamento']);
     }
 
     /**
@@ -119,6 +136,9 @@ final class ServizioIter
                 $id > 0 => (string) ($this->uffici->tutti()[$id]['nome'] ?? 'Ufficio didattico'),
                 default => 'Ufficio didattico',
             };
+            if (!empty($def[$i]['pagamento'])) {
+                $out[$i + 1] .= ' · marche da bollo';
+            }
         }
         // Pratiche che vanno prima al protocollo: non c'è uno smistamento
         $primo = $this->iter($m, $p)[0] ?? 0;
