@@ -14,7 +14,7 @@ use App\Core\Orologio;
  */
 final class ServizioRisorse
 {
-    public function __construct(private RisorsaRepository $risorse, private NotificheRisorse $notifiche, private Orologio $orologio)
+    public function __construct(private RisorsaRepository $risorse, private NotificheRisorse $notifiche, private Orologio $orologio, private ServizioContatoriRisorse $contatori, private DiarioBordoRepository $diario)
     {
     }
 
@@ -125,7 +125,7 @@ final class ServizioRisorse
      * @param array<string, mixed> $u
      * @return array{codici: list<string>, saltate: array<string, string>, errore: ?string, stato: string, serie: ?string}
      */
-    public function prenota(array $r, array $u, string $inizio, int $nSlot, string $motivo = '', ?string $ripetiFino = null): array
+    public function prenota(array $r, array $u, string $inizio, int $nSlot, string $motivo = '', ?string $ripetiFino = null, array $extra = []): array
     {
         $esito = ['codici' => [], 'saltate' => [], 'errore' => null, 'stato' => (int) $r['approvazione'] === 1 ? 'da_approvare' : 'confermata', 'serie' => null];
         if (!(int) $r['attiva']) {
@@ -135,6 +135,12 @@ final class ServizioRisorse
         }
         if (!$this->puoPrenotare($r, $u)) {
             $esito['errore'] = 'Non sei abilitato a prenotare questa risorsa.';
+
+            return $esito;
+        }
+        // Diario di bordo: chi non ha compilato quello dell'ultimo viaggio non prenota di nuovo (se la risorsa lo chiede)
+        if ((int) ($r['diario_blocca'] ?? 0) === 1 && (int) ($r['diario_attivo'] ?? 0) === 1 && ($manca = $this->diario->senzaDiario((int) $u['id'], (string) ($u['email'] ?? ''), (int) $r['id']))) {
+            $esito['errore'] = 'Prima di prenotare di nuovo compila il diario di bordo del viaggio del ' . date('d/m/Y', (int) strtotime((string) $manca[0]['inizio'])) . ' (dalle tue prenotazioni).';
 
             return $esito;
         }
@@ -161,6 +167,11 @@ final class ServizioRisorse
         $ora = date('H:i:s', $t0);
         $motivo = mb_substr(trim(strip_tags($motivo)), 0, 500);
         $rid = (int) $r['id'];
+        // Quantità dei contatori della risorsa (id contatore => quantità) e risposte ai campi personalizzati (JSON): vedi $extra
+        $contatori = $this->contatori->elenco($rid);
+        $qta = (array) ($extra['quantita'] ?? []);
+        $risposte = isset($extra['risposte_json']) ? (string) $extra['risposte_json'] : null;
+        $coConducenti = isset($extra['co_conducenti_json']) ? (string) $extra['co_conducenti_json'] : null;
         if (!$this->risorse->bloccaCalendario($rid)) {
             $esito['errore'] = 'Il calendario è occupato: riprova tra un istante.';
 
@@ -201,11 +212,33 @@ final class ServizioRisorse
                     $esito['saltate'][$d] = $motivoNo;
                     continue;
                 }
+                // Contatori: la quantità deve esserci per questa data (la prima data ferma tutto, le successive della serie si saltano)
+                if ($contatori && ($errQ = $this->contatori->controlla($contatori, $qta, $d)) !== null) {
+                    if ($i === 0) {
+                        $esito['errore'] = $errQ;
+
+                        return $esito;
+                    }
+                    $esito['saltate'][$d] = 'quantità non disponibile';
+                    continue;
+                }
                 $ini = $slot[$idx]['inizio'];
                 $fin = $slot[$idx + $nSlot - 1]['fine'];
                 $codice = 'RS-' . strtoupper(bin2hex(random_bytes(4)));
                 if ($this->risorse->inserisciPrenotazione($rid, (int) $u['id'], (string) ($u['nome'] ?? ''), (string) ($u['cognome'] ?? ''), strtolower((string) ($u['email'] ?? '')), $ini, $fin, $motivo, $esito['stato'], $esito['serie'], $codice)) {
                     $esito['codici'][] = $codice;
+                    if ($contatori || $risposte !== null || $coConducenti !== null) {
+                        $nuova = $this->risorse->prenotazione($codice);
+                        if ($nuova) {
+                            $this->contatori->registra((int) $nuova['id'], $contatori, $qta, $d);
+                            if ($risposte !== null) {
+                                $this->risorse->impostaRisposte((int) $nuova['id'], $risposte);
+                            }
+                            if ($coConducenti !== null) {
+                                $this->diario->impostaCoConducenti((int) $nuova['id'], $coConducenti);
+                            }
+                        }
+                    }
                 }
             }
         } finally {

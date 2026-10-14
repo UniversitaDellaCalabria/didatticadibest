@@ -107,18 +107,7 @@ final class ServizioModuli
             $verbale[$k] = mb_substr(trim((string) ($post['v_' . $k] ?? '')), 0, $max);
         }
         $verbaleJson = json_encode($verbale, JSON_UNESCAPED_UNICODE);
-        $iter = [];
-        foreach ((array) ($post['iter'] ?? []) as $x) {
-            // «@cdl» / «@segreteria»: l'ufficio si sceglie con la pratica (corso di studio, segreteria indicata dal referente)
-            if (in_array($x, ['@cdl', '@segreteria'], true)) {
-                $iter[] = $x;
-                continue;
-            }
-            if (($idU = $this->uffici->idDa((int) $x)) && !(int) ($this->uffici->tutti()[$idU]['smista'] ?? 0)) {
-                $iter[] = $idU;
-            }
-        }
-        $iterJson = $iter ? json_encode($iter) : null;
+        $iterJson = $this->iterDaForm($post);
         $dal = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) ($post['aperto_dal'] ?? '')) ? $post['aperto_dal'] : null;
         $al = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) ($post['aperto_al'] ?? '')) ? $post['aperto_al'] : null;
         $gg = max(0, min(90, (int) ($post['giorni_promemoria'] ?? 7)));
@@ -133,6 +122,9 @@ final class ServizioModuli
         }
         if ($id) {
             $this->moduli->impostaDomanda($id, (string) json_encode($domanda, JSON_UNESCAPED_UNICODE));
+            if (isset($post['in_verbale_c'])) {
+                $this->moduli->impostaInVerbale($id, !empty($post['in_verbale']));
+            }
         }
         $rifiutato = false;
         // Documento da scaricare (pubblico)
@@ -157,6 +149,71 @@ final class ServizioModuli
         }
 
         return ['id' => $id, 'titolo' => $titolo, 'tipo' => $tipo, 'errore' => null, 'file_rifiutato' => $rifiutato];
+    }
+
+    /**
+     * L'iter dal modulo del pannello: righe parallele iter_tipo[] (ufficio | persona | direttore), iter_uff[], iter_campo[] (la domanda di tipo docente)
+     * e iter_gg[] (giorni del promemoria del passo). Senza queste righe vale il vecchio elenco iter[] di uffici. Ritorna il JSON (null = nessun passo).
+     *
+     * @param array<string, mixed> $post
+     */
+    private function iterDaForm(array $post): ?string
+    {
+        $passi = [];
+        $uffici = $this->uffici->tutti();
+        $tipi = (array) ($post['iter_tipo'] ?? []);
+        if ($tipi) {
+            foreach ($tipi as $i => $t) {
+                $gg = max(0, min(90, (int) ($post['iter_gg'][$i] ?? 0)));
+                if ($t === 'direttore') {
+                    $passi[] = ['t' => 'direttore'] + ($gg ? ['gg' => $gg] : []);
+                } elseif ($t === 'persona') {
+                    $campo = mb_substr(trim((string) ($post['iter_campo'][$i] ?? '')), 0, 200);
+                    if ($campo !== '') {
+                        $passi[] = ['t' => 'persona', 'campo' => $campo] + ($gg ? ['gg' => $gg] : []);
+                    }
+                } else {
+                    $x = $post['iter_uff'][$i] ?? '';
+                    // «@cdl» / «@segreteria»: l'ufficio si sceglie con la pratica (corso di studio, segreteria indicata dal referente)
+                    $u = in_array($x, ['@cdl', '@segreteria'], true) ? $x : (($idU = $this->uffici->idDa((int) $x)) && !(int) ($uffici[$idU]['smista'] ?? 0) ? $idU : null);
+                    if ($u !== null) {
+                        $passi[] = $gg ? ['t' => 'ufficio', 'u' => $u, 'gg' => $gg] : $u;
+                    }
+                }
+            }
+        } else {
+            foreach ((array) ($post['iter'] ?? []) as $x) {
+                if (in_array($x, ['@cdl', '@segreteria'], true)) {
+                    $passi[] = $x;
+                } elseif (($idU = $this->uffici->idDa((int) $x)) && !(int) ($uffici[$idU]['smista'] ?? 0)) {
+                    $passi[] = $idU;
+                }
+            }
+        }
+
+        return $passi ? (string) json_encode($passi, JSON_UNESCAPED_UNICODE) : null;
+    }
+
+    /** Copia un modulo (non pubblicato, senza chiave): campi, iter, verbale e domanda; il file da scaricare non si copia. Ritorna l'id della copia (0 = non trovato). */
+    public function duplica(int $id): int
+    {
+        $m = $this->moduli->perId($id);
+        if (!$m) {
+            return 0;
+        }
+        $nuovo = $this->moduli->salva(0, [
+            'titolo' => mb_substr((string) $m['titolo'], 0, 190) . ' (copia)', 'categoria' => $m['categoria'], 'descrizione' => $m['descrizione'], 'tipo' => $m['tipo'], 'link' => $m['link'] ?? '',
+            'campi_json' => $m['campi_json'], 'verbale_json' => $m['verbale_json'], 'iter_json' => $m['iter_json'], 'destinatari' => $m['destinatari'], 'email_ufficio' => $m['email_ufficio'],
+            'attivo' => 0, 'ordine' => (int) $m['ordine'], 'aperto_dal' => $m['aperto_dal'], 'aperto_al' => $m['aperto_al'], 'giorni_promemoria' => (int) $m['giorni_promemoria'],
+        ]);
+        if ($nuovo) {
+            if (!empty($m['domanda_json'])) {
+                $this->moduli->impostaDomanda($nuovo, (string) $m['domanda_json']);
+            }
+            $this->moduli->impostaInVerbale($nuovo, (int) ($m['in_verbale'] ?? 1) === 1);
+        }
+
+        return $nuovo;
     }
 
     /**

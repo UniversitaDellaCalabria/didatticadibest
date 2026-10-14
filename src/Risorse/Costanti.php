@@ -12,7 +12,7 @@ final class Costanti
 {
     public const TIPI = [
         'aula' => ['Aula', 'fa-chalkboard'], 'laboratorio' => ['Laboratorio', 'fa-flask'],
-        'sportello' => ['Sportello / appuntamento', 'fa-user-clock'], 'altro' => ['Altra risorsa', 'fa-cube'],
+        'sportello' => ['Sportello / appuntamento', 'fa-user-clock'], 'veicolo' => ['Auto o mezzo', 'fa-car'], 'altro' => ['Altra risorsa', 'fa-cube'],
     ];
     public const ACCESSI = [
         'tutti' => 'Chiunque abbia fatto l\'accesso', 'studenti' => 'Studenti', 'docenti' => 'Docenti',

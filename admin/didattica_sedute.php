@@ -60,6 +60,14 @@ if ($fase === 'azioni') {
         flash_set("Presenze salvate ($n componenti): sono nel verbale.");
         admin_redirect("$base&tab=sedute&id=" . (int)$sed['id'] . "&r=" . time() . "#presenze");
     }
+    if (isset($_POST['salva_punti'])) {
+        $sed = seduta_didattica($conn, (int)($_POST['seduta_id'] ?? 0));
+        if (!$puo_seduta($sed)) nega_accesso();
+        $n = \App\Core\App::per($conn)->get(\App\Didattica\ServizioPuntiSeduta::class)->salva($sed, array_map('strval', (array)($_POST['testo'] ?? [])), array_map('strval', (array)($_POST['tipo'] ?? [])), array_map('strval', (array)($_POST['pratica_punto'] ?? [])));
+        registra_log_audit($conn, "Seduta: testi dei punti salvati", ["Seduta" => $sed['id'], "Punti" => $n]);
+        flash_set("Testi salvati ($n punti): sono nel verbale in Word.");
+        admin_redirect("$base&tab=sedute&id=" . (int)$sed['id'] . "&passo=punti&r=" . time());
+    }
     if (isset($_POST['salva_decisioni'])) {
         $id = (int)($_POST['pratica_id'] ?? 0); $p = pratica($conn, $id);
         $sed = $p && $p['seduta_id'] ? seduta_didattica($conn, (int)$p['seduta_id']) : null;
@@ -109,6 +117,108 @@ if ($fase === 'azioni') {
         flash_set($err ?? (isset($_POST['invia_verbale_firma']) ? "Verbale inviato: il segretario riceve l'email per firmarlo, poi tocca al coordinatore." : "Firma registrata."), $err ? 'danger' : 'success');
         admin_redirect("$base&tab=sedute&id=" . (int)$sed['id'] . "&r=" . time() . "#ps-firme");
     }
+    // ── Archivio verbali: importazione di PDF vecchi (una richiesta per gruppo di file: risponde in JSON) e modifica dei dati ──
+    if (isset($_POST['importa_verbali'])) {
+        while (ob_get_level() > 0) ob_end_clean();
+        header('Content-Type: application/json; charset=utf-8');
+        $cons_i = (int)($_POST['consiglio_id'] ?? 0);
+        if ($cons_i ? !$puo_consiglio($cons_i) : !$puo_didattica_tutto) { http_response_code(403); echo json_encode(['errore' => 'Scegli un consiglio che puoi gestire.']); exit; }
+        @set_time_limit(180);
+        $arch = \App\Core\App::per($conn)->get(\App\Didattica\ArchivioVerbali::class);
+        $f_i = $_FILES['file'] ?? ['name' => [], 'tmp_name' => [], 'error' => []];
+        $percorsi_i = array_map('strval', (array)($_POST['percorso'] ?? []));
+        $aa_i = preg_match('#^\d{4}/\d{4}$#', (string)($_POST['anno_accademico'] ?? '')) ? (string)$_POST['anno_accademico'] : '';
+        $ris_i = [];
+        foreach ((array)$f_i['name'] as $k => $nome_i) {
+            if (($f_i['error'][$k] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+                $ris_i[] = ['esito' => 'errore', 'nome' => (string)$nome_i, 'messaggio' => in_array($f_i['error'][$k] ?? 0, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true) ? 'troppo grande per il server' : 'caricamento non riuscito'];
+                continue;
+            }
+            $ris_i[] = $arch->importa((string)$f_i['tmp_name'][$k], (string)$nome_i, $percorsi_i[$k] ?? (string)$nome_i, $cons_i ?: null, (string)($_POST['organo'] ?? ''), $aa_i);
+        }
+        $n_ok = count(array_filter($ris_i, fn($r) => $r['esito'] === 'ok'));
+        if ($n_ok) registra_log_audit($conn, "Archivio verbali: verbali importati", ["Verbali" => $n_ok, "Consiglio" => $cons_i]);
+        echo json_encode(['risultati' => $ris_i], JSON_UNESCAPED_UNICODE); exit;
+    }
+    if (isset($_POST['salva_verbale_importato'])) {
+        $id = (int)($_POST['id'] ?? 0);
+        $imp = seduta_didattica($conn, $id);
+        $cons_n = (int)($_POST['consiglio_id'] ?? 0);
+        if (!$imp || $imp['origine'] !== 'importato' || !($imp['consiglio_id'] ? $puo_seduta($imp) : $puo_didattica_tutto) || ($cons_n ? !$puo_consiglio($cons_n) : !$puo_didattica_tutto)) nega_accesso();
+        $arch = \App\Core\App::per($conn)->get(\App\Didattica\ArchivioVerbali::class);
+        $err = $arch->salvaDati($id, $_POST, $consigli);
+        $f_n = $_FILES['verbale_pdf'] ?? null;
+        if (!$err && $f_n && ($f_n['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) $err = $arch->sostituisciFile($imp, (string)$f_n['tmp_name'], (string)$f_n['name']);
+        if (!$err) registra_log_audit($conn, "Archivio verbali: verbale importato modificato", ["Seduta" => $id]);
+        flash_set($err ?? "Verbale salvato.", $err ? 'danger' : 'success');
+        admin_redirect("$base&tab=sedute&archivio=1" . ($err ? "&imp=$id" : ''));
+    }
+    if (isset($_POST['elimina_verbale_importato'])) {
+        $id = (int)$_POST['elimina_verbale_importato'];
+        $imp = seduta_didattica($conn, $id);
+        if (!$imp || $imp['origine'] !== 'importato' || !($imp['consiglio_id'] ? $puo_seduta($imp) : $puo_didattica_tutto)) nega_accesso();
+        \App\Core\App::per($conn)->get(\App\Didattica\ArchivioVerbali::class)->elimina($imp);
+        registra_log_audit($conn, "Archivio verbali: verbale importato eliminato", ["Seduta" => $id]);
+        flash_set("Verbale tolto dall'archivio.", 'warning');
+        admin_redirect("$base&tab=sedute&archivio=1");
+    }
+    // ── Pagina pubblica dei verbali: accessi con password e pubblicazione dei singoli verbali (solo Ufficio didattico) ──
+    if (array_intersect(array_keys($_POST), ['crea_accesso_verbali', 'salva_accesso_verbali', 'nuova_password_verbali', 'stato_accesso_verbali', 'elimina_accesso_verbali', 'pubblica_verbale', 'ritira_verbale'])) {
+        if (!$puo_didattica_tutto) nega_accesso();
+        $pubb = \App\Core\App::per($conn)->get(\App\Didattica\ServizioVerbaliPubblici::class);
+        $rep_acc = \App\Core\App::per($conn)->get(\App\Didattica\AccessoVerbaliRepository::class);
+        $url_acc = "$base&tab=sedute&accessi=1";
+        $scade_p = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['scade_il'] ?? '')) ? (string)$_POST['scade_il'] : null;
+        if (isset($_POST['crea_accesso_verbali'])) {
+            [$err, $nid, $pw] = $pubb->crea((string)($_POST['etichetta'] ?? ''), (string)($_POST['password'] ?? ''), $scade_p, (array)($_POST['consigli_ids'] ?? []), !empty($_POST['tutti']), $consigli, $autore_nome);
+            if (!$err) { $_SESSION['verbali_nuova_password'] = [(int)$nid, $pw]; registra_log_audit($conn, "Verbali pubblici: accesso creato", ["Accesso" => trim((string)$_POST['etichetta'])]); }
+            flash_set($err ?? "Accesso creato: copia subito la password, non si potrà rivedere.", $err ? 'danger' : 'success');
+            admin_redirect($url_acc);
+        }
+        if (isset($_POST['salva_accesso_verbali'])) {
+            $id = (int)($_POST['id'] ?? 0);
+            $err = $pubb->aggiorna($id, (string)($_POST['etichetta'] ?? ''), $scade_p, (array)($_POST['consigli_ids'] ?? []), !empty($_POST['tutti']), $consigli);
+            if (!$err) registra_log_audit($conn, "Verbali pubblici: accesso modificato", ["Accesso" => $id]);
+            flash_set($err ?? "Accesso salvato.", $err ? 'danger' : 'success');
+            admin_redirect($url_acc);
+        }
+        if (isset($_POST['nuova_password_verbali'])) {
+            $id = (int)$_POST['nuova_password_verbali'];
+            $pw = $pubb->nuovaPassword($id);
+            if ($pw !== '') { $_SESSION['verbali_nuova_password'] = [$id, $pw]; registra_log_audit($conn, "Verbali pubblici: nuova password", ["Accesso" => $id]); }
+            flash_set($pw !== '' ? "Nuova password creata: la vecchia non funziona più. Copiala subito." : "Accesso non trovato.", $pw !== '' ? 'success' : 'danger');
+            admin_redirect($url_acc);
+        }
+        if (isset($_POST['stato_accesso_verbali'])) {
+            $id = (int)$_POST['stato_accesso_verbali'];
+            $rep_acc->imposta($id, !empty($_POST['attiva']));
+            registra_log_audit($conn, !empty($_POST['attiva']) ? "Verbali pubblici: accesso riattivato" : "Verbali pubblici: accesso revocato", ["Accesso" => $id]);
+            flash_set(!empty($_POST['attiva']) ? "Accesso riattivato." : "Accesso revocato: chi ha la password non entra più.", !empty($_POST['attiva']) ? 'success' : 'warning');
+            admin_redirect($url_acc);
+        }
+        if (isset($_POST['elimina_accesso_verbali'])) {
+            $rep_acc->elimina((int)$_POST['elimina_accesso_verbali']);
+            registra_log_audit($conn, "Verbali pubblici: accesso eliminato", ["Accesso" => (int)$_POST['elimina_accesso_verbali']]);
+            flash_set("Accesso eliminato.", 'warning');
+            admin_redirect($url_acc);
+        }
+        if (isset($_POST['pubblica_verbale']) || isset($_POST['ritira_verbale'])) {
+            $id = (int)($_POST['pubblica_verbale'] ?? $_POST['ritira_verbale']);
+            $sp = seduta_didattica($conn, $id);
+            if (!$sp) nega_accesso();
+            if (isset($_POST['ritira_verbale'])) {
+                $pubb->ritira($sp);
+                registra_log_audit($conn, "Verbali pubblici: verbale ritirato", ["Seduta" => $id]);
+                flash_set("Verbale ritirato dalla pagina pubblica.", 'warning');
+                admin_redirect("$base&tab=sedute&archivio=1");
+            }
+            $f_p = $_FILES['pdf_omissis'] ?? null;
+            $err = $pubb->pubblica($sp, ($_POST['modo'] ?? '') === 'omissis' ? 'omissis' : 'integrale', !empty($_POST['conferma']), $f_p && ($f_p['error'] ?? 1) === UPLOAD_ERR_OK ? (string)$f_p['tmp_name'] : null, $autore_nome);
+            if (!$err) registra_log_audit($conn, "Verbali pubblici: verbale pubblicato", ["Seduta" => $id, "Modo" => $_POST['modo'] ?? 'integrale']);
+            flash_set($err ?? "Verbale pubblicato: chi ha un accesso valido per questo consiglio lo trova nella pagina dei verbali.", $err ? 'danger' : 'success');
+            admin_redirect($err ? "$base&tab=sedute&archivio=1&pub=$id" : "$base&tab=sedute&archivio=1");
+        }
+    }
     // ── Sedute ──
     if (isset($_POST['salva_seduta'])) {
         $id = (int)($_POST['seduta_id'] ?? 0);
@@ -142,7 +252,11 @@ if ($fase === 'azioni') {
     $cons_sel = isset($_GET['consiglio']) ? ((int)$_GET['consiglio'] ? consiglio_didattica($conn, (int)$_GET['consiglio']) : ['id' => 0, 'nome' => '', 'corsi' => '[]', 'coordinatore' => '', 'segretario' => '', 'luogo' => '', 'odg' => '', 'attivo' => 1, 'ordine' => count($consigli) + 1]) : null;
     if ($cons_sel && ((int)$cons_sel['id'] ? !$puo_consiglio((int)$cons_sel['id']) : $solo_ref)) $cons_sel = null;
     $consigli_vis = array_filter($consigli, fn($c) => $puo_consiglio((int)$c['id']));
-    if ($cons_sel):
+    if (!empty($_GET['accessi']) && $puo_didattica_tutto):
+        require __DIR__ . '/didattica_accessi.php';
+    elseif (!empty($_GET['archivio'])):
+        require __DIR__ . '/didattica_archivio.php';
+    elseif ($cons_sel):
         // ── Consiglio: dati (Ufficio didattico), referenti (Ufficio didattico), componenti (anche i referenti) ──
         $cid = (int)$cons_sel['id'];
         $referenti = $cid ? persone_consiglio($conn, $cid, 'referente') : [];
@@ -300,7 +414,8 @@ if ($fase === 'azioni') {
         $cc = $cons_new ? ($consigli[$cons_new] ?? null) : null;
         $f = $mod_s ?: ['id' => 0, 'consiglio_id' => $cons_new, 'organo' => $cc['nome'] ?? ($ult['organo'] ?? ''), 'anno_accademico' => anno_accademico_corrente() . '/' . (anno_accademico_corrente() + 1), 'data' => '', 'ora_inizio' => '', 'ora_fine' => '',
                         'luogo' => ($cc['luogo'] ?? '') ?: ($ult['luogo'] ?? ''), 'odg' => ($cc['odg'] ?? '') ?: ($ult['odg'] ?? "Comunicazioni\nPratiche studenti\nVarie ed eventuali"), 'presenze' => $cc ? '' : ($ult['presenze'] ?? ''),
-                        'segretario' => ($cc['segretario'] ?? '') ?: ($ult['segretario'] ?? ''), 'coordinatore' => ($cc['coordinatore'] ?? '') ?: ($ult['coordinatore'] ?? '')];
+                        'segretario' => ($cc['segretario'] ?? '') ?: ($ult['segretario'] ?? ''), 'coordinatore' => ($cc['coordinatore'] ?? '') ?: ($ult['coordinatore'] ?? ''),
+                        'numero_verbale' => (string)(1 + count(array_filter($sedute, fn($x) => $cons_new && (int)$x['consiglio_id'] === $cons_new && $x['anno_accademico'] === anno_accademico_corrente() . '/' . (anno_accademico_corrente() + 1))))];
         $organi = array_values(array_unique(array_filter(array_column($sedute, 'organo'))));
 ?>
     <form method="POST" class="card border-0 shadow-sm"><div class="card-body">
@@ -321,11 +436,13 @@ if ($fase === 'azioni') {
             <div class="col-md-2"><label class="form-label small fw-bold" for="sOf">Ora di fine</label><input type="time" class="form-control" id="sOf" name="ora_fine" value="<?php echo $h($f['ora_fine']); ?>"></div>
             <div class="col-md-5"><label class="form-label small fw-bold" for="sLuogo">Luogo</label><input type="text" class="form-control" id="sLuogo" name="luogo" value="<?php echo $h($f['luogo']); ?>" placeholder="l'aula L3 del cubo 4A" maxlength="255"></div>
             <div class="col-md-6"><label class="form-label small fw-bold" for="sOdg">Ordine del giorno</label><textarea class="form-control" id="sOdg" name="odg" rows="10"><?php echo $h($f['odg']); ?></textarea>
-                <div class="form-text">Un punto per riga. Le pratiche vanno nel punto che contiene la parola «pratiche».</div></div>
+                <div class="form-text">Un punto per riga. Ogni punto ha poi il suo testo nel passo «Cosa è stato detto»; le pratiche vanno nel punto che contiene la parola «pratiche».</div></div>
             <div class="col-md-6"<?php echo (int)$f['consiglio_id'] ? ' hidden' : ''; ?>><label class="form-label small fw-bold" for="sPres">Presenze (senza consiglio)</label><textarea class="form-control font-monospace" id="sPres" name="presenze" rows="10" style="font-size:.8rem;" placeholder="Professori Ordinari e Associati&#10;Prof. Rossi Mario (Coordinatore) | PRESENTE&#10;Prof.ssa Bianchi Anna | GIUSTIFICATA"><?php echo $h($f['presenze']); ?></textarea>
                 <div class="form-text">Una riga per persona: <code>Nome | PRESENTE</code> (o ASSENTE, GIUSTIFICATO). Le righe senza «|» diventano titoli di gruppo.</div></div>
-            <div class="col-md-6"><label class="form-label small fw-bold" for="sSeg">Segretario verbalizzante</label><input type="text" class="form-control" id="sSeg" name="segretario" value="<?php echo $h($f['segretario']); ?>" placeholder="la Dott.ssa …" maxlength="200"></div>
-            <div class="col-md-6"><label class="form-label small fw-bold" for="sCoo">Coordinatore</label><input type="text" class="form-control" id="sCoo" name="coordinatore" value="<?php echo $h($f['coordinatore']); ?>" placeholder="Prof. …" maxlength="200"></div>
+            <div class="col-md-4"><label class="form-label small fw-bold" for="sSeg">Segretario verbalizzante</label><input type="text" class="form-control" id="sSeg" name="segretario" value="<?php echo $h($f['segretario']); ?>" placeholder="la Dott.ssa …" maxlength="200"></div>
+            <div class="col-md-4"><label class="form-label small fw-bold" for="sCoo">Coordinatore</label><input type="text" class="form-control" id="sCoo" name="coordinatore" value="<?php echo $h($f['coordinatore']); ?>" placeholder="Prof. …" maxlength="200"></div>
+            <div class="col-md-4"><label class="form-label small fw-bold" for="sNum">Verbale n.</label><input type="text" class="form-control" id="sNum" name="numero_verbale" value="<?php echo $h($f['numero_verbale'] ?? ''); ?>" maxlength="10" placeholder="8">
+                <div class="form-text">Compare in alto a ogni pagina del Word: «Verbale n. 8 – 07 settembre 2026».</div></div>
         </div>
         <div class="mt-3 d-flex gap-2">
             <button type="submit" name="salva_seduta" value="1" class="btn btn-primary fw-bold"><i class="fa fa-save me-1" aria-hidden="true"></i>Salva</button>
@@ -353,9 +470,13 @@ if ($fase === 'azioni') {
         $con_esito = count(array_filter($pr_sel, fn($x) => ($x['esito_seduta'] ?? '') !== ''));
         $vs = (string)($sel['verbale_stato'] ?? ''); $sv = STATI_VERBALE[$vs] ?? STATI_VERBALE[''];
         // Passi della seduta: chiave, nome, fatto?, nota. La convocazione è facoltativa.
+        $punti_s = \App\Core\App::per($conn)->get(\App\Didattica\ServizioPuntiSeduta::class)->punti($sel);
+        $pr_per_punto = \App\Didattica\ServizioPuntiSeduta::praticheDeiPunti($punti_s, $pr_sel);
+        $n_punti_pr = count(array_filter($punti_s, fn($x) => $x['tipo'] === 'pratiche'));
         $passi_s = [
             ['convocazione', 'Convocazione', !empty($sel['convocazione_il']), 'facoltativa'],
             ['presenze', 'Presenze', count(array_filter($presenze, fn($r) => !empty($r['_salvata']))) > $n_giust, ''],
+            ['punti', 'Cosa è stato detto', count(array_filter($punti_s, fn($x) => trim((string)$x['testo']) !== '')) > 0, ''],
             ['pratiche', 'Pratiche e decisioni', !empty($pr_sel) && $con_esito === count($pr_sel), ''],
             ['esiti', 'Esiti agli studenti', !empty($pr_sel) && $con_esito > 0 && !$da_applicare, ''],
             ['verbale', 'Verbale', $vs !== '', ''],
@@ -456,6 +577,49 @@ if ($fase === 'azioni') {
     <?php elseif ($cons_s): ?>
         <div class="alert alert-light border small">Il consiglio non ha ancora componenti: <a href="<?php echo $base; ?>&amp;tab=sedute&amp;consiglio=<?php echo (int)$cons_s['id']; ?>">inseriscili una volta sola</a> e qui segnerai le presenze.</div>
     <?php endif; ?>
+    </div>
+
+    <div class="tab-pane fade<?php echo $passo_aperto === 'punti' ? ' show active' : ''; ?>" id="ps-punti" role="tabpanel">
+        <form method="POST" class="card border-0 shadow-sm" id="punti" onsubmit="if (window.tinymce) tinymce.triggerSave();"><div class="card-body">
+            <?php csrf_field(); ?><input type="hidden" name="seduta_id" value="<?php echo (int)$sel['id']; ?>">
+            <div class="d-flex flex-wrap gap-2 align-items-center mb-1">
+                <h6 class="fw-bold mb-0"><i class="fa fa-pen-to-square me-1 text-primary" aria-hidden="true"></i>Cosa è stato detto, punto per punto</h6>
+                <a class="btn btn-sm btn-outline-secondary ms-auto" href="<?php echo $base; ?>&amp;tab=sedute&amp;modifica=<?php echo (int)$sel['id']; ?>"><i class="fa fa-list-ol me-1" aria-hidden="true"></i>Cambia l'ordine del giorno</a>
+            </div>
+            <p class="small text-secondary">Un riquadro per ogni punto dell'ordine del giorno: quello che scrivi finisce sotto il titolo del punto nel verbale in Word. Il punto delle <strong>pratiche studenti</strong> porta da solo le pratiche della seduta, ordinate per tipo di pratica; qui puoi aggiungere un'introduzione. I punti lasciati vuoti restano con «…» da completare nel Word.</p>
+            <?php foreach ($punti_s as $i_pt => $pt): $id_pt = (int)$pt['id']; $sue_pr = $pr_per_punto[$id_pt] ?? []; ?>
+            <div class="border rounded p-2 mb-3">
+                <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+                    <span class="badge text-bg-primary"><?php echo $i_pt + 1; ?></span>
+                    <strong class="flex-grow-1"><?php echo $h($pt['titolo']); ?></strong>
+                    <select class="form-select form-select-sm w-auto" name="tipo[<?php echo $id_pt; ?>]" aria-label="Tipo del punto <?php echo $i_pt + 1; ?>">
+                        <?php foreach (\App\Didattica\ServizioPuntiSeduta::TIPI as $k_t => $n_t): ?><option value="<?php echo $k_t; ?>"<?php echo $pt['tipo'] === $k_t ? ' selected' : ''; ?>><?php echo $h($n_t); ?></option><?php endforeach; ?>
+                    </select>
+                </div>
+                <textarea class="form-control editor-html" name="testo[<?php echo $id_pt; ?>]" id="pt<?php echo $id_pt; ?>" rows="5" aria-label="Testo del punto <?php echo $i_pt + 1; ?>"><?php echo $h($pt['testo']); ?></textarea>
+                <?php if ($pt['tipo'] === 'pratiche'): ?>
+                    <div class="small mt-2"><i class="fa fa-folder-open me-1 text-secondary" aria-hidden="true"></i><strong><?php echo count($sue_pr); ?> pratiche</strong> sotto questo punto<?php echo $sue_pr ? ': ' . $h(implode(', ', array_map(fn($x) => trim($x['cognome'] . ' ' . $x['nome']), array_slice($sue_pr, 0, 6))) . (count($sue_pr) > 6 ? '…' : '')) : ''; ?>.</div>
+                <?php endif; ?>
+            </div>
+            <?php endforeach; ?>
+            <?php if (!$punti_s): ?><div class="alert alert-light border small">La seduta non ha un ordine del giorno: <a href="<?php echo $base; ?>&amp;tab=sedute&amp;modifica=<?php echo (int)$sel['id']; ?>">scrivilo</a> (un punto per riga).</div><?php endif; ?>
+            <?php if ($n_punti_pr > 1 && $pr_sel): ?>
+            <div class="border rounded p-2 mb-3 bg-light">
+                <div class="fw-bold small mb-1"><i class="fa fa-folder-tree me-1 text-primary" aria-hidden="true"></i>Assegna le pratiche ai punti</div>
+                <p class="small text-secondary mb-2">Ci sono più punti per le pratiche: scegli sotto quale compare ognuna (di default, il primo).</p>
+                <?php foreach ($pr_sel as $x_pr): $cur = 0; foreach ($pr_per_punto as $k_pp => $l_pp) foreach ($l_pp as $y_pr) if ((int)$y_pr['id'] === (int)$x_pr['id']) $cur = $k_pp; ?>
+                <div class="d-flex flex-wrap gap-2 align-items-center small mb-1">
+                    <span class="flex-grow-1"><?php echo $h(trim($x_pr['cognome'] . ' ' . $x_pr['nome'])); ?> <span class="text-secondary">· <?php echo $h($x_pr['modulo_titolo']); ?></span></span>
+                    <select class="form-select form-select-sm w-auto" name="pratica_punto[<?php echo (int)$x_pr['id']; ?>]" aria-label="Punto di <?php echo $h(trim($x_pr['cognome'] . ' ' . $x_pr['nome'])); ?>">
+                        <?php foreach ($punti_s as $i_pt => $pt): if ($pt['tipo'] !== 'pratiche') continue; ?><option value="<?php echo (int)$pt['id']; ?>"<?php echo $cur === (int)$pt['id'] ? ' selected' : ''; ?>><?php echo ($i_pt + 1) . '. ' . $h(mb_strimwidth($pt['titolo'], 0, 60, '…')); ?></option><?php endforeach; ?>
+                    </select>
+                </div>
+                <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
+            <?php if ($punti_s): ?><button type="submit" name="salva_punti" value="1" class="btn btn-primary fw-bold"><i class="fa fa-save me-1" aria-hidden="true"></i>Salva i testi</button>
+            <a class="btn btn-outline-primary ms-1" href="<?php echo $h($url_sel); ?>&amp;esporta=docx"><i class="fa fa-file-word me-1" aria-hidden="true"></i>Anteprima in Word</a><?php endif; ?>
+        </div></form>
     </div>
 
     <div class="tab-pane fade<?php echo $passo_aperto === 'pratiche' ? ' show active' : ''; ?>" id="ps-pratiche" role="tabpanel">
@@ -705,6 +869,7 @@ if ($fase === 'azioni') {
         <form method="GET" class="d-flex gap-1 ms-auto"><input type="hidden" name="p_id" value="<?php echo (int)$filtro_p; ?>"><input type="hidden" name="tab" value="sedute">
             <select class="form-select form-select-sm" name="cons" onchange="this.form.submit()" aria-label="Filtra per consiglio" style="max-width:320px;"><option value="0">Tutti i consigli</option>
                 <?php foreach ($consigli_vis as $k => $c): ?><option value="<?php echo $k; ?>"<?php echo $f_cons === $k ? ' selected' : ''; ?>><?php echo $h(mb_strimwidth($c['nome'], 0, 70, '…')); ?></option><?php endforeach; ?></select></form>
+        <a href="<?php echo $base; ?>&amp;tab=sedute&amp;archivio=1" class="btn btn-outline-primary btn-sm fw-bold"><i class="fa fa-box-archive me-1" aria-hidden="true"></i>Archivio verbali</a>
         <?php if (!$solo_ref): ?><a href="<?php echo $base; ?>&amp;tab=sedute&amp;nuova=1" class="btn btn-primary btn-sm fw-bold"><i class="fa fa-plus-circle me-1" aria-hidden="true"></i>Nuova seduta</a><?php endif; ?>
     </div>
     <div class="row g-3">

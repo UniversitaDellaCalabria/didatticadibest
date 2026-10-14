@@ -81,7 +81,7 @@ prova(FP_::di(['stato' => 'in_lavorazione', 'seduta_id' => 2, 'esito_seduta' => 
 prova(FP_::di(['stato' => 'inviata']) === 'smistare' && FP_::di(['stato' => 'inviata', 'ufficio_id' => 7], 'cdl') === 'prendere' && FP_::di(['stato' => 'in_lavorazione', 'ufficio_id' => 7, 'assegnata_a' => 4], 'cdl') === 'lavorazione', "FasePratica: da assegnare, da prendere in carico, in lavorazione");
 prova(FP_::cosaFare('protocollare', ['protocollo' => ''])['tipo'] === 'azione' && FP_::cosaFare('protocollare', ['protocollo' => '55'])['tipo'] === 'attesa', "FasePratica::cosaFare(): protocollo registrato = si aspetta il bollo");
 prova(FP_::cosaFare('consiglio', [])['dove'] === 'seduta' && FP_::cosaFare('integrazione', [])['tipo'] === 'attesa' && FP_::cosaFare('conclusa', [])['tipo'] === 'nessuna' && FP_::cosaFare('lavorazione', ['seduta_id' => 1])['testo'] === 'Istruisci', "FasePratica::cosaFare(): dove si va e tipo di azione");
-prova(array_keys(FP_::FASI) === ['protocollare', 'smistare', 'prendere', 'lavorazione', 'integrazione', 'consiglio', 'decisa', 'segreteria', 'conclusa'], "FasePratica: fasi nell'ordine dell'iter");
+prova(array_keys(FP_::FASI) === ['protocollare', 'smistare', 'prendere', 'lavorazione', 'firma', 'integrazione', 'consiglio', 'decisa', 'segreteria', 'conclusa'], "FasePratica: fasi nell'ordine dell'iter");
 $cp_ = FP_::conta([['stato' => 'inviata'], ['stato' => 'inviata'], ['stato' => 'accolta']], fn($x) => '');
 prova($cp_ === ['smistare' => 2, 'conclusa' => 1], "FasePratica::conta(): numeri per fase");
 $it_ = \App\Core\App::per($conn)->get(\App\Didattica\ServizioIter::class)->passiIter(['stato' => 'accolta', 'passo' => 1, 'assegnata_a' => null, 'ufficio_id' => null], null);

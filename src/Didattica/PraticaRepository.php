@@ -21,7 +21,7 @@ final class PraticaRepository
      */
     public function perId(int $id): ?array
     {
-        return $this->db->riga('SELECT p.*, m.titolo AS modulo_titolo, m.email_ufficio, m.categoria FROM pratiche p JOIN didattica_moduli m ON m.id = p.modulo_id WHERE p.id = ?', [$id]);
+        return $this->db->riga('SELECT p.*, m.titolo AS modulo_titolo, m.email_ufficio, m.categoria, m.in_verbale, (SELECT COUNT(*) FROM pratiche_firme f WHERE f.pratica_id = p.id AND f.stato = "attesa") AS firme_attesa FROM pratiche p JOIN didattica_moduli m ON m.id = p.modulo_id WHERE p.id = ?', [$id]);
     }
 
     /**
@@ -61,6 +61,12 @@ final class PraticaRepository
     public function assegna(int $id, int $operatoreId, int $passo, string $stato, ?int $ufficioId): void
     {
         $this->db->esegui('UPDATE pratiche SET assegnata_a = ?, passo = ?, stato = ?, ufficio_id = ?, aggiornata_il = NOW() WHERE id = ?', [$operatoreId, $passo, $stato, $ufficioId, $id]);
+    }
+
+    /** La pratica passa al passo indicato dell'iter senza una persona in carico (es. in attesa di una firma). */
+    public function impostaPasso(int $id, int $passo): void
+    {
+        $this->db->esegui("UPDATE pratiche SET passo = ?, assegnata_a = NULL, ufficio_id = NULL, stato = IF(stato = 'inviata', 'in_lavorazione', stato), aggiornata_il = NOW() WHERE id = ?", [$passo, $id]);
     }
 
     /** Chi ha avuto la pratica resta tra gli operatori: la continua a vedere e a integrare (se c'è già, si aggiorna il passo). */
@@ -122,6 +128,21 @@ final class PraticaRepository
                AND COALESCE(p.aggiornata_il, p.creata_il) < NOW() - INTERVAL m.giorni_promemoria DAY
                AND (p.promemoria_il IS NULL OR p.promemoria_il < NOW() - INTERVAL m.giorni_promemoria DAY)"
         ));
+    }
+
+    /**
+     * Pratiche aperte che potrebbero avere un promemoria (non in attesa di una firma: a chi deve firmare pensa FirmaPratica): passo, giorni fermi
+     * e giorni dall'ultimo promemoria (null = mai). Quanti giorni servono lo dice l'iter del modulo (ServizioIter::giorniPasso).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function candidatePromemoria(): array
+    {
+        return $this->db->righe(
+            "SELECT p.id, p.passo, p.modulo_id, DATEDIFF(NOW(), COALESCE(p.aggiornata_il, p.creata_il)) AS giorni_fermi,
+                    IF(p.promemoria_il IS NULL, NULL, DATEDIFF(NOW(), p.promemoria_il)) AS giorni_dal_promemoria
+             FROM pratiche p WHERE p.stato IN ('inviata', 'in_lavorazione') AND NOT EXISTS (SELECT 1 FROM pratiche_firme f WHERE f.pratica_id = p.id AND f.stato = 'attesa')"
+        );
     }
 
     public function segnaPromemoria(int $id): void
@@ -204,6 +225,6 @@ final class PraticaRepository
             array_push($par, $like, $like, $like, $like, $like);
         }
 
-        return $this->db->righe('SELECT p.*, m.titolo AS modulo_titolo, s.data AS seduta_data FROM pratiche p JOIN didattica_moduli m ON m.id = p.modulo_id LEFT JOIN didattica_sedute s ON s.id = p.seduta_id WHERE ' . implode(' AND ', $where) . ' ORDER BY p.aggiornata_il DESC LIMIT 1000', $par);
+        return $this->db->righe('SELECT p.*, m.titolo AS modulo_titolo, m.in_verbale, (SELECT COUNT(*) FROM pratiche_firme f WHERE f.pratica_id = p.id AND f.stato = "attesa") AS firme_attesa, s.data AS seduta_data FROM pratiche p JOIN didattica_moduli m ON m.id = p.modulo_id LEFT JOIN didattica_sedute s ON s.id = p.seduta_id WHERE ' . implode(' AND ', $where) . ' ORDER BY p.aggiornata_il DESC LIMIT 1000', $par);
     }
 }

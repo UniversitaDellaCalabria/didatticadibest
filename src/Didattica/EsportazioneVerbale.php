@@ -13,7 +13,7 @@ use App\Infrastructure\Documenti\Word;
 /** Pratiche esportate: il verbale in Word (con la seduta o solo la parte delle pratiche) e il foglio Excel con le risposte di tutti i moduli. */
 final class EsportazioneVerbale
 {
-    public function __construct(private Database $db, private Sito $sito, private ServizioSedute $sedute)
+    public function __construct(private Database $db, private Sito $sito, private ServizioSedute $sedute, private ServizioPuntiSeduta $punti)
     {
     }
 
@@ -121,8 +121,9 @@ final class EsportazioneVerbale
         $x = '';
         $corpo_pr = $pratiche ? $this->corpoPratiche($pratiche) : Word::paragrafo('Nessuna pratica.', ['i' => true]);
         if ($s) {
-            $odg = array_values(array_filter(array_map('trim', preg_split('/\R/', (string)$s['odg']) ?: [])));
-            $odg = array_map(fn ($t) => (string) preg_replace('/^\d+[\.\)]\s*/', '', $t), $odg);
+            // Punti del verbale: uno per riga dell'o.d.g., ognuno col suo testo (le sedute senza punti usano il vecchio schema a righe)
+            $punti = !empty($s['id']) ? $this->punti->punti($s) : [];
+            $odg = $punti ? array_map(fn ($p) => (string)$p['titolo'], $punti) : ServizioPuntiSeduta::titoli((string)$s['odg']);
             $x .= Word::paragrafo((string)$s['organo'], ['b' => true, 'al' => 'center', 'dopo' => 60]);
             if ($s['anno_accademico'] !== '') {
                 $x .= Word::paragrafo('a.a. ' . $s['anno_accademico'], ['b' => true, 'al' => 'center', 'dopo' => 240]);
@@ -170,19 +171,38 @@ final class EsportazioneVerbale
                 $x .= Word::paragrafo('Risulta presente ' . $s['segretario'] . ' in qualità di segretario verbalizzante.', ['al' => 'both']);
             }
             $x .= Word::paragrafo('Il Coordinatore, accertato di aver raggiunto il numero legale, dichiara aperta la seduta per discutere i punti all’ordine del giorno.', ['al' => 'both', 'dopo' => 240]);
-            $messe = false;
-            foreach ($odg as $i => $t) {
-                $x .= Word::paragrafo(($i + 1) . '. ' . $t, ['b' => true, 'keep' => true, 'dopo' => 120]);
-                if (!$messe && preg_match('/pratich/i', $t)) {
-                    $x .= $corpo_pr;
-                    $messe = true;
-                } else {
-                    $x .= Word::paragrafo('…', ['i' => true, 'dopo' => 240]);
+            if ($punti) {
+                $per_punto = ServizioPuntiSeduta::praticheDeiPunti($punti, $pratiche);
+                foreach ($punti as $i => $p) {
+                    $x .= Word::paragrafo(($i + 1) . '. ' . $p['titolo'], ['b' => true, 'keep' => true, 'dopo' => 120]);
+                    $scritto = TestoVerbale::inWord((string)$p['testo']);
+                    $x .= $scritto;
+                    if ($p['tipo'] === 'pratiche') {
+                        $sue = $per_punto[(int)$p['id']] ?? [];
+                        $x .= $sue ? $this->corpoPratiche($sue) : ($scritto === '' ? Word::paragrafo('Nessuna pratica.', ['i' => true]) : '');
+                    } elseif ($scritto === '') {
+                        $x .= Word::paragrafo('…', ['i' => true, 'dopo' => 240]);
+                    }
                 }
-            }
-            if (!$messe) {
-                $x .= Word::paragrafo('Pratiche studenti', ['b' => true, 'keep' => true]);
-                $x .= $corpo_pr;
+                if (!empty($per_punto[0])) {
+                    $x .= Word::paragrafo('Pratiche studenti', ['b' => true, 'keep' => true]);
+                    $x .= $this->corpoPratiche($per_punto[0]);
+                }
+            } else {
+                $messe = false;
+                foreach ($odg as $i => $t) {
+                    $x .= Word::paragrafo(($i + 1) . '. ' . $t, ['b' => true, 'keep' => true, 'dopo' => 120]);
+                    if (!$messe && preg_match('/pratich/i', $t)) {
+                        $x .= $corpo_pr;
+                        $messe = true;
+                    } else {
+                        $x .= Word::paragrafo('…', ['i' => true, 'dopo' => 240]);
+                    }
+                }
+                if (!$messe) {
+                    $x .= Word::paragrafo('Pratiche studenti', ['b' => true, 'keep' => true]);
+                    $x .= $corpo_pr;
+                }
             }
             $x .= Word::paragrafo('Non avendo altro da discutere, la seduta si scioglie alle ore ' . ($s['ora_fine'] ?: '____') . '.', ['al' => 'both', 'dopo' => 480]);
             $x .= Word::tabella([], [["Il Segretario verbalizzante\n" . $s['segretario'], "Il Coordinatore\n" . $s['coordinatore']]], ['bordi' => false, 'sz' => 22]);
@@ -190,7 +210,19 @@ final class EsportazioneVerbale
             $x .= Word::paragrafo('Pratiche studenti', ['b' => true, 'al' => 'center', 'dopo' => 240]);
             $x .= $corpo_pr;
         }
-        return Word::crea($x, ['logo' => $this->sito->radice() . '/' . Costanti::LOGO_VERBALE, 'font' => 'Times New Roman', 'sz' => 22]);
+        $opzioni = ['logo' => $this->sito->radice() . '/' . Costanti::LOGO_VERBALE, 'font' => 'Times New Roman', 'sz' => 22];
+        if ($s) {
+            // Come nel modello: «Verbale n. 8 – 07 settembre 2026» in alto, segretario e coordinatore in basso a ogni pagina
+            $ts = $s['data'] ? strtotime($s['data']) : null;
+            $num = trim((string)($s['numero_verbale'] ?? ''));
+            $opzioni['testata'] = 'Verbale' . ($num !== '' ? ' n. ' . $num : '') . ($ts ? ' – ' . date('d', $ts) . ' ' . $mesi[(int)date('n', $ts)] . ' ' . date('Y', $ts) : '');
+            $opzioni['piede_sx'] = $s['segretario'] !== '' ? $s['segretario'] . "
+Segretario verbalizzante" : '';
+            $opzioni['piede_dx'] = $s['coordinatore'] !== '' ? $s['coordinatore'] . "
+Coordinatore" : '';
+        }
+
+        return Word::crea($x, $opzioni);
     }
 
     public function generaExcel(array $pratiche): ?string

@@ -17,6 +17,7 @@ final class FasePratica
         'smistare'     => ['Da assegnare', 'info', '#0056B3', 'fa-shuffle'],
         'prendere'     => ['Da prendere in carico', 'info', '#0369a1', 'fa-hand'],
         'lavorazione'  => ['In lavorazione', 'lavoro', '#7c3aed', 'fa-gears'],
+        'firma'        => ['In attesa di firma', 'attesa', '#b45309', 'fa-signature'],
         'integrazione' => ['Attesa dello studente', 'attesa', '#b45309', 'fa-hourglass-half'],
         'consiglio'    => ['Pronta per il consiglio', 'ok', '#047857', 'fa-gavel'],
         'decisa'       => ['Decisa in seduta', 'ok', '#15803d', 'fa-circle-check'],
@@ -37,6 +38,9 @@ final class FasePratica
         }
         if (($p['stato'] ?? '') === 'integrazione') {
             return 'integrazione';
+        }
+        if (!empty($p['firme_attesa'])) {
+            return 'firma';
         }
         if ($tipoUfficio === 'protocollo') {
             return 'protocollare';
@@ -67,7 +71,8 @@ final class FasePratica
             'protocollare' => ['testo' => (string) ($p['protocollo'] ?? '') === '' ? 'Protocolla' : 'Aspetta il bollo', 'tipo' => (string) ($p['protocollo'] ?? '') === '' ? 'azione' : 'attesa', 'dove' => 'pratica'],
             'smistare'     => ['testo' => 'Assegna a una persona', 'tipo' => 'azione', 'dove' => 'pratica'],
             'prendere'     => ['testo' => 'Prendi in carico', 'tipo' => 'azione', 'dove' => 'pratica'],
-            'lavorazione'  => ['testo' => empty($p['seduta_id']) ? 'Istruisci e porta in consiglio' : 'Istruisci', 'tipo' => 'azione', 'dove' => 'pratica'],
+            'lavorazione'  => ['testo' => (string) ($p['in_verbale'] ?? '1') === '0' ? 'Lavora e concludi la pratica' : (empty($p['seduta_id']) ? 'Istruisci e porta in consiglio' : 'Istruisci'), 'tipo' => 'azione', 'dove' => 'pratica'],
+            'firma'        => ['testo' => 'Aspetta la firma', 'tipo' => 'attesa', 'dove' => 'pratica'],
             'integrazione' => ['testo' => 'Aspetta lo studente', 'tipo' => 'attesa', 'dove' => 'pratica'],
             'consiglio'    => ['testo' => 'Decidi in seduta', 'tipo' => 'azione', 'dove' => 'seduta'],
             'decisa'       => ['testo' => 'Comunica l\'esito', 'tipo' => 'azione', 'dove' => 'seduta'],

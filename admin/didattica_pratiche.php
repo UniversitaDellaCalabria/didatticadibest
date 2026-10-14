@@ -63,6 +63,22 @@ if ($fase === 'azioni') {
         flash_set($err ?? $msg, $err ? 'danger' : (str_contains($msg, 'a mano') || str_contains($msg, 'bollo') ? 'warning' : 'success'));
         admin_redirect("$base&tab=pratiche&id=$id&r=" . time());
     }
+    // ── Iter: passo successivo e firme (persona indicata nel modulo, Direttore) ──
+    if (isset($_POST['avanza_pratica']) || isset($_POST['invia_firma']) || isset($_POST['rimanda_firma'])) {
+        $id = (int)$_POST['pratica_id']; $p = pratica($conn, $id);
+        if (!$p) nega_accesso();
+        if (isset($_POST['avanza_pratica'])) {
+            [$err, $msg] = \App\Core\App::per($conn)->get(\App\Didattica\ServizioFlussoConvalide::class)->trasmettiAlPasso($id, (int)$p['passo'], $uid, $autore_nome);
+            if (!$err) registra_log_audit($conn, "Pratica: passata al passo successivo", ["Pratica" => $p['codice']]);
+        } elseif (isset($_POST['invia_firma'])) {
+            $err = \App\Core\App::per($conn)->get(\App\Didattica\FirmaPratica::class)->avvia($id, max(1, (int)$p['passo'])); $msg = 'La pratica è stata mandata alla firma: chi deve firmare ha ricevuto l\'email.';
+            if (!$err) registra_log_audit($conn, "Pratica: mandata alla firma", ["Pratica" => $p['codice']]);
+        } else {
+            $err = \App\Core\App::per($conn)->get(\App\Didattica\FirmaPratica::class)->reinvia($id); $msg = 'Email con il link di firma rimandata.';
+        }
+        flash_set($err ?? $msg, $err ? 'danger' : 'success');
+        admin_redirect("$base&tab=pratiche&id=$id&r=" . time());
+    }
     if (isset($_POST['rigenera_domanda'])) {
         $id = (int)$_POST['pratica_id'];
         $ok = genera_domanda_pratica($conn, $id, $uid, $autore_nome);
@@ -154,6 +170,7 @@ $prossima_p = match ($fase_p) {
     'integrazione' => ['Si aspetta lo studente', 'Hai chiesto un\'integrazione: la pratica torna «In lavorazione» quando lo studente risponde.', '', 'attesa'],
     'consiglio'    => ['La pratica è in seduta', 'Registra la decisione del consiglio nella pagina della seduta.', $btn_sed('Vai alla seduta'), 'ok'],
     'decisa'       => ['Comunica l\'esito allo studente', 'Il consiglio ha deciso: applica l\'esito dalla pagina della seduta.', $btn_sed('Vai alla seduta'), 'ok'],
+    'firma'        => ['Si aspetta una firma', 'Chi deve firmare ha ricevuto il link per email: la pratica prosegue da sola appena firma (se rifiuta, torna allo studente). Puoi rimandare il link dal riquadro dell\'iter.', '', 'attesa'],
     'segreteria'   => ['La pratica è alla segreteria studenti', 'Ha ricevuto l\'estratto e il verbale: qui non c\'è altro da fare.', '', 'attesa'],
     default        => ['Pratica conclusa', 'Stato finale: «' . (STATI_PRATICA[$p['stato']][0] ?? $p['stato']) . '». Lo studente è stato avvisato.', '', 'ok'],
 };
@@ -167,6 +184,23 @@ echo pn_prossima($prossima_p[0], $prossima_p[1], $prossima_p[2], $prossima_p[3])
                 <?php if ($io_operatore && (int)$io_operatore['id'] !== (int)$p['assegnata_a'] && in_array((int)$io_operatore['id'], operatori_pratica($conn, (int)$p['id']), true)): ?> · <span class="badge bg-light text-dark border" title="Puoi aggiungere documenti e note: chi l'ha in carico viene avvisato"><i class="fa fa-clock-rotate-left me-1" aria-hidden="true"></i>l'hai avuta in carico</span><?php endif; ?></span>
         </div>
         <?php echo pn_iter(\App\Core\App::per($conn)->get(\App\Didattica\ServizioIter::class)->passiIter($p, $m_p), 'Iter della pratica'); ?>
+        <?php
+        $fp_svc = \App\Core\App::per($conn)->get(\App\Didattica\FirmaPratica::class);
+        $fa_p = $fp_svc->inAttesa((int)$p['id']);
+        $it_p = iter_modulo($m_p, $p);
+        $passo_firma = in_array($it_p[(int)$p['passo'] - 1] ?? 0, [ITER_PERSONA, ITER_DIRETTORE], true);
+        $ultima_firma = $fp_svc->storico((int)$p['id'])[0] ?? null;
+        if ($fa_p): ?>
+        <div class="alert alert-warning small mt-2 mb-0 d-flex flex-wrap gap-2 align-items-center"><span><i class="fa fa-signature me-1" aria-hidden="true"></i>In attesa della firma di <strong><?php echo $h($fa_p['nome']); ?></strong> (<?php echo $h($fa_p['email']); ?>) dal <?php echo date('d/m/Y', strtotime($fa_p['richiesta_il'])); ?><?php echo (int)$fa_p['solleciti'] ? ' · ' . (int)$fa_p['solleciti'] . ' solleciti' : ''; ?>.</span>
+            <form method="POST" class="ms-auto m-0"><?php csrf_field(); ?><input type="hidden" name="pratica_id" value="<?php echo (int)$p['id']; ?>"><button type="submit" name="rimanda_firma" value="1" class="btn btn-sm btn-outline-secondary py-0"><i class="fa fa-envelope me-1" aria-hidden="true"></i>Rimanda il link</button></form></div>
+        <?php elseif (!$conclusa && $passo_firma): ?>
+        <div class="alert alert-light border small mt-2 mb-0 d-flex flex-wrap gap-2 align-items-center"><span><i class="fa fa-signature me-1" aria-hidden="true"></i>Questo passo è una firma<?php echo $ultima_firma && $ultima_firma['stato'] === 'rifiutata' ? ': l\'ultima richiesta è stata rifiutata («' . $h($ultima_firma['motivo']) . '»)' : ''; ?>.</span>
+            <form method="POST" class="ms-auto m-0"><?php csrf_field(); ?><input type="hidden" name="pratica_id" value="<?php echo (int)$p['id']; ?>"><button type="submit" name="invia_firma" value="1" class="btn btn-sm btn-primary fw-bold py-0"><i class="fa fa-paper-plane me-1" aria-hidden="true"></i>Manda alla firma</button></form></div>
+        <?php endif; ?>
+        <?php if (!$conclusa && !$fa_p && !$passo_firma && isset($passi[(int)$p['passo'] + 1]) && (int)$p['passo'] >= 1): ?>
+        <form method="POST" class="mt-2 mb-0"><?php csrf_field(); ?><input type="hidden" name="pratica_id" value="<?php echo (int)$p['id']; ?>">
+            <button type="submit" name="avanza_pratica" value="1" class="btn btn-sm btn-outline-success fw-bold" data-confirm="Passare la pratica al passo successivo?"><i class="fa fa-forward-step me-1" aria-hidden="true"></i>Passa al passo successivo: <?php echo $h($passi[(int)$p['passo'] + 1]); ?></button></form>
+        <?php endif; ?>
         <?php if (!$conclusa && $io_operatore && (int)$p['assegnata_a'] !== (int)$io_operatore['id'] && $uff_p && in_array((int)$uff_p['id'], $io_operatore['_uffici'] ?? [], true)): ?>
             <form method="POST" class="mt-2"><?php csrf_field(); ?><input type="hidden" name="pratica_id" value="<?php echo (int)$p['id']; ?>">
                 <button type="submit" name="prendi_pratica" value="1" class="btn btn-sm btn-success fw-bold"><i class="fa fa-hand me-1" aria-hidden="true"></i>Prendi in carico</button></form>

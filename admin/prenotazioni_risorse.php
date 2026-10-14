@@ -44,6 +44,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['azione_pren'])) {
 
 // ── Elenco filtrato ──
 $righe = $repo_ris->elenco($pid, $filtri);
+// Quantità dei contatori e risposte ai campi personalizzati di ogni prenotazione
+$usi_pren = \App\Core\App::per($conn)->get(\App\Risorse\ServizioContatoriRisorse::class)->usiDi(array_map('intval', array_column($righe, 'id')));
+$dettagli_pren = function (array $p) use ($usi_pren): array {
+    $out = [];
+    if (!empty($usi_pren[(int)$p['id']])) $out[] = ['Quantità', \App\Risorse\ServizioContatoriRisorse::testoUsi($usi_pren[(int)$p['id']])];
+    return array_merge($out, \App\Risorse\ServizioCampiRisorsa::coppie($p['risposte_json'] ?? null));
+};
 $NOMI_STATO = ['confermata' => ['Confermata', 'success'], 'da_approvare' => ['Da approvare', 'warning'], 'annullata' => ['Annullata', 'secondary'], 'rifiutata' => ['Rifiutata', 'danger']];
 
 if (isset($_GET['csv'])) {
@@ -52,9 +59,16 @@ if (isset($_GET['csv'])) {
     header('Content-Disposition: attachment; filename="prenotazioni_' . preg_replace('/[^a-z0-9]+/i', '_', $page_cfg['slug']) . '_' . date('Ymd') . '.csv"');
     $out = fopen('php://output', 'w');
     fwrite($out, "\xEF\xBB\xBF");
-    fputcsv($out, ['Codice', 'Risorsa', 'Data', 'Dalle', 'Alle', 'Cognome', 'Nome', 'Email', 'Motivo', 'Stato', 'Serie', 'Nota gestore', 'Creata il'], ';');
-    foreach ($righe as $p) fputcsv($out, [$p['codice'], $p['risorsa_nome'], date('d/m/Y', strtotime($p['inizio'])), date('H:i', strtotime($p['inizio'])), date('H:i', strtotime($p['fine'])),
-        $p['cognome'], $p['nome'], $p['email'], $p['motivo'], $NOMI_STATO[$p['stato']][0] ?? $p['stato'], $p['serie'], $p['nota_gestore'], $p['creata_il']], ';');
+    // Colonne in più: una per ogni quantità (contatore) e una per ogni domanda personalizzata che compare nelle prenotazioni esportate
+    $col_extra = [];
+    foreach ($righe as $p) foreach ($dettagli_pren($p) as [$k_d]) $col_extra[$k_d] = true;
+    $col_extra = array_keys($col_extra);
+    fputcsv($out, array_merge(['Codice', 'Risorsa', 'Data', 'Dalle', 'Alle', 'Cognome', 'Nome', 'Email', 'Motivo', 'Stato', 'Serie', 'Nota gestore', 'Creata il'], $col_extra), ';');
+    foreach ($righe as $p) {
+        $det = []; foreach ($dettagli_pren($p) as [$k_d, $v_d]) $det[$k_d] = $v_d;
+        fputcsv($out, array_merge([$p['codice'], $p['risorsa_nome'], date('d/m/Y', strtotime($p['inizio'])), date('H:i', strtotime($p['inizio'])), date('H:i', strtotime($p['fine'])),
+            $p['cognome'], $p['nome'], $p['email'], $p['motivo'], $NOMI_STATO[$p['stato']][0] ?? $p['stato'], $p['serie'], $p['nota_gestore'], $p['creata_il']], array_map(fn($k) => $det[$k] ?? '', $col_extra)), ';');
+    }
     exit;
 }
 
@@ -215,7 +229,7 @@ endif; ?>
                     <td class="text-nowrap"><strong><?php echo $h(quando_risorsa($p)); ?></strong><div class="text-muted font-monospace" style="font-size:.7rem;"><?php echo $h($p['codice']); ?><?php echo $p['serie'] ? ' · serie ' . $h($p['serie']) : ''; ?></div></td>
                     <td><?php echo $h($p['risorsa_nome']); ?></td>
                     <td><?php echo $h(trim($p['cognome'] . ' ' . $p['nome'])); ?><div><a href="mailto:<?php echo $h($p['email']); ?>" class="text-decoration-none"><?php echo $h($p['email']); ?></a></div></td>
-                    <td style="max-width:260px;"><?php echo $h($p['motivo']); ?><?php if ($p['nota_gestore'] !== ''): ?><div class="text-secondary fst-italic">Nota: <?php echo $h($p['nota_gestore']); ?></div><?php endif; ?></td>
+                    <td style="max-width:260px;"><?php echo $h($p['motivo']); ?><?php foreach ($dettagli_pren($p) as [$k_d, $v_d]): ?><div class="small"><span class="text-secondary"><?php echo $h($k_d); ?>:</span> <strong><?php echo $h($v_d); ?></strong></div><?php endforeach; ?><?php if ($p['nota_gestore'] !== ''): ?><div class="text-secondary fst-italic">Nota: <?php echo $h($p['nota_gestore']); ?></div><?php endif; ?></td>
                     <td><span class="badge bg-<?php echo $c_st; ?><?php echo $c_st === 'warning' ? ' text-dark' : ''; ?>"><?php echo $n_st; ?></span></td>
                     <td class="text-end">
                         <?php if ($futura && in_array($p['stato'], ['confermata', 'da_approvare'], true)): ?>

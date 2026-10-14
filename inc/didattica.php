@@ -20,6 +20,8 @@ if (!defined('DIR_PRATICHE')) define('DIR_PRATICHE', \App\Didattica\Costanti::DI
 // Passi dell'iter risolti con la pratica: ufficio del corso di studio e segreteria studenti (vedi iter_modulo)
 if (!defined('ITER_CDL')) define('ITER_CDL', \App\Didattica\Costanti::ITER_CDL);
 if (!defined('ITER_SEGRETERIA')) define('ITER_SEGRETERIA', \App\Didattica\Costanti::ITER_SEGRETERIA);
+if (!defined('ITER_PERSONA')) define('ITER_PERSONA', \App\Didattica\Costanti::ITER_PERSONA);
+if (!defined('ITER_DIRETTORE')) define('ITER_DIRETTORE', \App\Didattica\Costanti::ITER_DIRETTORE);
 if (!defined('DIR_MODULISTICA')) define('DIR_MODULISTICA', \App\Didattica\Costanti::DIR_MODULISTICA);
 if (!defined('LOGO_VERBALE')) define('LOGO_VERBALE', \App\Didattica\Costanti::LOGO_VERBALE);
 

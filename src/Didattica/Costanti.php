@@ -68,6 +68,12 @@ final class Costanti
     /** Passi dell'iter risolti con la pratica: ufficio del corso di studio e segreteria studenti. */
     public const ITER_CDL = -1;
     public const ITER_SEGRETERIA = -2;
+    /** Passi dell'iter che non sono un ufficio: firma di una persona indicata nel modulo (es. il relatore) e firma del Direttore. */
+    public const ITER_PERSONA = -3;
+    public const ITER_DIRETTORE = -4;
+
+    /** Tipi di passo dell'iter di un modulo. */
+    public const TIPI_PASSO = ['ufficio' => 'Un ufficio', 'persona' => 'Firma di una persona indicata nel modulo (es. il relatore)', 'direttore' => 'Firma del Direttore'];
 
     /** Uffici con un tipo (didattica_uffici.tipo). */
     public const TIPI_UFFICIO = [

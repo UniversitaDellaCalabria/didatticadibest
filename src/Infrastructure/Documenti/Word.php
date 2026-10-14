@@ -78,7 +78,7 @@ final class Word
 }
 
     /**
-     * Documento A4 con il corpo dato. $o: font, sz, logo (jpg/png nell'intestazione), piede.
+     * Documento A4 con il corpo dato. $o: font, sz, logo (jpg/png nell'intestazione), testata (riga sotto il logo), piede, piede_sx / piede_dx (firmatari ai lati del numero di pagina).
      * @return string|null percorso di un file temporaneo
      */
     public static function crea(string $corpo, array $o = []): ?string
@@ -122,14 +122,24 @@ final class Word
             . '<pic:blipFill><a:blip r:embed="rIdLogo"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' . $cx . '" cy="' . $cy . '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic>'
             . '</a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>';
     }
+    // testata: riga di testo (es. «Verbale n. 8 – 07 settembre 2026») sotto il logo
+    if (!empty($o['testata'])) $hdr .= self::paragrafo((string)$o['testata'], ['b' => true, 'sz' => 20, 'al' => 'right', 'dopo' => 0]);
     $zip->addFromString('word/header1.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:hdr ' . $ns . '>' . ($hdr ?: '<w:p/>') . '</w:hdr>');
     $piede = !empty($o['piede']) ? self::runs((string)$o['piede'], ['sz' => 16]) . '<w:r><w:rPr><w:sz w:val="16"/></w:rPr><w:t xml:space="preserve"> – </w:t></w:r>' : '';
-    $zip->addFromString('word/footer1.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr ' . $ns . '><w:p><w:pPr><w:jc w:val="right"/></w:pPr>' . $piede
-        . '<w:r><w:rPr><w:sz w:val="16"/></w:rPr><w:t xml:space="preserve">pag. </w:t></w:r><w:r><w:rPr><w:sz w:val="16"/></w:rPr><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:rPr><w:sz w:val="16"/></w:rPr><w:instrText xml:space="preserve"> PAGE </w:instrText></w:r>'
-        . '<w:r><w:rPr><w:sz w:val="16"/></w:rPr><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:rPr><w:sz w:val="16"/></w:rPr><w:t>1</w:t></w:r><w:r><w:rPr><w:sz w:val="16"/></w:rPr><w:fldChar w:fldCharType="end"/></w:r></w:p></w:ftr>');
+    $pag = '<w:r><w:rPr><w:sz w:val="16"/></w:rPr><w:t xml:space="preserve">pag. </w:t></w:r><w:r><w:rPr><w:sz w:val="16"/></w:rPr><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:rPr><w:sz w:val="16"/></w:rPr><w:instrText xml:space="preserve"> PAGE </w:instrText></w:r>'
+        . '<w:r><w:rPr><w:sz w:val="16"/></w:rPr><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:rPr><w:sz w:val="16"/></w:rPr><w:t>1</w:t></w:r><w:r><w:rPr><w:sz w:val="16"/></w:rPr><w:fldChar w:fldCharType="end"/></w:r>';
+    if (!empty($o['piede_sx']) || !empty($o['piede_dx'])) {
+        // piè di pagina con i firmatari ai lati (nome e ruolo su due righe) e il numero di pagina al centro
+        $lato = fn($t) => self::runs((string)$t, ['sz' => 16]);
+        $piede_xml = '<w:p><w:pPr><w:tabs><w:tab w:val="center" w:pos="4870"/><w:tab w:val="right" w:pos="9740"/></w:tabs><w:spacing w:after="0"/></w:pPr>'
+            . $lato($o['piede_sx'] ?? '') . '<w:r><w:tab/></w:r>' . $pag . '<w:r><w:tab/></w:r>' . $lato($o['piede_dx'] ?? '') . '</w:p>';
+    } else {
+        $piede_xml = '<w:p><w:pPr><w:jc w:val="right"/></w:pPr>' . $piede . $pag . '</w:p>';
+    }
+    $zip->addFromString('word/footer1.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:ftr ' . $ns . '>' . $piede_xml . '</w:ftr>');
     $zip->addFromString('word/document.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document ' . $ns . '><w:body>' . $corpo
         . '<w:sectPr><w:headerReference w:type="default" r:id="rIdH1"/><w:footerReference w:type="default" r:id="rIdF1"/><w:pgSz w:w="11906" w:h="16838"/>'
-        . '<w:pgMar w:top="' . ($logo ? 2100 : 1440) . '" w:right="1080" w:bottom="1134" w:left="1080" w:header="425" w:footer="340" w:gutter="0"/></w:sectPr></w:body></w:document>');
+        . '<w:pgMar w:top="' . ($logo ? (!empty($o['testata']) ? 2500 : 2100) : 1440) . '" w:right="1080" w:bottom="1134" w:left="1080" w:header="425" w:footer="340" w:gutter="0"/></w:sectPr></w:body></w:document>');
     $zip->close();
     return $tmp;
 }

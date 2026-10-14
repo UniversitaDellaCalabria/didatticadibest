@@ -98,7 +98,7 @@ details > summary { cursor: pointer; font-weight: 700; }
 // ==========================================================================================
 // DATI — è la sola parte da aggiornare a ogni step (Claude lo fa per te).
 // ==========================================================================================
-var AGGIORNATO = "16/10/2026";
+var AGGIORNATO = "19/10/2026";
 
 var PACCHETTI = [
   {
@@ -252,6 +252,258 @@ var PACCHETTI = [
     ],
     nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code> e <code>documentazione/…</code>.",
     commit: "Tutorato: import dei vincitori dal decreto di approvazione atti (Word) con abbinamento agli insegnamenti dell'anagrafe di Ateneo, codice, corso e docente titolare"
+  },
+  {
+    id: "verbale-punti",
+    titolo: "Pacchetto 4 · Verbale punto per punto (C2)",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare",
+    schema: "v55",
+    riassunto: "Ogni punto dell'ordine del giorno ha il suo <strong>riquadro di testo</strong> («Cosa è stato detto»), con grassetto, corsivo ed elenchi. Il Word del verbale ricalca il modello del Consiglio unificato: <strong>«Verbale n. 8 – 07 settembre 2026» in alto</strong> e segretario e coordinatore <strong>in basso a ogni pagina</strong>, un punto dopo l'altro; le <strong>pratiche studenti</strong> stanno sotto il loro punto (se ce n'è più d'uno si sceglie quale), ordinate per tipo di pratica. Nuovo campo «Verbale n.» nella seduta.",
+    passi: [["C2", "Verbale compilato punto per punto"]],
+    cartelle: [
+      { cartella: "admin/", file: [
+        ["admin/didattica_sedute.php", "mod", "C2", "nuovo passo «Cosa è stato detto» nella seduta guidata; campo «Verbale n.»"],
+        ["admin/didattica.php", "mod", "C2", "i referenti possono salvare i testi dei punti"]
+      ]},
+      { cartella: "src/Didattica/", file: [
+        ["src/Didattica/PuntoSedutaRepository.php", "nuovo", "C2", "i punti dell'ordine del giorno nel database"],
+        ["src/Didattica/ServizioPuntiSeduta.php", "nuovo", "C2", "punti ricavati dall'o.d.g. (i testi restano se si riordina), assegnazione delle pratiche"],
+        ["src/Didattica/TestoVerbale.php", "nuovo", "C2", "pulizia del testo scritto e conversione in paragrafi di Word"],
+        ["src/Didattica/EsportazioneVerbale.php", "mod", "C2", "il Word legge i punti; testata «Verbale n. …» e firmatari nel piè di pagina"],
+        ["src/Didattica/SedutaRepository.php", "mod", "C2", "numero del verbale; eliminando la seduta spariscono i punti"],
+        ["src/Didattica/ServizioSedute.php", "mod", "C2", "salvando la seduta i punti seguono l'o.d.g."]
+      ]},
+      { cartella: "src/Infrastructure/Documenti/", file: [
+        ["src/Infrastructure/Documenti/Word.php", "mod", "C2", "testata e piè di pagina con i firmatari"]
+      ]},
+      { cartella: "src/Core/Schema/ (anche pacchetti 1, 2 e 3)", file: [
+        ["src/Core/Schema/Definizioni.php", "mod", "C2 · anche pacchetti 1-3", "tabella dei punti, colonna punto_id delle pratiche, numero del verbale"],
+        ["src/Core/Schema/Migrazioni.php", "mod", "C2 · anche pacchetti 1-3", "versione dello schema: 55"]
+      ]}
+    ],
+    dopo: [
+      "Apri una pagina del pannello: il portale crea da solo <code>cache/schema_v55.ok</code> (nuova tabella e colonne). I due file dello schema sono gli stessi dei pacchetti 1-3: se carichi tutto insieme basta una copia.",
+      "Le sedute già esistenti non cambiano: alla prima apertura del passo «Cosa è stato detto» i punti si ricavano dall'ordine del giorno.",
+      "<strong>Admin → Didattica → Sedute e verbali → una seduta → passo «Cosa è stato detto»</strong>: scrivi il testo di ogni punto, salva e premi «Anteprima in Word» per confrontarlo con il verbale del Consiglio unificato.",
+      "Compila «Verbale n.» nella seduta (Modifica): per le sedute nuove il portale propone il numero successivo nello stesso anno accademico."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Verbale punto per punto: testo di ogni punto dell'ordine del giorno, pratiche sotto il loro punto, numero del verbale in testata e firmatari nel piè di pagina come nel modello"
+  },
+  {
+    id: "archivio-verbali",
+    titolo: "Pacchetto 5 · Archivio dei verbali (C3)",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare",
+    schema: "v56",
+    riassunto: "Pagina <strong>«Archivio verbali»</strong> (Didattica → Sedute e verbali): tutti i verbali, quelli del portale e quelli vecchi in PDF, con filtri per consiglio, anno accademico e tipo e <strong>ricerca nel testo</strong> (anche dentro i PDF, se sono digitali e non scansioni). I verbali vecchi si caricano <strong>a gruppi, scegliendo più file o un'intera cartella</strong>: data, numero e anno accademico si ricavano dal nome del file e dalla cartella (o dal testo del PDF) e si correggono dopo. Un PDF già caricato non si duplica. Ognuno vede i verbali del proprio consiglio, l'Ufficio didattico tutti.",
+    passi: [["C3", "Archivio verbali con importazione dei PDF vecchi"]],
+    cartelle: [
+      { cartella: "admin/", file: [
+        ["admin/didattica_archivio.php", "nuovo", "C3", "pagina dell'archivio: importazione, filtri, ricerca, modifica dei dati"],
+        ["admin/didattica_sedute.php", "mod", "C3 · anche pacchetto 4", "pulsante «Archivio verbali» e azioni di importazione, modifica ed eliminazione"],
+        ["admin/didattica.php", "mod", "C3 · anche pacchetto 4", "i referenti possono usare le azioni dell'archivio"]
+      ]},
+      { cartella: "src/Didattica/", file: [
+        ["src/Didattica/ArchivioVerbali.php", "nuovo", "C3", "importazione dei PDF, dati dal nome del file, doppioni, modifica"],
+        ["src/Didattica/SedutaRepository.php", "mod", "C3 · anche pacchetto 4", "ricerca dell'archivio; le sedute del portale restano separate dai verbali importati"]
+      ]},
+      { cartella: "src/Infrastructure/Pdf/", file: [
+        ["src/Infrastructure/Pdf/TestoPdf.php", "nuovo", "C3", "legge il testo dei PDF digitali per la ricerca"]
+      ]},
+      { cartella: "src/Core/Schema/ (anche pacchetti 1-4)", file: [
+        ["src/Core/Schema/Definizioni.php", "mod", "C3 · anche pacchetti 1-4", "colonne: origine, testo del PDF, impronta del file, nome originale"],
+        ["src/Core/Schema/Migrazioni.php", "mod", "C3 · anche pacchetti 1-4", "versione dello schema: 56"]
+      ]}
+    ],
+    dopo: [
+      "Apri una pagina del pannello: il portale crea da solo <code>cache/schema_v56.ok</code> (se hai già caricato il pacchetto 4, il file v55 resta lì: non serve toccarlo).",
+      "Controlla in PHP (<code>php.ini</code>) <code>upload_max_filesize</code> (almeno 30M per i PDF più grandi) e <code>post_max_size</code>: il portale carica a gruppi di pochi file e circa 16 MB per volta, quindi bastano anche <code>post_max_size</code> da 20M. Se un file è più grande del limite il portale lo segnala senza bloccare gli altri.",
+      "<strong>Admin → Didattica → Sedute e verbali → «Archivio verbali» → «Aggiungi verbali vecchi (PDF)»</strong>: scegli il consiglio (e, se vuoi, l'anno accademico), poi «Scegli uno o più file» o «Scegli una cartella» e premi Importa. Alla fine compare l'elenco: i verbali senza data o senza organo hanno il link «completa i dati».",
+      "Se i PDF sono scansioni (immagini) l'archivio li conserva e li trova per organo, data, numero e ordine del giorno, ma non per le parole contenute nel testo: per questi conviene scrivere un ordine del giorno breve nella scheda del verbale (matita).",
+      "<strong>Prova veloce:</strong> carica 2-3 PDF, cerca una parola che contengono, apri la matita di uno, correggi la data e scaricalo."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Archivio verbali: tutti i verbali in un'unica pagina con filtri e ricerca nel testo, importazione di PDF vecchi (file multipli o cartella) con data e numero dal nome del file"
+  },
+  {
+    id: "verbali-pubblici",
+    titolo: "Pacchetto 6 · Pagina pubblica dei verbali con password (C4)",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare · da usare solo dopo il parere del DPO",
+    schema: "v57",
+    riassunto: "Pagina <strong>verbali.php</strong> per chi non ha le credenziali di Ateneo: si entra con una <strong>password</strong> data dall'Ufficio didattico e si scaricano solo i verbali <strong>firmati e segnati «pubblicabili»</strong> dei consigli dell'accesso, fino alla scadenza. Ogni verbale si pubblica dall'archivio (icona del mondo) <strong>o con una versione con omissis</strong> caricata a parte, <strong>o confermando</strong> che il PDF firmato non contiene dati personali degli studenti. Accessi creati, revocati e con password rigenerabile in «Accesso ai verbali»; registro di chi è entrato (IP anonimizzato, 12 mesi); sessione separata dal login di Ateneo, blocco dopo 8 tentativi, pagina non indicizzabile.",
+    passi: [["C4", "Verbali pubblici con password"]],
+    cartelle: [
+      { cartella: "/ (radice del portale)", file: [
+        ["verbali.php", "nuovo", "C4", "la pagina pubblica: password, elenco per consiglio e anno, download"]
+      ]},
+      { cartella: "admin/", file: [
+        ["admin/didattica_accessi.php", "nuovo", "C4", "«Accesso ai verbali»: password, consigli, scadenza, registro degli accessi"],
+        ["admin/didattica_archivio.php", "mod", "C4 · anche pacchetto 5", "icona «pagina pubblica» per ogni verbale e modulo di pubblicazione (omissis o conferma)"],
+        ["admin/didattica_sedute.php", "mod", "C4 · anche pacchetti 4 e 5", "azioni: crea/modifica/revoca accessi, nuova password, pubblica e ritira verbali"]
+      ]},
+      { cartella: "src/Didattica/", file: [
+        ["src/Didattica/ServizioVerbaliPubblici.php", "nuovo", "C4", "accesso con password, sessione, blocco dei tentativi, regole di visibilità, pubblicazione"],
+        ["src/Didattica/AccessoVerbaliRepository.php", "nuovo", "C4", "accessi e registro nel database"],
+        ["src/Didattica/SedutaRepository.php", "mod", "C4 · anche pacchetti 4 e 5", "verbali pubblicabili, pubblica e ritira"]
+      ]},
+      { cartella: "src/Core/Schema/ (anche pacchetti 1-5)", file: [
+        ["src/Core/Schema/Definizioni.php", "mod", "C4 · anche pacchetti 1-5", "tabelle degli accessi e del registro; colonne di pubblicazione dei verbali"],
+        ["src/Core/Schema/Migrazioni.php", "mod", "C4 · anche pacchetti 1-5", "versione dello schema: 57"]
+      ]}
+    ],
+    dopo: [
+      "Apri una pagina del pannello: il portale crea da solo <code>cache/schema_v57.ok</code> con le nuove tabelle e colonne.",
+      "<strong>Prima di dare una password a qualcuno: chiarisci con il DPO</strong> chi sono gli esterni, quali organi vedono e per quanto tempo, e cosa fare con i verbali che contengono nomi e matricole degli studenti. Fino ad allora la pagina è vuota: nessun verbale è pubblicabile finché non lo segni tu.",
+      "<strong>Admin → Didattica → Sedute e verbali → Archivio verbali → «Accesso ai verbali»</strong>: crea un accesso (a chi è destinato, consigli visibili, scadenza). La password si vede <strong>una volta sola</strong>: comunicala a parte rispetto al link <code>…/verbali.php</code>.",
+      "<strong>Per pubblicare un verbale</strong>: nell'archivio clicca l'icona del mondo del verbale firmato → carica la <strong>versione con omissis</strong> (consigliata) oppure conferma che il PDF firmato non ha dati personali → Pubblica. «Ritira» lo toglie subito.",
+      "Valuta di aggiornare l'informativa in <code>privacy.php</code> con il trattamento «accessi alla pagina dei verbali» (IP anonimizzato, 12 mesi).",
+      "<strong>Prova veloce:</strong> crea un accesso di prova su un consiglio, pubblica un verbale, apri <code>verbali.php</code> in una finestra anonima, entra con la password, scarica il PDF e controlla il registro."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Pagina pubblica dei verbali con password: accessi per gruppi di esterni con consigli e scadenza, pubblicazione dei singoli verbali (versione con omissis o conferma), registro degli accessi, blocco dei tentativi"
+  },
+  {
+    id: "wizard-pratiche",
+    titolo: "Pacchetto 7 · Pratiche: procedura guidata, firme e tempi per passo (C1)",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare",
+    schema: "v58",
+    riassunto: "<strong>Procedura guidata a sette passi</strong> per creare una pratica (che pratica è · cosa compila lo studente · chi la lavora · cosa compilano gli uffici · cosa va nel verbale · email e promemoria · anteprima e pubblica), con <strong>salvataggio in bozza</strong> e <strong>copia</strong> di un modulo. L'iter ora può avere passi di <strong>firma del relatore</strong> (la persona indicata dallo studente nel modulo, con link personale per email) e di <strong>firma del Direttore</strong> (firma PAdES con Aruba o PDF caricato), con il <strong>tempo massimo per ogni passo</strong> e il promemoria. Interruttore <strong>«passa dal verbale»</strong> sì/no (certificati e attestati si concludono senza seduta). Modelli pronti dal tuo elenco delle pratiche: certificati, attestati, esoneri, modifiche di carriera, titolo estero, cancellazioni, tesi e variazione tesi, mobilità.",
+    passi: [["C1a", "Passi di firma e tempi nell'iter"], ["C1b", "Firma del relatore e del Direttore"], ["C1c", "Procedura guidata, copia, bozza"], ["C1d", "Modelli dal tuo elenco"]],
+    cartelle: [
+      { cartella: "/ (radice del portale)", file: [
+        ["firma_pratica.php", "nuovo", "C1b", "pagina di firma (o rifiuto) del relatore o del Direttore, dal link dell'email"]
+      ]},
+      { cartella: "admin/ e inc/", file: [
+        ["admin/didattica_moduli.php", "mod", "C1c C1d", "procedura guidata a sette passi, editor dell'iter, copia, nuovi modelli"],
+        ["admin/didattica_pratiche.php", "mod", "C1b", "stato della firma, «Manda alla firma», «Rimanda il link», «Passa al passo successivo»"],
+        ["inc/didattica.php", "mod", "C1a", "costanti dei nuovi passi"]
+      ]},
+      { cartella: "src/Didattica/", file: [
+        ["src/Didattica/FirmaPratica.php", "nuovo", "C1b", "richiesta di firma, firma PAdES (Aruba o caricata), rifiuto, solleciti"],
+        ["src/Didattica/FirmaPraticaRepository.php", "nuovo", "C1b", "le richieste di firma nel database"],
+        ["src/Didattica/ServizioIter.php", "mod", "C1a", "passi dell'iter con tipo (ufficio, firma di una persona, firma del Direttore) e giorni per passo"],
+        ["src/Didattica/ServizioFlussoConvalide.php", "mod", "C1a C1b", "la pratica può partire dalla firma; «passa al passo successivo» per ogni tipo di passo"],
+        ["src/Didattica/ServizioModuli.php", "mod", "C1a C1c", "salvataggio dei passi, «passa dal verbale», copia del modulo"],
+        ["src/Didattica/ModuloRepository.php", "mod", "C1a", "colonna «in verbale»"],
+        ["src/Didattica/PraticaRepository.php", "mod", "C1a C1b", "firme in attesa e pratiche per il promemoria"],
+        ["src/Didattica/PromemoriaPratiche.php", "mod", "C1a", "promemoria con il tempo del passo; ricorda anche chi deve firmare; all'ufficio se nessuno ha preso in carico"],
+        ["src/Didattica/FasePratica.php", "mod", "C1b", "fase «in attesa di firma»"],
+        ["src/Didattica/SedutaRepository.php", "mod", "C1a · anche pacchetti 4-6", "in seduta si portano solo le pratiche dei moduli che passano dal verbale"],
+        ["src/Didattica/ServizioUffici.php", "mod", "C1a", "uso degli uffici nei nuovi passi"],
+        ["src/Didattica/Costanti.php", "mod", "C1a", "tipi di passo"]
+      ]},
+      { cartella: "src/Core/Schema/ (anche pacchetti 1-6)", file: [
+        ["src/Core/Schema/Definizioni.php", "mod", "C1 · anche pacchetti 1-6", "tabella delle firme, colonna «in verbale»"],
+        ["src/Core/Schema/Migrazioni.php", "mod", "C1 · anche pacchetti 1-6", "versione dello schema: 58"]
+      ]}
+    ],
+    dopo: [
+      "Apri una pagina del pannello: il portale crea da solo <code>cache/schema_v58.ok</code> (nuova tabella delle firme e colonna del modulo).",
+      "<strong>I moduli già pubblicati continuano a funzionare</strong> come prima (iter, verbale, domanda): «passa dal verbale» è sì per tutti. Ho cambiato una cosa: se una pratica è in un ufficio ma nessuno l'ha presa in carico, il promemoria arriva a <strong>tutte le persone di quell'ufficio</strong> e non più solo ai manager.",
+      "<strong>Direttore:</strong> la firma del Direttore usa lo stesso Direttore delle convenzioni (Admin → Formazione Scuola Lavoro → Scuole e convenzioni → «Direttore che firma le convenzioni»). Finché non è indicato, il passo di firma non parte e lo dice.",
+      "<strong>Relatore:</strong> nel modulo serve una domanda di tipo «Docente» (es. «Relatore»); il nome scelto dallo studente deve coincidere con un solo docente nell'anagrafe del personale, con la sua email. Se non si trova, la firma non parte e nello storico interno della pratica compare il motivo: si può rimandare dalla scheda.",
+      "<strong>Firma:</strong> con la firma remota Aruba (<code>ARUBA_ARSS_*</code> nel <code>.env</code>, se la configuri) si firma dal portale; altrimenti si scarica il PDF, si firma in PAdES e si ricarica.",
+      "<strong>Admin → Didattica → Moduli e documenti → Nuovo modulo</strong>: parti da uno dei <strong>modelli pronti</strong> (tesi, certificati, attestati, esoneri, modifiche di carriera…), controlla i sette passi e premi «Salva come bozza» o «Salva e pubblica». Ogni modulo ha il pulsante <strong>Copia</strong>.",
+      "Per certificati e attestati (<em>non</em> passano dal verbale): la segreteria carica il documento come allegato della pratica, poi «Passa al passo successivo» lo manda alla firma del Direttore; il documento firmato compare nella pratica, visibile allo studente. L'invio via PEC resta fuori dal portale.",
+      "<strong>Prova veloce:</strong> crea un modulo «Richiesta Tesi» dal modello, pubblicalo, inviane una come studente con un docente reale come relatore, apri il link di firma con le credenziali del relatore e firma o rifiuta."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Pratiche: procedura guidata per creare i moduli, passi di firma del relatore e del Direttore con tempi per passo, pratiche fuori verbale (certificati e attestati), copia dei moduli e modelli dal elenco del Dipartimento"
+  },
+  {
+    id: "risorse",
+    titolo: "Pacchetto 8 · Risorse: responsabili, campi, contatori e diario di bordo (B1–B3)",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare",
+    schema: "v61",
+    riassunto: "<strong>Responsabili</strong> di ogni risorsa scelti dall'anagrafe di Ateneo (ricevono le richieste e le approvano o rifiutano dalla loro Area personale, «Le mie risorse», senza accesso al pannello) · <strong>campi personalizzati</strong> nel modulo di prenotazione, costruiti dall'admin · <strong>contatori</strong> (es. i campioni di un laboratorio): per periodo (giorno, settimana, mese) o scorta con carichi, scalati dalle prenotazioni anche in attesa di approvazione e restituiti se annullate o rifiutate · <strong>diario di bordo</strong> per auto e mezzi con i campi del modulo cartaceo (modificabili), km iniziali proposti dall'ultimo viaggio, altri conducenti indicati da chi prenota, promemoria, blocco facoltativo delle nuove prenotazioni, verifica del responsabile ed Excel.",
+    passi: [["B1", "Responsabili delle risorse"], ["B2", "Campi personalizzati e contatori"], ["B3", "Diario di bordo"]],
+    cartelle: [
+      { cartella: "/ (radice del portale)", file: [
+        ["risorse_responsabile.php", "nuovo", "B1 B3", "«Le mie risorse»: richieste da approvare, prenotazioni, diario di bordo ed Excel"],
+        ["diario_bordo.php", "nuovo", "B3", "il diario di bordo da compilare dopo l'uso (anche da telefono)"],
+        ["area_personale.php", "mod", "B1", "riquadro «Le mie risorse» per chi è responsabile"],
+        ["calendario_area.php", "mod", "B2 B3", "modulo di prenotazione con campi, quantità, altri conducenti; «Diario di bordo da compilare»"],
+        ["inc/risorse.php", "mod", "B2", "la prenotazione accetta quantità e risposte"]
+      ]},
+      { cartella: "admin/", file: [
+        ["admin/risorse.php", "mod", "B1 B2 B3", "schede della risorsa: Chi se ne occupa, Campi della prenotazione, Contatori, Diario di bordo"],
+        ["admin/prenotazioni_risorse.php", "mod", "B2", "quantità e risposte nell'elenco e nel CSV"]
+      ]},
+      { cartella: "src/Risorse/", file: [
+        ["src/Risorse/ResponsabileRisorsaRepository.php", "nuovo", "B1", "responsabili nel database"],
+        ["src/Risorse/ServizioResponsabiliRisorse.php", "nuovo", "B1", "responsabili dall'anagrafe, approvazione dalle loro risorse"],
+        ["src/Risorse/ContatoreRisorsaRepository.php", "nuovo", "B2", "contatori, usi e movimenti di scorta"],
+        ["src/Risorse/ServizioContatoriRisorse.php", "nuovo", "B2", "disponibilità, controlli, carichi"],
+        ["src/Risorse/ServizioCampiRisorsa.php", "nuovo", "B2", "campi personalizzati e risposte"],
+        ["src/Risorse/DiarioBordoRepository.php", "nuovo", "B3", "diario di bordo nel database"],
+        ["src/Risorse/ServizioDiarioBordo.php", "nuovo", "B3", "campi e ruoli, controlli sui km, altri conducenti, registro, Excel"],
+        ["src/Risorse/ServizioRisorse.php", "mod", "B2 B3", "la prenotazione controlla le quantità, registra le risposte e rispetta il blocco del diario"],
+        ["src/Risorse/NotificheRisorse.php", "mod", "B1 B2 B3", "email ai responsabili, quantità e risposte nelle email, promemoria del diario"],
+        ["src/Risorse/PromemoriaPrenotazioni.php", "mod", "B3", "promemoria del diario di bordo con il cron esistente"],
+        ["src/Risorse/RisorsaRepository.php", "mod", "B1 B2 B3", "campi, diario e risposte; eliminazione completa"],
+        ["src/Risorse/Costanti.php", "mod", "B3", "tipo di risorsa «Auto o mezzo»"]
+      ]},
+      { cartella: "src/Core/Schema/ (anche pacchetti 1-7)", file: [
+        ["src/Core/Schema/Definizioni.php", "mod", "B · anche pacchetti 1-7", "tabelle responsabili, contatori (usi, movimenti), diario; colonne delle risorse e delle prenotazioni"],
+        ["src/Core/Schema/Migrazioni.php", "mod", "B · anche pacchetti 1-7", "versione dello schema: 61"]
+      ]}
+    ],
+    dopo: [
+      "Apri una pagina del pannello: il portale crea da solo <code>cache/schema_v61.ok</code> con le nuove tabelle e colonne.",
+      "<strong>Responsabili:</strong> Admin → area «Calendari e risorse» → Risorse, orari e chiusure → modifica una risorsa → <strong>«Chi se ne occupa»</strong>: cerca la persona nell'anagrafe e aggiungila. Se la risorsa richiede approvazione, il responsabile approva dalla sua Area personale («Le mie risorse»). Deve avere un'email nell'anagrafe e accedere con quella.",
+      "<strong>Campi della prenotazione</strong> e <strong>Contatori</strong>: nella stessa scheda della risorsa. Per i campioni di un laboratorio: contatore «Campioni», modalità «Per periodo», capacità 10 al giorno, massimo 6 per prenotazione. Lo studente vede quanti ne restano nel giorno scelto.",
+      "<strong>Diario di bordo:</strong> per un'auto scegli tipo «Auto o mezzo» e, nella scheda «Diario di bordo», attivalo (i campi partono dal tuo modulo cartaceo: puoi cambiarli). Il blocco delle nuove prenotazioni per chi non ha compilato il diario è un'opzione, spenta di default.",
+      "Il promemoria del diario parte con lo stesso cron dei promemoria delle prenotazioni (già attivo): due ore dopo la fine della prenotazione, una volta sola.",
+      "Chi prenota un mezzo può indicare altri conducenti scegliendoli dall'elenco del personale: anche loro potranno compilare il diario.",
+      "<strong>Prova veloce:</strong> crea un'auto con diario, prenotala come utente di prova, indica un co-conducente, compila il diario dopo l'orario (da «Diario di bordo da compilare»), poi apri «Le mie risorse» come responsabile e scarica l'Excel."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Risorse: responsabili scelti dall'anagrafe con approvazione dalla loro Area personale, campi personalizzati e contatori (per periodo e scorta) nelle prenotazioni, diario di bordo per auto e mezzi con altri conducenti, promemoria ed Excel"
+  },
+  {
+    id: "cruscotto",
+    titolo: "Pacchetto 9 · Cruscotto del responsabile della risorsa e scadenze (B4)",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare (con il pacchetto 8)",
+    schema: "v62",
+    riassunto: "<strong>Cruscotto</strong> di ogni risorsa per il responsabile (e gli amministratori): prenotazioni per stato, ore prenotate e utilizzo sulle ore di apertura, fasce più richieste, chi la usa di più, quantità consumate, km e consumo medio del diario di bordo, con scelta del periodo ed <strong>Excel</strong> · <strong>Scadenze</strong> (bollo, assicurazione, tagliando, revisione, taratura…) inserite dall'admin: il responsabile riceve un'email prima della data e una se è scaduta, e segna il rinnovo dal cruscotto. <em>Va caricato insieme al pacchetto 8: alcuni file sono gli stessi (tieni la versione più recente).</em>",
+    passi: [["B4", "Cruscotto, scadenze e avvisi"]],
+    cartelle: [
+      { cartella: "/ (radice del portale)", file: [
+        ["risorse_cruscotto.php", "nuovo", "B4", "il cruscotto della risorsa: numeri, fasce, persone, quantità, diario, scadenze con rinnovo, Excel"],
+        ["risorse_responsabile.php", "mod", "B4", "pulsante «Cruscotto» e avviso delle scadenze su ogni risorsa (ripete le modifiche del pacchetto 8)"]
+      ]},
+      { cartella: "admin/", file: [
+        ["admin/risorse.php", "mod", "B4", "scheda «Scadenze» della risorsa: aggiungi, modifica, elimina (ripete le modifiche del pacchetto 8)"]
+      ]},
+      { cartella: "src/Risorse/", file: [
+        ["src/Risorse/ScadenzaRisorsaRepository.php", "nuovo", "B4", "scadenze nel database"],
+        ["src/Risorse/ServizioScadenzeRisorsa.php", "nuovo", "B4", "stato (in regola, in scadenza, scaduta), controlli, rinnovo, avvisi da inviare"],
+        ["src/Risorse/CruscottoRisorsa.php", "nuovo", "B4", "tutti i numeri del cruscotto, chi può vederlo, Excel"],
+        ["src/Risorse/RisorsaRepository.php", "mod", "B4", "prenotazioni del periodo; l'eliminazione toglie anche scadenze e diario"],
+        ["src/Risorse/NotificheRisorse.php", "mod", "B4", "email di scadenza ai responsabili"],
+        ["src/Risorse/PromemoriaPrenotazioni.php", "mod", "B4", "invia gli avvisi di scadenza con il cron esistente, una volta sola"]
+      ]},
+      { cartella: "src/Core/Schema/ (anche pacchetti 1-8)", file: [
+        ["src/Core/Schema/Definizioni.php", "mod", "B4 · anche pacchetti 1-8", "tabella delle scadenze delle risorse"],
+        ["src/Core/Schema/Migrazioni.php", "mod", "B4 · anche pacchetti 1-8", "versione dello schema: 62"]
+      ]}
+    ],
+    dopo: [
+      "Apri una pagina del pannello: il portale crea da solo <code>cache/schema_v62.ok</code> con la nuova tabella (se avevi già caricato il pacchetto 8, il v61 è già a posto).",
+      "<strong>Scadenze:</strong> Admin → area «Calendari e risorse» → modifica una risorsa → scheda <strong>«Scadenze»</strong>: scrivi cosa scade (Bollo, Assicurazione, Tagliando…), la data e quanti giorni prima avvisare (30 di partenza).",
+      "Gli avvisi partono con lo stesso cron dei promemoria (già attivo): un'email al responsabile quando si entra nel preavviso e una il giorno dopo la scadenza, se non è stata rinnovata. Ognuna parte una sola volta.",
+      "<strong>Cruscotto:</strong> il responsabile lo apre da «Le mie risorse» → pulsante <strong>Cruscotto</strong> (gli amministratori dall'indirizzo <code>risorse_cruscotto.php?r=ID</code>). Sceglie il periodo (30 o 90 giorni, quest'anno, 12 mesi o date a piacere) e scarica l'Excel.",
+      "Quando un'assicurazione o un bollo viene rinnovato, il responsabile inserisce la nuova data dal riquadro «Scadenze» del cruscotto: l'avviso si azzera e ripartirà prima della nuova scadenza.",
+      "<strong>Prova veloce:</strong> aggiungi a un'auto una scadenza tra pochi giorni, apri «Le mie risorse» come responsabile (compare l'avviso), vai al Cruscotto e segna il rinnovo."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Risorse: cruscotto del responsabile (prenotazioni, utilizzo, fasce, persone, quantità, km e consumi) con Excel e scadenze di bollo, assicurazione e tagliando con avvisi via email e rinnovo"
   }
 ];
 
@@ -259,12 +511,14 @@ var PROSSIMI = [
   ["D1 · Tutorato: pagamenti", "fatto: vedi Pacchetto 2"],
   ["D2 · Tutorato: import dei vincitori del bando", "fatto: vedi Pacchetto 3"],
   ["D3 · Tutorato: collaudo del flusso intero", "fatto: nessuna modifica ai file"],
-  ["C2 · Verbali compilati punto per punto", "da fare"],
-  ["C3 · Archivio dei verbali", "da fare"],
-  ["C4 · Pagina pubblica dei verbali con password", "da fare"],
-  ["C1 · Wizard delle pratiche studenti", "da fare"],
-  ["B1–B4 · Risorse: responsabile, campi, diario di bordo", "da fare"],
-  ["E1–E2 · Protocollo Titulus", "da fare (servono i parametri)"]
+  ["C2 · Verbali compilati punto per punto", "fatto: vedi Pacchetto 4"],
+  ["C3 · Archivio dei verbali", "fatto: vedi Pacchetto 5"],
+  ["C4 · Pagina pubblica dei verbali con password", "fatto: vedi Pacchetto 6 (da usare dopo il parere del DPO)"],
+  ["C1 · Procedura guidata delle pratiche studenti", "fatto: vedi Pacchetto 7"],
+  ["B1–B3 · Risorse: responsabili, campi, contatori, diario di bordo", "fatto: vedi Pacchetto 8"],
+  ["B4 · Report e cruscotto del responsabile", "fatto: vedi Pacchetto 9"],
+  ["E1–E2 · Protocollo Titulus", "in attesa della risposta dell'Ateneo (servono i parametri, §6 del piano)"],
+  ["Firma digitale remota (Aruba) in produzione", "in attesa dell'Ateneo: finché non ci sono le variabili ARUBA_* nel .env si carica il PDF firmato a mano"]
 ];
 
 // ==========================================================================================

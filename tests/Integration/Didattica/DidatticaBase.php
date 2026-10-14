@@ -100,6 +100,7 @@ abstract class DidatticaBase extends DatabaseDiProva
                   `giorni_promemoria` smallint(6) NOT NULL DEFAULT 7,
                   `chiave` varchar(40) DEFAULT NULL,
                   `domanda_json` text DEFAULT NULL,
+                  `in_verbale` tinyint(1) NOT NULL DEFAULT 1,
                   PRIMARY KEY (`id`)
                 )
                 SQL,
@@ -128,6 +129,7 @@ abstract class DidatticaBase extends DatabaseDiProva
                   `promemoria_il` datetime DEFAULT NULL,
                   `decisioni_json` mediumtext DEFAULT NULL,
                   `esito_seduta` varchar(20) NOT NULL DEFAULT '',
+                  `punto_id` int(11) DEFAULT NULL,
                   `ufficio_id` int(11) DEFAULT NULL,
                   `cdl_id` int(11) DEFAULT NULL,
                   `segreteria_id` int(11) DEFAULT NULL,
@@ -226,6 +228,44 @@ abstract class DidatticaBase extends DatabaseDiProva
                   `verbale_firmato_il` datetime DEFAULT NULL,
                   `verbale_sollecito_il` datetime DEFAULT NULL,
                   `verbale_solleciti` tinyint(4) NOT NULL DEFAULT 0,
+                  `numero_verbale` varchar(10) NOT NULL DEFAULT '',
+                  `origine` varchar(10) NOT NULL DEFAULT 'portale',
+                  `testo_ricerca` mediumtext DEFAULT NULL,
+                  `file_hash` varchar(40) DEFAULT NULL,
+                  `nome_originale` varchar(255) NOT NULL DEFAULT '',
+                  PRIMARY KEY (`id`)
+                )
+                SQL,
+            'pratiche_firme' => <<<'SQL'
+                CREATE TABLE `pratiche_firme` (
+                  `id` int(11) NOT NULL AUTO_INCREMENT,
+                  `pratica_id` int(11) NOT NULL,
+                  `passo` tinyint(4) NOT NULL DEFAULT 0,
+                  `tipo` varchar(10) NOT NULL DEFAULT 'persona',
+                  `nome` varchar(200) NOT NULL DEFAULT '',
+                  `email` varchar(150) NOT NULL DEFAULT '',
+                  `token` varchar(40) NOT NULL,
+                  `stato` varchar(10) NOT NULL DEFAULT 'attesa',
+                  `file_origine` varchar(255) DEFAULT NULL,
+                  `file_firmato` varchar(255) DEFAULT NULL,
+                  `richiesta_il` datetime DEFAULT current_timestamp(),
+                  `firmata_il` datetime DEFAULT NULL,
+                  `firmato_da` varchar(200) DEFAULT '',
+                  `motivo` varchar(500) DEFAULT '',
+                  `solleciti` tinyint(4) NOT NULL DEFAULT 0,
+                  `sollecito_il` datetime DEFAULT NULL,
+                  PRIMARY KEY (`id`),
+                  UNIQUE KEY `uq_token` (`token`)
+                )
+                SQL,
+            'didattica_sedute_punti' => <<<'SQL'
+                CREATE TABLE `didattica_sedute_punti` (
+                  `id` int(11) NOT NULL AUTO_INCREMENT,
+                  `seduta_id` int(11) NOT NULL,
+                  `ordine` int(11) NOT NULL DEFAULT 0,
+                  `titolo` varchar(500) NOT NULL DEFAULT '',
+                  `tipo` varchar(10) NOT NULL DEFAULT 'testo',
+                  `testo` mediumtext DEFAULT NULL,
                   PRIMARY KEY (`id`)
                 )
                 SQL,

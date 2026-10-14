@@ -18,9 +18,66 @@ final class ServizioIter
     }
 
     /**
-     * Uffici che ricevono la pratica, in ordine (dal modulo: id o chiavi dei modelli pronti); vuoto = un solo passo generico (0).
-     * «@cdl» = l'ufficio del corso di studio della pratica (ITER_CDL), «@segreteria» = la segreteria studenti scelta (ITER_SEGRETERIA):
-     * con la pratica si risolvono nell'ufficio vero (cdl_id, segreteria_id della pratica).
+     * I passi dell'iter del modulo, normalizzati. Nel JSON un passo è un ufficio (id, chiave o «@cdl» / «@segreteria») oppure un oggetto:
+     * {"t": "ufficio", "u": …, "gg": N}, {"t": "persona", "campo": «domanda di tipo docente», "gg": N}, {"t": "direttore", "gg": N};
+     * «gg» = giorni dopo i quali si ricorda il passo (0 = quelli del modulo). I passi non validi (ufficio sparito, di smistamento) si saltano.
+     *
+     * @param array<string, mixed>|null $m
+     * @return list<array{t: string, u: int|string|null, campo: string, gg: int}>
+     */
+    public function definizione(?array $m): array
+    {
+        $out = [];
+        foreach (json_decode((string) ($m['iter_json'] ?? ''), true) ?: [] as $x) {
+            $t = is_array($x) ? (string) ($x['t'] ?? 'ufficio') : 'ufficio';
+            $gg = is_array($x) ? max(0, min(90, (int) ($x['gg'] ?? 0))) : 0;
+            if ($t === 'direttore') {
+                $out[] = ['t' => 'direttore', 'u' => null, 'campo' => '', 'gg' => $gg];
+                continue;
+            }
+            if ($t === 'persona') {
+                $campo = trim((string) ($x['campo'] ?? ''));
+                if ($campo !== '') {
+                    $out[] = ['t' => 'persona', 'u' => null, 'campo' => $campo, 'gg' => $gg];
+                }
+                continue;
+            }
+            $u = self::voceUfficio($x);
+            if ($u === '@cdl' || $u === '@segreteria') {
+                $out[] = ['t' => 'ufficio', 'u' => $u, 'campo' => '', 'gg' => $gg];
+                continue;
+            }
+            $id = $this->uffici->idDa($u);
+            if ($id && !(int) ($this->uffici->tutti()[$id]['smista'] ?? 0)) {
+                $out[] = ['t' => 'ufficio', 'u' => $id, 'campo' => '', 'gg' => $gg];
+            }
+        }
+
+        return $out;
+    }
+
+    /** L'ufficio di una voce del JSON dell'iter (la voce è l'ufficio stesso o un oggetto con «u»). */
+    public static function voceUfficio(mixed $x): mixed
+    {
+        return is_array($x) ? ($x['u'] ?? null) : $x;
+    }
+
+    /**
+     * Giorni dopo i quali si ricorda il passo (1 = primo): quelli del passo, altrimenti quelli del modulo (0 = mai).
+     *
+     * @param array<string, mixed>|null $m
+     */
+    public function giorniPasso(?array $m, int $passo): int
+    {
+        $gg = $this->definizione($m)[$passo - 1]['gg'] ?? 0;
+
+        return $gg > 0 ? $gg : (int) ($m['giorni_promemoria'] ?? 0);
+    }
+
+    /**
+     * Passi dell'iter in ordine: id dell'ufficio, oppure ITER_CDL / ITER_SEGRETERIA (da risolvere con la pratica), ITER_PERSONA (firma di una persona
+     * indicata nel modulo) o ITER_DIRETTORE; vuoto = un solo passo generico (0). Con la pratica «@cdl» e «@segreteria» si risolvono nell'ufficio vero
+     * (cdl_id, segreteria_id della pratica).
      *
      * @param array<string, mixed>|null $m
      * @param array<string, mixed>|null $p
@@ -29,26 +86,21 @@ final class ServizioIter
     public function iter(?array $m, ?array $p = null): array
     {
         $it = [];
-        foreach (json_decode((string) ($m['iter_json'] ?? ''), true) ?: [] as $x) {
-            if ($x === '@cdl') {
-                $it[] = !empty($p['cdl_id']) ? (int) $p['cdl_id'] : Costanti::ITER_CDL;
-                continue;
-            }
-            if ($x === '@segreteria') {
-                $it[] = !empty($p['segreteria_id']) ? (int) $p['segreteria_id'] : Costanti::ITER_SEGRETERIA;
-                continue;
-            }
-            $id = $this->uffici->idDa($x);
-            if ($id && !(int) ($this->uffici->tutti()[$id]['smista'] ?? 0)) {
-                $it[] = $id;
-            }
+        foreach ($this->definizione($m) as $d) {
+            $it[] = match (true) {
+                $d['t'] === 'persona' => Costanti::ITER_PERSONA,
+                $d['t'] === 'direttore' => Costanti::ITER_DIRETTORE,
+                $d['u'] === '@cdl' => !empty($p['cdl_id']) ? (int) $p['cdl_id'] : Costanti::ITER_CDL,
+                $d['u'] === '@segreteria' => !empty($p['segreteria_id']) ? (int) $p['segreteria_id'] : Costanti::ITER_SEGRETERIA,
+                default => (int) $d['u'],
+            };
         }
 
         return $it ?: [0];
     }
 
     /**
-     * Passi mostrati: 0 = ricevuta (da smistare), 1..n = uffici dell'iter, n+1 = conclusa.
+     * Passi mostrati: 0 = ricevuta (da smistare), 1..n = i passi dell'iter, n+1 = conclusa.
      *
      * @param array<string, mixed>|null $m
      * @param array<string, mixed>|null $p
@@ -57,8 +109,11 @@ final class ServizioIter
     public function passi(?array $m, ?array $p = null): array
     {
         $out = [0 => 'Ricevuta e da smistare'];
+        $def = $this->definizione($m);
         foreach ($this->iter($m, $p) as $i => $id) {
             $out[$i + 1] = match (true) {
+                $id === Costanti::ITER_PERSONA => 'Firma: ' . ($def[$i]['campo'] ?? 'persona indicata'),
+                $id === Costanti::ITER_DIRETTORE => 'Firma del Direttore',
                 $id === Costanti::ITER_CDL => 'Ufficio del corso di studio',
                 $id === Costanti::ITER_SEGRETERIA => 'Segreteria studenti',
                 $id > 0 => (string) ($this->uffici->tutti()[$id]['nome'] ?? 'Ufficio didattico'),

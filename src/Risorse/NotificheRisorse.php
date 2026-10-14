@@ -13,7 +13,7 @@ use App\Portale\Colori;
 /** Email delle prenotazioni di risorse: a chi ha prenotato (conferma, approvazione, annullamento, promemoria) e ai gestori. */
 final class NotificheRisorse
 {
-    public function __construct(private RisorsaRepository $risorse, private ServizioUtenti $utenti, private Mailer $mailer, private Sito $sito)
+    public function __construct(private RisorsaRepository $risorse, private ServizioUtenti $utenti, private Mailer $mailer, private Sito $sito, private ResponsabileRisorsaRepository $responsabili, private ContatoreRisorsaRepository $contatori)
     {
     }
 
@@ -26,6 +26,10 @@ final class NotificheRisorse
     public function emailGestori(array $p): array
     {
         $out = array_filter(array_map('trim', explode(',', (string) ($p['email_notifiche'] ?? ''))), static fn ($e): bool => (bool) filter_var($e, FILTER_VALIDATE_EMAIL));
+        // I responsabili della risorsa (scelti dall'anagrafe) ricevono le richieste insieme agli indirizzi indicati
+        if (!empty($p['risorsa_id'])) {
+            $out = array_merge($out, $this->responsabili->emailNotifiche((int) $p['risorsa_id']));
+        }
         if ($out) {
             return array_values(array_unique(array_map('strtolower', $out)));
         }
@@ -40,6 +44,26 @@ final class NotificheRisorse
         }
 
         return $out ?: $this->utenti->emailAmministratori();
+    }
+
+    /**
+     * Elenco HTML delle quantità prenotate e delle risposte ai campi personalizzati della prenotazione (vuoto se non ce ne sono).
+     *
+     * @param array<string, mixed> $p
+     */
+    private function dettagli(array $p): string
+    {
+        $righe = [];
+        $usi = !empty($p['id']) ? $this->contatori->usiDellaPrenotazione((int) $p['id']) : [];
+        if ($usi) {
+            $righe[] = ['Quantità', ServizioContatoriRisorse::testoUsi($usi)];
+        }
+        $righe = array_merge($righe, ServizioCampiRisorsa::coppie($p['risposte_json'] ?? null));
+        if (!$righe) {
+            return '';
+        }
+
+        return '<ul>' . implode('', array_map(static fn ($r): string => '<li>' . htmlspecialchars($r[0], ENT_QUOTES, 'UTF-8') . ': <strong>' . htmlspecialchars($r[1], ENT_QUOTES, 'UTF-8') . '</strong></li>', $righe)) . '</ul>';
     }
 
     /**
@@ -67,6 +91,7 @@ final class NotificheRisorse
         $corpo = '<p>Gentile <strong>' . $h(trim($p['nome'] . ' ' . $p['cognome'])) . '</strong>,</p>'
                . '<p><strong>' . $h($titoli[$tipo] ?? '') . '</strong>: ' . $h($p['risorsa_nome']) . ($p['luogo'] !== '' ? ' (' . $h($p['luogo']) . ')' : '') . ".</p><ul>$righe</ul>"
                . ($p['motivo'] !== '' ? '<p>Motivo: ' . $h($p['motivo']) . '</p>' : '')
+               . $this->dettagli($p)
                . ($saltate ? '<p>Non prenotate perché non disponibili: ' . $h(implode(', ', array_map(static fn ($d, $m): string => date('d/m/Y', (int) strtotime((string) $d)) . " ($m)", array_keys($saltate), $saltate))) . '.</p>' : '')
                . ($tipo === 'registrata' && $p['stato'] === 'da_approvare' ? "<p>Riceverai un'email quando la richiesta sarà approvata.</p>" : '')
                . (in_array($tipo, ['registrata', 'approvata', 'promemoria'], true)
@@ -74,6 +99,52 @@ final class NotificheRisorse
                . "<p>Le tue prenotazioni sono nella tua <a href='" . $h("$base/area_personale.php") . "'>Area personale</a>, dove puoi anche annullarle.</p>";
 
         return $this->mailer->invia((string) $p['email'], ($titoli[$tipo] ?? 'Prenotazione') . ': ' . $p['risorsa_nome'], $corpo, Colori::valido($p['colore_primario'] ?? ''));
+    }
+
+    /**
+     * Avviso di una scadenza della risorsa (in arrivo o scaduta) ai responsabili e agli indirizzi di notifica.
+     *
+     * @param array<string, mixed> $s scadenza con risorsa_nome, risorsa_id, pagina_id, email_notifiche, scaduta
+     */
+    public function emailScadenza(array $s): int
+    {
+        $h = static fn ($t): string => htmlspecialchars((string) $t, ENT_QUOTES, 'UTF-8');
+        $scaduta = (string) ($s['scaduta'] ?? '0') === '1';
+        $data = date('d/m/Y', (int) strtotime((string) $s['scade_il']));
+        $link = $this->sito->urlBase() . '/risorse_cruscotto.php?r=' . (int) $s['risorsa_id'];
+        $corpo = '<p><strong>' . $h($s['nome']) . '</strong> di <strong>' . $h($s['risorsa_nome']) . '</strong> ' . ($scaduta ? "è scaduta il $data" : "scade il $data") . '.</p>'
+               . (trim((string) ($s['note'] ?? '')) !== '' ? '<p>' . $h($s['note']) . '</p>' : '')
+               . "<p>Quando è stata rinnovata inserisci la nuova data dal cruscotto della risorsa, così l'avviso si azzera.</p><p><a href='" . $h($link) . "' style='background:#b45309;color:#fff;padding:10px 18px;text-decoration:none;border-radius:6px;font-weight:bold;'>Apri il cruscotto</a></p>";
+        $n = 0;
+        foreach ($this->emailGestori(['risorsa_id' => $s['risorsa_id'], 'pagina_id' => $s['pagina_id'], 'email_notifiche' => $s['email_notifiche'] ?? '']) as $em) {
+            $n += $this->mailer->invia($em, ($scaduta ? 'Scaduta: ' : 'In scadenza: ') . $s['nome'] . ' – ' . $s['risorsa_nome'], $corpo, Colori::valido($s['colore_primario'] ?? '')) ? 1 : 0;
+        }
+
+        return $n;
+    }
+
+    /**
+     * Promemoria per il diario di bordo del viaggio: a chi ha prenotato e agli altri conducenti indicati. Ritorna true se almeno una email è partita.
+     *
+     * @param array<string, mixed> $p prenotazione con risorsa_nome
+     */
+    public function emailDiario(array $p): bool
+    {
+        $h = static fn ($s): string => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
+        $link = $this->sito->urlBase() . '/diario_bordo.php?c=' . urlencode((string) $p['codice']);
+        $dest = array_filter([strtolower((string) ($p['email'] ?? ''))]);
+        foreach (ServizioDiarioBordo::coConducenti($p) as $c) {
+            $dest[] = (string) ($c['email'] ?? '');
+        }
+        $corpo = '<p>Gentile <strong>' . $h(trim($p['nome'] . ' ' . $p['cognome'])) . '</strong>,</p><p>hai usato <strong>' . $h($p['risorsa_nome']) . '</strong> (' . $h(Prenotazioni::quando($p)) . '): '
+               . "ti chiediamo di compilare il <strong>diario di bordo</strong> del viaggio (km, carburante, segnalazioni). Chi ha indicato altri conducenti può compilarlo anche da loro.</p>"
+               . "<p><a href='" . $h($link) . "' style='background:#0369a1;color:#fff;padding:10px 18px;text-decoration:none;border-radius:6px;font-weight:bold;'>Compila il diario di bordo</a></p>";
+        $fatto = false;
+        foreach (array_unique(array_filter($dest, static fn ($e): bool => (bool) filter_var($e, FILTER_VALIDATE_EMAIL))) as $e) {
+            $fatto = $this->mailer->invia($e, 'Diario di bordo da compilare: ' . $p['risorsa_nome'], $corpo, Colori::valido($p['colore_primario'] ?? '')) || $fatto;
+        }
+
+        return $fatto;
     }
 
     /**
@@ -89,10 +160,15 @@ final class NotificheRisorse
         $corpo = '<p><strong>' . $h(trim($p['nome'] . ' ' . $p['cognome'])) . '</strong> (' . $h($p['email']) . ") $cosa <strong>" . $h($p['risorsa_nome']) . '</strong>:'
                . ' ' . $h(Prenotazioni::quando($p)) . ($n > 1 ? ' e altre ' . ($n - 1) . ' date (ogni settimana)' : '') . '.</p>'
                . ($p['motivo'] !== '' ? '<p>Motivo: ' . $h($p['motivo']) . '</p>' : '')
+               . $this->dettagli($p)
                . "<p><a href='" . $h($link) . "'>" . ($p['stato'] === 'da_approvare' && $tipo !== 'annullata' ? 'Approva o rifiuta' : 'Apri le prenotazioni') . '</a></p>';
         $ogg = ($tipo === 'annullata' ? 'Annullata: ' : ($p['stato'] === 'da_approvare' ? 'Da approvare: ' : 'Nuova prenotazione: ')) . $p['risorsa_nome'] . ' – ' . date('d/m H:i', (int) strtotime((string) $p['inizio']));
+        // Chi è solo responsabile della risorsa (senza accesso al pannello dell'area) trova le richieste nella sua Area personale
+        $linkResp = $this->sito->urlBase() . '/risorse_responsabile.php';
+        $soloResp = !empty($p['risorsa_id']) ? $this->responsabili->emailNotifiche((int) $p['risorsa_id']) : [];
         foreach ($this->emailGestori($p) as $em) {
-            $this->mailer->invia($em, $ogg, $corpo, Colori::valido($p['colore_primario'] ?? ''));
+            $c = in_array($em, $soloResp, true) ? str_replace($h($link), $h($linkResp), $corpo) : $corpo;
+            $this->mailer->invia($em, $ogg, $c, Colori::valido($p['colore_primario'] ?? ''));
         }
     }
 }

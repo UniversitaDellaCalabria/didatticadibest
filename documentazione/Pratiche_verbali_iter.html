@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Pratiche studenti e verbali · l'iter completo</title>
+<style>
+/* Presentazione 16:9 da stampare in PDF (Chrome: Stampa → Salva come PDF, margini nessuno, sfondo attivo).
+   Generata con: chrome --headless --no-pdf-header-footer --print-to-pdf=Pratiche_verbali_iter.pdf Pratiche_verbali_iter.html */
+@page { size: 1280px 720px; margin: 0; }
+:root { --bg:#eef0f4; --ink:#1e293b; --mut:#64748b; --linea:#e2e8f0; --blu:#0056B3; --viola:#7c3aed; --ambra:#b45309; --verde:#15803d; --teal:#0f766e; --rosso:#b91c1c; --ardesia:#475569; --notte:#0f2a4a; }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #cbd5e1; font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif; color: var(--ink); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.slide { width: 1280px; height: 720px; background: var(--bg); position: relative; overflow: hidden; padding: 44px 56px 0; page-break-after: always; break-after: page; counter-increment: pag; }
+.slide:last-child { page-break-after: auto; break-after: auto; }
+@media screen { .slide { margin: 16px auto; box-shadow: 0 6px 24px rgba(0,0,0,.18); } }
+.piede { position: absolute; left: 56px; right: 56px; bottom: 18px; display: flex; justify-content: space-between; font-size: 12px; color: var(--mut); }
+.piede::after { content: counter(pag); font-weight: 600; }
+h1 { font-size: 34px; margin: 0 0 4px; letter-spacing: -.01em; }
+h2 { font-size: 34px; margin: 0 0 4px; letter-spacing: -.01em; }
+.sotto { color: var(--mut); font-size: 18px; margin: 0 0 26px; max-width: 1060px; line-height: 1.45; }
+.num { display: inline-flex; width: 32px; height: 32px; align-items: center; justify-content: center; background: var(--ink); color: #fff; border-radius: 8px; font-size: 15px; font-weight: 700; margin-right: 10px; vertical-align: 3px; }
+.griglia { display: grid; gap: 18px; }
+.g4 { grid-template-columns: repeat(4, 1fr); } .g3 { grid-template-columns: repeat(3, 1fr); } .g2 { grid-template-columns: repeat(2, 1fr); }
+.card { background: #fff; border: 1px solid var(--linea); border-radius: 14px; padding: 18px 20px 16px; box-shadow: 0 1px 2px rgba(15,23,42,.05); border-top: 5px solid var(--ardesia); }
+.card h3 { font-size: 20px; margin: 0 0 8px; line-height: 1.25; }
+.card p, .card li { font-size: 16.5px; color: #334155; line-height: 1.45; margin: 0 0 6px; }
+.card ul { margin: 4px 0 0; padding-left: 18px; }
+.card small { color: var(--mut); font-size: 12.5px; display: block; line-height: 1.35; }
+.blu { border-top-color: var(--blu); } .viola { border-top-color: var(--viola); } .ambra { border-top-color: var(--ambra); } .verde { border-top-color: var(--verde); } .teal { border-top-color: var(--teal); } .rosso { border-top-color: var(--rosso); } .ardesia { border-top-color: var(--ardesia); } .notte { border-top-color: var(--notte); }
+.chip { display: inline-block; font-size: 14.5px; font-weight: 600; padding: 3px 10px; border-radius: 999px; color: #fff; margin: 0 4px 4px 0; }
+.chip.chiaro { background: #fff; color: var(--ink); border: 1px solid var(--linea); }
+.freccia { color: #94a3b8; font-weight: 700; padding: 0 2px; }
+.attore { font-size: 13.5px; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; margin-bottom: 4px; }
+/* copertina */
+.copertina { background: linear-gradient(135deg, #0f2a4a 0%, #0056B3 100%); color: #fff; padding: 0; }
+.copertina .interno { position: absolute; left: 80px; top: 190px; right: 80px; }
+.copertina h1 { font-size: 58px; line-height: 1.08; margin-bottom: 18px; }
+.copertina p { font-size: 22px; opacity: .88; max-width: 860px; line-height: 1.45; margin: 0; }
+.copertina .tag { display: inline-block; background: rgba(255,255,255,.16); border-radius: 999px; padding: 6px 16px; font-size: 15px; margin-bottom: 26px; letter-spacing: .04em; }
+.copertina .piede { color: rgba(255,255,255,.7); }
+/* percorso */
+.percorso { display: flex; gap: 0; align-items: stretch; }
+.passo { flex: 1; background: #fff; border: 1px solid var(--linea); border-top: 5px solid var(--ardesia); border-radius: 12px; padding: 14px 13px; margin-right: 18px; position: relative; }
+.passo:last-child { margin-right: 0; }
+.passo:not(:last-child)::after { content: "›"; position: absolute; right: -15px; top: 50%; margin-top: -14px; color: #94a3b8; font-size: 26px; font-weight: 700; }
+.passo b { display: block; font-size: 17px; margin-bottom: 5px; line-height: 1.2; }
+.passo span { font-size: 14.5px; color: #475569; line-height: 1.4; display: block; }
+.passo em { font-style: normal; font-size: 12.5px; color: #fff; background: var(--mut); border-radius: 6px; padding: 1px 7px; display: inline-block; margin-bottom: 5px; }
+.fasi { display: flex; flex-wrap: wrap; gap: 8px; }
+.fasi .chip { font-size: 16px; padding: 8px 16px; margin: 0; }
+/* pagina di verbale */
+.foglio { background: #fff; border: 1px solid #cbd5e1; border-radius: 6px; box-shadow: 0 4px 14px rgba(15,23,42,.12); font-family: "Times New Roman", Georgia, serif; color: #111; padding: 14px 22px 10px; font-size: 12.5px; line-height: 1.38; position: relative; }
+.foglio .testata { text-align: right; font-weight: 700; font-size: 12px; border-bottom: 1px solid #94a3b8; padding-bottom: 4px; margin-bottom: 8px; font-family: "Segoe UI", Arial, sans-serif; }
+.foglio .logo { width: 150px; height: 20px; background: linear-gradient(90deg, #0056B3, #5aa0e0); border-radius: 3px; margin-bottom: 6px; }
+.foglio .c { text-align: center; font-weight: 700; }
+.foglio .pt { font-weight: 700; margin: 7px 0 2px; }
+.foglio .sez { font-weight: 700; text-decoration: underline; margin: 6px 0 2px; }
+.foglio .pr { display: flex; justify-content: space-between; }
+.foglio .tab { border: 1px solid #94a3b8; margin: 3px 0 5px; }
+.foglio .tab div { display: flex; border-bottom: 1px solid #cbd5e1; }
+.foglio .tab div:last-child { border-bottom: 0; }
+.foglio .tab div span { flex: 1; padding: 1px 5px; border-right: 1px solid #cbd5e1; font-size: 11px; }
+.foglio .tab div:first-child { background: #e7e6e6; font-weight: 700; }
+.foglio .pie { position: absolute; left: 22px; right: 22px; bottom: 8px; display: flex; justify-content: space-between; font-size: 10.5px; border-top: 1px solid #94a3b8; padding-top: 4px; font-family: "Segoe UI", Arial, sans-serif; }
+.nota { background: #fff7e6; border: 1px solid #f3d9a4; border-radius: 10px; padding: 14px 20px; font-size: 17px; color: #6b4a0e; line-height: 1.4; }
+.evidenza { background: #fff; border: 1px solid var(--linea); border-left: 6px solid var(--blu); border-radius: 10px; padding: 14px 20px; font-size: 17.5px; line-height: 1.5; }
+table.m { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 16px; background: #fff; border: 1px solid var(--linea); border-radius: 12px; overflow: hidden; }
+table.m th { background: #f1f5f9; text-align: left; padding: 10px 14px; font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: #475569; }
+table.m td { padding: 11px 14px; border-top: 1px solid var(--linea); vertical-align: top; line-height: 1.35; }
+table.m td:first-child { font-weight: 700; white-space: nowrap; }
+.pallino { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+</style>
+</head>
+<body>
+
+<!-- 1 · Copertina -->
+<section class="slide copertina">
+  <div class="interno">
+    <span class="tag">DiBEST · Portale eventi e didattica</span>
+    <h1>Pratiche degli studenti e verbali dei consigli</h1>
+    <p>Dal modulo compilato online alla delibera del Consiglio, fino al verbale firmato: chi fa cosa, in che ordine, e che cosa vede ognuno.</p>
+  </div>
+  <div class="piede"><span>Presentazione dell'iter · ottobre 2026</span></div>
+</section>
+
+<!-- 2 · L'iter completo -->
+<section class="slide">
+  <h2><span class="num">0</span>L'iter completo</h2>
+  <p class="sotto">Una pratica nasce dal modulo dello studente e finisce nel verbale del Consiglio. Tutto passa dal portale: nessuna mail da inoltrare, nessun foglio da ricopiare.</p>
+  <div class="griglia g4">
+    <div class="card blu"><div class="attore" style="color:var(--blu)">1 · Studente</div><h3>Compila e invia il modulo</h3><p>Accede con SPID/CIE o credenziali Unical, sceglie la pratica, allega i documenti e riceve il codice.</p></div>
+    <div class="card ambra"><div class="attore" style="color:var(--ambra)">2 · Protocollo</div><h3>Protocolla la domanda</h3><p>L'ufficio inserisce numero e data: la domanda è già un PDF/A pronto.</p></div>
+    <div class="card viola"><div class="attore" style="color:var(--viola)">3 · Ufficio del corso</div><h3>Prende in carico e lavora</h3><p>Verifica, chiede integrazioni, compila le convalide o il piano di studi.</p></div>
+    <div class="card verde"><div class="attore" style="color:var(--verde)">4 · Referente</div><h3>Porta la pratica in seduta</h3><p>La pratica è «pronta per il consiglio» e viene assegnata a una seduta.</p></div>
+    <div class="card teal"><div class="attore" style="color:var(--teal)">5 · Consiglio</div><h3>Decide in seduta</h3><p>Presenze, esito per ogni pratica (approvata, con modifiche, respinta, rinviata) e delibera.</p></div>
+    <div class="card notte"><div class="attore" style="color:var(--notte)">6 · Segretario</div><h3>Scrive il verbale</h3><p>Il testo di ogni punto dell'ordine del giorno e le pratiche al loro posto: esce un Word come il modello.</p></div>
+    <div class="card rosso"><div class="attore" style="color:var(--rosso)">7 · Firme</div><h3>Segretario e coordinatore firmano</h3><p>Firma digitale PAdES; il PDF firmato va ai referenti.</p></div>
+    <div class="card ardesia"><div class="attore" style="color:var(--ardesia)">8 · Esiti</div><h3>Studente e segreteria</h3><p>Lo studente riceve l'email con l'estratto del verbale; la segreteria studenti riceve la pratica con il verbale.</p></div>
+  </div>
+  <div class="piede"><span>Pratiche studenti e verbali · l'iter completo</span></div>
+</section>
+
+<!-- 3 · Lo studente -->
+<section class="slide">
+  <h2><span class="num">1</span>Lo studente presenta la pratica</h2>
+  <p class="sotto">Un solo luogo per tutte le richieste: convalida esami, passaggi di corso, piani di studio, lavoro finale, Erasmus… ogni pratica è un «modulo» configurato dall'Ufficio didattico.</p>
+  <div class="griglia g3">
+    <div class="card blu"><h3>Accede e sceglie</h3><ul><li>Accesso con SPID, CIE o credenziali di Ateneo</li><li>Vede solo i moduli per lui (studenti, docenti, personale)</li><li>Ogni modulo spiega cosa serve prima di iniziare</li></ul></div>
+    <div class="card blu"><h3>Compila il modulo</h3><ul><li>Campi che compaiono solo se servono («mostra se…»)</li><li>Corso, insegnamento e docente scelti dalle anagrafi di Ateneo</li><li>Tabelle a righe per gli esami, allegati PDF o immagine</li><li>Dichiarazioni da accettare</li></ul></div>
+    <div class="card blu"><h3>Invia e segue</h3><ul><li>Codice della pratica e <b>domanda in PDF/A</b> generata dal portale</li><li>Email di conferma e a ogni passaggio</li><li>Nella pratica vede stato, messaggi dell'ufficio e documenti</li><li>Può rispondere alle richieste di integrazione</li></ul></div>
+  </div>
+  <div class="evidenza" style="margin-top:20px"><b>Per lo studente</b> l'iter si legge sempre allo stesso modo: <span class="chip" style="background:#0056B3">Inviata</span><span class="chip" style="background:#7c3aed">In lavorazione</span><span class="chip" style="background:#b45309">Integrazione richiesta</span><span class="chip" style="background:#15803d">Accolta</span><span class="chip" style="background:#b91c1c">Respinta</span><span class="chip" style="background:#475569">Chiusa</span></div>
+  <div class="piede"><span>Pratiche studenti e verbali · l'iter completo</span></div>
+</section>
+
+<!-- 4 · Protocollo e smistamento -->
+<section class="slide">
+  <h2><span class="num">2</span>Protocollo, smistamento e presa in carico</h2>
+  <p class="sotto">Dopo l'invio la pratica viaggia da sola verso l'ufficio giusto. Ogni ufficio è definito dal pannello (nessun indirizzo scritto nel codice).</p>
+  <div class="percorso" style="margin-bottom:22px">
+    <div class="passo" style="border-top-color:var(--ambra)"><em style="background:var(--ambra)">Da protocollare</em><b>Ufficio protocollo</b><span>Riceve la domanda, inserisce numero e data (e verifica l'eventuale marca da bollo).</span></div>
+    <div class="passo" style="border-top-color:var(--blu)"><em style="background:var(--blu)">Da assegnare</em><b>Ufficio del corso</b><span>Arriva a chi segue il corso di studio indicato dallo studente, scelto dal consiglio di quel corso.</span></div>
+    <div class="passo" style="border-top-color:var(--viola)"><em style="background:var(--viola)">In lavorazione</em><b>Presa in carico</b><span>Un operatore la prende; chi l'ha avuta continua a vederla e a integrarla.</span></div>
+    <div class="passo" style="border-top-color:var(--verde)"><em style="background:var(--verde)">Pronta per il consiglio</em><b>Referente</b><span>Chiude la lavorazione e la rende disponibile per una seduta.</span></div>
+  </div>
+  <div class="griglia g3">
+    <div class="card ambra"><h3>Integrazione richiesta</h3><p>Se manca qualcosa l'ufficio chiede documenti o un'autodichiarazione: lo studente riceve l'email, risponde dalla pratica e l'iter riprende.</p></div>
+    <div class="card viola"><h3>Promemoria automatici</h3><p>Una pratica ferma da troppi giorni genera un promemoria a chi l'ha in carico (o a chi smista, se nessuno l'ha presa).</p></div>
+    <div class="card ardesia"><h3>Sempre tracciato</h3><p>Ogni passaggio, messaggio e allegato resta nello storico della pratica: chi, quando, a quale ufficio.</p></div>
+  </div>
+  <div class="piede"><span>Pratiche studenti e verbali · l'iter completo</span></div>
+</section>
+
+<!-- 4b · Firme e percorsi -->
+<section class="slide">
+  <h2><span class="num">2b</span>Firme nell'iter e percorsi diversi</h2>
+  <p class="sotto">Ogni tipo di pratica ha il suo percorso, deciso dall'Ufficio didattico con una procedura guidata: non serve toccare il codice.</p>
+  <div class="percorso" style="margin-bottom:20px">
+    <div class="passo" style="border-top-color:var(--viola)"><em style="background:var(--viola)">Tesi</em><b>Firma del relatore</b><span>La persona indicata dallo studente nel modulo riceve un link personale e firma (o rifiuta con un motivo).</span></div>
+    <div class="passo" style="border-top-color:var(--ambra)"><em style="background:var(--ambra)">Tutte</em><b>Protocollo</b><span>Numero, data e, dove serve, la marca da bollo.</span></div>
+    <div class="passo" style="border-top-color:var(--blu)"><em style="background:var(--blu)">Carriera</em><b>Referente → segreteria</b><span>Il referente del corso istruisce, la segreteria registra.</span></div>
+    <div class="passo" style="border-top-color:var(--rosso)"><em style="background:var(--rosso)">Certificati</em><b>Firma del Direttore</b><span>La segreteria carica il certificato o l'attestato, il Direttore lo firma in PAdES.</span></div>
+  </div>
+  <div class="griglia g3">
+    <div class="card viola"><h3>Tempi per ogni passo</h3><p>Dopo i giorni indicati chi deve agire riceve un promemoria; chi deve firmare ne riceve fino a tre.</p></div>
+    <div class="card teal"><h3>Con o senza verbale</h3><p>Le pratiche per il Consiglio vanno in seduta; certificati e attestati si concludono senza passare dal verbale.</p></div>
+    <div class="card blu"><h3>Procedura guidata</h3><p>Sette passi: che pratica è, cosa compila lo studente, chi la lavora, cosa compilano gli uffici, cosa va nel verbale, email, pubblica. Con bozza, copia e modelli già pronti.</p></div>
+  </div>
+  <div class="piede"><span>Pratiche studenti e verbali · l'iter completo</span></div>
+</section>
+
+<!-- 5 · Lavorazione -->
+<section class="slide">
+  <h2><span class="num">3</span>La lavorazione dell'ufficio</h2>
+  <p class="sotto">La scheda della pratica dice sempre «qual è la prossima azione» e raccoglie in un posto solo ciò che serve per decidere.</p>
+  <div class="griglia g2" style="margin-bottom:16px">
+    <div class="card viola"><h3>Cosa vede l'operatore</h3><ul><li>Le risposte dello studente e gli allegati</li><li>La fase in cui si trova e il riquadro «Prossima azione»</li><li>Il percorso a tappe dell'iter e lo storico completo</li><li>Messaggi con lo studente (anche note interne)</li></ul></div>
+    <div class="card viola"><h3>Cosa compila</h3><ul><li>Campi di lavorazione e di decisione previsti dal modulo</li><li><b>Convalide:</b> insegnamento dello studente → insegnamento del Dipartimento, totale o parziale, con CFU da integrare calcolati</li><li><b>Piano di studi:</b> insegnamenti in piano o fuori piano</li><li>Testo della delibera da portare nel verbale</li></ul></div>
+  </div>
+  <div class="fasi">
+    <span class="chip" style="background:#b45309">Da protocollare</span><span class="freccia">›</span>
+    <span class="chip" style="background:#0056B3">Da assegnare</span><span class="freccia">›</span>
+    <span class="chip" style="background:#0369a1">Da prendere in carico</span><span class="freccia">›</span>
+    <span class="chip" style="background:#7c3aed">In lavorazione</span><span class="freccia">›</span>
+    <span class="chip" style="background:#047857">Pronta per il consiglio</span><span class="freccia">›</span>
+    <span class="chip" style="background:#15803d">Decisa in seduta</span><span class="freccia">›</span>
+    <span class="chip" style="background:#5b21b6">Alla segreteria</span><span class="freccia">›</span>
+    <span class="chip" style="background:#475569">Conclusa</span>
+  </div>
+  <p class="sotto" style="margin-top:16px;font-size:16px">Le fasi si leggono in un colpo d'occhio nell'elenco delle pratiche, con i filtri per fase e per carico.</p>
+  <div class="piede"><span>Pratiche studenti e verbali · l'iter completo</span></div>
+</section>
+
+<!-- 6 · Il consiglio -->
+<section class="slide">
+  <h2><span class="num">4</span>Il Consiglio: componenti, convocazione, presenze</h2>
+  <p class="sotto">I componenti si inseriscono una volta sola dall'anagrafe di Ateneo; ogni seduta riparte da lì.</p>
+  <div class="griglia g3">
+    <div class="card teal"><h3>Il consiglio</h3><ul><li>Nome (organo nel verbale), corsi di studio, luogo abituale</li><li>Coordinatore e segretario verbalizzante</li><li>Componenti divisi per gruppo: ordinari, associati, ricercatori, a contratto, rappresentanti degli studenti, tecnico-amministrativi</li><li>Referenti: gestiscono solo le sedute del loro consiglio</li></ul></div>
+    <div class="card teal"><h3>La convocazione (facoltativa)</h3><ul><li>Email a tutti i componenti con data, ora, luogo e ordine del giorno</li><li>Testo personalizzabile con segnaposti</li><li>Ogni componente ha un <b>link personale per giustificare l'assenza</b>: finisce da solo nelle presenze come «assente giustificato»</li></ul></div>
+    <div class="card teal"><h3>Le presenze</h3><ul><li>Un clic per componente: <b>presente</b>, <b>assente giustificato</b>, <b>assente ingiustificato</b></li><li>Pulsanti «tutti presenti» e simili per fare in fretta</li><li>Nome e gruppo restano nella seduta anche se il consiglio cambia dopo</li><li>Riepilogo automatico nel verbale</li></ul></div>
+  </div>
+  <div class="piede"><span>Pratiche studenti e verbali · l'iter completo</span></div>
+</section>
+
+<!-- 7 · Seduta guidata -->
+<section class="slide">
+  <h2><span class="num">5</span>La seduta guidata in sette passi</h2>
+  <p class="sotto">Ogni seduta ha un percorso a tappe: si vede subito cosa è fatto e cosa manca. È uguale per tutti i consigli.</p>
+  <div class="percorso" style="margin-bottom:20px">
+    <div class="passo" style="border-top-color:var(--teal)"><em style="background:var(--teal)">1 · facoltativo</em><b>Convocazione</b><span>Email ai componenti con il link per giustificare.</span></div>
+    <div class="passo" style="border-top-color:var(--teal)"><em style="background:var(--teal)">2</em><b>Presenze</b><span>Presente, assente giustificato o ingiustificato.</span></div>
+    <div class="passo" style="border-top-color:var(--blu)"><em style="background:var(--blu)">3 · novità</em><b>Cosa è stato detto</b><span>Un riquadro di testo per ogni punto dell'o.d.g.</span></div>
+    <div class="passo" style="border-top-color:var(--viola)"><em style="background:var(--viola)">4</em><b>Pratiche e decisioni</b><span>Esito e delibera per ogni pratica portata in seduta.</span></div>
+    <div class="passo" style="border-top-color:var(--verde)"><em style="background:var(--verde)">5</em><b>Esiti agli studenti</b><span>Si applicano gli esiti e gli studenti sono avvisati.</span></div>
+    <div class="passo" style="border-top-color:var(--notte)"><em style="background:var(--notte)">6</em><b>Verbale</b><span>Word pronto da scaricare, poi PDF alla firma.</span></div>
+    <div class="passo" style="border-top-color:var(--rosso)"><em style="background:var(--rosso)">7</em><b>Firme</b><span>Segretario, poi coordinatore.</span></div>
+  </div>
+  <div class="evidenza">Il portale propone ogni volta <b>il passo successivo</b>: se mancano ancora delle decisioni lo dice, e si può sempre tornare indietro. L'ordine del giorno si scrive una volta (un punto per riga) e guida tutto il resto.</div>
+  <div class="piede"><span>Pratiche studenti e verbali · l'iter completo</span></div>
+</section>
+
+<!-- 8 · Cosa è stato detto + decisioni -->
+<section class="slide">
+  <h2><span class="num">6</span>Cosa è stato detto e cosa si è deciso</h2>
+  <p class="sotto">Il testo di ogni punto si scrive nel suo riquadro; le pratiche portano già con sé le decisioni. Il verbale è la somma delle due cose.</p>
+  <div class="griglia g2">
+    <div class="card blu">
+      <h3>Passo «Cosa è stato detto»</h3>
+      <ul>
+        <li>Un riquadro per punto dell'ordine del giorno, con grassetto, corsivo ed elenchi</li>
+        <li>Il punto delle <b>pratiche studenti</b> porta da solo le pratiche della seduta; si può aggiungere un'introduzione</li>
+        <li>Con più punti per le pratiche si sceglie sotto quale compare ognuna</li>
+        <li>Riordinando o correggendo l'ordine del giorno i testi già scritti restano al loro punto</li>
+        <li>I punti vuoti restano con «…» da completare a mano nel Word</li>
+      </ul>
+    </div>
+    <div class="card teal">
+      <h3>Passo «Pratiche e decisioni»</h3>
+      <p><span class="chip" style="background:#15803d">Approvata</span><span class="chip" style="background:#0f766e">Approvata con modifiche</span><span class="chip" style="background:#b91c1c">Respinta</span><span class="chip" style="background:#b45309">Rinviata</span></p>
+      <ul>
+        <li>Per le convalide: <b>quadro delle convalide</b> riga per riga (totale, parziale, CFU da integrare)</li>
+        <li>Per i piani di studio: insegnamenti in piano o fuori piano</li>
+        <li>Delibera: testo predefinito del modulo, modificabile pratica per pratica</li>
+        <li>Con «Applica gli esiti» le approvate diventano <b>accolte</b>, le respinte <b>respinte</b>; le rinviate tornano senza seduta per la prossima</li>
+      </ul>
+    </div>
+  </div>
+  <div class="piede"><span>Pratiche studenti e verbali · l'iter completo</span></div>
+</section>
+
+<!-- 9 · Il verbale in Word -->
+<section class="slide">
+  <h2><span class="num">7</span>Il verbale in Word, come il modello</h2>
+  <p class="sotto">Il file ricalca il verbale del Consiglio unificato: stessa testata, stessa sequenza, firmatari a ogni pagina. Si scarica, si completa se serve e si salva in PDF.</p>
+  <div style="display:grid;grid-template-columns:560px 1fr;gap:26px;align-items:start">
+    <div class="foglio" style="height:470px">
+      <div class="logo"></div>
+      <div class="testata">Verbale n. 8 – 07 settembre 2026</div>
+      <div class="c">Consiglio Unificato del Corso di Laurea in Scienze Naturali e Ambientali e del Corso di Laurea Magistrale in Biodiversità…</div>
+      <div class="c" style="margin-bottom:5px">a.a. 2025/2026</div>
+      <div>Il giorno 07 del mese di settembre 2026 alle ore 15:30, a seguito di convocazione si è riunito presso l'aula L3 del cubo 4A, il Consiglio Unificato… con il seguente o.d.g.:</div>
+      <div style="padding-left:18px">1. Comunicazioni<br>2. Pratiche studenti<br>3. Analisi degli indicatori e redazione in bozza della SMA…</div>
+      <div class="sez" style="margin-top:6px">Professori Ordinari e Associati</div>
+      <div class="pr"><span>Prof. Rossi Mario</span><span>PRESENTE</span></div>
+      <div class="pr"><span>Prof.ssa Bianchi Anna</span><span>ASSENTE GIUSTIFICATO</span></div>
+      <div class="pt">1. Comunicazioni</div>
+      <div>Il Coordinatore comunica che le lezioni del primo semestre iniziano il 28 settembre…</div>
+      <div class="pt">2. Pratiche studenti</div>
+      <div class="sez">Domande lavoro finale</div>
+      <div class="tab"><div><span>COGNOME</span><span>NOME</span><span>MATRICOLA</span><span>RELATORE</span></div><div><span>Verdi</span><span>Luca</span><span>245678</span><span>Prof. Neri</span></div></div>
+      <div class="pie"><span>Dott.ssa Segretaria<br>Segretario verbalizzante</span><span>pag. 1</span><span style="text-align:right">Prof. Coordinatore<br>Coordinatore</span></div>
+    </div>
+    <div>
+      <div class="griglia" style="gap:10px">
+        <div class="card notte" style="padding:10px 14px"><h3 style="margin-bottom:2px">In alto a ogni pagina</h3><p>«Verbale n. 8 – 07 settembre 2026» con il numero scritto nella seduta.</p></div>
+        <div class="card notte" style="padding:10px 14px"><h3 style="margin-bottom:2px">Incipit e presenze</h3><p>Data, ora, luogo e ordine del giorno; presenze per gruppo con il riepilogo; segretario e numero legale.</p></div>
+        <div class="card notte" style="padding:10px 14px"><h3 style="margin-bottom:2px">Un punto dopo l'altro</h3><p>Titolo in grassetto e testo scritto; le pratiche sotto il loro punto, raggruppate per tipo di pratica con la tabella dei nominativi o il testo della delibera.</p></div>
+        <div class="card notte" style="padding:10px 14px"><h3 style="margin-bottom:2px">In fondo e nel piè di pagina</h3><p>«La seduta si scioglie alle ore…», firme del segretario e del coordinatore, nomi e ruoli ripetuti a ogni pagina.</p></div>
+      </div>
+    </div>
+  </div>
+  <div class="piede"><span>Pratiche studenti e verbali · l'iter completo</span></div>
+</section>
+
+<!-- 10 · Firme -->
+<section class="slide">
+  <h2><span class="num">8</span>Firme e conclusione</h2>
+  <p class="sotto">Il verbale si firma in PAdES, prima dal segretario verbalizzante e poi dal coordinatore. Nessuno deve inseguire nessuno: ci pensa il portale.</p>
+  <div class="percorso" style="margin-bottom:20px">
+    <div class="passo" style="border-top-color:var(--ardesia)"><em style="background:var(--ardesia)">Operatore</em><b>Carica il PDF</b><span>Il Word completato e salvato in PDF, con le email di segretario e coordinatore.</span></div>
+    <div class="passo" style="border-top-color:var(--ambra)"><em style="background:var(--ambra)">Da firmare</em><b>Segretario verbalizzante</b><span>Riceve l'email con il link personale: firma dal portale (Aruba) o scarica, firma e ricarica.</span></div>
+    <div class="passo" style="border-top-color:var(--viola)"><em style="background:var(--viola)">Da firmare</em><b>Coordinatore</b><span>Stesso percorso, subito dopo il segretario.</span></div>
+    <div class="passo" style="border-top-color:var(--verde)"><em style="background:var(--verde)">Firmato in PAdES</em><b>Verbale firmato</b><span>Il PDF firmato parte ai referenti del consiglio.</span></div>
+  </div>
+  <div class="griglia g3">
+    <div class="card rosso"><h3>Solleciti automatici</h3><p>Se la firma tarda parte un sollecito da solo ogni pochi giorni (fino a tre); l'operatore può mandarlo anche a mano.</p></div>
+    <div class="card verde"><h3>Agli studenti</h3><p>Applicati gli esiti, ogni studente riceve l'email e trova nella pratica l'<b>estratto del verbale</b> in PDF con la propria delibera.</p></div>
+    <div class="card viola"><h3>Alla segreteria studenti</h3><p>Le pratiche lavorate vanno alla segreteria scelta dal referente, insieme al verbale: la pratica passa alla fase «Alla segreteria».</p></div>
+  </div>
+  <div class="piede"><span>Pratiche studenti e verbali · l'iter completo</span></div>
+</section>
+
+<!-- 11 · Chi vede e riceve cosa -->
+<section class="slide">
+  <h2><span class="num">9</span>Chi fa cosa e chi riceve cosa</h2>
+  <p class="sotto">Ognuno vede solo ciò che gli serve: lo studente la sua pratica, il referente le sedute del suo consiglio, l'Ufficio didattico tutto.</p>
+  <table class="m">
+    <tr><th style="width:190px">Chi</th><th>Che cosa fa</th><th style="width:330px">Che cosa riceve</th></tr>
+    <tr><td><span class="pallino" style="background:var(--blu)"></span>Studente</td><td>Presenta la pratica, integra se richiesto, scarica la domanda e l'estratto del verbale</td><td>Email a ogni passaggio, richiesta di integrazione, esito della seduta con estratto in PDF</td></tr>
+    <tr><td><span class="pallino" style="background:var(--ambra)"></span>Ufficio protocollo</td><td>Protocolla le domande (numero, data, bollo)</td><td>Nuove pratiche da protocollare</td></tr>
+    <tr><td><span class="pallino" style="background:var(--viola)"></span>Ufficio del corso</td><td>Prende in carico, lavora, compila convalide e piani, porta in seduta</td><td>Pratiche del suo corso, messaggi degli studenti, promemoria sulle pratiche ferme</td></tr>
+    <tr><td><span class="pallino" style="background:var(--teal)"></span>Referente del consiglio</td><td>Gestisce le sedute: presenze, testi dei punti, decisioni, verbale</td><td>Cose in sospeso del consiglio, verbale firmato</td></tr>
+    <tr><td><span class="pallino" style="background:var(--notte)"></span>Segretario e coordinatore</td><td>Firmano il verbale in PAdES</td><td>Link personale per la firma e solleciti</td></tr>
+    <tr><td><span class="pallino" style="background:var(--ardesia)"></span>Segreteria studenti</td><td>Registra l'esito sulla carriera</td><td>Pratiche concluse con il verbale</td></tr>
+    <tr><td><span class="pallino" style="background:var(--rosso)"></span>Ufficio didattico (manager)</td><td>Smista, configura moduli, uffici e consigli</td><td>Scrivania con tutto ciò che aspetta</td></tr>
+  </table>
+  <div class="piede"><span>Pratiche studenti e verbali · l'iter completo</span></div>
+</section>
+
+<!-- 12 · Cosa c'è e cosa viene dopo -->
+<section class="slide">
+  <h2><span class="num">10</span>A che punto siamo e cosa viene dopo</h2>
+  <p class="sotto">L'iter descritto è già costruito, archivio e pagina pubblica compresi; resta da attivare la pagina pubblica (dopo il parere del DPO) e da semplificare la configurazione delle pratiche.</p>
+  <div class="griglia g3">
+    <div class="card verde"><div class="attore" style="color:var(--verde)">Già disponibile</div><ul><li>Moduli online con logica e anagrafi</li><li>Protocollo, uffici, iter e promemoria</li><li>Convalide e piani di studio</li><li>Consigli, convocazioni, presenze</li><li>Seduta guidata e decisioni</li><li><b>Verbale punto per punto in Word</b></li><li><b>Archivio dei verbali con ricerca</b></li><li>Firma PAdES e estratti agli studenti</li></ul></div>
+    <div class="card blu"><div class="attore" style="color:var(--blu)">Archivio dei verbali</div><ul><li>Un'unica pagina con tutti i verbali, nuovi e vecchi</li><li>Filtri per consiglio, anno accademico e tipo, e <b>ricerca nel testo</b> (anche nei PDF vecchi)</li><li>Verbali storici in PDF caricati a decine, anche da una cartella: data e numero dal nome del file</li><li>Ognuno vede i verbali del proprio consiglio; l'Ufficio didattico tutti</li></ul></div>
+    <div class="card ambra"><div class="attore" style="color:var(--ambra)">Verbali pubblici · da attivare</div><ul><li><b>Pagina con password</b> per gli esterni: solo i verbali firmati che l'Ufficio didattico sceglie di pubblicare, per i consigli e il periodo indicati</li><li>Dati personali: si pubblica una <b>versione con omissis</b> oppure si conferma che il PDF non ne contiene</li><li>Accessi registrati, password revocabili in qualsiasi momento</li><li>Prima di usarla va chiarita con il DPO</li></ul></div>
+  </div>
+  <div class="nota" style="margin-top:20px"><b>Da decidere insieme (con il DPO):</b> chi sono gli esterni, quali organi vedono, per quanto tempo restano accessibili i verbali, chi gestisce le password. Prossimo passo di sviluppo: la configurazione guidata delle pratiche.</div>
+  <div class="piede"><span>Pratiche studenti e verbali · l'iter completo</span></div>
+</section>
+
+</body>
+</html>

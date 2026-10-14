@@ -41,3 +41,6 @@ composer.lock
 *.tgz
 .php-cs-fixer.cache
 .phpunit.result.cache
+
+# Materiali di lavoro con dati personali (modelli e verbali veri): non versionare
+materiali/

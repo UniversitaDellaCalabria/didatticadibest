@@ -25,8 +25,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['prenota_risorsa'])) {
     elseif ((int)$r['chiede_motivo'] && trim((string)($_POST['motivo'] ?? '')) === '') { flash_set("Indica il motivo della prenotazione.", 'danger'); }
     elseif (!check_rate_limit($conn, 'prenota_risorsa', 30, 600)) { flash_set("Troppe richieste: riprova tra qualche minuto.", 'danger'); }
     else {
-        $esito = prenota_risorsa($conn, $r, $utente, (string)($_POST['inizio'] ?? ''), (int)($_POST['n_slot'] ?? 1), (string)($_POST['motivo'] ?? ''),
-                                 !empty($_POST['ripeti']) ? (string)($_POST['ripeti_fino'] ?? '') : null);
+        // Campi personalizzati della risorsa e quantità dei contatori (vedi admin: Risorse → «Campi della prenotazione» e «Contatori»)
+        $svc_campi = \App\Core\App::per($conn)->get(\App\Risorse\ServizioCampiRisorsa::class);
+        [$risposte_json, $err_campi] = $svc_campi->leggi($svc_campi->campi($r), $_POST);
+        $esito = $err_campi ? ['errore' => implode(' ', $err_campi), 'codici' => [], 'saltate' => [], 'stato' => '', 'serie' => null]
+            : prenota_risorsa($conn, $r, $utente, (string)($_POST['inizio'] ?? ''), (int)($_POST['n_slot'] ?? 1), (string)($_POST['motivo'] ?? ''),
+                              !empty($_POST['ripeti']) ? (string)($_POST['ripeti_fino'] ?? '') : null, ['quantita' => array_map('intval', (array)($_POST['qta'] ?? [])), 'risposte_json' => $risposte_json,
+                               'co_conducenti_json' => (int)$r['diario_attivo'] ? \App\Core\App::per($conn)->get(\App\Risorse\ServizioDiarioBordo::class)->coConducentiDaForm($_POST) : null]);
         if ($esito['errore']) flash_set($esito['errore'], 'danger');
         else {
             $pren = array_values(array_filter(array_map(fn($c) => prenotazione_risorsa($conn, $c), $esito['codici'])));
@@ -107,6 +112,22 @@ require_once 'header.php';
         <?php endif; ?>
     </div>
 
+    <?php $diari_dc = $utente ? \App\Core\App::per($conn)->get(\App\Risorse\ServizioDiarioBordo::class)->daCompilare($utente) : [];
+    $diari_dc = array_values(array_filter($diari_dc, fn($x) => in_array((int)$x['risorsa_id'], array_map(fn($rr) => (int)$rr['id'], $risorse), true)));
+    if ($diari_dc): ?>
+    <div class="card border-0 mb-4" style="border-radius: 12px; border-left: 5px solid #0369a1 !important; box-shadow: 0 1px 6px rgba(15,23,42,.08);">
+        <div class="card-body">
+            <h2 class="h6 fw-bold mb-2"><i class="fa fa-book-open me-1" style="color:#0369a1;" aria-hidden="true"></i>Diario di bordo da compilare</h2>
+            <ul class="list-unstyled mb-0 small">
+            <?php foreach ($diari_dc as $dd): ?>
+                <li class="d-flex flex-wrap align-items-center gap-2 py-1 border-bottom"><strong><?php echo $h(quando_risorsa($dd)); ?></strong> · <?php echo $h($dd['risorsa_nome']); ?>
+                    <a href="diario_bordo.php?c=<?php echo urlencode($dd['codice']); ?>" class="btn btn-sm btn-primary fw-bold ms-auto py-0">Compila il diario</a></li>
+            <?php endforeach; ?>
+            </ul>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <?php if ($mie): ?>
     <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;">
         <div class="card-body">
@@ -176,6 +197,8 @@ require_once 'header.php';
             $giorni[$d] = slot_risorsa($conn, $sel, $d);
         }
         $prec = strtotime('-7 days', $dal); $succ = strtotime('+7 days', $dal);
+        $contatori_f = \App\Core\App::per($conn)->get(\App\Risorse\ServizioContatoriRisorse::class)->riepilogo((int)$sel['id'], array_keys($giorni));
+        $campi_f = \App\Core\App::per($conn)->get(\App\Risorse\ServizioCampiRisorsa::class)->campi($sel);
     ?>
         <nav aria-label="Percorso" class="small mb-2"><a href="<?php echo $h($pagina_url); ?>" class="text-decoration-none"><i class="fa fa-arrow-left me-1" aria-hidden="true"></i>Tutte le risorse</a></nav>
         <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
@@ -230,6 +253,24 @@ require_once 'header.php';
                 <div class="col-md-4"><label class="form-label small fw-bold" for="prSlot">Durata</label><select class="form-select form-select-sm" name="n_slot" id="prSlot"></select></div>
                 <div class="col-md-8"><label class="form-label small fw-bold" for="prMotivo">Motivo<?php echo (int)$sel['chiede_motivo'] ? ' *' : ''; ?></label>
                     <input type="text" class="form-control form-control-sm" name="motivo" id="prMotivo" maxlength="500" placeholder="es. Esercitazione del corso di …, ricevimento per tesi"<?php echo (int)$sel['chiede_motivo'] ? ' required' : ''; ?>></div>
+                <?php foreach ($contatori_f as $ct): ?>
+                <div class="col-md-6 pr-contatore" data-id="<?php echo (int)$ct['id']; ?>">
+                    <label class="form-label small fw-bold" for="prQta<?php echo (int)$ct['id']; ?>"><?php echo $h($ct['nome'] . ($ct['unita'] !== '' ? ' (' . $ct['unita'] . ')' : '')); ?><?php echo $ct['obbligatorio'] ? ' *' : ''; ?></label>
+                    <input type="number" class="form-control form-control-sm" name="qta[<?php echo (int)$ct['id']; ?>]" id="prQta<?php echo (int)$ct['id']; ?>" min="0" step="1" inputmode="numeric"<?php echo $ct['obbligatorio'] ? ' required' : ''; ?>>
+                    <div class="form-text pr-resta" aria-live="polite"></div>
+                </div>
+                <?php endforeach; ?>
+                <?php if ((int)$sel['diario_attivo']): ?>
+                <div class="col-12">
+                    <div class="small fw-bold mb-1"><i class="fa fa-user-group me-1" aria-hidden="true"></i>Altri conducenti <span class="fw-normal text-secondary">(facoltativo: potranno compilare il diario di bordo)</span></div>
+                    <datalist id="dlConducenti"><?php foreach (\App\Core\App::per($conn)->get(\App\Risorse\ServizioDiarioBordo::class)->nominativi() as $nom_c): ?><option value="<?php echo $h($nom_c); ?>"><?php endforeach; ?></datalist>
+                    <div id="prConducenti" class="d-flex flex-column gap-1 mb-1"></div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="prAggConducente"><i class="fa fa-plus me-1" aria-hidden="true"></i>Aggiungi un conducente</button>
+                </div>
+                <?php endif; ?>
+                <?php if ($campi_f): ?>
+                <div class="col-12"><div class="row g-2"><?php echo html_datalist_didattica($conn, $campi_f); foreach ($campi_f as $c_f) echo html_campo_pratica($c_f, '', $conn, true); ?></div></div>
+                <?php endif; ?>
                 <?php if ((int)$sel['ripetizione']): ?>
                 <div class="col-12 d-flex flex-wrap align-items-center gap-2">
                     <div class="form-check m-0"><input class="form-check-input" type="checkbox" name="ripeti" value="1" id="prRip"><label class="form-check-label small" for="prRip">Ripeti ogni settimana fino al</label></div>
@@ -249,6 +290,29 @@ require_once 'header.php';
             var form = document.getElementById('formPrenRis'), max = <?php echo (int)$sel['max_slot']; ?>, durata = <?php echo (int)$sel['durata_slot']; ?>;
             var selSlot = document.getElementById('prSlot'), titolo = document.getElementById('prTitolo'), inizio = document.getElementById('prInizio');
             var giorni = <?php echo json_encode(array_map(fn($d) => GIORNI_SETTIMANA[(int)date('N', strtotime($d))] . ' ' . date('d/m/Y', strtotime($d)), array_combine(array_keys($giorni), array_keys($giorni)))); ?>;
+            var contatori = <?php echo json_encode($contatori_f, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
+            var inviaBtn = form.querySelector('button[name=prenota_risorsa]');
+            var btnCond = document.getElementById('prAggConducente');
+            if (btnCond) btnCond.addEventListener('click', function () {
+                var d = document.createElement('div'); d.className = 'd-flex gap-1';
+                d.innerHTML = '<input type="text" class="form-control form-control-sm" name="conducenti[]" list="dlConducenti" maxlength="150" placeholder="Cognome e nome (dall\'elenco del personale)" aria-label="Altro conducente" autocomplete="off"><button type="button" class="btn btn-sm btn-outline-danger" aria-label="Togli il conducente"><i class="fa fa-times" aria-hidden="true"></i></button>';
+                d.querySelector('button').addEventListener('click', function () { d.remove(); });
+                document.getElementById('prConducenti').appendChild(d); d.querySelector('input').focus();
+            });
+            // Quanti ne restano nel giorno scelto: limite del campo e avviso; senza abbastanza non si può inviare
+            function aggiornaContatori(giorno) {
+                var bloccato = false;
+                contatori.forEach(function (c) {
+                    var box = form.querySelector('.pr-contatore[data-id="' + c.id + '"]'), inp = box.querySelector('input'), msg = box.querySelector('.pr-resta');
+                    var resta = c.resta[giorno]; if (resta === undefined) resta = 0;
+                    var tetto = c.massimo !== null ? Math.min(c.massimo, resta) : resta;
+                    inp.max = tetto; inp.min = c.obbligatorio ? c.minimo : 0; if (inp.value && +inp.value > tetto) inp.value = tetto;
+                    var quando = c.modalita === 'periodo' ? (c.periodo === 'giorno' ? ' in questo giorno' : (c.periodo === 'settimana' ? ' in questa settimana' : ' in questo mese')) : ' in totale';
+                    if (resta < c.minimo && c.obbligatorio) { msg.textContent = 'Esaurito' + quando + ': non si può prenotare.'; msg.className = 'form-text pr-resta text-danger fw-bold'; bloccato = true; }
+                    else { msg.textContent = 'Ne restano ' + resta + quando + (c.massimo !== null ? ' (al massimo ' + c.massimo + ' per prenotazione)' : '') + '.'; msg.className = 'form-text pr-resta' + (resta <= c.minimo * 2 ? ' text-warning fw-bold' : ''); }
+                });
+                if (inviaBtn) inviaBtn.disabled = bloccato;
+            }
             function hhmm(s) { return s.substr(11, 5); }
             document.querySelectorAll('#settimana .slot-libero[data-inizio]').forEach(function (b) {
                 b.addEventListener('click', function () {
@@ -269,6 +333,7 @@ require_once 'header.php';
                         selSlot.appendChild(o);
                     });
                     inizio.value = b.dataset.inizio;
+                    aggiornaContatori(b.dataset.giorno);
                     titolo.textContent = 'Prenota: ' + (giorni[b.dataset.giorno] || '') + ', dalle ' + hhmm(b.dataset.inizio);
                     form.style.display = '';
                     form.scrollIntoView({ behavior: 'smooth', block: 'center' });

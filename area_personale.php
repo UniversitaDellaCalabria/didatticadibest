@@ -372,6 +372,22 @@ require_once 'header.php';
     <?php endif; endif; ?>
 
     <?php
+    // Risorse di cui l'utente è responsabile (scelto dall'admin dall'anagrafe): richieste da approvare e prenotazioni in arrivo
+    $mie_ris = \App\Core\App::per($conn)->get(\App\Risorse\ServizioResponsabiliRisorse::class)->risorseDi($user_info);
+    if ($mie_ris): $n_da_appr_r = array_sum(array_column($mie_ris, 'da_approvare')); $n_fut_r = array_sum(array_column($mie_ris, 'future')); ?>
+        <a href="risorse_responsabile.php" class="card border-0 shadow-sm mb-4 text-decoration-none" style="border-radius: 12px; border-left: 5px solid #0f766e !important;">
+            <div class="card-body d-flex align-items-center gap-3 flex-wrap">
+                <i class="fa fa-user-shield fs-3" style="color:#0f766e;" aria-hidden="true"></i>
+                <div class="flex-grow-1">
+                    <div class="fw-bold text-dark">Le mie risorse</div>
+                    <div class="small text-secondary"><?php echo count($mie_ris); ?> risorse di cui sei responsabile · <?php echo $n_da_appr_r ? '<strong>' . $n_da_appr_r . ' richieste da approvare</strong>' : 'nessuna richiesta da approvare'; ?> · <?php echo $n_fut_r; ?> prenotazioni in programma</div>
+                </div>
+                <span class="btn btn-sm fw-bold text-white" style="background:#0f766e;">Gestisci</span>
+            </div>
+        </a>
+    <?php endif; ?>
+
+    <?php
     // Pratiche della didattica (moduli online): collegamento a Le mie pratiche se l'utente ne ha
     $pr_rows = \App\Core\App::get(\App\Iscrizioni\AreaPersonaleRepository::class)->riepilogoPratiche((int)$_SESSION['utente_id']);
     if ($pr_rows && (int)$pr_rows['n'] > 0): ?>

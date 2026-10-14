@@ -30,7 +30,8 @@ final class ServizioFlussoConvalide implements FlussoPratica
         private EstrattoVerbale $estratto,
         private ConsiglioRepository $consigli,
         private SedutaRepository $sedute,
-        private DomandaPdfa $domanda
+        private DomandaPdfa $domanda,
+        private FirmaPratica $firme
     ) {
     }
 
@@ -166,6 +167,47 @@ final class ServizioFlussoConvalide implements FlussoPratica
             $this->db->esegui("UPDATE pratiche SET ufficio_id = ?, passo = 1 WHERE id = ?", [$primo, $id]);
             $this->storico->evento($id, 'passaggio', 'ufficio', 0, null, 'In carico a: ' . $this->uffici->tutti()[$primo]['nome'] . ' (da protocollare)');
         }
+        // Iter che comincia con una firma (es. il relatore firma prima del protocollo): la richiesta parte subito
+        if (in_array($primo, [Costanti::ITER_PERSONA, Costanti::ITER_DIRETTORE], true) && ($err = $this->firme->avvia($id, 1))) {
+            $this->storico->evento($id, 'messaggio', 'ufficio', 0, null, 'La firma non è partita: ' . $err, null, null, true);
+        }
+    }
+
+    /**
+     * Porta la pratica al passo dell'iter con indice $idx (0 = il primo): un ufficio (l'ufficio del corso e la segreteria si risolvono con la pratica)
+     * oppure una firma (persona indicata nel modulo, Direttore). Ritorna [errore, messaggio]: errore null = fatto.
+     *
+     * @return array{0: ?string, 1: string}
+     */
+    public function trasmettiAlPasso(int $id, int $idx, int $uid, string $autore_nome = ''): array
+    {
+        $p = $this->pratiche->perId($id);
+        $m = $p ? $this->moduli->perId((int)$p['modulo_id']) : null;
+        if (!$p || !$m) {
+            return ['Pratica non trovata.', ''];
+        }
+        $dopo = $this->iter->iter($m, $p)[$idx] ?? null;
+        if ($dopo === null) {
+            $this->firme->avvisaOperatori($p, 'Iter concluso: pratica ' . $p['codice'], '<p>La pratica <strong>' . htmlspecialchars((string)$p['codice']) . '</strong> ha concluso tutti i passi dell\'iter: puoi chiuderla.</p>');
+            return [null, "Non ci sono altri passi nell'iter: concludi la pratica."];
+        }
+        if (in_array($dopo, [Costanti::ITER_PERSONA, Costanti::ITER_DIRETTORE], true)) {
+            $err = $this->firme->avvia($id, $idx + 1);
+            return $err ? [$err, ''] : [null, 'La pratica è stata mandata alla firma.'];
+        }
+        $extra = [];
+        if ($dopo === Costanti::ITER_CDL) {
+            $dopo = $this->ufficioDelCorso(self::corsoPratica($p));
+            if (!$dopo) {
+                return ["Nessun ufficio di corso di studio ha il corso «" . (self::corsoPratica($p) ?: '—') . "»: assegna la pratica a mano (o indica i corsi nel consiglio).", ''];
+            }
+            $extra = ['cdl_id' => $dopo];
+        }
+        if ($dopo <= 0) {
+            return ["Il passo successivo (segreteria studenti) si sceglie con la pratica: assegnala a mano.", ''];
+        }
+        $this->assegnaAUfficio($id, $dopo, $idx + 1, $uid, $autore_nome, '', $extra);
+        return [null, 'La pratica è passata a «' . $this->uffici->tutti()[$dopo]['nome'] . '».'];
     }
 
     public function assegnaAUfficio(int $id, int $uff_id, int $passo, int $uid, string $autore_nome = '', string $nota = '', array $extra = [], bool $email_ufficio = true): void
@@ -254,6 +296,10 @@ final class ServizioFlussoConvalide implements FlussoPratica
         $dopo = $it[$pos + 1] ?? null;
         if ($dopo === null) {
             return [null, "Protocollo registrato."];
+        }
+        if (in_array($dopo, [Costanti::ITER_PERSONA, Costanti::ITER_DIRETTORE], true)) {
+            $err = $this->firme->avvia($id, $pos + 2);
+            return [null, $err ? "Protocollo registrato. La firma non è partita: " . $err : "Protocollo registrato: la pratica è stata mandata alla firma."];
         }
         $extra = [];
         if ($dopo === Costanti::ITER_CDL) {

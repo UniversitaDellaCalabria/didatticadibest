@@ -7,10 +7,16 @@ namespace Tests\Integration\Risorse;
 use App\Auth\ServizioUtenti;
 use App\Auth\UtenteRepository;
 use App\Core\Sito;
+use App\Risorse\ContatoreRisorsaRepository;
+use App\Risorse\DiarioBordoRepository;
 use App\Risorse\NotificheRisorse;
 use App\Risorse\PromemoriaPrenotazioni;
+use App\Risorse\ResponsabileRisorsaRepository;
 use App\Risorse\RisorsaRepository;
 use App\Risorse\ServizioAuleTurni;
+use App\Risorse\ScadenzaRisorsaRepository;
+use App\Risorse\ServizioContatoriRisorse;
+use App\Risorse\ServizioScadenzeRisorsa;
 use App\Risorse\ServizioGestioneRisorse;
 use App\Risorse\ServizioRisorse;
 use App\Risorse\StatisticheRisorse;
@@ -37,12 +43,18 @@ final class RisorseIntegrazioneTest extends DatabaseDiProva
             'risorse' => "CREATE TABLE risorse (id INT AUTO_INCREMENT PRIMARY KEY, pagina_id INT NOT NULL, nome VARCHAR(150) NOT NULL DEFAULT '', tipo VARCHAR(20) NOT NULL DEFAULT 'aula', descrizione TEXT NULL,
                 luogo VARCHAR(255) DEFAULT '', capienza INT NULL, referente VARCHAR(150) DEFAULT '', email_notifiche VARCHAR(500) DEFAULT '', durata_slot SMALLINT NOT NULL DEFAULT 60, max_slot TINYINT NOT NULL DEFAULT 2,
                 anticipo_ore SMALLINT NOT NULL DEFAULT 2, max_giorni SMALLINT NOT NULL DEFAULT 60, accesso VARCHAR(20) NOT NULL DEFAULT 'tutti', approvazione TINYINT NOT NULL DEFAULT 0, ripetizione TINYINT NOT NULL DEFAULT 0,
-                chiede_motivo TINYINT NOT NULL DEFAULT 1, attiva TINYINT NOT NULL DEFAULT 1, ordine INT NOT NULL DEFAULT 0, colore VARCHAR(7) NULL, persona_id VARCHAR(80) NULL, ufficio VARCHAR(20) NOT NULL DEFAULT '')",
+                chiede_motivo TINYINT NOT NULL DEFAULT 1, attiva TINYINT NOT NULL DEFAULT 1, ordine INT NOT NULL DEFAULT 0, colore VARCHAR(7) NULL, persona_id VARCHAR(80) NULL, ufficio VARCHAR(20) NOT NULL DEFAULT '', campi_json MEDIUMTEXT NULL, diario_attivo TINYINT NOT NULL DEFAULT 0, diario_blocca TINYINT NOT NULL DEFAULT 0, diario_json MEDIUMTEXT NULL)",
             'risorse_orari' => 'CREATE TABLE risorse_orari (id INT AUTO_INCREMENT PRIMARY KEY, risorsa_id INT NOT NULL, giorno TINYINT NOT NULL, dalle TIME NOT NULL, alle TIME NOT NULL)',
+            'risorse_responsabili' => "CREATE TABLE risorse_responsabili (id INT AUTO_INCREMENT PRIMARY KEY, risorsa_id INT NOT NULL, persona_id VARCHAR(80) NOT NULL, nominativo VARCHAR(200) NOT NULL DEFAULT '', email VARCHAR(150) NOT NULL DEFAULT '', riceve_notifiche TINYINT(1) NOT NULL DEFAULT 1, puo_approvare TINYINT(1) NOT NULL DEFAULT 1, creato_il DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY uq_risorsa_persona (risorsa_id, persona_id))",
+            'risorse_contatori' => "CREATE TABLE risorse_contatori (id INT AUTO_INCREMENT PRIMARY KEY, risorsa_id INT NOT NULL, nome VARCHAR(100) NOT NULL DEFAULT '', unita VARCHAR(30) DEFAULT '', modalita VARCHAR(10) NOT NULL DEFAULT 'periodo', capacita INT NOT NULL DEFAULT 0, periodo VARCHAR(10) NOT NULL DEFAULT 'giorno', minimo INT NOT NULL DEFAULT 1, massimo INT NULL, obbligatorio TINYINT NOT NULL DEFAULT 1, attivo TINYINT NOT NULL DEFAULT 1, ordine INT NOT NULL DEFAULT 0)",
+            'risorse_contatori_usi' => 'CREATE TABLE risorse_contatori_usi (id INT AUTO_INCREMENT PRIMARY KEY, contatore_id INT NOT NULL, prenotazione_id INT NOT NULL, quantita INT NOT NULL DEFAULT 0, data DATE NOT NULL, UNIQUE KEY uq (contatore_id, prenotazione_id))',
+            'risorse_contatori_movimenti' => "CREATE TABLE risorse_contatori_movimenti (id INT AUTO_INCREMENT PRIMARY KEY, contatore_id INT NOT NULL, quantita INT NOT NULL DEFAULT 0, nota VARCHAR(255) DEFAULT '', autore VARCHAR(150) DEFAULT '', creato_il DATETIME DEFAULT CURRENT_TIMESTAMP)",
+            'risorse_diario' => "CREATE TABLE risorse_diario (id INT AUTO_INCREMENT PRIMARY KEY, risorsa_id INT NOT NULL, prenotazione_id INT NOT NULL, data DATE NULL, conducente VARCHAR(200) DEFAULT '', km_iniziali INT NULL, km_finali INT NULL, km_percorsi INT NULL, litri DECIMAL(8,2) NULL, valori_json MEDIUMTEXT NULL, compilato_da VARCHAR(200) DEFAULT '', compilato_il DATETIME DEFAULT CURRENT_TIMESTAMP, modificato_il DATETIME NULL, verificato_da VARCHAR(200) DEFAULT '', verificato_il DATETIME NULL, UNIQUE KEY uq (prenotazione_id))",
+            'risorse_scadenze' => "CREATE TABLE risorse_scadenze (id INT AUTO_INCREMENT PRIMARY KEY, risorsa_id INT NOT NULL, nome VARCHAR(100) NOT NULL DEFAULT '', scade_il DATE NOT NULL, preavviso_giorni SMALLINT NOT NULL DEFAULT 30, note VARCHAR(255) DEFAULT '', avviso_il DATETIME NULL, avviso_scaduta_il DATETIME NULL)",
             'risorse_chiusure' => "CREATE TABLE risorse_chiusure (id INT AUTO_INCREMENT PRIMARY KEY, pagina_id INT NOT NULL, risorsa_id INT NULL, dal DATE NOT NULL, al DATE NOT NULL, motivo VARCHAR(255) DEFAULT '')",
             'prenotazioni_risorse' => "CREATE TABLE prenotazioni_risorse (id INT AUTO_INCREMENT PRIMARY KEY, risorsa_id INT NOT NULL, utente_id INT NULL, nome VARCHAR(100) DEFAULT '', cognome VARCHAR(100) DEFAULT '',
                 email VARCHAR(255) DEFAULT '', inizio DATETIME NOT NULL, fine DATETIME NOT NULL, motivo VARCHAR(500) DEFAULT '', stato VARCHAR(20) NOT NULL DEFAULT 'confermata', serie VARCHAR(12) NULL,
-                codice VARCHAR(20) NOT NULL, nota_gestore VARCHAR(500) DEFAULT '', promemoria_inviato TINYINT NOT NULL DEFAULT 0, creata_il DATETIME DEFAULT CURRENT_TIMESTAMP, turno_id INT NULL, UNIQUE KEY uq (codice))",
+                codice VARCHAR(20) NOT NULL, nota_gestore VARCHAR(500) DEFAULT '', promemoria_inviato TINYINT NOT NULL DEFAULT 0, creata_il DATETIME DEFAULT CURRENT_TIMESTAMP, turno_id INT NULL, risposte_json MEDIUMTEXT NULL, co_conducenti_json TEXT NULL, diario_promemoria_il DATETIME NULL, UNIQUE KEY uq (codice))",
             'turni' => 'CREATE TABLE turni (id INT AUTO_INCREMENT PRIMARY KEY, evento_id INT, nome_turno VARCHAR(150) NULL, data_turno DATE NULL, orario_inizio TIME NULL, orario_fine TIME NULL, risorsa_id INT NULL)',
             'eventi' => "CREATE TABLE eventi (id INT AUTO_INCREMENT PRIMARY KEY, titolo VARCHAR(150) DEFAULT '')",
         ];
@@ -53,8 +65,8 @@ final class RisorseIntegrazioneTest extends DatabaseDiProva
         parent::setUp();
         $this->repo = new RisorsaRepository($this->db);
         $this->mailer = new MailerFinto();
-        $this->notifiche = new NotificheRisorse($this->repo, new ServizioUtenti(new UtenteRepository($this->db)), $this->mailer, new Sito(sys_get_temp_dir(), 'https://portale.test/eventi'));
-        $this->servizio = new ServizioRisorse($this->repo, $this->notifiche, new OrologioFisso('2026-10-05 08:00:00'));
+        $this->notifiche = new NotificheRisorse($this->repo, new ServizioUtenti(new UtenteRepository($this->db)), $this->mailer, new Sito(sys_get_temp_dir(), 'https://portale.test/eventi'), new ResponsabileRisorsaRepository($this->db), new ContatoreRisorsaRepository($this->db));
+        $this->servizio = new ServizioRisorse($this->repo, $this->notifiche, new OrologioFisso('2026-10-05 08:00:00'), new ServizioContatoriRisorse(new ContatoreRisorsaRepository($this->db)), new DiarioBordoRepository($this->db));
         $this->db->esegui("INSERT INTO pagine_eventi (id, slug, titolo, colore_primario, gestore_utente_id) VALUES (1, 'aule', 'AULE', '#112233', 2)");
         $this->db->esegui("INSERT INTO ruoli (id, nome) VALUES (1, 'Super Amministratore'), (2, 'Gestore'), (3, 'Studente'), (4, 'Docente/Dipendente'), (5, 'Ospite'), (6, 'Docenti'), (7, 'Personale tecnico amministrativo'), (8, 'Altro personale di Ateneo')");
         $this->db->esegui("INSERT INTO utenti (id, nome, cognome, email, ruolo_id, ruoli_secondari) VALUES
@@ -431,7 +443,7 @@ final class RisorseIntegrazioneTest extends DatabaseDiProva
 
         // promemoria: confermate che iniziano tra 1 e 24 ore e non l'hanno già avuto (qui solo RS-0001, a +2 ore)
         $this->db->esegui("UPDATE prenotazioni_risorse SET email = '' WHERE codice = 'RS-0003'");
-        $pr = new PromemoriaPrenotazioni($this->repo, $this->notifiche);
+        $pr = new PromemoriaPrenotazioni($this->repo, $this->notifiche, new DiarioBordoRepository($this->db), new ServizioScadenzeRisorsa(new ScadenzaRisorsaRepository($this->db)));
         self::assertSame(1, $pr->inviaPromemoria());
         self::assertSame('x@x.it', $this->mailer->inviate[0]['a']);
         self::assertSame('Promemoria: prenotazione di domani: A', $this->mailer->inviate[0]['oggetto']);

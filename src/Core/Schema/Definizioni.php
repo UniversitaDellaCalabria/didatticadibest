@@ -192,6 +192,67 @@ final class Definizioni
             ordine INT NOT NULL DEFAULT 0, stato VARCHAR(2) NOT NULL DEFAULT 'P', PRIMARY KEY (seduta_id, componente_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         // v38: chi ha avuto in carico la pratica (anche dopo il passaggio all'ufficio successivo continua a vederla e a integrarla)
+        // v62: scadenze delle risorse (bollo, assicurazione, tagliando, revisione di un'auto; taratura di uno strumento…): il responsabile riceve un avviso
+        // prima della data e il giorno della scadenza se non è stata rinnovata
+        'risorse_scadenze' => "CREATE TABLE IF NOT EXISTS risorse_scadenze (
+            id INT AUTO_INCREMENT PRIMARY KEY, risorsa_id INT NOT NULL, nome VARCHAR(100) NOT NULL DEFAULT '', scade_il DATE NOT NULL, preavviso_giorni SMALLINT NOT NULL DEFAULT 30,
+            note VARCHAR(255) DEFAULT '', avviso_il DATETIME DEFAULT NULL, avviso_scaduta_il DATETIME DEFAULT NULL, INDEX idx_risorsa (risorsa_id), INDEX idx_data (scade_il)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        // v61: diario di bordo (auto e mezzi): un diario per prenotazione, compilato da chi ha prenotato, dagli altri conducenti o dal responsabile
+        'risorse_diario' => "CREATE TABLE IF NOT EXISTS risorse_diario (
+            id INT AUTO_INCREMENT PRIMARY KEY, risorsa_id INT NOT NULL, prenotazione_id INT NOT NULL, data DATE DEFAULT NULL, conducente VARCHAR(200) DEFAULT '',
+            km_iniziali INT DEFAULT NULL, km_finali INT DEFAULT NULL, km_percorsi INT DEFAULT NULL, litri DECIMAL(8,2) DEFAULT NULL, valori_json MEDIUMTEXT DEFAULT NULL,
+            compilato_da VARCHAR(200) DEFAULT '', compilato_il DATETIME DEFAULT CURRENT_TIMESTAMP, modificato_il DATETIME DEFAULT NULL,
+            verificato_da VARCHAR(200) DEFAULT '', verificato_il DATETIME DEFAULT NULL,
+            UNIQUE KEY uq_prenotazione (prenotazione_id), INDEX idx_risorsa (risorsa_id, data)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        // v60: contatori delle risorse (quantità prenotabili, es. i campioni di un laboratorio): «periodo» = capacità per giorno / settimana / mese,
+        // «scorta» = quantità che si consuma e si ricarica con i movimenti; gli usi sono le quantità delle prenotazioni (contano solo se confermate o da approvare)
+        'risorse_contatori' => "CREATE TABLE IF NOT EXISTS risorse_contatori (
+            id INT AUTO_INCREMENT PRIMARY KEY, risorsa_id INT NOT NULL, nome VARCHAR(100) NOT NULL DEFAULT '', unita VARCHAR(30) DEFAULT '',
+            modalita VARCHAR(10) NOT NULL DEFAULT 'periodo', capacita INT NOT NULL DEFAULT 0, periodo VARCHAR(10) NOT NULL DEFAULT 'giorno',
+            minimo INT NOT NULL DEFAULT 1, massimo INT DEFAULT NULL, obbligatorio TINYINT(1) NOT NULL DEFAULT 1, attivo TINYINT(1) NOT NULL DEFAULT 1,
+            ordine INT NOT NULL DEFAULT 0, INDEX idx_risorsa (risorsa_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        'risorse_contatori_usi' => "CREATE TABLE IF NOT EXISTS risorse_contatori_usi (
+            id INT AUTO_INCREMENT PRIMARY KEY, contatore_id INT NOT NULL, prenotazione_id INT NOT NULL, quantita INT NOT NULL DEFAULT 0, data DATE NOT NULL,
+            UNIQUE KEY uq_cont_pren (contatore_id, prenotazione_id), INDEX idx_data (contatore_id, data), INDEX idx_pren (prenotazione_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        'risorse_contatori_movimenti' => "CREATE TABLE IF NOT EXISTS risorse_contatori_movimenti (
+            id INT AUTO_INCREMENT PRIMARY KEY, contatore_id INT NOT NULL, quantita INT NOT NULL DEFAULT 0, nota VARCHAR(255) DEFAULT '', autore VARCHAR(150) DEFAULT '',
+            creato_il DATETIME DEFAULT CURRENT_TIMESTAMP, INDEX idx_contatore (contatore_id, creato_il)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        // v59: responsabili delle risorse (persone dell'anagrafe di Ateneo scelte dall'admin): ricevono le richieste e, se abilitati, le approvano
+        'risorse_responsabili' => "CREATE TABLE IF NOT EXISTS risorse_responsabili (
+            id INT AUTO_INCREMENT PRIMARY KEY, risorsa_id INT NOT NULL, persona_id VARCHAR(80) NOT NULL, nominativo VARCHAR(200) NOT NULL DEFAULT '',
+            email VARCHAR(150) NOT NULL DEFAULT '', riceve_notifiche TINYINT(1) NOT NULL DEFAULT 1, puo_approvare TINYINT(1) NOT NULL DEFAULT 1,
+            creato_il DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY uq_risorsa_persona (risorsa_id, persona_id), INDEX idx_email (email)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        // v58: firme richieste durante l'iter di una pratica: di una persona indicata nel modulo (es. il relatore) o del Direttore (link personale per
+        // email, firma PAdES con Aruba o PDF caricato); stato: attesa | firmata | rifiutata | annullata
+        'pratiche_firme' => "CREATE TABLE IF NOT EXISTS pratiche_firme (
+            id INT AUTO_INCREMENT PRIMARY KEY, pratica_id INT NOT NULL, passo TINYINT NOT NULL DEFAULT 0, tipo VARCHAR(10) NOT NULL DEFAULT 'persona',
+            nome VARCHAR(200) NOT NULL DEFAULT '', email VARCHAR(150) NOT NULL DEFAULT '', token VARCHAR(40) NOT NULL, stato VARCHAR(10) NOT NULL DEFAULT 'attesa',
+            file_origine VARCHAR(255) DEFAULT NULL, file_firmato VARCHAR(255) DEFAULT NULL, richiesta_il DATETIME DEFAULT CURRENT_TIMESTAMP, firmata_il DATETIME DEFAULT NULL,
+            firmato_da VARCHAR(200) DEFAULT '', motivo VARCHAR(500) DEFAULT '', solleciti TINYINT NOT NULL DEFAULT 0, sollecito_il DATETIME DEFAULT NULL,
+            UNIQUE KEY uq_token (token), INDEX idx_pratica (pratica_id, stato)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        // v57: pagina pubblica dei verbali con password: accessi (una password per gruppo di esterni, con i consigli che possono vedere e la scadenza)
+        // e registro di chi è entrato e cosa ha scaricato (IP con l'ultimo numero azzerato)
+        'verbali_accessi' => "CREATE TABLE IF NOT EXISTS verbali_accessi (
+            id INT AUTO_INCREMENT PRIMARY KEY, etichetta VARCHAR(150) NOT NULL DEFAULT '', password_hash VARCHAR(255) NOT NULL DEFAULT '', ambiti_json TEXT DEFAULT NULL,
+            scade_il DATE DEFAULT NULL, attivo TINYINT(1) NOT NULL DEFAULT 1, creato_il DATETIME DEFAULT CURRENT_TIMESTAMP, creato_da VARCHAR(150) DEFAULT '',
+            ultimo_accesso_il DATETIME DEFAULT NULL, n_accessi INT NOT NULL DEFAULT 0
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        'verbali_accessi_log' => "CREATE TABLE IF NOT EXISTS verbali_accessi_log (
+            id INT AUTO_INCREMENT PRIMARY KEY, accesso_id INT DEFAULT NULL, azione VARCHAR(20) NOT NULL DEFAULT '', seduta_id INT DEFAULT NULL, ip VARCHAR(45) DEFAULT '',
+            creato_il DATETIME DEFAULT CURRENT_TIMESTAMP, INDEX idx_accesso (accesso_id, creato_il), INDEX idx_data (creato_il)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        // v55: punti dell'ordine del giorno di una seduta con il testo scritto per il verbale (tipo: testo | pratiche = qui vanno le pratiche portate in seduta)
+        'didattica_sedute_punti' => "CREATE TABLE IF NOT EXISTS didattica_sedute_punti (
+            id INT AUTO_INCREMENT PRIMARY KEY, seduta_id INT NOT NULL, ordine INT NOT NULL DEFAULT 0, titolo VARCHAR(500) NOT NULL DEFAULT '',
+            tipo VARCHAR(10) NOT NULL DEFAULT 'testo', testo MEDIUMTEXT DEFAULT NULL, INDEX idx_seduta (seduta_id, ordine)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         'pratiche_operatori' => "CREATE TABLE IF NOT EXISTS pratiche_operatori (
             pratica_id INT NOT NULL, operatore_id INT NOT NULL, passo TINYINT NOT NULL DEFAULT 0, dal DATETIME DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (pratica_id, operatore_id), INDEX idx_operatore (operatore_id)
@@ -332,10 +393,18 @@ final class Definizioni
             'persona_id' => "ADD COLUMN persona_id VARCHAR(80) DEFAULT NULL, ADD INDEX idx_persona (persona_id)",
             // v35: sportello di un ufficio (es. 'didattica'): lo gestiscono gli operatori dell'ufficio
             'ufficio'    => "ADD COLUMN ufficio VARCHAR(20) NOT NULL DEFAULT ''",
+            // v60: campi personalizzati del modulo di prenotazione (stesso formato dei moduli della didattica)
+            'campi_json' => "ADD COLUMN campi_json MEDIUMTEXT DEFAULT NULL",
+            // v61: diario di bordo (da compilare dopo l'uso), opzione «blocca le nuove prenotazioni a chi non l'ha compilato» e campi del diario (JSON)
+            'diario_attivo'  => "ADD COLUMN diario_attivo TINYINT(1) NOT NULL DEFAULT 0",
+            'diario_blocca'  => "ADD COLUMN diario_blocca TINYINT(1) NOT NULL DEFAULT 0",
+            'diario_json'    => "ADD COLUMN diario_json MEDIUMTEXT DEFAULT NULL",
         ],
         'pratiche' => [
             // v35: seduta del Consiglio a cui va la pratica, testo della delibera per il verbale, campi compilati dall'ufficio
             'seduta_id'    => "ADD COLUMN seduta_id INT DEFAULT NULL, ADD INDEX idx_seduta (seduta_id)",
+            // v55: punto dell'ordine del giorno sotto cui la pratica compare nel verbale (vuoto = il primo punto «pratiche»)
+            'punto_id'     => "ADD COLUMN punto_id INT DEFAULT NULL",
             'delibera'     => "ADD COLUMN delibera TEXT DEFAULT NULL",
             'ufficio_json' => "ADD COLUMN ufficio_json MEDIUMTEXT DEFAULT NULL",
             // v36: chi ha in carico la pratica, passo dell'iter, integrazione richiesta allo studente (documenti o autodichiarazione)
@@ -385,6 +454,18 @@ final class Definizioni
             'verbale_firmato_il'    => "ADD COLUMN verbale_firmato_il DATETIME DEFAULT NULL",
             'verbale_sollecito_il'  => "ADD COLUMN verbale_sollecito_il DATETIME DEFAULT NULL",
             'verbale_solleciti'     => "ADD COLUMN verbale_solleciti TINYINT NOT NULL DEFAULT 0",
+            // v55: numero del verbale (nell'intestazione del Word)
+            'numero_verbale'        => "ADD COLUMN numero_verbale VARCHAR(10) NOT NULL DEFAULT ''",
+            // v56: archivio dei verbali: sedute del portale o verbali vecchi importati (PDF), testo del PDF per la ricerca, impronta del file (niente doppioni)
+            'origine'               => "ADD COLUMN origine VARCHAR(10) NOT NULL DEFAULT 'portale', ADD INDEX idx_origine (origine)",
+            'testo_ricerca'         => "ADD COLUMN testo_ricerca MEDIUMTEXT DEFAULT NULL",
+            'file_hash'             => "ADD COLUMN file_hash VARCHAR(40) DEFAULT NULL, ADD INDEX idx_hash (file_hash)",
+            'nome_originale'        => "ADD COLUMN nome_originale VARCHAR(255) NOT NULL DEFAULT ''",
+            // v57: verbale visibile nella pagina pubblica con password (solo firmato o importato); eventuale versione con omissis al posto del PDF firmato
+            'pubblicabile'          => "ADD COLUMN pubblicabile TINYINT(1) NOT NULL DEFAULT 0",
+            'verbale_pubblico_pdf'  => "ADD COLUMN verbale_pubblico_pdf VARCHAR(255) DEFAULT NULL",
+            'pubblicato_il'         => "ADD COLUMN pubblicato_il DATETIME DEFAULT NULL",
+            'pubblicato_da'         => "ADD COLUMN pubblicato_da VARCHAR(150) NOT NULL DEFAULT ''",
         ],
         'tutorato_bandi' => [
             // v53: ufficio di Ateneo che paga i tutor di questo bando e i tre decreti in PDF (bando, commissione, approvazione atti)
@@ -493,10 +574,17 @@ final class Definizioni
             // v42: modulo creato dal portale (chiave) e domanda in PDF/A da protocollare (destinatario, testo dopo «CHIEDE»)
             'chiave'       => "ADD COLUMN chiave VARCHAR(40) DEFAULT NULL",
             'domanda_json' => "ADD COLUMN domanda_json TEXT DEFAULT NULL",
+            // v58: la pratica passa dal verbale del Consiglio (1) oppure si chiude senza seduta, come certificati e attestati (0)
+            'in_verbale'   => "ADD COLUMN in_verbale TINYINT(1) NOT NULL DEFAULT 1",
         ],
         'prenotazioni_risorse' => [
             // v33: prenotazione creata dal turno di un evento (aula collegata): si aggiorna con il turno
             'turno_id' => "ADD COLUMN turno_id INT DEFAULT NULL, ADD INDEX idx_turno (turno_id)",
+            // v60: risposte ai campi personalizzati della risorsa
+            'risposte_json' => "ADD COLUMN risposte_json MEDIUMTEXT DEFAULT NULL",
+            // v61: altri conducenti indicati da chi prenota e promemoria del diario di bordo
+            'co_conducenti_json'  => "ADD COLUMN co_conducenti_json TEXT DEFAULT NULL",
+            'diario_promemoria_il' => "ADD COLUMN diario_promemoria_il DATETIME DEFAULT NULL",
         ],
         'sondaggi_domande' => [
             'condizione_json' => "ADD COLUMN condizione_json TEXT NULL",

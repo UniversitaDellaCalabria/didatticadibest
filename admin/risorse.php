@@ -12,6 +12,12 @@ $torna = fn(string $qs = '') => print("<script>window.location.replace(" . json_
 $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
 $ora_ok = fn($t) => preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', (string)$t) ? $t . ':00' : null;
 
+// ── Diario di bordo: esportazione Excel ──
+if (isset($_GET['diario_xlsx']) && ($r_x = risorsa($conn, (int)$_GET['diario_xlsx'])) && (int)$r_x['pagina_id'] === (int)$filtro_p) {
+    $f_x = \App\Core\App::per($conn)->get(\App\Risorse\ServizioDiarioBordo::class)->esporta($r_x);
+    if ($f_x) { while (ob_get_level() > 0) ob_end_clean(); invia_file_scaricabile($f_x, 'Diario_di_bordo_' . preg_replace('/[^A-Za-z0-9]+/', '_', (string)$r_x['nome']) . '_' . date('Ymd') . '.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); }
+}
+
 // ── Salvataggio della risorsa ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['salva_risorsa'])) {
     csrf_verify($_POST['csrf_token'] ?? '');
@@ -72,6 +78,99 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['elimina_risorsa'])) {
         }
     }
     $torna(); exit;
+}
+
+// ── Responsabili della risorsa (persone dell'anagrafe di Ateneo) ──
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['aggiungi_responsabile']) || isset($_POST['salva_responsabili']) || isset($_POST['togli_responsabile']))) {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    $svc_resp = \App\Core\App::per($conn)->get(\App\Risorse\ServizioResponsabiliRisorse::class);
+    $rid = (int)($_POST['risorsa_id'] ?? 0);
+    $r_resp = $rid ? risorsa($conn, $rid) : null;
+    if (!$r_resp || (int)$r_resp['pagina_id'] !== (int)$filtro_p) { flash_set("Risorsa non trovata.", 'danger'); $torna(); exit; }
+    if (isset($_POST['aggiungi_responsabile'])) {
+        $err = $svc_resp->aggiungi($rid, (string)($_POST['persona_id'] ?? ''));
+        if (!$err) registra_log_audit($conn, "Risorsa: responsabile aggiunto", ["Risorsa" => $r_resp['nome'], "Persona" => $_POST['persona_id'] ?? '']);
+        flash_set($err ?? "Responsabile aggiunto: riceve le richieste e le gestisce da «Le mie risorse» nella sua Area personale.", $err ? 'danger' : 'success');
+    } elseif (isset($_POST['togli_responsabile'])) {
+        $x = $svc_resp->perId((int)$_POST['togli_responsabile']);
+        if ($x && (int)$x['risorsa_id'] === $rid) { $svc_resp->togli((int)$x['id']); registra_log_audit($conn, "Risorsa: responsabile tolto", ["Risorsa" => $r_resp['nome'], "Persona" => $x['nominativo']]); }
+        flash_set("Responsabile tolto.", 'warning');
+    } else {
+        foreach ($svc_resp->elenco($rid) as $x) $svc_resp->imposta((int)$x['id'], !empty($_POST['notifiche'][$x['id']]), !empty($_POST['approva'][$x['id']]));
+        flash_set("Permessi dei responsabili salvati.");
+    }
+    $torna("&modifica=$rid#responsabili"); exit;
+}
+
+// ── Campi della prenotazione e contatori (quantità prenotabili) ──
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && array_intersect(array_keys($_POST), ['salva_scadenza', 'elimina_scadenza', 'rinnova_scadenza'])) {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    $rid = (int)($_POST['risorsa_id'] ?? 0);
+    $r_c = $rid ? risorsa($conn, $rid) : null;
+    if (!$r_c || (int)$r_c['pagina_id'] !== (int)$filtro_p) { flash_set("Risorsa non trovata.", 'danger'); $torna(); exit; }
+    $scad_svc = \App\Core\App::per($conn)->get(\App\Risorse\ServizioScadenzeRisorsa::class);
+    if (isset($_POST['salva_scadenza'])) {
+        [$err] = $scad_svc->salva($rid, (int)($_POST['scadenza_id'] ?? 0), $_POST);
+        if (!$err) registra_log_audit($conn, "Risorsa: scadenza salvata", ["Risorsa" => $r_c['nome'], "Scadenza" => $_POST['nome'] ?? '']);
+        flash_set($err ?? "Scadenza salvata: il responsabile riceve un avviso prima della data.", $err ? 'danger' : 'success');
+    } elseif (isset($_POST['rinnova_scadenza'])) {
+        $err = $scad_svc->rinnova($rid, (int)$_POST['rinnova_scadenza'], (string)($_POST['nuova_data'] ?? ''));
+        flash_set($err ?? "Scadenza rinnovata.", $err ? 'danger' : 'success');
+    } else {
+        $scad_svc->elimina($rid, (int)$_POST['elimina_scadenza']);
+        flash_set("Scadenza eliminata.", 'warning');
+    }
+    $torna("&modifica=$rid#scadenze"); exit;
+}
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['salva_diario_risorsa'])) {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    $rid = (int)($_POST['risorsa_id'] ?? 0);
+    $r_c = $rid ? risorsa($conn, $rid) : null;
+    if (!$r_c || (int)$r_c['pagina_id'] !== (int)$filtro_p) { flash_set("Risorsa non trovata.", 'danger'); $torna(); exit; }
+    \App\Core\App::per($conn)->get(\App\Risorse\ServizioDiarioBordo::class)->salvaConfigurazione($rid, $_POST, \App\Core\App::per($conn)->get(\App\Risorse\ServizioCampiRisorsa::class));
+    registra_log_audit($conn, "Risorsa: diario di bordo configurato", ["Risorsa" => $r_c['nome'], "Attivo" => !empty($_POST['diario_attivo']) ? 'sì' : 'no']);
+    flash_set(!empty($_POST['diario_attivo']) ? "Diario di bordo salvato: chi usa il mezzo lo compila dalle sue prenotazioni." : "Diario di bordo salvato (non attivo).");
+    $torna("&modifica=$rid#diario"); exit;
+}
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && array_intersect(array_keys($_POST), ['salva_campi_risorsa', 'copia_campi_risorsa', 'salva_contatore', 'elimina_contatore', 'movimento_contatore'])) {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    $rid = (int)($_POST['risorsa_id'] ?? 0);
+    $r_c = $rid ? risorsa($conn, $rid) : null;
+    if (!$r_c || (int)$r_c['pagina_id'] !== (int)$filtro_p) { flash_set("Risorsa non trovata.", 'danger'); $torna(); exit; }
+    $campi_svc = \App\Core\App::per($conn)->get(\App\Risorse\ServizioCampiRisorsa::class);
+    $cont_svc = \App\Core\App::per($conn)->get(\App\Risorse\ServizioContatoriRisorse::class);
+    $autore_r = trim(($utente_admin['nome'] ?? '') . ' ' . ($utente_admin['cognome'] ?? '')) ?: 'Admin';
+    if (isset($_POST['salva_campi_risorsa'])) {
+        $campi_svc->salva($rid, $_POST);
+        registra_log_audit($conn, "Risorsa: campi della prenotazione salvati", ["Risorsa" => $r_c['nome']]);
+        flash_set("Campi della prenotazione salvati: compaiono nel modulo di prenotazione.");
+        $torna("&modifica=$rid#campi"); exit;
+    }
+    if (isset($_POST['copia_campi_risorsa'])) {
+        $ok = $campi_svc->copiaDa($rid, (int)($_POST['da_risorsa'] ?? 0));
+        flash_set($ok ? "Campi copiati: controllali e ritocca quello che cambia." : "L'altra risorsa non ha campi da copiare.", $ok ? 'success' : 'warning');
+        $torna("&modifica=$rid#campi"); exit;
+    }
+    if (isset($_POST['salva_contatore'])) {
+        $cid = (int)($_POST['contatore_id'] ?? 0);
+        if ($cid && (!($c_old = $cont_svc->perId($cid)) || (int)$c_old['risorsa_id'] !== $rid)) { flash_set("Contatore non trovato.", 'danger'); $torna("&modifica=$rid#contatori"); exit; }
+        [$err, $cid] = $cont_svc->salva($rid, $cid, $_POST, $autore_r);
+        if (!$err) registra_log_audit($conn, "Risorsa: contatore salvato", ["Risorsa" => $r_c['nome'], "Contatore" => $_POST['nome'] ?? '']);
+        flash_set($err ?? "Contatore salvato.", $err ? 'danger' : 'success');
+        $torna("&modifica=$rid#contatori"); exit;
+    }
+    $cid = (int)($_POST['elimina_contatore'] ?? $_POST['contatore_id'] ?? 0);
+    $c_x = $cid ? $cont_svc->perId($cid) : null;
+    if (!$c_x || (int)$c_x['risorsa_id'] !== $rid) { flash_set("Contatore non trovato.", 'danger'); $torna("&modifica=$rid#contatori"); exit; }
+    if (isset($_POST['elimina_contatore'])) {
+        $cont_svc->elimina($cid);
+        registra_log_audit($conn, "Risorsa: contatore eliminato", ["Risorsa" => $r_c['nome'], "Contatore" => $c_x['nome']]);
+        flash_set("Contatore eliminato con le sue quantità prenotate.", 'warning');
+    } else {
+        $err = $cont_svc->movimento($cid, (int)($_POST['quantita'] ?? 0), mb_substr(trim((string)($_POST['nota'] ?? '')), 0, 255), $autore_r);
+        flash_set($err ?? "Movimento registrato.", $err ? 'danger' : 'success');
+    }
+    $torna("&modifica=$rid#contatori"); exit;
 }
 
 // ── Chiusure ──
@@ -183,6 +282,254 @@ $url_pub = '../' . $page_cfg['slug'] . '.php';
         <?php if ($risorse): ?><a href="risorse.php?p_id=<?php echo $filtro_p; ?>" class="btn btn-outline-secondary">Annulla</a><?php endif; ?>
     </div>
 </form>
+<?php endif; ?>
+
+<?php if ($modifica):
+    $svc_resp = \App\Core\App::per($conn)->get(\App\Risorse\ServizioResponsabiliRisorse::class); $resp_r = $svc_resp->elenco((int)$modifica['id']); ?>
+<div class="card border-0 shadow-sm mb-4" id="responsabili" style="border-left:4px solid #0f766e !important;"><div class="card-body">
+    <h6 class="fw-bold mb-1"><i class="fa fa-user-shield me-1 text-success" aria-hidden="true"></i>Chi se ne occupa</h6>
+    <p class="small text-secondary mb-3">I responsabili si scelgono dall'anagrafe di Ateneo. Ricevono un'email a ogni richiesta e vedono solo questa risorsa (e le altre di cui sono responsabili) in <strong>«Le mie risorse»</strong>, nella loro Area personale: non serve abilitarli al pannello. Se la risorsa richiede approvazione, i responsabili abilitati accettano o rifiutano le richieste.</p>
+    <?php if ($resp_r): ?>
+    <form method="POST" class="mb-3"><?php csrf_field(); ?><input type="hidden" name="risorsa_id" value="<?php echo (int)$modifica['id']; ?>">
+        <div class="table-responsive"><table class="table table-sm align-middle small mb-2">
+            <thead class="table-light"><tr><th>Responsabile</th><th class="text-center">Riceve le email</th><th class="text-center">Approva e rifiuta</th><th style="width:40px;"></th></tr></thead><tbody>
+            <?php foreach ($resp_r as $x): ?>
+                <tr><td><strong><?php echo $h($x['nominativo']); ?></strong><div class="text-secondary"><?php echo $h($x['email']); ?></div></td>
+                    <td class="text-center"><input class="form-check-input" type="checkbox" name="notifiche[<?php echo (int)$x['id']; ?>]" value="1"<?php echo (int)$x['riceve_notifiche'] ? ' checked' : ''; ?> aria-label="Riceve le email: <?php echo $h($x['nominativo']); ?>"></td>
+                    <td class="text-center"><input class="form-check-input" type="checkbox" name="approva[<?php echo (int)$x['id']; ?>]" value="1"<?php echo (int)$x['puo_approvare'] ? ' checked' : ''; ?> aria-label="Approva e rifiuta: <?php echo $h($x['nominativo']); ?>"></td>
+                    <td><button type="submit" name="togli_responsabile" value="<?php echo (int)$x['id']; ?>" class="btn btn-sm btn-link text-danger p-0" data-confirm="Togliere <?php echo $h($x['nominativo']); ?> dai responsabili?" aria-label="Togli"><i class="fa fa-user-minus" aria-hidden="true"></i></button></td></tr>
+            <?php endforeach; ?>
+        </tbody></table></div>
+        <button type="submit" name="salva_responsabili" value="1" class="btn btn-sm btn-outline-primary"><i class="fa fa-save me-1" aria-hidden="true"></i>Salva i permessi</button>
+    </form>
+    <?php else: ?><p class="small text-muted">Nessun responsabile: le richieste arrivano agli indirizzi indicati sopra o ai gestori dell'area.</p><?php endif; ?>
+    <form method="POST" class="dd-scelta-persona"><?php csrf_field(); ?><input type="hidden" name="risorsa_id" value="<?php echo (int)$modifica['id']; ?>"><input type="hidden" name="persona_id" value=""><input type="hidden" name="aggiungi_responsabile" value="1">
+        <div class="small fw-bold mb-1">Aggiungi un responsabile dall'anagrafe</div>
+        <?php echo html_ricerca_personale($conn, 'Aggiungi'); ?>
+    </form>
+    <script>
+    document.querySelectorAll('.dd-scelta-persona').forEach(function (f) {
+        f.addEventListener('persona-scelta', function (e) { f.querySelector('[name=persona_id]').value = e.detail.id; f.submit(); });
+        f.addEventListener('submit', function (e) { if (!f.querySelector('[name=persona_id]').value) e.preventDefault(); });
+    });
+    </script>
+</div></div>
+
+<?php
+    $campi_svc = \App\Core\App::per($conn)->get(\App\Risorse\ServizioCampiRisorsa::class);
+    $cont_svc = \App\Core\App::per($conn)->get(\App\Risorse\ServizioContatoriRisorse::class);
+    $campi_m = \App\Didattica\CampiModulo::da((string)($modifica['campi_json'] ?? ''));
+    $contatori_m = $cont_svc->elenco((int)$modifica['id'], false);
+    $con_campi_r = array_values(array_filter($risorse, fn($x) => (int)$x['id'] !== (int)$modifica['id']));
+?>
+<div class="card border-0 shadow-sm mb-4" id="campi" style="border-left:4px solid #7c3aed !important;"><div class="card-body">
+    <h6 class="fw-bold mb-1"><i class="fa fa-list-check me-1" style="color:#7c3aed;" aria-hidden="true"></i>Campi della prenotazione</h6>
+    <p class="small text-secondary mb-3">Le domande in più che chi prenota deve compilare (es. «Tipo di analisi», «Gruppo di ricerca», «Dichiaro di aver letto il regolamento»). Le risposte arrivano al responsabile, nell'email e nell'export.</p>
+    <form method="POST" id="fCampiRis"><?php csrf_field(); ?><input type="hidden" name="risorsa_id" value="<?php echo (int)$modifica['id']; ?>">
+        <div id="rcCampi">
+            <?php foreach ($campi_m ?: [] as $c): ?>
+            <div class="row g-2 align-items-center mb-2 rc-campo">
+                <div class="col-md-3"><input type="text" class="form-control form-control-sm" name="c_etichetta[]" value="<?php echo $h($c['etichetta']); ?>" placeholder="Domanda" aria-label="Domanda"></div>
+                <div class="col-md-2"><select class="form-select form-select-sm" name="c_tipo[]" aria-label="Tipo"><?php foreach (\App\Risorse\ServizioCampiRisorsa::TIPI as $k => $n): ?><option value="<?php echo $k; ?>"<?php echo $c['tipo'] === $k ? ' selected' : ''; ?>><?php echo $h($n); ?></option><?php endforeach; ?></select></div>
+                <div class="col-md-3"><input type="text" class="form-control form-control-sm" name="c_opzioni[]" value="<?php echo $h(implode(', ', (array)$c['opzioni'])); ?>" placeholder="Scelte separate da virgola" aria-label="Scelte"></div>
+                <div class="col-md-2"><input type="text" class="form-control form-control-sm" name="c_aiuto[]" value="<?php echo $h($c['aiuto']); ?>" placeholder="Aiuto (facoltativo)" aria-label="Aiuto"></div>
+                <div class="col-md-2 d-flex gap-2 align-items-center"><input type="hidden" name="c_obbl[]" value="<?php echo !empty($c['obbligatorio']) ? '1' : '0'; ?>"><label class="form-check small m-0 text-nowrap"><input class="form-check-input rc-obbl" type="checkbox"<?php echo !empty($c['obbligatorio']) ? ' checked' : ''; ?>> obbligatorio</label>
+                    <button type="button" class="btn btn-sm btn-outline-danger rc-togli" aria-label="Togli il campo"><i class="fa fa-times" aria-hidden="true"></i></button></div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <template id="rcModello"><div class="row g-2 align-items-center mb-2 rc-campo">
+            <div class="col-md-3"><input type="text" class="form-control form-control-sm" name="c_etichetta[]" placeholder="Domanda" aria-label="Domanda"></div>
+            <div class="col-md-2"><select class="form-select form-select-sm" name="c_tipo[]" aria-label="Tipo"><?php foreach (\App\Risorse\ServizioCampiRisorsa::TIPI as $k => $n): ?><option value="<?php echo $k; ?>"><?php echo $h($n); ?></option><?php endforeach; ?></select></div>
+            <div class="col-md-3"><input type="text" class="form-control form-control-sm" name="c_opzioni[]" placeholder="Scelte separate da virgola" aria-label="Scelte"></div>
+            <div class="col-md-2"><input type="text" class="form-control form-control-sm" name="c_aiuto[]" placeholder="Aiuto (facoltativo)" aria-label="Aiuto"></div>
+            <div class="col-md-2 d-flex gap-2 align-items-center"><input type="hidden" name="c_obbl[]" value="0"><label class="form-check small m-0 text-nowrap"><input class="form-check-input rc-obbl" type="checkbox"> obbligatorio</label>
+                <button type="button" class="btn btn-sm btn-outline-danger rc-togli" aria-label="Togli il campo"><i class="fa fa-times" aria-hidden="true"></i></button></div>
+        </div></template>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <button type="button" class="btn btn-sm btn-outline-secondary fw-bold" id="rcAggiungi"><i class="fa fa-plus me-1" aria-hidden="true"></i>Aggiungi un campo</button>
+            <button type="submit" name="salva_campi_risorsa" value="1" class="btn btn-sm btn-primary fw-bold"><i class="fa fa-save me-1" aria-hidden="true"></i>Salva i campi</button>
+        </div>
+    </form>
+    <?php if ($con_campi_r): ?>
+    <form method="POST" class="d-flex flex-wrap gap-2 align-items-center mt-3"><?php csrf_field(); ?><input type="hidden" name="risorsa_id" value="<?php echo (int)$modifica['id']; ?>">
+        <label class="small fw-bold m-0" for="rcDa">Copia i campi da</label>
+        <select class="form-select form-select-sm w-auto" id="rcDa" name="da_risorsa"><?php foreach ($con_campi_r as $x): ?><option value="<?php echo (int)$x['id']; ?>"><?php echo $h($x['nome']); ?></option><?php endforeach; ?></select>
+        <button type="submit" name="copia_campi_risorsa" value="1" class="btn btn-sm btn-outline-secondary" data-confirm="Sostituire i campi di questa risorsa con quelli dell'altra?">Copia</button>
+    </form>
+    <?php endif; ?>
+    <script>
+    (function () {
+        var box = document.getElementById('rcCampi');
+        document.getElementById('rcAggiungi').addEventListener('click', function () { var n = document.getElementById('rcModello').content.cloneNode(true); box.appendChild(n); box.lastElementChild.querySelector('input').focus(); });
+        box.addEventListener('click', function (e) { var b = e.target.closest('.rc-togli'); if (b) b.closest('.rc-campo').remove(); });
+        document.getElementById('fCampiRis').addEventListener('change', function (e) { if (e.target.classList.contains('rc-obbl')) e.target.closest('div').querySelector('input[type=hidden]').value = e.target.checked ? '1' : '0'; });
+    })();
+    </script>
+</div></div>
+
+<div class="card border-0 shadow-sm mb-4" id="contatori" style="border-left:4px solid #b45309 !important;"><div class="card-body">
+    <h6 class="fw-bold mb-1"><i class="fa fa-gauge-high me-1" style="color:#b45309;" aria-hidden="true"></i>Contatori (quantità prenotabili)</h6>
+    <p class="small text-secondary mb-3">Per le risorse con una quantità limitata (es. i campioni che un laboratorio può trattare). Chi prenota indica quanti ne vuole e il contatore li scala: se non ce ne sono abbastanza non può prenotare. Una richiesta in attesa di approvazione tiene occupata la quantità; se è rifiutata o annullata torna disponibile.
+        <strong>Per periodo</strong>: la capacità vale per ogni giorno, settimana o mese e si ricarica da sola. <strong>Scorta</strong>: una quantità che si consuma e che il responsabile ricarica con i carichi.</p>
+    <?php foreach ($contatori_m as $ct): $scorta = $ct['modalita'] === 'scorta'; ?>
+    <div class="border rounded p-2 mb-3<?php echo (int)$ct['attivo'] ? '' : ' bg-light'; ?>">
+        <form method="POST" class="row g-2 align-items-end"><?php csrf_field(); ?><input type="hidden" name="risorsa_id" value="<?php echo (int)$modifica['id']; ?>"><input type="hidden" name="contatore_id" value="<?php echo (int)$ct['id']; ?>">
+            <div class="col-md-3"><label class="form-label small fw-bold mb-0">Cosa si prenota</label><input class="form-control form-control-sm" name="nome" value="<?php echo $h($ct['nome']); ?>" maxlength="100" required></div>
+            <div class="col-md-2"><label class="form-label small fw-bold mb-0">Unità</label><input class="form-control form-control-sm" name="unita" value="<?php echo $h($ct['unita']); ?>" maxlength="30" placeholder="es. campioni"></div>
+            <div class="col-md-3"><label class="form-label small fw-bold mb-0">Modalità</label><select class="form-select form-select-sm rc-modalita" name="modalita"><?php foreach (\App\Risorse\ServizioContatoriRisorse::MODALITA as $k => $n): ?><option value="<?php echo $k; ?>"<?php echo $ct['modalita'] === $k ? ' selected' : ''; ?>><?php echo $h($n); ?></option><?php endforeach; ?></select></div>
+            <div class="col-6 col-md-2 rc-per"<?php echo $scorta ? ' hidden' : ''; ?>><label class="form-label small fw-bold mb-0">Capacità</label><input type="number" min="0" class="form-control form-control-sm" name="capacita" value="<?php echo (int)$ct['capacita']; ?>"></div>
+            <div class="col-6 col-md-2 rc-per"<?php echo $scorta ? ' hidden' : ''; ?>><label class="form-label small fw-bold mb-0">Ogni</label><select class="form-select form-select-sm" name="periodo"><?php foreach (\App\Risorse\ServizioContatoriRisorse::PERIODI as $k => $n): ?><option value="<?php echo $k; ?>"<?php echo $ct['periodo'] === $k ? ' selected' : ''; ?>><?php echo $h($n); ?></option><?php endforeach; ?></select></div>
+            <div class="col-6 col-md-2"><label class="form-label small fw-bold mb-0">Minimo per prenotazione</label><input type="number" min="1" class="form-control form-control-sm" name="minimo" value="<?php echo (int)$ct['minimo']; ?>"></div>
+            <div class="col-6 col-md-2"><label class="form-label small fw-bold mb-0">Massimo per prenotazione</label><input type="number" min="1" class="form-control form-control-sm" name="massimo" value="<?php echo $ct['massimo'] !== null ? (int)$ct['massimo'] : ''; ?>" placeholder="nessun limite"></div>
+            <div class="col-md-4 d-flex gap-3 align-items-center">
+                <label class="form-check small m-0"><input class="form-check-input" type="checkbox" name="obbligatorio" value="1"<?php echo (int)$ct['obbligatorio'] ? ' checked' : ''; ?>> da indicare sempre</label>
+                <input type="hidden" name="attivo" value="0"><label class="form-check small m-0"><input class="form-check-input" type="checkbox" name="attivo" value="1"<?php echo (int)$ct['attivo'] ? ' checked' : ''; ?>> attivo</label></div>
+            <div class="col-md-4 d-flex gap-2 ms-auto justify-content-end">
+                <button type="submit" name="salva_contatore" value="1" class="btn btn-sm btn-primary fw-bold"><i class="fa fa-save me-1" aria-hidden="true"></i>Salva</button>
+                <button type="submit" name="elimina_contatore" value="<?php echo (int)$ct['id']; ?>" class="btn btn-sm btn-outline-danger" data-confirm="Eliminare il contatore? Le quantità già prenotate non si vedranno più."><i class="fa fa-trash" aria-hidden="true"></i></button></div>
+        </form>
+        <?php if ($scorta): $saldo = $cont_svc->disponibile($ct, date('Y-m-d')); ?>
+        <div class="border-top mt-2 pt-2">
+            <div class="d-flex flex-wrap gap-3 align-items-end">
+                <div><div class="small text-secondary">Scorta disponibile</div><div class="fs-4 fw-bold"><?php echo $saldo; ?> <span class="fs-6 fw-normal text-secondary"><?php echo $h($ct['unita'] ?: ''); ?></span></div></div>
+                <form method="POST" class="d-flex flex-wrap gap-2 align-items-end m-0"><?php csrf_field(); ?><input type="hidden" name="risorsa_id" value="<?php echo (int)$modifica['id']; ?>"><input type="hidden" name="contatore_id" value="<?php echo (int)$ct['id']; ?>">
+                    <div><label class="form-label small fw-bold mb-0" for="mv<?php echo (int)$ct['id']; ?>">Carico (+) o rettifica (−)</label><input type="number" class="form-control form-control-sm" style="width:130px;" id="mv<?php echo (int)$ct['id']; ?>" name="quantita" required placeholder="es. 50 o -3"></div>
+                    <div><label class="form-label small fw-bold mb-0" for="mn<?php echo (int)$ct['id']; ?>">Nota</label><input class="form-control form-control-sm" id="mn<?php echo (int)$ct['id']; ?>" name="nota" maxlength="255" placeholder="es. Nuovo arrivo"></div>
+                    <button type="submit" name="movimento_contatore" value="1" class="btn btn-sm btn-outline-success fw-bold"><i class="fa fa-plus-minus me-1" aria-hidden="true"></i>Registra</button></form></div>
+            <?php $mov = $cont_svc->movimenti((int)$ct['id']); if ($mov): ?><details class="small mt-2"><summary>Ultimi movimenti</summary><ul class="mb-0 mt-1"><?php foreach ($mov as $mv): ?><li><?php echo date('d/m/Y H:i', strtotime($mv['creato_il'])); ?> · <strong><?php echo ((int)$mv['quantita'] > 0 ? '+' : '') . (int)$mv['quantita']; ?></strong> · <?php echo $h($mv['nota']); ?> <span class="text-secondary">(<?php echo $h($mv['autore']); ?>)</span></li><?php endforeach; ?></ul></details><?php endif; ?>
+        </div>
+        <?php endif; ?>
+    </div>
+    <?php endforeach; ?>
+    <form method="POST" class="border rounded p-2 bg-light"><?php csrf_field(); ?><input type="hidden" name="risorsa_id" value="<?php echo (int)$modifica['id']; ?>"><input type="hidden" name="contatore_id" value="0">
+        <div class="small fw-bold mb-1"><i class="fa fa-plus me-1 text-success" aria-hidden="true"></i>Nuovo contatore</div>
+        <div class="row g-2 align-items-end">
+            <div class="col-md-3"><label class="form-label small mb-0" for="ncNome">Cosa si prenota</label><input class="form-control form-control-sm" id="ncNome" name="nome" maxlength="100" required placeholder="es. Campioni"></div>
+            <div class="col-md-2"><label class="form-label small mb-0" for="ncUn">Unità</label><input class="form-control form-control-sm" id="ncUn" name="unita" maxlength="30" placeholder="es. campioni"></div>
+            <div class="col-md-3"><label class="form-label small mb-0" for="ncMod">Modalità</label><select class="form-select form-select-sm rc-modalita" id="ncMod" name="modalita"><?php foreach (\App\Risorse\ServizioContatoriRisorse::MODALITA as $k => $n): ?><option value="<?php echo $k; ?>"><?php echo $h($n); ?></option><?php endforeach; ?></select></div>
+            <div class="col-6 col-md-2"><label class="form-label small mb-0 rc-cap-et" for="ncCap">Capacità</label><input type="number" min="0" class="form-control form-control-sm" id="ncCap" name="capacita" value="10"></div>
+            <div class="col-6 col-md-2 rc-per"><label class="form-label small mb-0" for="ncPer">Ogni</label><select class="form-select form-select-sm" id="ncPer" name="periodo"><?php foreach (\App\Risorse\ServizioContatoriRisorse::PERIODI as $k => $n): ?><option value="<?php echo $k; ?>"><?php echo $h($n); ?></option><?php endforeach; ?></select></div>
+            <div class="col-6 col-md-2"><label class="form-label small mb-0" for="ncMin">Minimo</label><input type="number" min="1" class="form-control form-control-sm" id="ncMin" name="minimo" value="1"></div>
+            <div class="col-6 col-md-2"><label class="form-label small mb-0" for="ncMax">Massimo</label><input type="number" min="1" class="form-control form-control-sm" id="ncMax" name="massimo" placeholder="nessun limite"></div>
+            <div class="col-md-3"><label class="form-check small m-0"><input class="form-check-input" type="checkbox" name="obbligatorio" value="1" checked> da indicare sempre</label></div>
+            <div class="col-md-2 ms-auto"><button type="submit" name="salva_contatore" value="1" class="btn btn-sm btn-success fw-bold w-100"><i class="fa fa-plus me-1" aria-hidden="true"></i>Aggiungi</button></div>
+        </div>
+        <div class="form-text">Con «Scorta» la capacità è la quantità iniziale; per «Per periodo» è il massimo per ogni giorno, settimana o mese.</div>
+    </form>
+    <script>
+    document.querySelectorAll('#contatori .rc-modalita').forEach(function (sel) {
+        function agg() { var f = sel.closest('form'); f.querySelectorAll('.rc-per').forEach(function (x) { x.hidden = sel.value === 'scorta'; }); var e = f.querySelector('.rc-cap-et'); if (e) e.textContent = sel.value === 'scorta' ? 'Quantità iniziale' : 'Capacità'; }
+        sel.addEventListener('change', agg); agg();
+    });
+    </script>
+</div></div>
+
+<?php
+    $diario_svc = \App\Core\App::per($conn)->get(\App\Risorse\ServizioDiarioBordo::class);
+    $conf_d = $diario_svc->configurazione($modifica);
+    $reg_d = (int)$modifica['diario_attivo'] ? $diario_svc->registro((int)$modifica['id']) : null;
+?>
+<div class="card border-0 shadow-sm mb-4" id="diario" style="border-left:4px solid #0369a1 !important;"><div class="card-body">
+    <h6 class="fw-bold mb-1"><i class="fa fa-book-open me-1" style="color:#0369a1;" aria-hidden="true"></i>Diario di bordo (auto e mezzi)</h6>
+    <p class="small text-secondary mb-3">Dopo ogni uso chi ha prenotato (o un altro conducente che indica, o il responsabile) compila il diario: partenza e arrivo, km, carburante, segnalazioni. I km iniziali si propongono dall'ultimo viaggio e non possono essere più bassi; i km percorsi si calcolano da soli. Un promemoria per email parte dopo la prenotazione.</p>
+    <form method="POST" id="fDiarioRis"><?php csrf_field(); ?><input type="hidden" name="risorsa_id" value="<?php echo (int)$modifica['id']; ?>">
+        <div class="d-flex flex-wrap gap-4 mb-3">
+            <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="dgAtt" name="diario_attivo" value="1"<?php echo (int)$modifica['diario_attivo'] ? ' checked' : ''; ?>><label class="form-check-label" for="dgAtt">Diario di bordo attivo</label></div>
+            <div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="dgBlk" name="diario_blocca" value="1"<?php echo (int)$modifica['diario_blocca'] ? ' checked' : ''; ?>><label class="form-check-label" for="dgBlk">Chi non ha compilato il diario dell'ultimo viaggio non può prenotare di nuovo</label></div>
+        </div>
+        <div class="small fw-bold mb-1">Campi del diario <span class="fw-normal text-secondary">(partono dal modulo cartaceo: cambiali, togli o aggiungine)</span></div>
+        <div id="rdCampi">
+            <?php foreach ($conf_d['campi'] as $c): ?>
+            <div class="row g-2 align-items-center mb-2 rc-campo">
+                <div class="col-md-3"><input type="text" class="form-control form-control-sm rd-et" name="c_etichetta[]" value="<?php echo $h($c['etichetta']); ?>" placeholder="Domanda" aria-label="Domanda"></div>
+                <div class="col-md-2"><select class="form-select form-select-sm" name="c_tipo[]" aria-label="Tipo"><?php foreach (\App\Risorse\ServizioCampiRisorsa::TIPI as $k => $n): ?><option value="<?php echo $k; ?>"<?php echo ($c['tipo'] ?? 'text') === $k ? ' selected' : ''; ?>><?php echo $h($n); ?></option><?php endforeach; ?></select></div>
+                <div class="col-md-3"><input type="text" class="form-control form-control-sm" name="c_opzioni[]" value="<?php echo $h(is_array($c['opzioni'] ?? null) ? implode(', ', $c['opzioni']) : ($c['opzioni'] ?? '')); ?>" placeholder="Scelte separate da virgola" aria-label="Scelte"></div>
+                <div class="col-md-2"><input type="text" class="form-control form-control-sm" name="c_aiuto[]" value="<?php echo $h($c['aiuto'] ?? ''); ?>" placeholder="Aiuto (facoltativo)" aria-label="Aiuto"></div>
+                <div class="col-md-2 d-flex gap-2 align-items-center"><input type="hidden" name="c_obbl[]" value="<?php echo !empty($c['obbligatorio']) ? '1' : '0'; ?>"><label class="form-check small m-0 text-nowrap"><input class="form-check-input rc-obbl" type="checkbox"<?php echo !empty($c['obbligatorio']) ? ' checked' : ''; ?>> obbligatorio</label>
+                    <button type="button" class="btn btn-sm btn-outline-danger rc-togli" aria-label="Togli il campo"><i class="fa fa-times" aria-hidden="true"></i></button></div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <template id="rdModello"><div class="row g-2 align-items-center mb-2 rc-campo">
+            <div class="col-md-3"><input type="text" class="form-control form-control-sm rd-et" name="c_etichetta[]" placeholder="Domanda" aria-label="Domanda"></div>
+            <div class="col-md-2"><select class="form-select form-select-sm" name="c_tipo[]" aria-label="Tipo"><?php foreach (\App\Risorse\ServizioCampiRisorsa::TIPI as $k => $n): ?><option value="<?php echo $k; ?>"><?php echo $h($n); ?></option><?php endforeach; ?></select></div>
+            <div class="col-md-3"><input type="text" class="form-control form-control-sm" name="c_opzioni[]" placeholder="Scelte separate da virgola" aria-label="Scelte"></div>
+            <div class="col-md-2"><input type="text" class="form-control form-control-sm" name="c_aiuto[]" placeholder="Aiuto (facoltativo)" aria-label="Aiuto"></div>
+            <div class="col-md-2 d-flex gap-2 align-items-center"><input type="hidden" name="c_obbl[]" value="0"><label class="form-check small m-0 text-nowrap"><input class="form-check-input rc-obbl" type="checkbox"> obbligatorio</label>
+                <button type="button" class="btn btn-sm btn-outline-danger rc-togli" aria-label="Togli il campo"><i class="fa fa-times" aria-hidden="true"></i></button></div>
+        </div></template>
+        <button type="button" class="btn btn-sm btn-outline-secondary fw-bold mb-3" id="rdAggiungi"><i class="fa fa-plus me-1" aria-hidden="true"></i>Aggiungi un campo</button>
+        <div class="border rounded p-2 bg-light mb-3">
+            <div class="small fw-bold mb-1">Quali campi sono… <span class="fw-normal text-secondary">(servono ai controlli sui km e ai totali: anche se cambi i nomi funzionano)</span></div>
+            <div class="row g-2">
+                <?php foreach (\App\Risorse\ServizioDiarioBordo::RUOLI as $k_r => $n_r): ?>
+                <div class="col-md-4"><label class="form-label small mb-0" for="rd_<?php echo $k_r; ?>"><?php echo $h($n_r); ?></label>
+                    <select class="form-select form-select-sm rd-ruolo" id="rd_<?php echo $k_r; ?>" name="ruolo_<?php echo $k_r; ?>" data-val="<?php echo $h($conf_d['ruoli'][$k_r] ?? ''); ?>"></select></div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <button type="submit" name="salva_diario_risorsa" value="1" class="btn btn-sm btn-primary fw-bold"><i class="fa fa-save me-1" aria-hidden="true"></i>Salva il diario di bordo</button>
+    </form>
+    <?php if ($reg_d): ?>
+    <div class="border-top mt-3 pt-2 small">
+        <strong><?php echo (int)$reg_d['totali']['viaggi']; ?> viaggi · <?php echo (int)$reg_d['totali']['km']; ?> km · <?php echo number_format($reg_d['totali']['litri'], 1, ',', '.'); ?> litri</strong> nel diario.
+        <a class="btn btn-sm btn-outline-success ms-2" href="risorse.php?p_id=<?php echo (int)$filtro_p; ?>&amp;diario_xlsx=<?php echo (int)$modifica['id']; ?>"><i class="fa fa-file-excel me-1" aria-hidden="true"></i>Scarica in Excel</a>
+        <span class="text-secondary ms-2">Il responsabile lo vede e lo verifica da «Le mie risorse».</span>
+    </div>
+    <?php endif; ?>
+    <script>
+    (function () {
+        var box = document.getElementById('rdCampi');
+        function ruoli() {
+            var et = Array.prototype.map.call(box.querySelectorAll('.rd-et'), function (i) { return i.value.trim(); }).filter(Boolean);
+            document.querySelectorAll('#diario .rd-ruolo').forEach(function (s) {
+                var v = s.dataset.val !== undefined && s.dataset.val !== '' ? s.dataset.val : s.value; s.innerHTML = '<option value="">— nessuno —</option>';
+                et.forEach(function (e) { var o = document.createElement('option'); o.value = e; o.textContent = e; if (e === v) o.selected = true; s.appendChild(o); });
+                s.dataset.val = s.value;
+            });
+        }
+        document.getElementById('rdAggiungi').addEventListener('click', function () { box.appendChild(document.getElementById('rdModello').content.cloneNode(true)); box.lastElementChild.querySelector('input').focus(); });
+        box.addEventListener('click', function (e) { var b = e.target.closest('.rc-togli'); if (b) { b.closest('.rc-campo').remove(); ruoli(); } });
+        box.addEventListener('input', function (e) { if (e.target.classList.contains('rd-et')) { document.querySelectorAll('#diario .rd-ruolo').forEach(function (s) { s.dataset.val = s.value; }); ruoli(); } });
+        document.getElementById('diario').addEventListener('change', function (e) {
+            if (e.target.classList.contains('rc-obbl')) e.target.closest('div').querySelector('input[type=hidden]').value = e.target.checked ? '1' : '0';
+            if (e.target.classList.contains('rd-ruolo')) e.target.dataset.val = e.target.value;
+        });
+        ruoli();
+    })();
+    </script>
+</div></div>
+<?php endif; ?>
+
+<?php if ($modifica):
+    $scad_svc = \App\Core\App::per($conn)->get(\App\Risorse\ServizioScadenzeRisorsa::class);
+    $scadenze_m = $scad_svc->elenco((int)$modifica['id']);
+    $col_sc = ['ok' => ['success', 'in regola'], 'in_scadenza' => ['warning', 'in scadenza'], 'scaduta' => ['danger', 'scaduta']];
+?>
+<div class="card border-0 shadow-sm mb-4" id="scadenze" style="border-left:4px solid #dc2626 !important;"><div class="card-body">
+    <h6 class="fw-bold mb-1"><i class="fa fa-bell me-1 text-danger" aria-hidden="true"></i>Scadenze</h6>
+    <p class="small text-secondary mb-3">Per le cose da rinnovare nel tempo (bollo, assicurazione, tagliando, revisione di un'auto; taratura di uno strumento…). Il responsabile riceve un'email prima della data e un'altra se è scaduta; le rinnova dal cruscotto della risorsa.</p>
+    <datalist id="dlScad"><?php foreach (\App\Risorse\ServizioScadenzeRisorsa::PROPOSTE as $pr_s): ?><option value="<?php echo $h($pr_s); ?>"><?php endforeach; ?></datalist>
+    <?php foreach ($scadenze_m as $sc): [$cl_s, $tx_s] = $col_sc[$sc['stato']]; ?>
+    <form method="POST" class="row g-2 align-items-end mb-2"><?php csrf_field(); ?><input type="hidden" name="risorsa_id" value="<?php echo (int)$modifica['id']; ?>"><input type="hidden" name="scadenza_id" value="<?php echo (int)$sc['id']; ?>">
+        <div class="col-md-3"><label class="form-label small mb-0">Cosa scade</label><input class="form-control form-control-sm" name="nome" list="dlScad" value="<?php echo $h($sc['nome']); ?>" maxlength="100" required></div>
+        <div class="col-md-2"><label class="form-label small mb-0">Scade il</label><input type="date" class="form-control form-control-sm" name="scade_il" value="<?php echo $h($sc['scade_il']); ?>" required></div>
+        <div class="col-md-2"><label class="form-label small mb-0">Avvisa prima (giorni)</label><input type="number" min="0" max="365" class="form-control form-control-sm" name="preavviso_giorni" value="<?php echo (int)$sc['preavviso_giorni']; ?>"></div>
+        <div class="col-md-3"><label class="form-label small mb-0">Note</label><input class="form-control form-control-sm" name="note" value="<?php echo $h($sc['note']); ?>" maxlength="255"></div>
+        <div class="col-md-2 d-flex gap-1 align-items-center"><span class="badge text-bg-<?php echo $cl_s; ?>" title="<?php echo (int)$sc['giorni']; ?> giorni"><?php echo $tx_s; ?></span>
+            <button type="submit" name="salva_scadenza" value="1" class="btn btn-sm btn-outline-primary" aria-label="Salva"><i class="fa fa-save" aria-hidden="true"></i></button>
+            <button type="submit" name="elimina_scadenza" value="<?php echo (int)$sc['id']; ?>" class="btn btn-sm btn-outline-danger" data-confirm="Eliminare la scadenza?" aria-label="Elimina"><i class="fa fa-trash" aria-hidden="true"></i></button></div>
+    </form>
+    <?php endforeach; ?>
+    <form method="POST" class="row g-2 align-items-end border rounded p-2 bg-light"><?php csrf_field(); ?><input type="hidden" name="risorsa_id" value="<?php echo (int)$modifica['id']; ?>"><input type="hidden" name="scadenza_id" value="0">
+        <div class="col-md-3"><label class="form-label small mb-0" for="nsNome">Nuova scadenza</label><input class="form-control form-control-sm" id="nsNome" name="nome" list="dlScad" maxlength="100" required placeholder="es. Assicurazione"></div>
+        <div class="col-md-2"><label class="form-label small mb-0" for="nsData">Scade il</label><input type="date" class="form-control form-control-sm" id="nsData" name="scade_il" required></div>
+        <div class="col-md-2"><label class="form-label small mb-0" for="nsPre">Avvisa prima (giorni)</label><input type="number" min="0" max="365" class="form-control form-control-sm" id="nsPre" name="preavviso_giorni" value="30"></div>
+        <div class="col-md-3"><label class="form-label small mb-0" for="nsNote">Note</label><input class="form-control form-control-sm" id="nsNote" name="note" maxlength="255"></div>
+        <div class="col-md-2"><button type="submit" name="salva_scadenza" value="1" class="btn btn-sm btn-success fw-bold w-100"><i class="fa fa-plus me-1" aria-hidden="true"></i>Aggiungi</button></div>
+    </form>
+</div></div>
 <?php endif; ?>
 
 <?php if ($risorse): ?>

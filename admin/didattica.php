@@ -34,7 +34,7 @@ $puo_seduta = fn(?array $s) => $s && ($puo_didattica_tutto || in_array((int)$s['
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify($_POST['csrf_token'] ?? '');
     // I referenti dei consigli fanno solo le azioni delle sedute (ognuna controlla anche il consiglio)
-    if ($solo_ref && !array_intersect(array_keys($_POST), ['salva_seduta', 'elimina_seduta', 'assegna_seduta', 'salva_presenze', 'salva_decisioni', 'applica_esiti', 'aggiungi_persona_consiglio', 'togli_persona_consiglio', 'salva_qualifiche', 'importa_componenti', 'invia_convocazione', 'invia_verbale_firma', 'carica_verbale_firmato'])) nega_accesso();
+    if ($solo_ref && !array_intersect(array_keys($_POST), ['salva_seduta', 'elimina_seduta', 'assegna_seduta', 'salva_presenze', 'salva_punti', 'importa_verbali', 'salva_verbale_importato', 'elimina_verbale_importato', 'salva_decisioni', 'applica_esiti', 'aggiungi_persona_consiglio', 'togli_persona_consiglio', 'salva_qualifiche', 'importa_componenti', 'invia_convocazione', 'invia_verbale_firma', 'carica_verbale_firmato'])) nega_accesso();
 
     $fase = 'azioni';
     foreach (SCHEDE_DIDATTICA as $scheda) require __DIR__ . '/didattica_' . $scheda . '.php';

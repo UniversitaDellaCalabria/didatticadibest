@@ -10,7 +10,7 @@ namespace App\Didattica;
  */
 final class ServizioSedute
 {
-    public function __construct(private SedutaRepository $sedute, private ConsiglioRepository $consigli, private ServizioConsigli $servizioConsigli, private ServizioUffici $ufficio)
+    public function __construct(private SedutaRepository $sedute, private ConsiglioRepository $consigli, private ServizioConsigli $servizioConsigli, private ServizioUffici $ufficio, private ServizioPuntiSeduta $punti)
     {
     }
 
@@ -138,7 +138,7 @@ final class ServizioSedute
     public function campiDaModulo(array $post, array $consigli): array
     {
         $f = [];
-        foreach (['organo' => 500, 'anno_accademico' => 20, 'luogo' => 255, 'segretario' => 200, 'coordinatore' => 200, 'odg' => 5000, 'presenze' => 20000] as $k => $max) {
+        foreach (['organo' => 500, 'anno_accademico' => 20, 'luogo' => 255, 'segretario' => 200, 'coordinatore' => 200, 'odg' => 5000, 'presenze' => 20000, 'numero_verbale' => 10] as $k => $max) {
             $f[$k] = mb_substr(trim((string) ($post[$k] ?? '')), 0, $max);
         }
         $f['data'] = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) ($post['data'] ?? '')) ? $post['data'] : null;
@@ -160,7 +160,11 @@ final class ServizioSedute
      */
     public function salva(int $id, array $campi): int
     {
-        return $this->sedute->salva($id, $campi);
+        $id = $this->sedute->salva($id, $campi);
+        // I punti del verbale seguono l'ordine del giorno (i testi già scritti restano ai punti che restano)
+        $this->punti->sincronizza($id, (string) ($campi['odg'] ?? ''));
+
+        return $id;
     }
 
     /** Elimina la seduta (le pratiche restano, senza seduta). */

@@ -116,6 +116,24 @@ final class RisorsaRepository
         return 'dibest_risorsa_' . $risorsaId;
     }
 
+    /** Campi personalizzati del modulo di prenotazione della risorsa (JSON nel formato dei moduli della didattica). */
+    public function impostaCampi(int $id, ?string $json): void
+    {
+        $this->db->esegui('UPDATE risorse SET campi_json = ? WHERE id = ?', [$json, $id]);
+    }
+
+    /** Diario di bordo della risorsa: attivo, blocco delle nuove prenotazioni se manca il diario, campi e ruoli (JSON). */
+    public function impostaDiario(int $id, bool $attivo, bool $blocca, ?string $json): void
+    {
+        $this->db->esegui('UPDATE risorse SET diario_attivo = ?, diario_blocca = ?, diario_json = ? WHERE id = ?', [$attivo ? 1 : 0, $blocca ? 1 : 0, $json, $id]);
+    }
+
+    /** Risposte ai campi personalizzati della prenotazione (JSON). */
+    public function impostaRisposte(int $prenotazioneId, ?string $json): void
+    {
+        $this->db->esegui('UPDATE prenotazioni_risorse SET risposte_json = ? WHERE id = ?', [$json, $prenotazioneId]);
+    }
+
     /** Registra la prenotazione; false se l'INSERT non riesce (es. codice già usato). */
     public function inserisciPrenotazione(int $risorsaId, int $utenteId, string $nome, string $cognome, string $email, string $inizio, string $fine, string $motivo, string $stato, ?string $serie, string $codice): bool
     {
@@ -300,6 +318,12 @@ final class RisorsaRepository
     {
         $this->db->esegui('DELETE FROM risorse_orari WHERE risorsa_id = ?', [$id]);
         $this->db->esegui('DELETE FROM risorse_chiusure WHERE risorsa_id = ?', [$id]);
+        $this->db->esegui('DELETE FROM risorse_responsabili WHERE risorsa_id = ?', [$id]);
+        $this->db->esegui('DELETE FROM risorse_scadenze WHERE risorsa_id = ?', [$id]);
+        $this->db->esegui('DELETE FROM risorse_diario WHERE risorsa_id = ?', [$id]);
+        $this->db->esegui('DELETE FROM risorse_contatori_usi WHERE contatore_id IN (SELECT id FROM risorse_contatori WHERE risorsa_id = ?)', [$id]);
+        $this->db->esegui('DELETE FROM risorse_contatori_movimenti WHERE contatore_id IN (SELECT id FROM risorse_contatori WHERE risorsa_id = ?)', [$id]);
+        $this->db->esegui('DELETE FROM risorse_contatori WHERE risorsa_id = ?', [$id]);
         $this->db->esegui('DELETE FROM prenotazioni_risorse WHERE risorsa_id = ?', [$id]);
         $this->db->esegui('DELETE FROM risorse WHERE id = ?', [$id]);
     }
@@ -506,6 +530,19 @@ final class RisorsaRepository
         $this->db->esegui(
             "INSERT INTO prenotazioni_risorse (risorsa_id, utente_id, nome, cognome, email, inizio, fine, motivo, stato, codice, turno_id) VALUES (?, ?, ?, '', '', ?, ?, ?, 'confermata', ?, ?)",
             [$risorsaId, $utenteId, $nome, $inizio, $fine, $motivo, $codice, $turnoId]
+        );
+    }
+
+    /**
+     * Le prenotazioni della risorsa che iniziano nel periodo (dal giorno «dal» al giorno «al» compresi), per il cruscotto.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function prenotazioniDellaRisorsa(int $risorsaId, string $dal, string $al): array
+    {
+        return $this->db->righe(
+            'SELECT id, codice, stato, inizio, fine, nome, cognome, email, motivo FROM prenotazioni_risorse WHERE risorsa_id = ? AND inizio >= ? AND inizio < DATE_ADD(?, INTERVAL 1 DAY) ORDER BY inizio',
+            [$risorsaId, $dal . ' 00:00:00', $al]
         );
     }
 

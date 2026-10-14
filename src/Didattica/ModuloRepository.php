@@ -88,6 +88,11 @@ final class ModuloRepository
         $this->db->esegui('UPDATE didattica_moduli SET domanda_json = ? WHERE id = ?', [$json, $id]);
     }
 
+    public function impostaInVerbale(int $id, bool $si): void
+    {
+        $this->db->esegui('UPDATE didattica_moduli SET in_verbale = ? WHERE id = ?', [$si ? 1 : 0, $id]);
+    }
+
     public function impostaFile(int $id, string $percorso): void
     {
         $this->db->esegui('UPDATE didattica_moduli SET file_path = ? WHERE id = ?', [$percorso, $id]);

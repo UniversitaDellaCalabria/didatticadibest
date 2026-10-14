@@ -392,6 +392,278 @@ prova(prenotazione_di_classe(true, ['per_scuole' => 1]) && !prenotazione_di_clas
 prova(annullamento_scaduto(['annullabile_fino' => date('Y-m-d H:i:s', time() - 60)]) && !annullamento_scaduto(['annullabile_fino' => null]), "termine per annullare");
 prova(colore_valido('#abc') === '#AABBCC' && colore_valido('red') === '#B30000', "colori validati");
 
+sezione("Responsabili delle risorse: scelti dall'anagrafe, email, approvazione dalla loro Area personale");
+$resp_svc = \App\Core\App::per($conn)->get(\App\Risorse\ServizioResponsabiliRisorse::class);
+$q("INSERT INTO personale_ateneo (id, cognome, nome, email, gruppo, docente, attivo) VALUES ('resp.gina', 'Rossi', 'Gina', 'gina.rossi@unical.it', 'docenti', 1, 1), ('resp.senza', 'Senza', 'Mail', '', 'pta', 0, 1)");
+$q("INSERT INTO utenti (id, codice_fiscale, nome, cognome, email, ruolo_id) VALUES (83, 'RISOR83XXXXXXXXX', 'Gina', 'Rossi', 'gina.rossi@unical.it', 5)");
+$u83 = $conn->query("SELECT * FROM utenti WHERE id = 83")->fetch_assoc();
+$q("INSERT INTO risorse (id, pagina_id, nome, tipo, luogo, durata_slot, max_slot, anticipo_ore, max_giorni, accesso, approvazione, ripetizione, referente) VALUES (902, 5, 'Laboratorio con approvazione', 'laboratorio', 'Cubo 5', 60, 2, 0, 60, 'tutti', 1, 0, '')");
+$q("INSERT INTO risorse_orari (risorsa_id, giorno, dalle, alle) VALUES (902, 1, '09:00', '13:00')");
+prova($resp_svc->aggiungi(902, 'resp.sconosciuta') !== null && $resp_svc->aggiungi(902, 'resp.senza') !== null && $resp_svc->aggiungi(9999, 'resp.gina') !== null, "responsabile: persona inesistente, senza email o risorsa inesistente rifiutati");
+prova($resp_svc->aggiungi(902, 'resp.gina') === null && $resp_svc->aggiungi(902, 'resp.gina') !== null && count($resp_svc->elenco(902)) === 1 && risorsa($conn, 902)['referente'] === 'Gina Rossi', "responsabile aggiunto dall'anagrafe (non due volte); diventa il referente mostrato al pubblico");
+prova($resp_svc->risorseDi($u83) !== [] && $resp_svc->risorseDi($u83)[0]['nome'] === 'Laboratorio con approvazione' && $resp_svc->risorseDi($u81) === [] && $resp_svc->risorseDi(null) === [], "«Le mie risorse»: solo quelle di cui si è responsabili");
+$ris2 = risorsa($conn, 902); $EMAIL = [];
+$e_r = prenota_risorsa($conn, $ris2, $u81, "$lun 09:00:00", 1, 'Analisi');
+prova(!$e_r['errore'] && $e_r['stato'] === 'da_approvare', "prenotazione con approvazione: in attesa");
+notifica_gestori_risorsa($conn, prenotazione_risorsa($conn, $e_r['codici'][0]), 'nuova', 1);
+$em_resp = array_values(array_filter($EMAIL, fn($e) => $e['a'] === 'gina.rossi@unical.it'));
+prova(count($em_resp) === 1 && str_contains($em_resp[0]['corpo'], 'risorse_responsabile.php') && !str_contains($em_resp[0]['corpo'], 'admin/prenotazioni_risorse.php'), "il responsabile riceve la richiesta con il link alle sue risorse (non al pannello)");
+$pr_r = prenotazione_risorsa($conn, $e_r['codici'][0]);
+$lista_r = $resp_svc->prenotazioni($u83, 902);
+prova(count($lista_r) === 1 && $lista_r[0]['stato'] === 'da_approvare' && $resp_svc->prenotazioni($u81, 902) === [] && (int)$resp_svc->risorseDi($u83)[0]['da_approvare'] === 1, "il responsabile vede le richieste della sua risorsa; gli altri no");
+prova($resp_svc->decidi($u81, (int)$pr_r['id'], 'approva') !== null && prenotazione_risorsa($conn, $e_r['codici'][0])['stato'] === 'da_approvare', "chi non è responsabile non può approvare");
+$EMAIL = [];
+prova($resp_svc->decidi($u83, (int)$pr_r['id'], 'approva', 'Portare il camice') === null && prenotazione_risorsa($conn, $e_r['codici'][0])['stato'] === 'confermata' && in_array('ugo@unical.it', array_column($EMAIL, 'a'), true) && prenotazione_risorsa($conn, $e_r['codici'][0])['nota_gestore'] === 'Portare il camice', "il responsabile approva: chi ha prenotato riceve l'email con la nota");
+prova($resp_svc->decidi($u83, (int)$pr_r['id'], 'approva') !== null, "una richiesta già gestita non si approva due volte");
+$e_r2 = prenota_risorsa($conn, $ris2, $u82, "$lun 10:00:00", 1, 'Altro');
+$pr_r2 = prenotazione_risorsa($conn, $e_r2['codici'][0]);
+$resp_id = (int)$resp_svc->elenco(902)[0]['id'];
+$resp_svc->imposta($resp_id, true, false);
+prova($resp_svc->decidi($u83, (int)$pr_r2['id'], 'rifiuta') !== null && $resp_svc->responsabileDi($u83, 902) && !$resp_svc->responsabileDi($u83, 902, true), "responsabile senza il permesso di approvare: vede ma non decide");
+$resp_svc->imposta($resp_id, false, true);
+$EMAIL = [];
+$e_r3 = prenota_risorsa($conn, $ris2, $u82, "$lun 11:00:00", 1, 'Terza');
+notifica_gestori_risorsa($conn, prenotazione_risorsa($conn, $e_r3['codici'][0]), 'nuova', 1);
+prova(!in_array('gina.rossi@unical.it', array_column($EMAIL, 'a'), true), "responsabile con le email disattivate: non le riceve");
+$resp_svc->imposta($resp_id, true, true);
+prova($resp_svc->decidi($u83, (int)$pr_r2['id'], 'rifiuta', 'Occupato') === null && prenotazione_risorsa($conn, $e_r2['codici'][0])['stato'] === 'rifiutata' && $resp_svc->decidi($u83, (int)$pr_r['id'], 'annulla') === null && prenotazione_risorsa($conn, $e_r['codici'][0])['stato'] === 'annullata', "il responsabile rifiuta una richiesta e annulla una prenotazione confermata");
+$resp_svc->togli($resp_id);
+prova($resp_svc->elenco(902) === [] && $resp_svc->risorseDi($u83) === [], "responsabile tolto");
+$resp_svc->aggiungi(902, 'resp.gina');
+\App\Core\App::per($conn)->get(\App\Risorse\ServizioGestioneRisorse::class)->eliminaODisattiva(902);
+prova((int)db_valore($conn, "SELECT attiva FROM risorse WHERE id = 902") === 0 && (int)db_valore($conn, "SELECT COUNT(*) FROM risorse_responsabili WHERE risorsa_id = 902") === 1, "eliminazione con prenotazioni future: la risorsa si disattiva e i responsabili restano");
+$conn->query("DELETE FROM prenotazioni_risorse WHERE risorsa_id = 902");
+\App\Core\App::per($conn)->get(\App\Risorse\ServizioGestioneRisorse::class)->eliminaODisattiva(902);
+prova((int)db_valore($conn, "SELECT COUNT(*) FROM risorse_responsabili WHERE risorsa_id = 902") === 0, "risorsa eliminata: spariscono anche i suoi responsabili");
+
+sezione("Contatori delle risorse (per periodo e scorta) e campi personalizzati della prenotazione");
+$cont_svc = \App\Core\App::per($conn)->get(\App\Risorse\ServizioContatoriRisorse::class);
+$campi_svc = \App\Core\App::per($conn)->get(\App\Risorse\ServizioCampiRisorsa::class);
+$q("INSERT INTO risorse (id, pagina_id, nome, tipo, luogo, durata_slot, max_slot, anticipo_ore, max_giorni, accesso, approvazione, ripetizione) VALUES (903, 5, 'Laboratorio campioni', 'laboratorio', 'Cubo 6', 60, 1, 0, 90, 'tutti', 0, 1)");
+$q("INSERT INTO risorse_orari (risorsa_id, giorno, dalle, alle) VALUES (903, 1, '09:00', '13:00'), (903, 2, '09:00', '13:00')");
+[$e_c, $id_cont] = $cont_svc->salva(903, 0, ['nome' => 'Campioni', 'unita' => 'campioni', 'modalita' => 'periodo', 'periodo' => 'giorno', 'capacita' => '10', 'minimo' => '1', 'massimo' => '6', 'obbligatorio' => '1'], 'Admin');
+prova($e_c === null && $id_cont > 0 && $cont_svc->salva(903, 0, ['nome' => ' '], 'Admin')[0] !== null, "contatore creato dall'admin (il nome è obbligatorio)");
+$r903 = risorsa($conn, 903);
+$cont903 = $cont_svc->elenco(903);
+$pren_q = fn($u, $giorno, $ora, $qta, $extra = []) => prenota_risorsa($conn, $r903, $u, "$giorno $ora", 1, 'Prova', null, ['quantita' => [$id_cont => $qta]] + $extra);
+prova(str_contains((string)prenota_risorsa($conn, $r903, $u81, "$lun 09:00:00", 1, 'Prova')['errore'], 'Indica la quantità'), "quantità obbligatoria: senza non si prenota");
+prova(str_contains((string)$pren_q($u81, $lun, '09:00:00', 7)['errore'], 'al massimo 6') && str_contains((string)$pren_q($u81, $lun, '09:00:00', 0)['errore'], 'Indica la quantità'), "massimo per prenotazione e quantità zero rifiutati");
+$qa = $pren_q($u81, $lun, '09:00:00', 4);
+prova(!$qa['errore'] && $cont_svc->disponibile($cont903[0], $lun) === 6 && $cont_svc->disponibile($cont903[0], $sett(1)) === 10, "prenotazione con quantità: il contatore scala per quel giorno, non per gli altri");
+$qb = $pren_q($u82, $lun, '10:00:00', 4);
+prova(!$qb['errore'] && $cont_svc->disponibile($cont903[0], $lun) === 2, "seconda prenotazione dello stesso giorno");
+$err_q = $pren_q($u81, $lun, '11:00:00', 3)['errore'];
+prova(str_contains((string)$err_q, 'ne restano solo 2') && str_contains((string)$err_q, 'il ' . date('d/m/Y', strtotime($lun))), "oltre il disponibile: rifiutata con il numero che resta");
+$qc = $pren_q($u81, $lun, '11:00:00', 2);
+prova(!$qc['errore'] && str_contains((string)$pren_q($u82, $lun, '12:00:00', 1)['errore'], 'esaurito'), "esaurito il giorno: non si prenota più");
+$pa = prenotazione_risorsa($conn, $qa['codici'][0]);
+cambia_stato_prenotazione_risorsa($conn, (int)$pa['id'], 'annullata', false);
+prova($cont_svc->disponibile($cont903[0], $lun) === 4 && !$pren_q($u82, $lun, '12:00:00', 3)['errore'], "prenotazione annullata: le quantità tornano disponibili subito");
+prova($cont_svc->testoUsi($cont_svc->usi((int)prenotazione_risorsa($conn, $qb['codici'][0])['id'])) === '4 campioni', "quantità della prenotazione leggibile per email ed elenchi");
+$ril = $cont_svc->riepilogo(903, [$lun, $sett(1)]);
+prova(count($ril) === 1 && $ril[0]['resta'] === [$lun => 1, $sett(1) => 10] && $ril[0]['massimo'] === 6, "riepilogo per il modulo di prenotazione: quanti ne restano per ogni giorno", json_encode($ril[0]['resta']));
+// Ripetizione settimanale: la serie salta le date in cui non ce ne sono abbastanza
+$pren_q($u82, $sett(6), '09:00:00', 6);
+$serie = prenota_risorsa($conn, risorsa($conn, 903), $u81, $sett(5) . " 10:00:00", 1, 'Serie', $sett(6), ['quantita' => [$id_cont => 6]]);
+prova(count($serie['codici']) === 1 && ($serie['saltate'][$sett(6)] ?? '') === 'quantità non disponibile', "serie settimanale: la data senza abbastanza quantità si salta, le altre si prenotano");
+prova(str_contains((string)prenota_risorsa($conn, risorsa($conn, 903), $u81, $sett(6) . " 10:00:00", 1, 'Serie', null, ['quantita' => [$id_cont => 5]])['errore'], 'ne restano solo 4'), "la prima data senza abbastanza quantità ferma la prenotazione");
+// Settimana: la capacità vale per tutta la settimana
+[$e_s, $id_set] = $cont_svc->salva(903, 0, ['nome' => 'Provette', 'unita' => '', 'modalita' => 'periodo', 'periodo' => 'settimana', 'capacita' => '5', 'minimo' => '1', 'obbligatorio' => '0'], 'Admin');
+$c_set = $cont_svc->perId($id_set);
+$mar = date('Y-m-d', strtotime("$lun +1 day"));
+prova($cont_svc->finestra($c_set, $mar) === [$lun, date('Y-m-d', strtotime("$lun +6 days"))] && $cont_svc->finestra(['modalita' => 'scorta', 'periodo' => 'giorno'], $lun) === null, "finestra della settimana (lunedì-domenica) e scorta senza finestra");
+$qs1 = prenota_risorsa($conn, risorsa($conn, 903), $u82, "$mar 09:00:00", 1, 'Provette', null, ['quantita' => [$id_cont => 1, $id_set => 3]]);
+$qs2 = prenota_risorsa($conn, risorsa($conn, 903), $u81, "$mar 10:00:00", 1, 'Provette', null, ['quantita' => [$id_cont => 1, $id_set => 3]]);
+prova(!$qs1['errore'] && str_contains((string)$qs2['errore'], 'ne restano solo 2') && str_contains((string)$qs2['errore'], 'settimana') && $cont_svc->disponibile($c_set, $sett(1)) === 5, "contatore settimanale: le quantità di giorni diversi si sommano; la settimana dopo riparte");
+prova(!prenota_risorsa($conn, risorsa($conn, 903), $u81, "$mar 11:00:00", 1, 'Senza provette', null, ['quantita' => [$id_cont => 1]])['errore'], "contatore non obbligatorio: si può non indicare");
+// Scorta
+[$e_t, $id_sc] = $cont_svc->salva(903, 0, ['nome' => 'Kit', 'unita' => 'kit', 'modalita' => 'scorta', 'capacita' => '20', 'minimo' => '1', 'obbligatorio' => '0'], 'Admin');
+$c_sc = $cont_svc->perId($id_sc);
+prova($cont_svc->disponibile($c_sc, $lun) === 20 && $cont_svc->movimenti($id_sc)[0]['nota'] === 'Scorta iniziale', "scorta: la quantità iniziale è il primo carico");
+$qk = prenota_risorsa($conn, risorsa($conn, 903), $u82, $sett(8) . " 09:00:00", 1, 'Kit', null, ['quantita' => [$id_cont => 1, $id_sc => 8]]);
+prova(!$qk['errore'] && $cont_svc->disponibile($c_sc, $lun) === 12 && $cont_svc->disponibile($c_sc, $sett(9)) === 12, "scorta: si consuma e vale per qualunque data");
+prova($cont_svc->movimento($id_sc, 10, 'Nuovo arrivo', 'Resp') === null && $cont_svc->disponibile($c_sc, $lun) === 22 && $cont_svc->movimento($id_sc, -30, '', 'Resp') !== null && $cont_svc->movimento($id_sc, 0, '', 'Resp') !== null && $cont_svc->movimento($id_cont, 5, '', 'Resp') !== null, "carico di scorta; non si scala più di quanto resta; il carico vale solo per le scorte");
+$pk = prenotazione_risorsa($conn, $qk['codici'][0]);
+cambia_stato_prenotazione_risorsa($conn, (int)$pk['id'], 'annullata', false);
+prova($cont_svc->disponibile($c_sc, $lun) === 30, "scorta: la prenotazione annullata restituisce i kit");
+// Approvazione: la richiesta in attesa tiene occupate le quantità
+$conn->query("UPDATE risorse SET approvazione = 1 WHERE id = 903");
+$resto_prima = $cont_svc->disponibile($c_sc, $lun);
+$qp = prenota_risorsa($conn, risorsa($conn, 903), $u82, $sett(3) . " 09:00:00", 1, 'In attesa', null, ['quantita' => [$id_cont => 1, $id_sc => 5]]);
+$pp = prenotazione_risorsa($conn, $qp['codici'][0]);
+prova($qp['stato'] === 'da_approvare' && $cont_svc->disponibile($c_sc, $lun) === $resto_prima - 5, "richiesta da approvare: tiene occupata la quantità");
+cambia_stato_prenotazione_risorsa($conn, (int)$pp['id'], 'rifiutata', true);
+prova($cont_svc->disponibile($c_sc, $lun) === $resto_prima, "richiesta rifiutata: la quantità torna disponibile");
+$conn->query("UPDATE risorse SET approvazione = 0 WHERE id = 903");
+// Campi personalizzati
+$post_c = ['c_etichetta' => ['Tipo di analisi', 'Referente del gruppo', '', 'Allegato'], 'c_tipo' => ['select', 'text', 'text', 'file'], 'c_opzioni' => ['chimica, biologica', '', '', ''], 'c_obbl' => ['1', '0', '0', '0'], 'c_aiuto' => ['', 'es. Prof. Rossi', '', '']];
+$json_c = $campi_svc->jsonDaForm($post_c);
+prova(count(json_decode($json_c, true)) === 2 && $campi_svc->jsonDaForm(['c_etichetta' => ['']]) === null, "campi della risorsa: le righe vuote e i tipi non ammessi (allegati) si scartano");
+$campi_svc->salva(903, $post_c);
+$campi_r = $campi_svc->campi(risorsa($conn, 903));
+prova(count($campi_r) === 2 && $campi_r[0]['nome'] === 'c1' && $campi_r[0]['opzioni'] === ['chimica', 'biologica'] && (int)$campi_r[0]['obbligatorio'] === 1, "campi letti dalla risorsa", json_encode($campi_r));
+[$j_err, $err_r] = $campi_svc->leggi($campi_r, []);
+[$j_ok, $err_ok] = $campi_svc->leggi($campi_r, ['campo_c1' => 'chimica', 'campo_c2' => 'Prof. Neri']);
+prova($j_err === null && count($err_r) === 1 && $err_ok === [] && $j_ok !== null, "risposte: il campo obbligatorio manca → errore; compilato → JSON");
+$qf = prenota_risorsa($conn, risorsa($conn, 903), $u82, $sett(4) . " 09:00:00", 1, 'Con campi', null, ['quantita' => [$id_cont => 2], 'risposte_json' => $j_ok]);
+$pf = prenotazione_risorsa($conn, $qf['codici'][0]);
+prova(!$qf['errore'] && \App\Risorse\ServizioCampiRisorsa::coppie($pf['risposte_json']) === [['Tipo di analisi', 'chimica'], ['Referente del gruppo', 'Prof. Neri']], "risposte ai campi personalizzati salvate con la prenotazione e leggibili");
+$altra = $conn->query("SELECT id FROM risorse WHERE id = 1")->fetch_assoc();
+prova($campi_svc->copiaDa(1, 903) && $campi_svc->campi(risorsa($conn, 1)) !== [] && !$campi_svc->copiaDa(1, 1) && !$campi_svc->copiaDa(1, 902), "copia dei campi da un'altra risorsa");
+// Eliminazione
+\App\Core\App::per($conn)->get(\App\Risorse\RisorsaRepository::class);
+$conn->query("DELETE FROM prenotazioni_risorse WHERE risorsa_id = 903");
+\App\Core\App::per($conn)->get(\App\Risorse\ServizioGestioneRisorse::class)->eliminaODisattiva(903);
+prova((int)db_valore($conn, "SELECT COUNT(*) FROM risorse_contatori WHERE risorsa_id = 903") === 0 && (int)db_valore($conn, "SELECT COUNT(*) FROM risorse_contatori_movimenti WHERE contatore_id = $id_sc") === 0, "risorsa eliminata: spariscono contatori e movimenti");
+
+sezione("Diario di bordo: campi dell'admin, co-conducenti, km, blocco, responsabile, promemoria, Excel");
+$dia_svc = \App\Core\App::per($conn)->get(\App\Risorse\ServizioDiarioBordo::class);
+$q("INSERT INTO personale_ateneo (id, cognome, nome, email, gruppo, docente, attivo) VALUES ('resp.luca', 'Verdi', 'Luca', 'luca.verdi@unical.it', 'pta', 0, 1)");
+$q("INSERT INTO utenti (id, codice_fiscale, nome, cognome, email, ruolo_id) VALUES (84, 'RISOR84XXXXXXXXX', 'Luca', 'Verdi', 'luca.verdi@unical.it', 5)");
+$u84 = $conn->query("SELECT * FROM utenti WHERE id = 84")->fetch_assoc();
+$q("INSERT INTO risorse (id, pagina_id, nome, tipo, luogo, durata_slot, max_slot, anticipo_ore, max_giorni, accesso, approvazione, ripetizione) VALUES (904, 5, 'Auto di servizio', 'veicolo', 'Parcheggio', 60, 2, 0, 90, 'tutti', 0, 0)");
+$q("INSERT INTO risorse_orari (risorsa_id, giorno, dalle, alle) VALUES (904, 1, '08:00', '18:00')");
+prova(isset(TIPI_RISORSA['veicolo']) && $dia_svc->configurazione(['diario_json' => null]) === \App\Risorse\ServizioDiarioBordo::PREDEFINITO, "tipo «Auto o mezzo»; i campi di partenza sono quelli del modulo cartaceo");
+$dia_svc->salvaConfigurazione(904, ['diario_attivo' => '1', 'diario_blocca' => '1'], $campi_svc);
+$r904 = risorsa($conn, 904);
+prova((int)$r904['diario_attivo'] === 1 && (int)$r904['diario_blocca'] === 1 && $r904['diario_json'] === null, "diario attivato con i campi di partenza (nessuna personalizzazione salvata)");
+[$campi904, $ruoli904] = $dia_svc->campi($r904);
+$nome_di = fn($ruolo) => array_search($ruolo, $ruoli904, true);
+prova(count($campi904) === 10 && count($ruoli904) === 7 && $nome_di('km_iniziali') !== false && $nome_di('km_finali') !== false && $nome_di('litri') !== false, "10 campi e 7 ruoli (data, conducente, ore, km, litri) riconosciuti dai nomi", json_encode($ruoli904));
+// Co-conducenti
+$cc_json = $dia_svc->coConducentiDaForm(['conducenti' => ['Rossi Gina', 'Mario Ignoto', '', 'Gina Rossi']]);
+$cc = json_decode($cc_json, true);
+prova(count($cc) === 3 && $cc[0]['email'] === 'gina.rossi@unical.it' && $cc[0]['persona_id'] === 'resp.gina' && $cc[1]['email'] === '' && $cc[1]['persona_id'] === null && $dia_svc->coConducentiDaForm(['conducenti' => ['', ' ']]) === null, "altri conducenti: riconosciuti nell'anagrafe (anche «Nome Cognome»); chi non c'è resta scritto, senza email");
+// Una prenotazione passata di Ugo (u81) con Gina come co-conducente
+$ieri = date('Y-m-d', strtotime('-2 days'));
+$q("INSERT INTO prenotazioni_risorse (risorsa_id, utente_id, nome, cognome, email, inizio, fine, motivo, stato, codice, co_conducenti_json) VALUES (904, 81, 'Ugo', 'Uno', 'ugo@unical.it', '$ieri 08:00:00', '$ieri 12:00:00', 'Trasferta', 'confermata', 'RS-DIARIO1', '" . $conn->real_escape_string($cc_json) . "')");
+$p_d1 = prenotazione_risorsa($conn, 'RS-DIARIO1');
+prova($dia_svc->puoCompilare($p_d1, $u81) && $dia_svc->puoCompilare($p_d1, $u83) && !$dia_svc->puoCompilare($p_d1, $u82) && !$dia_svc->puoCompilare($p_d1, $u84) && !$dia_svc->puoCompilare($p_d1, null), "il diario lo compila chi ha prenotato o un co-conducente indicato; gli altri no");
+$resp_svc->aggiungi(904, 'resp.luca');
+prova($dia_svc->puoCompilare($p_d1, $u84) && $dia_svc->eResponsabile($p_d1, $u84) && !$dia_svc->eResponsabile($p_d1, $u81), "anche un responsabile della risorsa può compilarlo (e solo lui verifica)");
+prova(count($dia_svc->daCompilare($u81)) === 1 && count($dia_svc->daCompilare($u83)) === 1 && $dia_svc->daCompilare($u82) === [] && count($dia_svc->mancanti(904)) === 1, "diari da compilare: per chi ha prenotato e per i co-conducenti; per la risorsa dal responsabile");
+// Blocco delle nuove prenotazioni
+$r904 = risorsa($conn, 904);
+$err_b = prenota_risorsa($conn, $r904, $u81, "$lun 09:00:00", 1, 'Altra trasferta')['errore'];
+prova(str_contains((string)$err_b, 'compila il diario di bordo del viaggio del ' . date('d/m/Y', strtotime($ieri))) && !prenota_risorsa($conn, $r904, $u82, "$lun 09:00:00", 1, 'Altra auto')['errore'], "con il blocco attivo chi non ha compilato il diario non prenota di nuovo; gli altri sì");
+$conn->query("UPDATE risorse SET diario_blocca = 0 WHERE id = 904"); $conn->query("DELETE FROM prenotazioni_risorse WHERE risorsa_id = 904 AND codice <> 'RS-DIARIO1'");
+prova(!prenota_risorsa($conn, risorsa($conn, 904), $u81, "$lun 11:00:00", 1, 'Senza blocco')['errore'], "blocco spento (di partenza): si prenota anche senza diario");
+$conn->query("DELETE FROM prenotazioni_risorse WHERE risorsa_id = 904 AND codice <> 'RS-DIARIO1'");
+// Compilazione
+$v0 = $dia_svc->valoriIniziali($r904, $p_d1);
+prova($v0[$nome_di('data')] === $ieri && $v0[$nome_di('conducente')] === 'Ugo Uno' && $v0[$nome_di('ora_partenza')] === '08:00' && $v0[$nome_di('ora_arrivo')] === '12:00' && !isset($v0[$nome_di('km_iniziali')]), "diario nuovo: data, conducente e ore dalla prenotazione; primo viaggio senza km proposti");
+$base_d = ['campo_' . array_search('Luogo di partenza', array_column($campi904, 'etichetta', 'nome'), true) => 'Arcavacata', 'campo_' . array_search('Luogo di arrivo', array_column($campi904, 'etichetta', 'nome'), true) => 'Catanzaro'];
+$d_post = fn(array $extra) => $extra + $base_d + array_combine(array_map(fn($n) => 'campo_' . $n, array_keys($v0)), array_values($v0));
+$k = fn($ruolo) => 'campo_' . $nome_di($ruolo);
+prova($dia_svc->salva($p_d1, $u82, $d_post([$k('km_iniziali') => '100', $k('km_finali') => '150'])) !== null, "un estraneo non salva il diario");
+prova(str_contains((string)$dia_svc->salva($p_d1, $u81, $d_post([$k('km_iniziali') => '100'])), 'Km finali'), "campo obbligatorio mancante: errore");
+prova(str_contains((string)$dia_svc->salva($p_d1, $u81, $d_post([$k('km_iniziali') => '200', $k('km_finali') => '150'])), 'inferiori ai km iniziali'), "km finali inferiori agli iniziali: rifiutati");
+prova($dia_svc->salva($p_d1, $u83, $d_post([$k('km_iniziali') => '100', $k('km_finali') => '150', $k('litri') => '12,5'])) === null, "il co-conducente compila il diario");
+$d1 = $dia_svc->diarioDi((int)$p_d1['id']);
+prova($d1 && (int)$d1['km_percorsi'] === 50 && (int)$d1['km_iniziali'] === 100 && (float)$d1['litri'] === 12.5 && $d1['compilato_da'] === 'Gina Rossi' && $d1['data'] === $ieri && $d1['conducente'] === 'Ugo Uno', "diario salvato: km percorsi calcolati, litri, chi l'ha compilato", json_encode($d1));
+prova($dia_svc->daCompilare($u81) === [] && $dia_svc->mancanti(904) === [], "compilato: non risulta più da fare");
+// Secondo viaggio: i km iniziali si propongono e non possono essere più bassi
+$oggi_d = date('Y-m-d', strtotime('-1 day'));
+$q("INSERT INTO prenotazioni_risorse (risorsa_id, utente_id, nome, cognome, email, inizio, fine, motivo, stato, codice) VALUES (904, 82, 'Eva', 'Due', 'eva@unical.it', '$oggi_d 09:00:00', '$oggi_d 11:00:00', 'Seconda', 'confermata', 'RS-DIARIO2')");
+$p_d2 = prenotazione_risorsa($conn, 'RS-DIARIO2');
+$v2 = $dia_svc->valoriIniziali($r904, $p_d2);
+prova($v2[$nome_di('km_iniziali')] === '150' && $dia_svc->ultimiKm($p_d2) === 150, "i km iniziali del viaggio dopo sono i km finali dell'ultimo");
+$d_post2 = fn(array $extra) => $extra + $base_d + array_combine(array_map(fn($n) => 'campo_' . $n, array_keys($v2)), array_values($v2));
+prova(str_contains((string)$dia_svc->salva($p_d2, $u82, $d_post2([$k('km_iniziali') => '120', $k('km_finali') => '180'])), 'ultimi km finali registrati (150)'), "km iniziali più bassi dell'ultimo viaggio: rifiutati");
+prova($dia_svc->salva($p_d2, $u82, $d_post2([$k('km_iniziali') => '150', $k('km_finali') => '230'])) === null, "secondo viaggio salvato");
+// Verifica del responsabile e correzione
+prova($dia_svc->verifica($p_d1, $u81) !== null && $dia_svc->verifica($p_d1, $u84) === null && $dia_svc->diarioDi((int)$p_d1['id'])['verificato_da'] === 'Luca Verdi', "solo il responsabile verifica");
+$dia_svc->salva($p_d1, $u84, $d_post([$k('km_iniziali') => '100', $k('km_finali') => '160']));
+$d1b = $dia_svc->diarioDi((int)$p_d1['id']);
+prova((int)$d1b['km_percorsi'] === 60 && $d1b['verificato_il'] === null && $d1b['modificato_il'] !== null, "una correzione azzera la verifica");
+$reg = $dia_svc->registro(904);
+prova($reg['totali'] === ['viaggi' => 2, 'km' => 140, 'litri' => 0.0] && count($reg['righe']) === 2, "registro e totali del responsabile", json_encode($reg['totali']));
+$xls = $dia_svc->esporta(risorsa($conn, 904));
+prova($xls && str_starts_with((string)file_get_contents($xls), 'PK'), "Excel del diario");
+if ($xls) @unlink($xls);
+// Promemoria
+$q("INSERT INTO prenotazioni_risorse (risorsa_id, utente_id, nome, cognome, email, inizio, fine, motivo, stato, codice, co_conducenti_json) VALUES (904, 81, 'Ugo', 'Uno', 'ugo@unical.it', '$ieri 14:00:00', '$ieri 16:00:00', 'Terzo', 'confermata', 'RS-DIARIO3', '" . $conn->real_escape_string($cc_json) . "')");
+$EMAIL = [];
+$prom_d = \App\Core\App::per($conn)->get(\App\Risorse\PromemoriaPrenotazioni::class);
+$n1 = $prom_d->inviaPromemoria();
+$dest_d = array_column(array_filter($EMAIL, fn($e) => str_contains($e['oggetto'], 'Diario di bordo da compilare')), 'a');
+prova(in_array('ugo@unical.it', $dest_d, true) && in_array('gina.rossi@unical.it', $dest_d, true) && str_contains($EMAIL[0]['corpo'] ?? '', 'diario_bordo.php?c=RS-DIARIO3'), "promemoria del diario: a chi ha prenotato e ai co-conducenti con il link", json_encode($dest_d));
+$EMAIL = [];
+prova($prom_d->inviaPromemoria() === 0 && $EMAIL === [], "il promemoria del diario parte una volta sola");
+// Campi personalizzati dell'admin con ruoli
+$dia_svc->salvaConfigurazione(904, ['diario_attivo' => '1', 'c_etichetta' => ['Giorno', 'Odometro partenza', 'Odometro arrivo', 'Note'], 'c_tipo' => ['date', 'number', 'number', 'textarea'], 'c_opzioni' => ['', '', '', ''],
+    'c_obbl' => ['1', '1', '1', '0'], 'c_aiuto' => ['', '', '', ''], 'ruolo_data' => 'Giorno', 'ruolo_km_iniziali' => 'Odometro partenza', 'ruolo_km_finali' => 'Odometro arrivo', 'ruolo_litri' => 'Inesistente'], $campi_svc);
+[$camp_c, $ruoli_c] = $dia_svc->campi(risorsa($conn, 904));
+prova(count($camp_c) === 4 && array_values($ruoli_c) === ['data', 'km_iniziali', 'km_finali'], "campi personalizzati: i ruoli seguono le etichette scelte (un'etichetta che non c'è si scarta)", json_encode($ruoli_c));
+$nm = array_flip(array_column($camp_c, 'etichetta', 'nome'));
+$p_x = ['campo_' . $nm['Giorno'] => $oggi_d, 'campo_' . $nm['Odometro partenza'] => '230', 'campo_' . $nm['Odometro arrivo'] => '300'];
+prova($dia_svc->salva($p_d2, $u82, $p_x) === null && (int)$dia_svc->diarioDi((int)$p_d2['id'])['km_percorsi'] === 70, "i controlli e i km percorsi funzionano con i campi rinominati dall'admin");
+$conn->query("DELETE FROM prenotazioni_risorse WHERE risorsa_id = 904");
+sezione("Cruscotto del responsabile: scadenze con avvisi e rinnovo, numeri del periodo, chi può vederlo, Excel");
+$scad_svc = \App\Core\App::per($conn)->get(\App\Risorse\ServizioScadenzeRisorsa::class);
+$cru_svc = \App\Core\App::per($conn)->get(\App\Risorse\CruscottoRisorsa::class);
+$q("INSERT INTO risorse (id, pagina_id, nome, tipo, luogo, durata_slot, max_slot, anticipo_ore, max_giorni, accesso, approvazione, ripetizione) VALUES (905, 5, 'Furgone', 'veicolo', 'Garage', 60, 4, 0, 90, 'tutti', 1, 0)");
+$q("INSERT INTO risorse_orari (risorsa_id, giorno, dalle, alle) SELECT 905, g, '08:00', '18:00' FROM (SELECT 1 g UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7) x");
+$resp_svc->aggiungi(905, 'resp.luca');
+$oggi_c = date('Y-m-d');
+prova(\App\Risorse\ServizioScadenzeRisorsa::stato(['scade_il' => date('Y-m-d', strtotime('+10 days')), 'preavviso_giorni' => 30])['stato'] === 'in_scadenza'
+    && \App\Risorse\ServizioScadenzeRisorsa::stato(['scade_il' => date('Y-m-d', strtotime('+90 days')), 'preavviso_giorni' => 30])['stato'] === 'ok'
+    && \App\Risorse\ServizioScadenzeRisorsa::stato(['scade_il' => date('Y-m-d', strtotime('-1 day')), 'preavviso_giorni' => 30]) === ['stato' => 'scaduta', 'giorni' => -1], "stato di una scadenza: in regola, in scadenza (entro il preavviso), scaduta");
+prova(str_contains((string)$scad_svc->salva(905, 0, ['nome' => '', 'scade_il' => '2030-01-01'])[0], 'Scrivi cosa scade') && str_contains((string)$scad_svc->salva(905, 0, ['nome' => 'Bollo', 'scade_il' => '2030-02-31'])[0], 'data'), "scadenza senza nome o con data impossibile: rifiutata");
+[$e1, $id_bollo] = $scad_svc->salva(905, 0, ['nome' => 'Bollo', 'scade_il' => date('Y-m-d', strtotime('+10 days')), 'preavviso_giorni' => '30']);
+[$e2, $id_ass] = $scad_svc->salva(905, 0, ['nome' => 'Assicurazione', 'scade_il' => date('Y-m-d', strtotime('-2 days')), 'preavviso_giorni' => '15', 'note' => 'Polizza 123']);
+[$e3] = $scad_svc->salva(905, 0, ['nome' => 'Tagliando', 'scade_il' => date('Y-m-d', strtotime('+200 days'))]);
+prova($e1 === null && $e2 === null && $e3 === null && count($scad_svc->elenco(905)) === 3 && $scad_svc->elenco(905)[0]['nome'] === 'Assicurazione', "tre scadenze inserite dall'admin, in ordine di data");
+prova(array_column($scad_svc->daControllare([905]), 'nome') === ['Assicurazione', 'Bollo'] && $scad_svc->daControllare([]) === [], "il responsabile vede solo quelle scadute o in scadenza");
+$EMAIL = [];
+$prom_c = \App\Core\App::per($conn)->get(\App\Risorse\PromemoriaPrenotazioni::class);
+$prom_c->inviaPromemoria();
+$og_c = array_column(array_filter($EMAIL, fn($e) => str_contains($e['oggetto'], 'Furgone')), 'oggetto');
+sort($og_c);
+prova($og_c === ['In scadenza: Bollo – Furgone', 'Scaduta: Assicurazione – Furgone'] && str_contains(implode(' ', array_column($EMAIL, 'corpo')), 'risorse_cruscotto.php?r=905'), "il cron avvisa il responsabile: una email per quella in scadenza e una per quella scaduta, con il link al cruscotto", json_encode($og_c));
+$EMAIL = [];
+$prom_c->inviaPromemoria();
+prova(!array_filter($EMAIL, fn($e) => str_contains($e['oggetto'], 'Furgone')), "gli avvisi di scadenza partono una volta sola");
+prova(str_contains((string)$scad_svc->rinnova(905, $id_ass, date('Y-m-d', strtotime('-1 day'))), 'futura') && str_contains((string)$scad_svc->rinnova(904, $id_ass, date('Y-m-d', strtotime('+300 days'))), 'non trovata'), "rinnovo con data non futura o di un'altra risorsa: rifiutato");
+prova($scad_svc->rinnova(905, $id_ass, date('Y-m-d', strtotime('+365 days'))) === null && $scad_svc->elenco(905)[0]['nome'] !== 'Assicurazione' && array_column($scad_svc->daControllare([905]), 'nome') === ['Bollo'], "rinnovata: torna in regola e sparisce dall'avviso");
+$q("UPDATE risorse_scadenze SET scade_il = '" . date('Y-m-d', strtotime('-1 day')) . "' WHERE id = $id_ass");
+$EMAIL = [];
+$prom_c->inviaPromemoria();
+prova(count(array_filter($EMAIL, fn($e) => str_contains($e['oggetto'], 'Scaduta: Assicurazione'))) >= 1, "dopo il rinnovo l'avviso si azzera: se scade di nuovo, riparte");
+// Prenotazioni del periodo
+$lun_c = date('Y-m-d', strtotime('-3 days'));
+$q("INSERT INTO prenotazioni_risorse (risorsa_id, utente_id, nome, cognome, email, inizio, fine, motivo, stato, codice) VALUES
+    (905, 81, 'Ugo', 'Uno', 'ugo@unical.it', '$lun_c 09:00:00', '$lun_c 11:00:00', 'Uscita 1', 'confermata', 'RS-CRU1'),
+    (905, 81, 'Ugo', 'Uno', 'ugo@unical.it', '$lun_c 14:00:00', '$lun_c 15:00:00', 'Uscita 2', 'confermata', 'RS-CRU2'),
+    (905, 82, 'Eva', 'Due', 'eva@unical.it', '$lun_c 11:00:00', '$lun_c 12:00:00', 'Uscita 3', 'confermata', 'RS-CRU3'),
+    (905, 82, 'Eva', 'Due', 'eva@unical.it', '$lun_c 16:00:00', '$lun_c 17:00:00', 'Rifiutata', 'rifiutata', 'RS-CRU4'),
+    (905, 83, 'Gina', 'Rossi', 'gina.rossi@unical.it', '$lun_c 17:00:00', '$lun_c 18:00:00', 'Annullata', 'annullata', 'RS-CRU5')");
+$r905 = risorsa($conn, 905);
+[$dal_c, $al_c] = \App\Risorse\CruscottoRisorsa::periodo('30', null, null, $oggi_c);
+$dc = $cru_svc->dati($r905, $dal_c, $al_c);
+prova($dc['conteggi']['totale'] === 5 && $dc['conteggi']['confermata'] === 3 && $dc['conteggi']['rifiutata'] === 1 && $dc['conteggi']['annullata'] === 1, "conteggi per stato nel periodo", json_encode($dc['conteggi']));
+prova($dc['ore'] == 4.0 && $dc['ore_aperte'] > 100 && $dc['utilizzo'] !== null && $dc['utilizzo'] <= 5, "ore prenotate (solo le confermate) e utilizzo sulle ore di apertura", json_encode([$dc['ore'], $dc['ore_aperte'], $dc['utilizzo']]));
+prova($dc['rifiutate_pct'] === 25, "percentuale di rifiuti tra le richieste decise (la risorsa richiede approvazione)", json_encode($dc['rifiutate_pct']));
+prova($dc['utenti'][0]['email'] === 'ugo@unical.it' && $dc['utenti'][0]['prenotazioni'] === 2 && $dc['utenti'][0]['ore'] == 3.0 && count($dc['utenti']) === 2, "chi la usa di più", json_encode($dc['utenti']));
+$g_c = (int)date('N', strtotime($lun_c));
+prova(($dc['fasce'][$g_c][9] ?? 0) === 1 && ($dc['fasce'][$g_c][14] ?? 0) === 1 && ($dc['fasce'][$g_c][16] ?? 0) === 0 && count($dc['mesi']) >= 1, "fasce orarie e mesi: contano solo le prenotazioni confermate");
+prova(count($dc['scadenze']) === 3 && $dc['diario'] === null, "scadenze incluse; senza diario attivo non c'è la parte km");
+$q("UPDATE risorse SET diario_attivo = 1 WHERE id = 905");
+$p_cr = prenotazione_risorsa($conn, 'RS-CRU1');
+$q("INSERT INTO risorse_diario (prenotazione_id, risorsa_id, data, km_iniziali, km_finali, km_percorsi, litri, compilato_da) VALUES ({$p_cr['id']}, 905, '$lun_c', 1000, 1200, 200, 14, 'Ugo Uno')");
+$dc2 = $cru_svc->dati(risorsa($conn, 905), $dal_c, $al_c);
+prova($dc2['diario']['km'] === 200 && $dc2['diario']['viaggi'] === 1 && $dc2['diario']['consumo'] === 7.0 && $dc2['diario']['km_medi'] === 200 && $dc2['diario']['senza_diario'] === 2, "diario: km, consumo l/100 km, km a viaggio e viaggi senza diario", json_encode($dc2['diario']));
+$xls_c = $cru_svc->esporta(risorsa($conn, 905), $dal_c, $al_c);
+prova($xls_c && str_starts_with((string)file_get_contents($xls_c), 'PK'), "Excel del cruscotto");
+if ($xls_c) @unlink($xls_c);
+$u_admin = ['id' => 1, 'ruolo_id' => 1, 'email' => 'admin@unical.it', 'ruoli_secondari' => ''];
+prova($cru_svc->puoVedere($u84, 905) && !$cru_svc->puoVedere($u84, 999) && !$cru_svc->puoVedere($u81, 905) && $cru_svc->puoVedere($u_admin, 905) && !$cru_svc->puoVedere(null, 905), "il cruscotto lo vedono il responsabile di quella risorsa e gli amministratori");
+[$d1_c, $d2_c] = \App\Risorse\CruscottoRisorsa::periodo('altro', '2026-03-01', '2026-03-31', '2026-10-14');
+prova($d1_c === '2026-03-01' && $d2_c === '2026-03-31' && \App\Risorse\CruscottoRisorsa::periodo('boh', null, null, '2026-10-14')[0] === '2026-09-14' && \App\Risorse\CruscottoRisorsa::periodo('anno', null, null, '2026-10-14')[0] === '2026-01-01', "periodi: intervallo scelto, anno corrente, valore non valido = ultimi 30 giorni");
+$conn->query("DELETE FROM risorse WHERE id = 905"); $risorse_repo_c = \App\Core\App::per($conn)->get(\App\Risorse\RisorsaRepository::class); $risorse_repo_c->elimina(905);
+prova((int)db_valore($conn, "SELECT COUNT(*) FROM risorse_scadenze WHERE risorsa_id = 905") === 0, "risorsa eliminata: spariscono anche le sue scadenze");
+$conn->query("DELETE FROM prenotazioni_risorse WHERE risorsa_id = 905");
+
 sezione("Abilitazioni per perimetro");
 // Area 2: progetto FSL 20 + evento 21 non FSL; area 1: evento FSL 10
 $q("INSERT INTO eventi (id, pagina_id, titolo, tipo) VALUES (21, 2, 'Evento FSL no', 'evento')");
@@ -719,6 +991,140 @@ $conn->query("UPDATE pratiche SET stato = 'in_lavorazione', esito_seduta = 'rinv
 applica_esiti_seduta($conn, $s61, 50);
 prova(pratica($conn, $pc)['seduta_id'] === null && pratica($conn, $pc)['stato'] === 'in_lavorazione', "pratica rinviata: torna senza seduta per la prossima");
 
+sezione("Verbale punto per punto: testi dei punti, pratiche sotto il punto giusto, testata e piede come nel modello");
+$sv62 = \App\Core\App::per($conn)->get(\App\Didattica\ServizioSedute::class);
+$id62 = $sv62->salva(0, ['organo' => 'Consiglio Unificato di prova', 'anno_accademico' => '2025/2026', 'data' => '2026-09-07', 'ora_inizio' => '15:30', 'ora_fine' => '', 'luogo' => "l'aula L3", 'odg' => "Comunicazioni\n2) Pratiche studenti\nOrario lezioni\nVarie ed eventuali",
+                       'presenze' => '', 'segretario' => 'Dott.ssa Segretaria', 'coordinatore' => 'Prof. Coordinatore', 'consiglio_id' => null, 'numero_verbale' => '8']);
+$pu = \App\Core\App::per($conn)->get(\App\Didattica\ServizioPuntiSeduta::class);
+$s62 = seduta_didattica($conn, $id62);
+$p62 = $pu->punti($s62);
+prova(array_column($p62, 'titolo') === ['Comunicazioni', 'Pratiche studenti', 'Orario lezioni', 'Varie ed eventuali'] && array_column($p62, 'tipo') === ['testo', 'pratiche', 'testo', 'testo'], "i punti nascono dall'o.d.g. (senza numerazione); «pratiche» nel titolo = punto delle pratiche", json_encode(array_column($p62, 'tipo')));
+$t62 = []; foreach ($p62 as $pt) $t62[(int)$pt['id']] = '';
+$t62[(int)$p62[0]['id']] = '<p style="color:red" onclick="x()">Il Coordinatore <strong>comunica</strong> che <em>tutto</em> procede.</p><script>alert(1)</script><p>Seconda riga.</p>';
+$t62[(int)$p62[2]['id']] = '<ul><li>Primo orario</li><li>Secondo orario</li></ul>';
+$pu->salva($s62, $t62, []);
+$p62 = $pu->punti($s62);
+prova(!str_contains($p62[0]['testo'], 'script') && !str_contains($p62[0]['testo'], 'onclick') && !str_contains($p62[0]['testo'], 'style') && str_contains($p62[0]['testo'], '<strong>comunica</strong>'), "il testo del punto è ripulito (niente script né attributi)", $p62[0]['testo']);
+// Una pratica sotto il punto delle pratiche
+$conn->query("UPDATE pratiche SET seduta_id = $id62 WHERE id = $pb");
+$dopo62 = fn() => genera_verbale_pratiche($conn, seduta_didattica($conn, $id62), pratiche_per_esportazione($conn, \App\Core\App::per($conn)->get(\App\Didattica\SedutaRepository::class)->idPratiche($id62)));
+$zip62 = function ($f, $parte) { $z = new ZipArchive(); $r = ''; if ($f && $z->open($f) === true) { $r = (string)$z->getFromName($parte); $z->close(); } return $r; };
+$f62 = $dopo62(); $d62 = $zip62($f62, 'word/document.xml'); $h62 = $zip62($f62, 'word/header1.xml'); $ft62 = $zip62($f62, 'word/footer1.xml'); @unlink($f62);
+$tx62 = html_entity_decode(strip_tags(str_replace('</w:p>', "\n", $d62)));
+prova(@simplexml_load_string($d62) !== false && @simplexml_load_string($h62) !== false && @simplexml_load_string($ft62) !== false, "verbale: XML di corpo, testata e piede ben formato (Word lo apre senza errori)");
+$cogn62 = mb_strtoupper((string)pratica($conn, $pb)['cognome']);
+$tx62 = mb_substr($tx62, (int)mb_strpos($tx62, 'dichiara aperta')); // dopo l'elenco dell'o.d.g. dell'incipit
+$ip = mb_strpos($tx62, $cogn62);
+prova(mb_strpos($tx62, 'Il Coordinatore comunica che tutto procede.') !== false && mb_strpos($tx62, 'Seconda riga.') !== false && mb_strpos($tx62, "1. Comunicazioni") < mb_strpos($tx62, 'comunica che') && $ip > mb_strpos($tx62, '2. Pratiche studenti') && $ip < mb_strpos($tx62, '3. Orario lezioni'),
+      "verbale: il testo di ogni punto sotto il suo titolo e le pratiche sotto il punto delle pratiche");
+prova(str_contains($tx62, '• Primo orario') || (str_contains($tx62, '•') && str_contains($tx62, 'Primo orario') && str_contains($tx62, 'Secondo orario')), "verbale: elenchi puntati nel testo del punto");
+prova(str_contains($tx62, '4. Varie ed eventuali') && str_contains($tx62, '…'), "verbale: un punto senza testo resta con «…» da completare");
+prova(str_contains($h62, 'Verbale n. 8') && str_contains($h62, '07 settembre 2026') && str_contains($ft62, 'Dott.ssa Segretaria') && str_contains($ft62, 'Segretario verbalizzante') && str_contains($ft62, 'Prof. Coordinatore'), "testata «Verbale n. 8 – 07 settembre 2026» e firmatari nel piè di pagina");
+// Il testo scritto resta se l'o.d.g. cambia ordine; due punti per le pratiche: ognuna sotto quello scelto
+$sv62->salva($id62, ['organo' => 'Consiglio Unificato di prova', 'anno_accademico' => '2025/2026', 'data' => '2026-09-07', 'ora_inizio' => '15:30', 'ora_fine' => '', 'luogo' => "l'aula L3", 'odg' => "Orario lezioni\nComunicazioni\nPratiche studenti\nPratiche di laurea\nVarie ed eventuali",
+                       'presenze' => '', 'segretario' => 'Dott.ssa Segretaria', 'coordinatore' => 'Prof. Coordinatore', 'consiglio_id' => null, 'numero_verbale' => '8']);
+$p62 = $pu->punti(seduta_didattica($conn, $id62));
+prova(array_column($p62, 'titolo') === ['Orario lezioni', 'Comunicazioni', 'Pratiche studenti', 'Pratiche di laurea', 'Varie ed eventuali'] && str_contains($p62[0]['testo'], 'Primo orario') && str_contains($p62[1]['testo'], 'comunica'), "o.d.g. riordinato: i testi restano ai loro punti");
+$pu->salva(seduta_didattica($conn, $id62), [], ['0' => 'testo'], [$pb => (string)$p62[3]['id']]);
+$f62 = $dopo62(); $tx62 = html_entity_decode(strip_tags(str_replace('</w:p>', "\n", $zip62($f62, 'word/document.xml')))); @unlink($f62);
+$tx62 = mb_substr($tx62, (int)mb_strpos($tx62, 'dichiara aperta'));
+$ip = mb_strpos($tx62, $cogn62);
+prova($ip !== false && $ip > mb_strpos($tx62, '4. Pratiche di laurea') && $ip < mb_strpos($tx62, '5. Varie ed eventuali'), "pratica assegnata al secondo punto delle pratiche: compare lì e non nel primo");
+$conn->query("DELETE FROM didattica_sedute_punti WHERE seduta_id = $id62"); $conn->query("UPDATE pratiche SET seduta_id = NULL, punto_id = NULL WHERE id = $pb");
+prova(count($pu->punti(seduta_didattica($conn, $id62))) === 5, "sedute senza punti (precedenti): si ricavano dall'o.d.g. alla prima apertura");
+$sv62->elimina($id62);
+prova((int)$conn->query("SELECT COUNT(*) c FROM didattica_sedute_punti WHERE seduta_id = $id62")->fetch_assoc()['c'] === 0, "seduta eliminata: spariscono anche i suoi punti");
+
+sezione("Archivio verbali: importazione di PDF vecchi, dati dal nome del file, ricerca nel testo");
+use App\Didattica\ArchivioVerbali as AV;
+$g1 = AV::indovina('2024-2025/Verbale_08_2025-01-20.pdf');
+prova($g1 === ['data' => '2025-01-20', 'numero' => '8', 'anno_accademico' => '2024/2025'], "nome del file e cartella: data, numero e anno accademico", json_encode($g1));
+prova(AV::indovina('Verbale n. 12 del 07-09-2026.pdf') === ['data' => '2026-09-07', 'numero' => '12', 'anno_accademico' => null] && AV::indovina('verbale 7 settembre 2026.pdf')['data'] === '2026-09-07' && AV::indovina('Verbale_07092026.PDF')['data'] === '2026-09-07'
+      && AV::indovina('scansione.pdf') === ['data' => null, 'numero' => null, 'anno_accademico' => null] && AV::indovina('Verbale 31-02-2026.pdf')['data'] === null && AV::indovina('Verbale 07-09-2026.pdf')['numero'] === null, "varianti del nome (numero, mese in lettere, data compatta) e nomi senza dati o con date impossibili");
+prova(AV::annoAccademico('2026-09-07') === '2026/2027' && AV::annoAccademico('2026-08-31') === '2025/2026' && AV::dataDa('Il giorno 07 del mese di settembre 2026 alle ore 15:30') === '2026-09-07' && AV::numeroDa('Verbale n. 8 – 07 settembre 2026') === '8', "anno accademico dalla data; data e numero dal testo del verbale");
+$arch = \App\Core\App::per($conn)->get(AV::class);
+$sorgente = RADICE_SITO . '/documentazione/Pratiche_verbali_iter.pdf';
+$tmp_a = sys_get_temp_dir() . '/arch_a.pdf'; copy($sorgente, $tmp_a);
+$r1 = $arch->importa($tmp_a, 'Verbale_08_2026-09-07.pdf', '2025-2026/Verbale_08_2026-09-07.pdf', null, 'Consiglio unificato di prova');
+prova($r1['esito'] === 'ok' && $r1['completo'] === true, "verbale importato con data e organo: completo", json_encode($r1));
+$v1 = seduta_didattica($conn, (int)$r1['id']);
+prova($v1['origine'] === 'importato' && $v1['data'] === '2026-09-07' && $v1['numero_verbale'] === '8' && $v1['anno_accademico'] === '2025/2026' && str_contains($v1['testo_ricerca'], 'iter completo') && is_file((string)$arch->percorsoFile($v1)), "dati ricavati, testo del PDF letto, file in cartella protetta", substr((string)$v1['testo_ricerca'], 0, 80));
+prova($arch->importa($tmp_a, 'copia.pdf', 'copia.pdf', null, 'X')['esito'] === 'doppio', "lo stesso PDF caricato due volte non crea un doppione");
+$tmp_b = sys_get_temp_dir() . '/arch_b.pdf'; file_put_contents($tmp_b, "non sono un pdf");
+prova($arch->importa($tmp_b, 'finto.pdf', 'finto.pdf', null, 'X')['esito'] === 'errore', "un file che non è un PDF viene rifiutato");
+$tmp_c = sys_get_temp_dir() . '/arch_c.pdf'; file_put_contents($tmp_c, "%PDF-1.4\n" . str_repeat('x', 300) . "\n%%EOF");
+$r2 = $arch->importa($tmp_c, 'scansione.pdf', 'scansione.pdf', null, '');
+prova($r2['esito'] === 'ok' && $r2['completo'] === false, "PDF senza data né organo: archiviato ma da completare", json_encode($r2));
+$rep_arch = \App\Core\App::per($conn)->get(\App\Didattica\SedutaRepository::class);
+prova(array_column($rep_arch->archivio(['q' => 'iter completo'], null), 'id') === [(string)$r1['id']] && array_column($rep_arch->archivio(['q' => 'itercompleto'], null), 'id') === [(string)$r1['id']] && !$rep_arch->archivio(['q' => 'parolainesistente'], null), "ricerca nel testo del PDF (anche senza spazi) e nessun risultato per parole che non ci sono");
+prova(array_column($rep_arch->archivio(['tipo' => 'incompleto'], null), 'id') === [(string)$r2['id']] && count($rep_arch->archivio(['tipo' => 'importato'], null)) === 2 && count($rep_arch->archivio(['anno_accademico' => '2025/2026'], null)) === 1, "filtri: da completare, importati, anno accademico");
+prova(!in_array((string)$r1['id'], array_column($rep_arch->elenco(null), 'id'), true), "i verbali importati non compaiono tra le sedute del portale");
+$cons_arch = (int)array_key_first(consigli_didattica($conn));
+prova($arch->salvaDati((int)$r2['id'], ['consiglio_id' => $cons_arch, 'data' => '2024-11-05', 'numero_verbale' => '3', 'odg' => "Comunicazioni\nPratiche"], consigli_didattica($conn)) === null
+      && ($v2 = seduta_didattica($conn, (int)$r2['id'])) && $v2['data'] === '2024-11-05' && $v2['anno_accademico'] === '2024/2025' && $v2['consiglio_id'] !== null && $v2['organo'] !== '' && $arch->salvaDati((int)$r2['id'], ['organo' => ''], []) !== null, "dati completati dopo l'importazione (consiglio, data, anno accademico dalla data); senza organo non si salva");
+prova(count($rep_arch->archivio(['q' => 'Pratiche'], [$cons_arch])) >= 1 && !$rep_arch->archivio(['q' => 'Pratiche'], [$cons_arch + 999]), "un referente vede solo i verbali del proprio consiglio");
+$pdf_nuovo = (new \App\Infrastructure\Pdf\Documento(['piede' => 'prova']));
+$pdf_nuovo->paragrafo('Il Consiglio approva all\'unanimità il calendario degli esami.', ['dopo' => 4]);
+$tmp_d = sys_get_temp_dir() . '/arch_d.pdf'; file_put_contents($tmp_d, $pdf_nuovo->pdf());
+prova(str_contains((new \App\Infrastructure\Pdf\TestoPdf())->estrai((string)file_get_contents($tmp_d)), 'calendario degli esami'), "testo letto anche dai PDF generati dal portale");
+$f_vecchio = (string)$arch->percorsoFile($v1);
+$arch->elimina($v1);
+prova(seduta_didattica($conn, (int)$r1['id']) === null && !is_file($f_vecchio), "verbale importato eliminato con il suo file");
+$arch->elimina(seduta_didattica($conn, (int)$r2['id']));
+foreach ([$tmp_a, $tmp_b, $tmp_c, $tmp_d] as $t_) @unlink($t_);
+
+sezione("Pagina pubblica dei verbali con password: accessi, pubblicazione, omissis, registro");
+use App\Didattica\ServizioVerbaliPubblici as VP;
+$vp = \App\Core\App::per($conn)->get(VP::class);
+$rep_vp = \App\Core\App::per($conn)->get(\App\Didattica\AccessoVerbaliRepository::class);
+$cons_vp = consigli_didattica($conn); $cA = (int)array_key_first($cons_vp); $cB = (int)array_keys($cons_vp)[1];
+prova(preg_match('/^[A-Za-z2-9]{4}-[A-Za-z2-9]{4}-[A-Za-z2-9]{4}$/', VP::generaPassword()) === 1 && VP::generaPassword() !== VP::generaPassword() && VP::ipAnonimo('151.20.33.77') === '151.20.33.0' && VP::ipAnonimo('2001:db8:1:2:3:4:5:6') === '2001:db8:1:2::' && VP::ipAnonimo('non un ip') === '', "password leggibili a gruppi; IP anonimizzato");
+prova($vp->crea('', '', null, [$cA], false, $cons_vp, 'Ufficio')[0] !== null && $vp->crea('Esterni', '', null, [], false, $cons_vp, 'Ufficio')[0] !== null && $vp->crea('Esterni', 'corta', null, [$cA], false, $cons_vp, 'Ufficio')[0] !== null && $vp->crea('Esterni', '', null, [99999], false, $cons_vp, 'Ufficio')[0] !== null, "accesso senza nome, senza consigli, con password troppo corta o consiglio inesistente: rifiutato");
+[$e1, $id1, $pw1] = $vp->crea('Rappresentanti A', '', null, [$cA], false, $cons_vp, 'Ufficio didattico');
+[$e2, $id2, $pw2] = $vp->crea('Tutti i consigli', 'password-scelta-lunga', null, [], true, $cons_vp, 'Ufficio didattico');
+$a1 = $rep_vp->perId($id1);
+prova($e1 === null && $e2 === null && $pw2 === 'password-scelta-lunga' && $a1['password_hash'] !== $pw1 && password_verify($pw1, $a1['password_hash']) && $a1['ambiti_json'] === json_encode([$cA]) && $rep_vp->perId($id2)['ambiti_json'] === '["*"]', "accesso creato: password solo come impronta (hash), consigli salvati");
+// Verbale firmato del consiglio A con un PDF vero
+$dir_vp = RADICE_SITO . '/uploads/verbali/'; if (!is_dir($dir_vp)) mkdir($dir_vp, 0755, true);
+file_put_contents($dir_vp . 'prova_pub.pdf', "%PDF-1.4\nverbale intero\n%%EOF");
+$q("INSERT INTO didattica_sedute (id, consiglio_id, organo, data, anno_accademico, numero_verbale, verbale_stato, verbale_pdf) VALUES (701, $cA, 'Consiglio A', '2026-09-07', '2025/2026', '8', 'firmato', 'uploads/verbali/prova_pub.pdf')");
+$q("INSERT INTO didattica_sedute (id, consiglio_id, organo, data, verbale_stato, verbale_pdf) VALUES (702, $cB, 'Consiglio B', '2026-09-08', 'firmato', 'uploads/verbali/prova_pub.pdf'), (703, $cA, 'Consiglio A bozza', '2026-09-09', 'segretario', 'uploads/verbali/prova_pub.pdf')");
+$ac1 = $rep_vp->perId($id1); $ac2 = $rep_vp->perId($id2);
+prova(!$vp->verbali($ac1) && $vp->file($ac1, 701) === null, "un verbale non pubblicabile non si vede né si scarica, nemmeno conoscendo l'indirizzo");
+$sp = seduta_didattica($conn, 701);
+prova($vp->pubblica($sp, 'integrale', false, null, 'Ufficio') !== null && $vp->pubblica(seduta_didattica($conn, 703), 'integrale', true, null, 'Ufficio') !== null && $vp->pubblica($sp, 'omissis', false, null, 'Ufficio') !== null, "si pubblica solo con la conferma «niente dati personali» o con il PDF con gli omissis, e solo se il verbale è firmato");
+prova($vp->pubblica($sp, 'integrale', true, null, 'Ufficio') === null && array_map('intval', array_column($vp->verbali($ac1), 'id')) === [701] && !$vp->verbali(['ambiti_json' => json_encode([$cB])] + $ac1), "pubblicato: lo vede chi ha il consiglio giusto, non chi ha un altro consiglio");
+$q("UPDATE didattica_sedute SET pubblicabile = 1 WHERE id IN (702, 703)");
+prova(array_map('intval', array_column($vp->verbali($ac2), 'id')) === [702, 701] && array_map('intval', array_column($vp->verbali($ac1), 'id')) === [701], "«tutti i consigli» vede tutti i pubblicabili firmati; la bozza in firma non si vede mai", json_encode(array_column($vp->verbali($ac2), 'id')));
+$f_pub = $vp->file($ac1, 701);
+prova($f_pub && str_ends_with($f_pub['percorso'], 'prova_pub.pdf') && $f_pub['nome'] === 'Verbale_07_09_2026.pdf' && $vp->file($ac1, 702) === null && $vp->file($ac2, 703) === null, "download: nome e percorso corretti; consiglio non autorizzato e verbale non firmato rifiutati");
+file_put_contents($dir_vp . 'omissis_tmp.pdf', "%PDF-1.4\nverbale con omissis\n%%EOF");
+prova($vp->pubblica($sp, 'omissis', false, $dir_vp . 'omissis_tmp.pdf', 'Ufficio') === null && ($f_om = $vp->file($ac1, 701)) && str_contains((string)file_get_contents($f_om['percorso']), 'omissis') && str_starts_with(basename($f_om['percorso']), 'pubblico_701_'), "con la versione con omissis si scarica quella, non il PDF firmato");
+file_put_contents($dir_vp . 'finto.txt', 'non pdf');
+prova($vp->pubblica($sp, 'omissis', false, $dir_vp . 'finto.txt', 'Ufficio') !== null, "la versione con omissis deve essere un PDF");
+$vp->ritira(seduta_didattica($conn, 701));
+prova(!$vp->verbali($ac1) && !is_file($f_om['percorso']) && is_file($dir_vp . 'prova_pub.pdf'), "ritirato: sparisce dalla pagina e la versione con omissis viene cancellata (il PDF firmato resta)");
+// Accesso con password
+$vp->pubblica(seduta_didattica($conn, 701), 'integrale', true, null, 'Ufficio');
+prova($vp->corrente() === null && $vp->accedi('password sbagliata') === 'Password non valida.' && $vp->corrente() === null, "password sbagliata: messaggio generico, nessun accesso");
+prova($vp->accedi($pw1) === null && ($cur = $vp->corrente()) && (int)$cur['id'] === $id1 && array_map('intval', array_column($vp->verbali($cur), 'id')) === [701], "password giusta: entra con il suo accesso");
+$rep_vp->imposta($id1, false);
+prova($vp->corrente() === null, "accesso revocato: la sessione smette di valere subito");
+$rep_vp->imposta($id1, true); $q("UPDATE verbali_accessi SET scade_il = '2020-01-01' WHERE id = $id1");
+prova($vp->accedi($pw1) === 'Password non valida.' && $vp->corrente() === null, "accesso scaduto: la password non vale più");
+$q("UPDATE verbali_accessi SET scade_il = NULL WHERE id = $id1");
+$vp->accedi($pw1); $_SESSION[VP::CHIAVE]['ultimo'] = time() - 4000;
+prova($vp->corrente() === null, "sessione ferma da più di un'ora: si deve rientrare");
+$np = $vp->nuovaPassword($id1);
+prova($np !== '' && $np !== $pw1 && $vp->accedi($pw1) !== null && $vp->accedi($np) === null, "nuova password: la vecchia smette di funzionare");
+$reg = $rep_vp->registro(50);
+$azioni_vp = array_column($reg, 'azione');
+prova(in_array('accesso', $azioni_vp, true) && in_array('rifiutato', $azioni_vp, true) && in_array('scarica', $azioni_vp, true) && !str_contains(json_encode($reg), $pw1), "registro: accessi, tentativi rifiutati e scaricamenti (mai le password)");
+for ($i = 0; $i < 10; $i++) $r_lim = $vp->accedi('tentativo ' . $i);
+prova($r_lim === 'Troppi tentativi: riprova tra qualche minuto.' && $vp->accedi($np) === 'Troppi tentativi: riprova tra qualche minuto.', "troppi tentativi sbagliati: blocco temporaneo anche con la password giusta");
+$vp->esci();
+@unlink($dir_vp . 'prova_pub.pdf'); @unlink($dir_vp . 'omissis_tmp.pdf'); @unlink($dir_vp . 'finto.txt');
+
 sezione("Iter: chi ha avuto la pratica la vede e la integra; email solo ai passaggi");
 $q("INSERT INTO utenti (id, codice_fiscale, nome, cognome, email, ruolo_id) VALUES (99, 'TUTIRE80XXXXXXXX', 'Irene', 'Tutor', 'irene.int@unical.it', 5)");
 $pj = crea_pratica($conn, $m503, $u73, [['etichetta' => 'Corso di studio', 'tipo' => 'corso_studio', 'valore' => 'Corso di laurea in Scienze naturali', 'file' => null, 'nome_file' => null]]);
@@ -1044,6 +1450,100 @@ prova(count($mail_seg) === 1 && str_contains($mail_seg[0]['corpo'], $p_cv['codic
 prova(str_contains((string)corpo_pratiche_verbale(pratiche_per_esportazione($conn, [$id_cv])), 'come insegnamento a scelta'), "nel verbale in Word c'è la richiesta sul piano di studi");
 foreach (glob(RADICE_SITO . '/' . DIR_PRATICHE . '*.pdf') ?: [] as $f_d) @unlink($f_d);
 $_POST = []; unset($_SESSION['auth_meta']);
+
+sezione("Iter con firme: relatore (persona indicata nel modulo), Direttore, tempi per passo, pratiche fuori verbale");
+$iter_svc = \App\Core\App::per($conn)->get(\App\Didattica\ServizioIter::class);
+$fp = \App\Core\App::per($conn)->get(\App\Didattica\FirmaPratica::class);
+$flusso = \App\Core\App::per($conn)->get(\App\Didattica\ServizioFlussoConvalide::class);
+$q("INSERT INTO personale_ateneo (id, cognome, nome, email, gruppo, docente, attivo) VALUES ('neri.paolo', 'Neri', 'Paolo', 'paolo.neri@unical.it', 'docenti', 1, 1), ('neri.dup1', 'Gemelli', 'Anna', 'a1@unical.it', 'docenti', 1, 1), ('neri.dup2', 'Gemelli', 'Anna', 'a2@unical.it', 'docenti', 1, 1)");
+$q("INSERT INTO utenti (id, nome, cognome, email, codice_fiscale, matricola_studente, ruolo_id) VALUES (9302, 'Luca', 'Bianchi', 'luca.b@studenti.unical.it', 'BNCLCU02A01D086K', '245999', 5)");
+$stud_t = ['id' => 9302, 'nome' => 'Luca', 'cognome' => 'Bianchi', 'email' => 'luca.b@studenti.unical.it', 'matricola_studente' => '245999'];
+$campi_t = json_encode([['etichetta' => 'Corso di studio', 'tipo' => 'corso_studio', 'obbligatorio' => true], ['etichetta' => 'Relatore', 'tipo' => 'docente', 'obbligatorio' => true]], JSON_UNESCAPED_UNICODE);
+$iter_t = json_encode([['t' => 'persona', 'campo' => 'Relatore', 'gg' => 3], ['u' => $u_prot, 'gg' => 2], '@cdl', ['t' => 'direttore'], ['t' => 'inesistente'], ['t' => 'persona', 'campo' => '']], JSON_UNESCAPED_UNICODE);
+$q("INSERT INTO didattica_moduli (id, titolo, categoria, tipo, campi_json, destinatari, attivo, ordine, iter_json, giorni_promemoria, domanda_json, verbale_json) VALUES (820, 'Richiesta Tesi di prova', 'Lauree', 'online', '" . $conn->real_escape_string($campi_t) . "', 'studenti', 1, 1, '" . $conn->real_escape_string($iter_t) . "', 7, '{\"pdf\":1,\"bollo\":0,\"oggetto\":\"\",\"destinatario\":\"\",\"chiede\":\"\"}', '{\"sezione\":\"Tesi\"}')");
+$m_t = modulo_didattica($conn, 820);
+prova($iter_svc->definizione($m_t) === [['t' => 'persona', 'u' => null, 'campo' => 'Relatore', 'gg' => 3], ['t' => 'ufficio', 'u' => $u_prot, 'campo' => '', 'gg' => 2], ['t' => 'ufficio', 'u' => '@cdl', 'campo' => '', 'gg' => 0], ['t' => 'direttore', 'u' => null, 'campo' => '', 'gg' => 0]], "passi dell'iter: ufficio, persona del modulo, Direttore; quelli non validi si saltano", json_encode($iter_svc->definizione($m_t)));
+prova($iter_svc->iter($m_t) === [ITER_PERSONA, $u_prot, ITER_CDL, ITER_DIRETTORE] && $iter_svc->passi($m_t) === [0 => 'Ricevuta e da smistare', 1 => 'Firma: Relatore', 2 => 'Ufficio protocollo', 3 => 'Ufficio del corso di studio', 4 => 'Firma del Direttore'], "iter: passi con le firme e i loro nomi", json_encode($iter_svc->passi($m_t)));
+prova($iter_svc->giorniPasso($m_t, 1) === 3 && $iter_svc->giorniPasso($m_t, 2) === 2 && $iter_svc->giorniPasso($m_t, 3) === 7, "tempo massimo del passo; se manca vale quello del modulo");
+prova($iter_svc->iter(['iter_json' => json_encode(['protocollo', '@cdl', '@segreteria'])]) === [$u_prot, ITER_CDL, ITER_SEGRETERIA], "il vecchio formato dell'iter (elenco di uffici) continua a funzionare");
+// La pratica parte dalla firma del relatore
+$risp_t = [['etichetta' => 'Corso di studio', 'tipo' => 'corso_studio', 'valore' => 'Corso di laurea in Biologia', 'file' => null, 'nome_file' => null], ['etichetta' => 'Relatore', 'tipo' => 'docente', 'valore' => 'Neri Paolo', 'file' => null, 'nome_file' => null]];
+$EMAIL = []; $_SERVER['REMOTE_ADDR'] = '10.1.2.3';
+$id_t = crea_pratica($conn, $m_t, $stud_t, $risp_t);
+$p_t = pratica($conn, $id_t);
+$fa = $fp->inAttesa($id_t);
+prova($fa && $fa['email'] === 'paolo.neri@unical.it' && $fa['tipo'] === 'persona' && (int)$fa['passo'] === 1 && (int)$p_t['passo'] === 1 && $p_t['ufficio_id'] === null && $p_t['assegnata_a'] === null && (int)$p_t['firme_attesa'] === 1, "iter che comincia con la firma: la richiesta parte subito al relatore indicato dallo studente");
+$em_rel = array_values(array_filter($EMAIL, fn($e) => $e['a'] === 'paolo.neri@unical.it'));
+prova(count($em_rel) === 1 && str_contains($em_rel[0]['corpo'], 'firma_pratica.php?t=' . $fa['token']) && in_array('luca.b@studenti.unical.it', array_column($EMAIL, 'a'), true) && !in_array('prot@unical.it', array_column($EMAIL, 'a'), true), "email al relatore con il link personale; lo studente è avvisato; il protocollo non riceve ancora nulla");
+prova(\App\Didattica\FasePratica::di($p_t, '') === 'firma' && \App\Didattica\FasePratica::cosaFare('firma', $p_t)['tipo'] === 'attesa', "fase «in attesa di firma»");
+$u_rel = ['id' => 1, 'email' => 'PAOLO.NERI@unical.it']; $u_alt = ['id' => 2, 'email' => 'altro@unical.it'];
+prova($fp->puoFirmare($fa, $u_rel) && !$fp->puoFirmare($fa, $u_alt) && !$fp->puoFirmare($fa, null), "firma solo chi ha l'email a cui è arrivato il link");
+// Firma: PDF della domanda con una firma PAdES in più
+$pdf_dom = (string)file_get_contents(RADICE_SITO . '/' . $p_t['domanda_pdf']);
+$cert_rel = $crea_cert('Paolo Neri', 'NRIPLA70A01D086Q');
+prova($fp->caricaFirmato($fa, 'non un pdf') !== null && $fp->caricaFirmato($fa, str_replace('%%EOF', '%%EOF ', $pdf_dom)) !== null && $fp->inAttesa($id_t) !== null, "PDF non firmato o modificato rifiutato: la richiesta resta in attesa");
+$EMAIL = [];
+$esito_f = $fp->caricaFirmato($fa, $firma_pades($pdf_dom, $cert_rel));
+prova($esito_f === null && $fp->inAttesa($id_t) === null && $fp->perToken($fa['token'])['stato'] === 'firmata' && (int)db_valore($conn, "SELECT COUNT(*) FROM pratiche_eventi WHERE pratica_id = ? AND nome_allegato LIKE 'Firmato\\_%' AND interno = 0", [$id_t]) === 1, "PDF firmato caricato: richiesta chiusa e documento firmato nella pratica, visibile allo studente");
+[$e_n, $m_n] = $flusso->trasmettiAlPasso($id_t, 1, 0, 'Paolo Neri');
+$p_t = pratica($conn, $id_t);
+prova($e_n === null && (int)$p_t['ufficio_id'] === $u_prot && (int)$p_t['passo'] === 2 && in_array('prot@unical.it', array_column($EMAIL, 'a'), true) && $fp->perToken($fa['token'])['firmato_da'] !== '', "dopo la firma la pratica passa al protocollo, che riceve l'email", json_encode([$e_n, $m_n]));
+// Rifiuto del relatore
+$EMAIL = [];
+$id_t2 = crea_pratica($conn, $m_t, $stud_t, $risp_t);
+$fa2 = $fp->inAttesa($id_t2);
+prova($fp->rifiuta($fa2, '  ') !== null && $fp->inAttesa($id_t2) !== null, "il rifiuto richiede il motivo");
+$EMAIL = [];
+prova($fp->rifiuta($fa2, 'Titolo non concordato') === null && $fp->inAttesa($id_t2) === null && pratica($conn, $id_t2)['stato'] === 'integrazione' && in_array('luca.b@studenti.unical.it', array_column($EMAIL, 'a'), true) && str_contains(implode(' ', array_column($EMAIL, 'corpo')), 'Titolo non concordato'), "rifiuto: la pratica torna allo studente come integrazione, con il motivo per email");
+$conn->query("UPDATE pratiche SET stato = 'in_lavorazione' WHERE id = $id_t2");
+prova($fp->avvia($id_t2, 1) === null && $fp->inAttesa($id_t2) !== null && $fp->inAttesa($id_t2)['token'] !== $fa2['token'] && $fp->perToken($fa2['token'])['stato'] === 'rifiutata', "dopo il rifiuto l'ufficio può mandare di nuovo alla firma: nuovo link");
+// Relatore non trovato o ambiguo
+$risp_amb = $risp_t; $risp_amb[1]['valore'] = 'Gemelli Anna';
+$id_t3 = crea_pratica($conn, $m_t, $stud_t, $risp_amb);
+prova($fp->inAttesa($id_t3) === null && str_contains((string)$fp->avvia($id_t3, 1), 'Non trovo l\'email') && (int)db_valore($conn, "SELECT COUNT(*) FROM pratiche_eventi WHERE pratica_id = ? AND interno = 1 AND testo LIKE 'La firma non è partita%'", [$id_t3]) === 1, "relatore ambiguo (due docenti con lo stesso nome): la firma non parte e l'ufficio lo legge nello storico");
+// Solleciti: dopo i giorni del passo, al massimo tre
+$EMAIL = [];
+$conn->query("UPDATE pratiche_firme SET richiesta_il = NOW() - INTERVAL 5 DAY WHERE pratica_id = $id_t2 AND stato = 'attesa'");
+prova($fp->solleciti() === 1 && $fp->solleciti() === 0 && str_contains($EMAIL[0]['oggetto'] ?? '', 'Promemoria') && ($EMAIL[0]['a'] ?? '') === 'paolo.neri@unical.it', "promemoria al relatore dopo 3 giorni, una sola volta per periodo");
+// Direttore: documento dell'ufficio da firmare
+$q("INSERT INTO ufficio_didattica (email, nominativo, compiti, ufficio_id, corsi) VALUES ('seg.cert@unical.it', 'Segreteria Sara', 'pratiche', $u_prot, NULL)");
+$m_d = ['iter_json' => json_encode([$u_prot, ['t' => 'direttore', 'gg' => 4]])];
+$q("INSERT INTO didattica_moduli (id, titolo, categoria, tipo, campi_json, destinatari, attivo, ordine, iter_json, giorni_promemoria, domanda_json, in_verbale) VALUES (821, 'Certificato di prova', 'Certificati', 'online', '[]', 'studenti', 1, 2, '" . $conn->real_escape_string($m_d['iter_json']) . "', 7, '{\"pdf\":1,\"bollo\":0}', 0)");
+$id_d = crea_pratica($conn, modulo_didattica($conn, 821), $stud_t, []);
+prova(str_contains((string)$fp->avvia($id_d, 2), 'Indica prima il Direttore'), "senza il Direttore impostato la firma non parte e dice cosa fare");
+\App\Core\App::per($conn)->get(\App\Sistema\ImpostazioniSistemaRepository::class)->salvaDirettoreConvenzioni('Prof. Direttore', 'direttore@unical.it', '');
+prova(str_contains((string)$fp->avvia($id_d, 1), 'non è una firma'), "un passo che non è una firma non si può mandare alla firma");
+$dir_pr_rel = \App\Core\App::per($conn)->get(\App\Didattica\AllegatiPratiche::class)->cartella(); $cartella_pr = RADICE_SITO . '/' . $dir_pr_rel; @mkdir($cartella_pr, 0755, true);
+file_put_contents($cartella_pr . 'certificato_prova.pdf', $pdf_dom);
+$conn->query("INSERT INTO pratiche_eventi (pratica_id, tipo, autore, testo, allegato, nome_allegato, interno) VALUES ($id_d, 'attivita', 'ufficio', 'Certificato caricato', '" . $dir_pr_rel . "certificato_prova.pdf', 'Certificato.pdf', 0)");
+$err_d = $fp->avvia($id_d, 2);
+prova($err_d === null && ($fd = $fp->inAttesa($id_d)) && $fd['tipo'] === 'direttore' && $fd['email'] === 'direttore@unical.it' && str_ends_with($fd['file_origine'], 'certificato_prova.pdf'), "firma del Direttore: il documento è l'ultimo caricato dall'ufficio (non la domanda)", (string)$err_d);
+$conn->query("DELETE FROM pratiche_firme WHERE pratica_id = $id_d");
+$fa_rel = $fp->inAttesa($id_t2);
+prova(str_ends_with($fa_rel['file_origine'], basename(pratica($conn, $id_t2)['domanda_pdf'])), "firma del relatore: il documento è la domanda dello studente");
+// Tempi per passo e pratiche fuori verbale
+$conn->query("UPDATE pratiche SET stato = 'in_lavorazione', passo = 2, ufficio_id = $u_prot, assegnata_a = NULL, aggiornata_il = NOW() - INTERVAL 3 DAY, promemoria_il = NULL WHERE id = $id_t");
+$conn->query("UPDATE pratiche_firme SET stato = 'annullata' WHERE stato = 'attesa'");
+$EMAIL = [];
+$prom = \App\Core\App::per($conn)->get(\App\Didattica\PromemoriaPratiche::class);
+prova($prom->invia() >= 1 && in_array('prot@unical.it', array_column($EMAIL, 'a'), true) && str_contains(implode(' ', array_column($EMAIL, 'oggetto')), 'ferma da 3 giorni'), "promemoria con il tempo del passo (2 giorni) anche se il modulo ne chiede 7");
+$EMAIL = [];
+$conn->query("UPDATE pratiche SET aggiornata_il = NOW() - INTERVAL 1 DAY, promemoria_il = NULL WHERE id = $id_t");
+prova(!in_array('prot@unical.it', array_column($EMAIL, 'a'), true) && $prom->invia() === 0 || !in_array('prot@unical.it', array_column(array_slice($EMAIL, 0), 'a'), true), "sotto il tempo del passo nessun promemoria");
+prova(!in_array($id_d, array_map('intval', array_column(\App\Core\App::per($conn)->get(\App\Didattica\SedutaRepository::class)->pratichePortabili(), 'id')), true) && in_array($id_t, array_map('intval', array_column(\App\Core\App::per($conn)->get(\App\Didattica\SedutaRepository::class)->pratichePortabili(), 'id')), true), "una pratica di un modulo «fuori verbale» non si porta in seduta");
+$p_d = pratica($conn, $id_d);
+prova(\App\Didattica\FasePratica::cosaFare('lavorazione', $p_d)['testo'] === 'Lavora e concludi la pratica' && \App\Didattica\FasePratica::cosaFare('lavorazione', $p_t)['testo'] !== 'Lavora e concludi la pratica', "fase di lavorazione: «concludi» per le pratiche che non vanno in verbale");
+// Salvataggio dal pannello: passi dell'iter, in_verbale, copia
+$mod_svc = \App\Core\App::per($conn)->get(\App\Didattica\ServizioModuli::class);
+$post_m = ['titolo' => 'Modulo da pannello', 'tipo' => 'online', 'categoria' => 'Prova', 'destinatari' => 'studenti', 'attivo' => '1', 'in_verbale_c' => '1', 'giorni_promemoria' => '5',
+           'iter_tipo' => ['persona', 'ufficio', 'ufficio', 'direttore', 'persona'], 'iter_uff' => ['', (string)$u_prot, '@cdl', '', ''], 'iter_campo' => ['Relatore', '', '', '', ''], 'iter_gg' => ['2', '', '4', '', '0'],
+           'c_etichetta' => ['Relatore'], 'c_tipo' => ['docente'], 'c_opzioni' => [''], 'c_obbl' => ['1'], 'c_uff' => ['0'], 'c_aiuto' => [''], 'c_cond_campo' => [''], 'c_cond_op' => ['uguale'], 'c_cond_val' => [''], 'c_auto_campo' => [''], 'c_auto_op' => ['uguale'], 'c_auto_val' => [''], 'c_auto_imposta' => ['']];
+$es_m = $mod_svc->salva($post_m, []);
+$m_sal = modulo_didattica($conn, (int)$es_m['id']);
+prova(json_decode($m_sal['iter_json'], true) === [['t' => 'persona', 'campo' => 'Relatore', 'gg' => 2], $u_prot, ['t' => 'ufficio', 'u' => '@cdl', 'gg' => 4], ['t' => 'direttore']] && (int)$m_sal['in_verbale'] === 0, "modulo salvato dal pannello: passi con firme e tempi (il passo persona senza domanda si scarta), «in verbale» tolto se non spuntato", (string)$m_sal['iter_json']);
+$id_cop = $mod_svc->duplica((int)$es_m['id']); $m_cop = modulo_didattica($conn, $id_cop);
+prova($id_cop > 0 && $m_cop['titolo'] === 'Modulo da pannello (copia)' && (int)$m_cop['attivo'] === 0 && $m_cop['iter_json'] === $m_sal['iter_json'] && $m_cop['campi_json'] === $m_sal['campi_json'] && (int)$m_cop['in_verbale'] === 0 && ($m_cop['chiave'] ?? null) === null && $mod_svc->duplica(999999) === 0, "copia del modulo: non pubblicata, stessi campi, iter e verbale");
+@unlink($cartella_pr . 'certificato_prova.pdf');
 
 sezione("Classi OOP (MIGRATION_PLAN.md, step 1-2): autoload, Database, container, facciate");
 prova(class_exists(\App\Core\Database::class) && class_exists('PdfSemplice') && (new ReflectionClass('PdfSemplice'))->getName() === \App\Infrastructure\Pdf\Documento::class, "autoload PSR-4 delle classi App\\ e vecchi nomi delle classi PDF come alias");

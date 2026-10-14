@@ -38,8 +38,125 @@ final class SedutaRepository
     {
         return Righe::testo($this->db->righe(
             'SELECT s.*, (SELECT COUNT(*) FROM pratiche p WHERE p.seduta_id = s.id) AS n_pratiche FROM didattica_sedute s'
-            . ($consigli !== null ? ' WHERE s.consiglio_id IN (' . implode(',', array_map('intval', $consigli ?: [0])) . ')' : '') . ' ORDER BY s.data DESC, s.id DESC'
+            . " WHERE s.origine = 'portale'" . ($consigli !== null ? ' AND s.consiglio_id IN (' . implode(',', array_map('intval', $consigli ?: [0])) . ')' : '') . ' ORDER BY s.data DESC, s.id DESC'
         ));
+    }
+
+    /**
+     * L'archivio dei verbali: sedute del portale e verbali vecchi importati, dal più recente. Filtri: consiglio, anno_accademico, q (testo: organo,
+     * ordine del giorno, testi dei punti, testo dei PDF importati), tipo ('' tutti, portale, importato, firmato, incompleto = senza data o senza organo).
+     *
+     * @param array<string, mixed> $f
+     * @param list<int>|null $consigli null = tutti (per i referenti solo i loro)
+     * @return list<array<string, string|null>>
+     */
+    public function archivio(array $f, ?array $consigli, int $limite = 300): array
+    {
+        $dove = ['1'];
+        $par = [];
+        if ($consigli !== null) {
+            $dove[] = 's.consiglio_id IN (' . implode(',', array_map('intval', $consigli ?: [0])) . ')';
+        }
+        if (!empty($f['consiglio'])) {
+            $dove[] = 's.consiglio_id = ?';
+            $par[] = (int) $f['consiglio'];
+        }
+        if (!empty($f['anno_accademico'])) {
+            $dove[] = 's.anno_accademico = ?';
+            $par[] = (string) $f['anno_accademico'];
+        }
+        $tipo = (string) ($f['tipo'] ?? '');
+        if ($tipo === 'portale' || $tipo === 'importato') {
+            $dove[] = 's.origine = ?';
+            $par[] = $tipo;
+        } elseif ($tipo === 'firmato') {
+            $dove[] = "s.verbale_stato = 'firmato'";
+        } elseif ($tipo === 'incompleto') {
+            $dove[] = "(s.data IS NULL OR s.organo = '')";
+        }
+        $q = trim((string) ($f['q'] ?? ''));
+        if ($q !== '') {
+            $l = '%' . addcslashes($q, '%_\\') . '%';
+            $c = '%' . addcslashes(preg_replace('/\s+/u', '', $q) ?? '', '%_\\') . '%';
+            $dove[] = "(s.organo LIKE ? OR s.odg LIKE ? OR s.nome_originale LIKE ? OR s.numero_verbale = ? OR s.testo_ricerca LIKE ? OR REPLACE(REPLACE(s.testo_ricerca, ' ', ''), CHAR(10), '') LIKE ?
+                OR EXISTS (SELECT 1 FROM didattica_sedute_punti pt WHERE pt.seduta_id = s.id AND pt.testo LIKE ?))";
+            array_push($par, $l, $l, $l, $q, $l, $c, $l);
+        }
+
+        return Righe::testo($this->db->righe(
+            'SELECT s.id, s.organo, s.data, s.anno_accademico, s.numero_verbale, s.origine, s.verbale_stato, s.verbale_pdf, s.nome_originale, s.consiglio_id, s.odg, s.pubblicabile, s.verbale_pubblico_pdf
+             FROM didattica_sedute s WHERE ' . implode(' AND ', $dove) . ' ORDER BY s.data IS NULL DESC, s.data DESC, s.id DESC LIMIT ' . (int) $limite,
+            $par
+        ));
+    }
+
+    /**
+     * I verbali segnati pubblicabili (firmati o importati), dal più recente, con il nome del consiglio.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function pubblici(): array
+    {
+        return $this->db->righe(
+            "SELECT s.*, c.nome AS consiglio_nome FROM didattica_sedute s LEFT JOIN didattica_consigli c ON c.id = s.consiglio_id
+             WHERE s.pubblicabile = 1 AND (s.verbale_stato = 'firmato' OR s.origine = 'importato') AND s.verbale_pdf IS NOT NULL ORDER BY s.data DESC, s.id DESC"
+        );
+    }
+
+    /** Segna il verbale come pubblicabile; $filePubblico = PDF con gli omissis (null = si pubblica il PDF firmato). */
+    public function pubblica(int $id, ?string $filePubblico, string $da): void
+    {
+        $this->db->esegui('UPDATE didattica_sedute SET pubblicabile = 1, verbale_pubblico_pdf = ?, pubblicato_il = NOW(), pubblicato_da = ? WHERE id = ?', [$filePubblico, $da, $id]);
+    }
+
+    public function ritira(int $id): void
+    {
+        $this->db->esegui("UPDATE didattica_sedute SET pubblicabile = 0, verbale_pubblico_pdf = NULL, pubblicato_il = NULL, pubblicato_da = '' WHERE id = ?", [$id]);
+    }
+
+    /** @return array<string, mixed>|null una seduta (o verbale importato) con questa impronta del file */
+    public function perImpronta(string $hash): ?array
+    {
+        return $this->db->riga('SELECT id, organo, data FROM didattica_sedute WHERE file_hash = ? LIMIT 1', [$hash]);
+    }
+
+    /**
+     * Un verbale vecchio importato (PDF). Ritorna l'id.
+     *
+     * @param array<string, mixed> $f
+     */
+    public function inserisciImportato(array $f): int
+    {
+        return $this->db->inserisci(
+            "INSERT INTO didattica_sedute (organo, anno_accademico, data, odg, consiglio_id, numero_verbale, origine, verbale_pdf, nome_originale, file_hash, testo_ricerca)
+             VALUES (?, ?, ?, ?, ?, ?, 'importato', ?, ?, ?, ?)",
+            [$f['organo'], $f['anno_accademico'], $f['data'], $f['odg'] ?? '', $f['consiglio_id'], $f['numero_verbale'], $f['verbale_pdf'], $f['nome_originale'], $f['file_hash'], $f['testo_ricerca']]
+        );
+    }
+
+    /** @param array<string, mixed> $f organo, anno_accademico, data, odg, consiglio_id, numero_verbale */
+    public function aggiornaImportato(int $id, array $f): void
+    {
+        $this->db->esegui(
+            "UPDATE didattica_sedute SET organo = ?, anno_accademico = ?, data = ?, odg = ?, consiglio_id = ?, numero_verbale = ? WHERE id = ? AND origine = 'importato'",
+            [$f['organo'], $f['anno_accademico'], $f['data'], $f['odg'], $f['consiglio_id'], $f['numero_verbale'], $id]
+        );
+    }
+
+    public function sostituisciFileImportato(int $id, string $percorso, string $nomeOriginale, string $hash, string $testo): void
+    {
+        $this->db->esegui("UPDATE didattica_sedute SET verbale_pdf = ?, nome_originale = ?, file_hash = ?, testo_ricerca = ? WHERE id = ? AND origine = 'importato'", [$percorso, $nomeOriginale, $hash, $testo, $id]);
+    }
+
+    public function eliminaImportato(int $id): void
+    {
+        $this->db->esegui("DELETE FROM didattica_sedute WHERE id = ? AND origine = 'importato'", [$id]);
+    }
+
+    /** @return list<string> anni accademici presenti nell'archivio, dal più recente */
+    public function anniAccademici(): array
+    {
+        return array_map('strval', array_column($this->db->righe("SELECT DISTINCT anno_accademico FROM didattica_sedute WHERE anno_accademico <> '' ORDER BY anno_accademico DESC"), 'anno_accademico'));
     }
 
     /**
@@ -72,18 +189,18 @@ final class SedutaRepository
     /**
      * Crea (id = 0) o aggiorna una seduta. Ritorna l'id.
      *
-     * @param array<string, mixed> $f organo, anno_accademico, data, ora_inizio, ora_fine, luogo, odg, presenze, segretario, coordinatore, consiglio_id
+     * @param array<string, mixed> $f organo, anno_accademico, data, ora_inizio, ora_fine, luogo, odg, presenze, segretario, coordinatore, consiglio_id, numero_verbale
      */
     public function salva(int $id, array $f): int
     {
-        $v = [$f['organo'], $f['anno_accademico'], $f['data'], $f['ora_inizio'], $f['ora_fine'], $f['luogo'], $f['odg'], $f['presenze'], $f['segretario'], $f['coordinatore'], $f['consiglio_id']];
+        $v = [$f['organo'], $f['anno_accademico'], $f['data'], $f['ora_inizio'], $f['ora_fine'], $f['luogo'], $f['odg'], $f['presenze'], $f['segretario'], $f['coordinatore'], $f['consiglio_id'], (string) ($f['numero_verbale'] ?? '')];
         if ($id) {
-            $this->db->esegui('UPDATE didattica_sedute SET organo=?, anno_accademico=?, data=?, ora_inizio=?, ora_fine=?, luogo=?, odg=?, presenze=?, segretario=?, coordinatore=?, consiglio_id=? WHERE id=?', [...$v, $id]);
+            $this->db->esegui('UPDATE didattica_sedute SET organo=?, anno_accademico=?, data=?, ora_inizio=?, ora_fine=?, luogo=?, odg=?, presenze=?, segretario=?, coordinatore=?, consiglio_id=?, numero_verbale=? WHERE id=?', [...$v, $id]);
 
             return $id;
         }
 
-        return $this->db->inserisci('INSERT INTO didattica_sedute (organo, anno_accademico, data, ora_inizio, ora_fine, luogo, odg, presenze, segretario, coordinatore, consiglio_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', $v);
+        return $this->db->inserisci('INSERT INTO didattica_sedute (organo, anno_accademico, data, ora_inizio, ora_fine, luogo, odg, presenze, segretario, coordinatore, consiglio_id, numero_verbale) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', $v);
     }
 
     /** Elimina la seduta con le sue presenze e convocazioni; le pratiche restano, senza seduta. */
@@ -91,6 +208,8 @@ final class SedutaRepository
     {
         $this->db->esegui('DELETE FROM didattica_sedute_presenze WHERE seduta_id = ?', [$id]);
         $this->db->esegui('DELETE FROM didattica_convocazioni WHERE seduta_id = ?', [$id]);
+        $this->db->esegui('UPDATE pratiche SET punto_id = NULL WHERE seduta_id = ?', [$id]);
+        $this->db->esegui('DELETE FROM didattica_sedute_punti WHERE seduta_id = ?', [$id]);
         $this->db->esegui('UPDATE pratiche SET seduta_id = NULL WHERE seduta_id = ?', [$id]);
         $this->db->esegui('DELETE FROM didattica_sedute WHERE id = ?', [$id]);
     }
@@ -155,7 +274,7 @@ final class SedutaRepository
     {
         return Righe::testo($this->db->righe(
             "SELECT p.id, p.codice, p.cognome, p.nome, p.matricola, p.stato, p.risposte_json, m.titolo AS modulo_titolo FROM pratiche p JOIN didattica_moduli m ON m.id = p.modulo_id
-             WHERE p.seduta_id IS NULL AND p.stato NOT IN ('chiusa', 'respinta') ORDER BY m.titolo, p.cognome, p.nome"
+             WHERE p.seduta_id IS NULL AND m.in_verbale = 1 AND p.stato NOT IN ('chiusa', 'respinta') ORDER BY m.titolo, p.cognome, p.nome"
         ));
     }
 

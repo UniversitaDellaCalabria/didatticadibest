@@ -56,8 +56,9 @@ if (!function_exists('prenota_risorsa')) {
     // Prenota $n_slot slot consecutivi da $inizio (Y-m-d H:i:s) e, se la risorsa lo consente, ogni settimana fino a $ripeti_fino.
     // La prima occorrenza deve riuscire; le successive in conflitto vengono saltate. Ritorna
     // ['codici' => [...], 'saltate' => ['Y-m-d' => motivo], 'errore' => null|string, 'stato' => confermata|da_approvare, 'serie' => ?].
-    function prenota_risorsa($conn, array $r, array $u, string $inizio, int $n_slot, string $motivo = '', ?string $ripeti_fino = null): array {
-        return \App\Core\App::per($conn)->get(\App\Risorse\ServizioRisorse::class)->prenota($r, $u, $inizio, $n_slot, $motivo, $ripeti_fino);
+    // $extra: ['quantita' => [id contatore => quantità], 'risposte_json' => risposte ai campi personalizzati]
+    function prenota_risorsa($conn, array $r, array $u, string $inizio, int $n_slot, string $motivo = '', ?string $ripeti_fino = null, array $extra = []): array {
+        return \App\Core\App::per($conn)->get(\App\Risorse\ServizioRisorse::class)->prenota($r, $u, $inizio, $n_slot, $motivo, $ripeti_fino, $extra);
     }
 }
 
