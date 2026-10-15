@@ -664,6 +664,49 @@ $conn->query("DELETE FROM risorse WHERE id = 905"); $risorse_repo_c = \App\Core\
 prova((int)db_valore($conn, "SELECT COUNT(*) FROM risorse_scadenze WHERE risorsa_id = 905") === 0, "risorsa eliminata: spariscono anche le sue scadenze");
 $conn->query("DELETE FROM prenotazioni_risorse WHERE risorsa_id = 905");
 
+sezione("Risorse: prenotazioni ripetute (ogni settimana, due settimane, mese) e lista d'attesa");
+$svc_rs = \App\Core\App::per($conn)->get(\App\Risorse\ServizioRisorse::class);
+$t_rip = strtotime('2026-10-13 10:00:00'); // un martedì, il secondo del mese
+prova(\App\Risorse\ServizioRisorse::dateRipetute($t_rip, '2026-11-03', 'settimana') === ['2026-10-13', '2026-10-20', '2026-10-27', '2026-11-03']
+    && \App\Risorse\ServizioRisorse::dateRipetute($t_rip, '2026-11-30', 'quindici') === ['2026-10-13', '2026-10-27', '2026-11-10', '2026-11-24']
+    && \App\Risorse\ServizioRisorse::dateRipetute($t_rip, '2027-01-31', 'mese') === ['2026-10-13', '2026-11-10', '2026-12-08', '2027-01-12'], "ripetizione: ogni settimana, ogni due settimane e ogni mese (il secondo martedì)");
+prova(\App\Risorse\ServizioRisorse::dateRipetute(strtotime('2026-10-27 10:00:00'), '2026-12-31', 'mese') === ['2026-10-27', '2026-11-24', '2026-12-22']
+    && \App\Risorse\ServizioRisorse::dateRipetute(strtotime('2026-12-29 10:00:00'), '2027-02-28', 'mese') === ['2026-12-29', '2027-01-26', '2027-02-23'], "ripetizione mensile: il quarto martedì resta il quarto, il quinto diventa l'ultimo");
+$q("INSERT INTO risorse (id, pagina_id, nome, tipo, luogo, durata_slot, max_slot, anticipo_ore, max_giorni, accesso, approvazione, ripetizione) VALUES (906, 5, 'Aula Magna', 'aula', 'Cubo 4', 60, 2, 0, 90, 'tutti', 0, 1)");
+$q("INSERT INTO risorse_orari (risorsa_id, giorno, dalle, alle) SELECT 906, g, '08:00', '18:00' FROM (SELECT 1 g UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7) x");
+$r906 = risorsa($conn, 906);
+$ua = ['id' => 81, 'nome' => 'Ugo', 'cognome' => 'Uno', 'email' => 'ugo@unical.it', 'ruolo_id' => 3];
+$ub = ['id' => 82, 'nome' => 'Eva', 'cognome' => 'Due', 'email' => 'eva@unical.it', 'ruolo_id' => 3];
+$uc = ['id' => 83, 'nome' => 'Gina', 'cognome' => 'Rossi', 'email' => 'gina.rossi@unical.it', 'ruolo_id' => 3];
+$giorno_a = date('Y-m-d', strtotime('+3 days'));
+$ini_a = "$giorno_a 10:00:00";
+$es_a = $svc_rs->prenota($r906, $ua, $ini_a, 1, 'Lezione', null);
+prova($es_a['errore'] === null && count($es_a['codici']) === 1, "prenotazione normale dello slot");
+prova(str_contains((string)$svc_rs->mettiInAttesa($r906, $ub, "$giorno_a 11:00:00", 1), 'libero'), "lista d'attesa: per uno slot libero si prenota e basta");
+prova($svc_rs->mettiInAttesa($r906, $ub, $ini_a, 1) === null && str_contains((string)$svc_rs->mettiInAttesa($r906, $ub, $ini_a, 1), 'già in lista'), "lista d'attesa: ci si mette in coda per lo slot occupato, una volta sola");
+prova($svc_rs->mettiInAttesa($r906, $uc, $ini_a, 1) === null, "lista d'attesa: anche una terza persona");
+$att_svc = \App\Core\App::per($conn)->get(\App\Risorse\ListaAttesaRisorse::class);
+$mie_b = $att_svc->dellUtente(82);
+prova(count($mie_b) === 1 && (int)$mie_b[0]['posizione'] === 1 && (int)$att_svc->dellUtente(83)[0]['posizione'] === 2 && ($att_svc->incoda(906, $giorno_a)[$ini_a] ?? 0) === 2, "lista d'attesa: posizione in coda e numero di persone per slot");
+$EMAIL = [];
+$pren_a = prenotazione_risorsa($conn, $es_a['codici'][0]);
+prova(cambia_stato_prenotazione_risorsa($conn, (int)$pren_a['id'], 'annullata', false), "chi aveva prenotato annulla");
+$avv = array_values(array_filter($EMAIL, fn($e) => str_contains($e['oggetto'], 'Si è liberato uno slot')));
+prova(count($avv) === 1 && $avv[0]['a'] === 'eva@unical.it' && str_contains($avv[0]['corpo'], 'Prenota ora'), "annullamento: avvisa solo il primo in coda", json_encode(array_column($EMAIL, 'oggetto')));
+prova($att_svc->dellUtente(82)[0]['stato'] === 'avvisata' && $att_svc->dellUtente(83)[0]['stato'] === 'attesa', "il primo è «avvisata», il secondo resta in attesa");
+$EMAIL = [];
+prova($att_svc->scala() === 0 && $EMAIL === [], "prima delle 24 ore l'avviso non passa al successivo");
+$q("UPDATE prenotazioni_risorse_attesa SET avvisata_il = DATE_SUB(NOW(), INTERVAL 2 DAY) WHERE utente_id = 82");
+prova($att_svc->scala() === 1 && ($EMAIL[0]['a'] ?? '') === 'gina.rossi@unical.it', "dopo 24 ore senza prenotare l'avviso passa al secondo in coda");
+prova((string)$conn->query("SELECT stato FROM prenotazioni_risorse_attesa WHERE utente_id = 82")->fetch_row()[0] === 'scaduta' && $att_svc->dellUtente(83)[0]['stato'] === 'avvisata', "la prima attesa scade, la seconda è «avvisata»");
+$es_c = $svc_rs->prenota($r906, $uc, $ini_a, 1, 'Seminario', null);
+prova($es_c['errore'] === null && $att_svc->dellUtente(83) === [], "chi era in coda e prenota: la lista si chiude");
+prova($svc_rs->mettiInAttesa($r906, $ua, '2020-01-06 10:00:00', 1) !== null, "lista d'attesa: non per orari passati");
+// Ripetizione mensile vera: la serie si crea con le date calcolate
+$es_m = $svc_rs->prenota($r906, $ua, date('Y-m-d', strtotime('+10 days')) . ' 15:00:00', 1, 'Corso', date('Y-m-d', strtotime('+80 days')), [], 'quindici');
+prova($es_m['errore'] === null && count($es_m['codici']) >= 4 && $es_m['serie'] !== null, "prenotazione ripetuta ogni due settimane: serie creata", json_encode($es_m));
+$conn->query("DELETE FROM prenotazioni_risorse WHERE risorsa_id = 906");
+$conn->query("DELETE FROM prenotazioni_risorse_attesa WHERE risorsa_id = 906");
 sezione("Abilitazioni per perimetro");
 // Area 2: progetto FSL 20 + evento 21 non FSL; area 1: evento FSL 10
 $q("INSERT INTO eventi (id, pagina_id, titolo, tipo) VALUES (21, 2, 'Evento FSL no', 'evento')");

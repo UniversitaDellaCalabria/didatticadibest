@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Certificati e attestati · l&#x27;iter</title>
+<style>
+/* Presentazione 16:9 da stampare in PDF. Generata da strumenti/locale/presentazioni.py; PDF con strumenti/locale/genera_pdf.sh */
+
+/* Presentazione 16:9 da stampare in PDF (Chrome: Stampa → Salva come PDF, margini nessuno, sfondo attivo).
+   Generata con: chrome --headless --no-pdf-header-footer --print-to-pdf=Pratiche_verbali_iter.pdf Pratiche_verbali_iter.html */
+@page { size: 1280px 720px; margin: 0; }
+:root { --bg:#eef0f4; --ink:#1e293b; --mut:#64748b; --linea:#e2e8f0; --blu:#0056B3; --viola:#7c3aed; --ambra:#b45309; --verde:#15803d; --teal:#0f766e; --rosso:#b91c1c; --ardesia:#475569; --notte:#0f2a4a; }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #cbd5e1; font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif; color: var(--ink); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.slide { width: 1280px; height: 720px; background: var(--bg); position: relative; overflow: hidden; padding: 44px 56px 0; page-break-after: always; break-after: page; counter-increment: pag; }
+.slide:last-child { page-break-after: auto; break-after: auto; }
+@media screen { .slide { margin: 16px auto; box-shadow: 0 6px 24px rgba(0,0,0,.18); } }
+.piede { position: absolute; left: 56px; right: 56px; bottom: 18px; display: flex; justify-content: space-between; font-size: 12px; color: var(--mut); }
+.piede::after { content: counter(pag); font-weight: 600; }
+h1 { font-size: 34px; margin: 0 0 4px; letter-spacing: -.01em; }
+h2 { font-size: 34px; margin: 0 0 4px; letter-spacing: -.01em; }
+.sotto { color: var(--mut); font-size: 18px; margin: 0 0 26px; max-width: 1060px; line-height: 1.45; }
+.num { display: inline-flex; width: 32px; height: 32px; align-items: center; justify-content: center; background: var(--ink); color: #fff; border-radius: 8px; font-size: 15px; font-weight: 700; margin-right: 10px; vertical-align: 3px; }
+.griglia { display: grid; gap: 18px; }
+.g4 { grid-template-columns: repeat(4, 1fr); } .g3 { grid-template-columns: repeat(3, 1fr); } .g2 { grid-template-columns: repeat(2, 1fr); }
+.card { background: #fff; border: 1px solid var(--linea); border-radius: 14px; padding: 18px 20px 16px; box-shadow: 0 1px 2px rgba(15,23,42,.05); border-top: 5px solid var(--ardesia); }
+.card h3 { font-size: 20px; margin: 0 0 8px; line-height: 1.25; }
+.card p, .card li { font-size: 16.5px; color: #334155; line-height: 1.45; margin: 0 0 6px; }
+.card ul { margin: 4px 0 0; padding-left: 18px; }
+.card small { color: var(--mut); font-size: 12.5px; display: block; line-height: 1.35; }
+.blu { border-top-color: var(--blu); } .viola { border-top-color: var(--viola); } .ambra { border-top-color: var(--ambra); } .verde { border-top-color: var(--verde); } .teal { border-top-color: var(--teal); } .rosso { border-top-color: var(--rosso); } .ardesia { border-top-color: var(--ardesia); } .notte { border-top-color: var(--notte); }
+.chip { display: inline-block; font-size: 14.5px; font-weight: 600; padding: 3px 10px; border-radius: 999px; color: #fff; margin: 0 4px 4px 0; }
+.chip.chiaro { background: #fff; color: var(--ink); border: 1px solid var(--linea); }
+.freccia { color: #94a3b8; font-weight: 700; padding: 0 2px; }
+.attore { font-size: 13.5px; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; margin-bottom: 4px; }
+/* copertina */
+.copertina { background: linear-gradient(135deg, #0f2a4a 0%, #0056B3 100%); color: #fff; padding: 0; }
+.copertina .interno { position: absolute; left: 80px; top: 190px; right: 80px; }
+.copertina h1 { font-size: 58px; line-height: 1.08; margin-bottom: 18px; }
+.copertina p { font-size: 22px; opacity: .88; max-width: 860px; line-height: 1.45; margin: 0; }
+.copertina .tag { display: inline-block; background: rgba(255,255,255,.16); border-radius: 999px; padding: 6px 16px; font-size: 15px; margin-bottom: 26px; letter-spacing: .04em; }
+.copertina .piede { color: rgba(255,255,255,.7); }
+/* percorso */
+.percorso { display: flex; gap: 0; align-items: stretch; }
+.passo { flex: 1; background: #fff; border: 1px solid var(--linea); border-top: 5px solid var(--ardesia); border-radius: 12px; padding: 14px 13px; margin-right: 18px; position: relative; }
+.passo:last-child { margin-right: 0; }
+.passo:not(:last-child)::after { content: "›"; position: absolute; right: -15px; top: 50%; margin-top: -14px; color: #94a3b8; font-size: 26px; font-weight: 700; }
+.passo b { display: block; font-size: 17px; margin-bottom: 5px; line-height: 1.2; }
+.passo span { font-size: 14.5px; color: #475569; line-height: 1.4; display: block; }
+.passo em { font-style: normal; font-size: 12.5px; color: #fff; background: var(--mut); border-radius: 6px; padding: 1px 7px; display: inline-block; margin-bottom: 5px; }
+.fasi { display: flex; flex-wrap: wrap; gap: 8px; }
+.fasi .chip { font-size: 16px; padding: 8px 16px; margin: 0; }
+/* pagina di verbale */
+.foglio { background: #fff; border: 1px solid #cbd5e1; border-radius: 6px; box-shadow: 0 4px 14px rgba(15,23,42,.12); font-family: "Times New Roman", Georgia, serif; color: #111; padding: 14px 22px 10px; font-size: 12.5px; line-height: 1.38; position: relative; }
+.foglio .testata { text-align: right; font-weight: 700; font-size: 12px; border-bottom: 1px solid #94a3b8; padding-bottom: 4px; margin-bottom: 8px; font-family: "Segoe UI", Arial, sans-serif; }
+.foglio .logo { width: 150px; height: 20px; background: linear-gradient(90deg, #0056B3, #5aa0e0); border-radius: 3px; margin-bottom: 6px; }
+.foglio .c { text-align: center; font-weight: 700; }
+.foglio .pt { font-weight: 700; margin: 7px 0 2px; }
+.foglio .sez { font-weight: 700; text-decoration: underline; margin: 6px 0 2px; }
+.foglio .pr { display: flex; justify-content: space-between; }
+.foglio .tab { border: 1px solid #94a3b8; margin: 3px 0 5px; }
+.foglio .tab div { display: flex; border-bottom: 1px solid #cbd5e1; }
+.foglio .tab div:last-child { border-bottom: 0; }
+.foglio .tab div span { flex: 1; padding: 1px 5px; border-right: 1px solid #cbd5e1; font-size: 11px; }
+.foglio .tab div:first-child { background: #e7e6e6; font-weight: 700; }
+.foglio .pie { position: absolute; left: 22px; right: 22px; bottom: 8px; display: flex; justify-content: space-between; font-size: 10.5px; border-top: 1px solid #94a3b8; padding-top: 4px; font-family: "Segoe UI", Arial, sans-serif; }
+.nota { background: #fff7e6; border: 1px solid #f3d9a4; border-radius: 10px; padding: 14px 20px; font-size: 17px; color: #6b4a0e; line-height: 1.4; }
+.evidenza { background: #fff; border: 1px solid var(--linea); border-left: 6px solid var(--blu); border-radius: 10px; padding: 14px 20px; font-size: 17.5px; line-height: 1.5; }
+table.m { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 16px; background: #fff; border: 1px solid var(--linea); border-radius: 12px; overflow: hidden; }
+table.m th { background: #f1f5f9; text-align: left; padding: 10px 14px; font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: #475569; }
+table.m td { padding: 11px 14px; border-top: 1px solid var(--linea); vertical-align: top; line-height: 1.35; }
+table.m td:first-child { font-weight: 700; white-space: nowrap; }
+.pallino { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+/* schermate */
+.shot { display: grid; grid-template-columns: 1.62fr 1fr; gap: 28px; align-items: start; margin-top: 4px; }
+.shot .img { background: #fff; border: 1px solid var(--linea); border-radius: 12px; padding: 8px; box-shadow: 0 3px 14px rgba(15,23,42,.12); }
+.shot .img img { width: 100%; display: block; border-radius: 6px; object-fit: cover; object-position: top; }
+.shot .img.alto img { max-height: 520px; }
+.shot .tag { display: inline-block; background: var(--rosso); color: #fff; font-weight: 700; padding: 6px 16px; border-radius: 999px; font-size: 15px; margin-bottom: 14px; }
+.shot ul { margin: 0; padding-left: 22px; } .shot li { font-size: 19px; line-height: 1.42; margin-bottom: 10px; color: #1e293b; }
+.shot .nota { margin-top: 14px; font-size: 16px; padding: 12px 16px; }
+.titolo-schermata { font-size: 32px; margin: 0 0 14px; }
+.m.fitto { font-size: 14px; } .m.fitto th { padding: 7px 12px; } .m.fitto td { padding: 6px 12px; line-height: 1.28; }
+.copertina.verde { background: linear-gradient(135deg, #0f3d33 0%, #0f766e 100%); }
+.copertina.rosso { background: linear-gradient(135deg, #5b1111 0%, #b91c1c 100%); }
+</style>
+</head>
+<body>
+<section class="slide copertina ">
+  <div class="interno"><span class="tag">DiBEST · Portale eventi e didattica</span><h1>Certificati e attestati</h1><p>Dalla richiesta dello studente al documento firmato dal Direttore: marche da bollo, conferma dei docenti e protocollo in uscita, tutto dal portale.</p></div>
+  <div class="piede"><span>Presentazione dell'iter · ottobre 2026</span></div>
+</section>
+
+<section class="slide">
+  <h2><span class="num">0</span>I documenti e il loro percorso</h2>
+  <p class="sotto">Una sola richiesta per il certificato di iscrizione, di laurea o di rinuncia; il Diploma Supplement e gli attestati hanno percorsi propri. Nessuno passa dal verbale.</p>
+  <div class="griglia g4"><div class="card blu"><div class="attore" style="color:var(--blu)">Certificato</div><h3>Iscrizione, laurea, rinuncia</h3><p>Una tendina sceglie il tipo e compare l’elenco di caselle (con esami, con date, con anni accademici, con piano…). Protocollo → ufficio del corso → pagamento delle 2 marche da bollo → Direttore.</p></div><div class="card viola"><div class="attore" style="color:var(--viola)">Diploma Supplement</div><h3>Senza marca da bollo</h3><p>Protocollo → l’ufficio del corso carica il documento da firmare → Direttore firma → lo studente lo scarica.</p></div><div class="card verde"><div class="attore" style="color:var(--verde)">Attestato di frequenza</div><h3>Lezioni seguite</h3><p>Lo studente elenca le lezioni; ogni docente conferma le sue righe nel portale; l’Ufficio attestati controlla il PDF/A; il Direttore firma; protocollo in uscita.</p></div><div class="card teal"><div class="attore" style="color:var(--teal)">Attestato di esame</div><h3>Esame sostenuto</h3><p>Come la frequenza, con i dati dell’esame (insegnamento, docente titolare, data, ore, aula) confermati dal docente.</p></div></div>
+  <div class="piede"><span>Certificati e attestati · l&#x27;iter</span></div>
+</section>
+
+<section class="slide">
+  <h2><span class="num">1</span>Lo studente sceglie e compila</h2>
+  <div class="shot"><div class="img alto"><img src="schermate/stud_modulo_certificato.png" alt=""></div>
+  <div><span class="tag">Studente · Richiesta Certificato</span><ul><li>Una <b>sola pratica</b> per iscrizione, laurea e rinuncia: scegli il tipo e vedi solo i campi di quel tipo</li><li>Le <b>caselle</b> dei certificati cambiano con il tipo (iscrizione con esami, laurea con tesi e relatore…)</li><li>Corso di laurea scelto dall’elenco di Ateneo: la pratica va <b>all’ufficio di quel corso</b></li><li>«Salva come bozza»: la richiesta si riprende quando si vuole e si modifica fino alla presa in carico</li></ul></div></div>
+  <div class="piede"><span>Certificati e attestati · l&#x27;iter</span></div>
+</section>
+
+<section class="slide">
+  <h2><span class="num">2</span>Le marche da bollo</h2>
+  <div class="shot"><div class="img alto"><img src="schermate/stud_pratica_laurea.png" alt=""></div>
+  <div><span class="tag">Studente · A che punto è</span><ul><li>Dopo il protocollo la pratica passa all’<b>ufficio del corso</b></li><li>L’ufficio carica le <b>2 marche da bollo su Esse3</b> e avvisa lo studente per email</li><li>Lo studente paga da Esse3 (Segreteria, Situazione tasse): nel portale non serve fare nulla</li><li>Le tappe in alto dicono sempre dove si trova la pratica</li></ul></div></div>
+  <div class="piede"><span>Certificati e attestati · l&#x27;iter</span></div>
+</section>
+
+<section class="slide">
+  <h2><span class="num">3</span>L’ufficio registra il pagamento</h2>
+  <div class="shot"><div class="img alto"><img src="schermate/ref_marche.png" alt=""></div>
+  <div><span class="tag">Ufficio del corso · Marche da bollo</span><ul><li><b>1.</b> Carica le marche su Esse3 e premi «avvisa lo studente»</li><li><b>2.</b> Quando il pagamento risulta, spunta «marca da bollo assolta virtualmente»</li><li><b>3.</b> Carica il certificato generato da Esse3 (PDF): la pratica passa al Direttore</li><li>Lo studente vede che la marca è assolta; il certificato da firmare resta interno</li></ul></div></div>
+  <div class="piede"><span>Certificati e attestati · l&#x27;iter</span></div>
+</section>
+
+<section class="slide">
+  <h2><span class="num">4</span>Il Direttore firma</h2>
+  <div class="shot"><div class="img alto"><img src="schermate/dir_firma.png" alt=""></div>
+  <div><span class="tag">Direttore · Pagina di firma</span><ul><li>Riceve l’email con il <b>link personale</b>; accede con Unical ID, SPID o CIE</li><li>Firma in <b>PAdES</b> con la firma remota, oppure scarica, firma e ricarica</li><li>Il portale controlla che il file sia firmato e che il firmatario sia lui</li><li>Dopo la firma lo <b>studente scarica e stampa</b> il certificato e l’operatore è avvisato</li></ul></div></div>
+  <div class="piede"><span>Certificati e attestati · l&#x27;iter</span></div>
+</section>
+
+<section class="slide">
+  <h2><span class="num">5</span>Il cruscotto del Direttore</h2>
+  <div class="shot"><div class="img alto"><img src="schermate/dir_cruscotto.png" alt=""></div>
+  <div><span class="tag">Direttore · Cose da fare</span><ul><li>In cima ci sono i <b>documenti da firmare</b>, con i giorni di attesa</li><li>Sotto, tutto ciò che si è fermato: pratiche, conferme dei docenti, verbali, convenzioni, tutorato, risorse</li><li>Premendo su una riga si va diretti alla firma o alla pratica</li><li>Non cambia nulla: serve a vedere dove intervenire</li></ul></div></div>
+  <div class="piede"><span>Certificati e attestati · l&#x27;iter</span></div>
+</section>
+
+<section class="slide">
+  <h2><span class="num">6</span>Attestati: i docenti confermano</h2>
+  <div class="shot"><div class="img"><img src="schermate/rel_conferma_attestato.png" alt=""></div>
+  <div><span class="tag">Docente · Conferma nel portale</span><ul><li>Lo studente elenca le lezioni (o i dati dell’esame) e indica i docenti dall’anagrafe</li><li>Ogni docente riceve un link e vede <b>solo le righe che lo riguardano</b></li><li>«Confermo» o «Non confermo» con il motivo: se un docente non conferma la richiesta torna allo studente e poi le conferme ripartono</li><li>Resta registrato chi ha confermato, quando e con quale accesso (senza firma digitale)</li></ul></div></div>
+  <div class="piede"><span>Certificati e attestati · l&#x27;iter</span></div>
+</section>
+
+<section class="slide">
+  <h2><span class="num">7</span>Dopo le conferme: l’Ufficio attestati</h2>
+  <p class="sotto">Il portale prepara l’attestato in PDF/A: l’ufficio lo controlla, il Direttore lo firma e si registra il protocollo in uscita.</p>
+  <div class="griglia g4"><div class="card ambra"><div class="attore" style="color:var(--ambra)">Ufficio attestati</div><h3>Controlla il PDF/A</h3><p>Vede l’anteprima dell’attestato preparato dal portale e lo manda al Direttore.</p></div><div class="card rosso"><div class="attore" style="color:var(--rosso)">Direttore</div><h3>Firma in PAdES</h3><p>Il documento firmato resta interno finché non c’è il protocollo.</p></div><div class="card viola"><div class="attore" style="color:var(--viola)">Ufficio attestati</div><h3>Protocollo in uscita</h3><p>Registra numero, data e PDF protocollato (invio all’azienda per PEC fuori dal portale).</p></div><div class="card verde"><div class="attore" style="color:var(--verde)">Studente</div><h3>Scarica il PDF</h3><p>Riceve l’email e scarica l’attestato firmato e protocollato.</p></div></div>
+  <div class="piede"><span>Certificati e attestati · l&#x27;iter</span></div>
+</section>
+
+<section class="slide">
+  <h2><span class="num">8</span>Chi riceve cosa, e quando</h2>
+  <p class="sotto">Ogni passaggio avvisa per email chi deve agire dopo.</p>
+  <table class="m"><tr><th>Passaggio</th><th>Chi riceve l’email</th><th>Oggetto</th></tr><tr><td>Lo studente invia</td><td>Ufficio protocollo; lo studente (ricevuta)</td><td>Nuova pratica da protocollare</td></tr><tr><td>Protocollo registrato</td><td>Ufficio del corso; lo studente</td><td>Pratica presa in carico</td></tr><tr><td>Marche caricate su Esse3</td><td>Studente</td><td>Puoi pagare le marche da bollo</td></tr><tr><td>Pagamento registrato</td><td>Direttore</td><td>Documento da firmare</td></tr><tr><td>Il Direttore firma</td><td>Studente; operatore</td><td>Il tuo documento è pronto · Iter concluso</td></tr><tr><td>Conferme dei docenti</td><td>Docenti indicati; promemoria se ritardano</td><td>Da confermare</td></tr></table>
+  <div class="piede"><span>Certificati e attestati · l&#x27;iter</span></div>
+</section>
+</body>
+</html>

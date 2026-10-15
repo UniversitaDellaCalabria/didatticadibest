@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<title>Aule, laboratori e mezzi · l&#x27;iter delle prenotazioni</title>
+<style>
+/* Presentazione 16:9 da stampare in PDF. Generata da strumenti/locale/presentazioni.py; PDF con strumenti/locale/genera_pdf.sh */
+
+/* Presentazione 16:9 da stampare in PDF (Chrome: Stampa → Salva come PDF, margini nessuno, sfondo attivo).
+   Generata con: chrome --headless --no-pdf-header-footer --print-to-pdf=Pratiche_verbali_iter.pdf Pratiche_verbali_iter.html */
+@page { size: 1280px 720px; margin: 0; }
+:root { --bg:#eef0f4; --ink:#1e293b; --mut:#64748b; --linea:#e2e8f0; --blu:#0056B3; --viola:#7c3aed; --ambra:#b45309; --verde:#15803d; --teal:#0f766e; --rosso:#b91c1c; --ardesia:#475569; --notte:#0f2a4a; }
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: #cbd5e1; font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif; color: var(--ink); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.slide { width: 1280px; height: 720px; background: var(--bg); position: relative; overflow: hidden; padding: 44px 56px 0; page-break-after: always; break-after: page; counter-increment: pag; }
+.slide:last-child { page-break-after: auto; break-after: auto; }
+@media screen { .slide { margin: 16px auto; box-shadow: 0 6px 24px rgba(0,0,0,.18); } }
+.piede { position: absolute; left: 56px; right: 56px; bottom: 18px; display: flex; justify-content: space-between; font-size: 12px; color: var(--mut); }
+.piede::after { content: counter(pag); font-weight: 600; }
+h1 { font-size: 34px; margin: 0 0 4px; letter-spacing: -.01em; }
+h2 { font-size: 34px; margin: 0 0 4px; letter-spacing: -.01em; }
+.sotto { color: var(--mut); font-size: 18px; margin: 0 0 26px; max-width: 1060px; line-height: 1.45; }
+.num { display: inline-flex; width: 32px; height: 32px; align-items: center; justify-content: center; background: var(--ink); color: #fff; border-radius: 8px; font-size: 15px; font-weight: 700; margin-right: 10px; vertical-align: 3px; }
+.griglia { display: grid; gap: 18px; }
+.g4 { grid-template-columns: repeat(4, 1fr); } .g3 { grid-template-columns: repeat(3, 1fr); } .g2 { grid-template-columns: repeat(2, 1fr); }
+.card { background: #fff; border: 1px solid var(--linea); border-radius: 14px; padding: 18px 20px 16px; box-shadow: 0 1px 2px rgba(15,23,42,.05); border-top: 5px solid var(--ardesia); }
+.card h3 { font-size: 20px; margin: 0 0 8px; line-height: 1.25; }
+.card p, .card li { font-size: 16.5px; color: #334155; line-height: 1.45; margin: 0 0 6px; }
+.card ul { margin: 4px 0 0; padding-left: 18px; }
+.card small { color: var(--mut); font-size: 12.5px; display: block; line-height: 1.35; }
+.blu { border-top-color: var(--blu); } .viola { border-top-color: var(--viola); } .ambra { border-top-color: var(--ambra); } .verde { border-top-color: var(--verde); } .teal { border-top-color: var(--teal); } .rosso { border-top-color: var(--rosso); } .ardesia { border-top-color: var(--ardesia); } .notte { border-top-color: var(--notte); }
+.chip { display: inline-block; font-size: 14.5px; font-weight: 600; padding: 3px 10px; border-radius: 999px; color: #fff; margin: 0 4px 4px 0; }
+.chip.chiaro { background: #fff; color: var(--ink); border: 1px solid var(--linea); }
+.freccia { color: #94a3b8; font-weight: 700; padding: 0 2px; }
+.attore { font-size: 13.5px; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; margin-bottom: 4px; }
+/* copertina */
+.copertina { background: linear-gradient(135deg, #0f2a4a 0%, #0056B3 100%); color: #fff; padding: 0; }
+.copertina .interno { position: absolute; left: 80px; top: 190px; right: 80px; }
+.copertina h1 { font-size: 58px; line-height: 1.08; margin-bottom: 18px; }
+.copertina p { font-size: 22px; opacity: .88; max-width: 860px; line-height: 1.45; margin: 0; }
+.copertina .tag { display: inline-block; background: rgba(255,255,255,.16); border-radius: 999px; padding: 6px 16px; font-size: 15px; margin-bottom: 26px; letter-spacing: .04em; }
+.copertina .piede { color: rgba(255,255,255,.7); }
+/* percorso */
+.percorso { display: flex; gap: 0; align-items: stretch; }
+.passo { flex: 1; background: #fff; border: 1px solid var(--linea); border-top: 5px solid var(--ardesia); border-radius: 12px; padding: 14px 13px; margin-right: 18px; position: relative; }
+.passo:last-child { margin-right: 0; }
+.passo:not(:last-child)::after { content: "›"; position: absolute; right: -15px; top: 50%; margin-top: -14px; color: #94a3b8; font-size: 26px; font-weight: 700; }
+.passo b { display: block; font-size: 17px; margin-bottom: 5px; line-height: 1.2; }
+.passo span { font-size: 14.5px; color: #475569; line-height: 1.4; display: block; }
+.passo em { font-style: normal; font-size: 12.5px; color: #fff; background: var(--mut); border-radius: 6px; padding: 1px 7px; display: inline-block; margin-bottom: 5px; }
+.fasi { display: flex; flex-wrap: wrap; gap: 8px; }
+.fasi .chip { font-size: 16px; padding: 8px 16px; margin: 0; }
+/* pagina di verbale */
+.foglio { background: #fff; border: 1px solid #cbd5e1; border-radius: 6px; box-shadow: 0 4px 14px rgba(15,23,42,.12); font-family: "Times New Roman", Georgia, serif; color: #111; padding: 14px 22px 10px; font-size: 12.5px; line-height: 1.38; position: relative; }
+.foglio .testata { text-align: right; font-weight: 700; font-size: 12px; border-bottom: 1px solid #94a3b8; padding-bottom: 4px; margin-bottom: 8px; font-family: "Segoe UI", Arial, sans-serif; }
+.foglio .logo { width: 150px; height: 20px; background: linear-gradient(90deg, #0056B3, #5aa0e0); border-radius: 3px; margin-bottom: 6px; }
+.foglio .c { text-align: center; font-weight: 700; }
+.foglio .pt { font-weight: 700; margin: 7px 0 2px; }
+.foglio .sez { font-weight: 700; text-decoration: underline; margin: 6px 0 2px; }
+.foglio .pr { display: flex; justify-content: space-between; }
+.foglio .tab { border: 1px solid #94a3b8; margin: 3px 0 5px; }
+.foglio .tab div { display: flex; border-bottom: 1px solid #cbd5e1; }
+.foglio .tab div:last-child { border-bottom: 0; }
+.foglio .tab div span { flex: 1; padding: 1px 5px; border-right: 1px solid #cbd5e1; font-size: 11px; }
+.foglio .tab div:first-child { background: #e7e6e6; font-weight: 700; }
+.foglio .pie { position: absolute; left: 22px; right: 22px; bottom: 8px; display: flex; justify-content: space-between; font-size: 10.5px; border-top: 1px solid #94a3b8; padding-top: 4px; font-family: "Segoe UI", Arial, sans-serif; }
+.nota { background: #fff7e6; border: 1px solid #f3d9a4; border-radius: 10px; padding: 14px 20px; font-size: 17px; color: #6b4a0e; line-height: 1.4; }
+.evidenza { background: #fff; border: 1px solid var(--linea); border-left: 6px solid var(--blu); border-radius: 10px; padding: 14px 20px; font-size: 17.5px; line-height: 1.5; }
+table.m { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 16px; background: #fff; border: 1px solid var(--linea); border-radius: 12px; overflow: hidden; }
+table.m th { background: #f1f5f9; text-align: left; padding: 10px 14px; font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: #475569; }
+table.m td { padding: 11px 14px; border-top: 1px solid var(--linea); vertical-align: top; line-height: 1.35; }
+table.m td:first-child { font-weight: 700; white-space: nowrap; }
+.pallino { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+/* schermate */
+.shot { display: grid; grid-template-columns: 1.62fr 1fr; gap: 28px; align-items: start; margin-top: 4px; }
+.shot .img { background: #fff; border: 1px solid var(--linea); border-radius: 12px; padding: 8px; box-shadow: 0 3px 14px rgba(15,23,42,.12); }
+.shot .img img { width: 100%; display: block; border-radius: 6px; object-fit: cover; object-position: top; }
+.shot .img.alto img { max-height: 520px; }
+.shot .tag { display: inline-block; background: var(--rosso); color: #fff; font-weight: 700; padding: 6px 16px; border-radius: 999px; font-size: 15px; margin-bottom: 14px; }
+.shot ul { margin: 0; padding-left: 22px; } .shot li { font-size: 19px; line-height: 1.42; margin-bottom: 10px; color: #1e293b; }
+.shot .nota { margin-top: 14px; font-size: 16px; padding: 12px 16px; }
+.titolo-schermata { font-size: 32px; margin: 0 0 14px; }
+.m.fitto { font-size: 14px; } .m.fitto th { padding: 7px 12px; } .m.fitto td { padding: 6px 12px; line-height: 1.28; }
+.copertina.verde { background: linear-gradient(135deg, #0f3d33 0%, #0f766e 100%); }
+.copertina.rosso { background: linear-gradient(135deg, #5b1111 0%, #b91c1c 100%); }
+</style>
+</head>
+<body>
+<section class="slide copertina verde">
+  <div class="interno"><span class="tag">DiBEST · Portale eventi e didattica</span><h1>Aule, laboratori e mezzi</h1><p>Prenotazioni, approvazioni, ripetizioni, liste d’attesa, diario di bordo e scadenze: chi fa cosa e che cosa vede ognuno.</p></div>
+  <div class="piede"><span>Presentazione dell'iter · ottobre 2026</span></div>
+</section>
+
+<section class="slide">
+  <h2><span class="num">0</span>L’iter di una prenotazione</h2>
+  <p class="sotto">Dallo slot scelto dall’utente al cruscotto del responsabile.</p>
+  <div class="griglia g4"><div class="card teal"><div class="attore" style="color:var(--teal)">1 · Utente</div><h3>Sceglie lo slot</h3><p>Dal calendario della risorsa: slot liberi in verde, durata, motivo, eventuali campi e quantità.</p></div><div class="card viola"><div class="attore" style="color:var(--viola)">2 · Responsabile</div><h3>Approva (se serve)</h3><p>Le risorse con approvazione tengono lo slot «in sospeso»; il responsabile approva o rifiuta dal portale.</p></div><div class="card blu"><div class="attore" style="color:var(--blu)">3 · Portale</div><h3>Conferma e promemoria</h3><p>Email di conferma con il file .ics e promemoria il giorno prima.</p></div><div class="card ambra"><div class="attore" style="color:var(--ambra)">4 · Utente</div><h3>Usa la risorsa</h3><p>Per auto e mezzi compila il diario di bordo (km, rifornimenti, segnalazioni).</p></div><div class="card verde"><div class="attore" style="color:var(--verde)">5 · Responsabile</div><h3>Controlla</h3><p>Cruscotto con numeri del periodo, fasce più richieste, chi la usa di più, scadenze e Excel.</p></div><div class="card notte"><div class="attore" style="color:var(--notte)">6 · Direttore</div><h3>Vede cosa è fermo</h3><p>Nel cruscotto: richieste da approvare da troppo tempo e scadenze vicine.</p></div><div class="card rosso"><div class="attore" style="color:var(--rosso)">7 · Lista d’attesa</div><h3>Se lo slot è occupato</h3><p>Chi si mette in coda viene avvisato se la prenotazione è annullata o rifiutata.</p></div><div class="card ardesia"><div class="attore" style="color:var(--ardesia)">8 · Ripetizioni</div><h3>Attività periodiche</h3><p>Ogni settimana, ogni due settimane o ogni mese, lo stesso giorno della settimana.</p></div></div>
+  <div class="piede"><span>Aule, laboratori e mezzi · l&#x27;iter delle prenotazioni</span></div>
+</section>
+
+<section class="slide">
+  <h2><span class="num">1</span>Il calendario della risorsa</h2>
+  <div class="shot"><div class="img alto"><img src="schermate/stud_calendario.png" alt=""></div>
+  <div><span class="tag">Utente · Prenotazione</span><ul><li>Gli slot <b>liberi</b> sono in verde: si sceglie uno slot (o più di seguito, fino al massimo consentito)</li><li>Gli slot occupati mostrano <b>«lista d’attesa»</b> e quante persone sono già in coda</li><li>In fondo, «Le tue liste d’attesa»: posizione in coda e pulsante per uscire</li><li>Chi non è abilitato (per esempio solo docenti) vede il motivo</li></ul></div></div>
+  <div class="piede"><span>Aule, laboratori e mezzi · l&#x27;iter delle prenotazioni</span></div>
+</section>
+
+<section class="slide">
+  <h2><span class="num">2</span>Ripetere una prenotazione</h2>
+  <div class="shot"><div class="img alto"><img src="schermate/stud_prenota.png" alt=""></div>
+  <div><span class="tag">Utente · Prenotazione periodica</span><ul><li>Con <b>«Ripeti»</b> si sceglie la frequenza: ogni settimana, ogni due settimane o ogni mese (lo stesso giorno della settimana, per esempio il secondo martedì)</li><li>Si indica fino a quando: le date non disponibili vengono <b>saltate</b> e indicate nell’email di riepilogo</li><li>La prima data deve essere libera; le serie si annullano una per una</li><li>Le risorse con approvazione chiedono il via libera per l’intera serie</li></ul></div></div>
+  <div class="piede"><span>Aule, laboratori e mezzi · l&#x27;iter delle prenotazioni</span></div>
+</section>
+
+<section class="slide">
+  <h2><span class="num">3</span>La lista d’attesa</h2>
+  <p class="sotto">Nessuno deve ricontrollare il calendario: se si libera, il portale avvisa.</p>
+  
+      <div class="percorso" style="margin-bottom:22px">
+        <div class="passo" style="border-top-color:var(--ambra)"><em style="background:var(--ambra)">1 · In coda</em><b>Slot occupato</b><span>L’utente preme «lista d’attesa» sullo slot: massimo 5 code aperte per risorsa.</span></div>
+        <div class="passo" style="border-top-color:var(--rosso)"><em style="background:var(--rosso)">2 · Si libera</em><b>Annullata o rifiutata</b><span>Chi aveva prenotato annulla, o il responsabile rifiuta: il primo in coda riceve l’email.</span></div>
+        <div class="passo" style="border-top-color:var(--blu)"><em style="background:var(--blu)">3 · 24 ore</em><b>Tempo per prenotare</b><span>Lo slot non è riservato: chi arriva prima lo prende. Il primo ha 24 ore di vantaggio nell’avviso.</span></div>
+        <div class="passo" style="border-top-color:var(--verde)"><em style="background:var(--verde)">4 · Chiusa</em><b>Prenotato o scaduto</b><span>Se prenota la coda si chiude; se non fa in tempo l’avviso passa al successivo (cron del portale).</span></div>
+      </div>
+      <div class="evidenza"><b>Per chi gestisce:</b> non c’è nulla da configurare. L’avviso parte da solo e la lista è visibile all’utente nella pagina della risorsa.</div>
+  <div class="piede"><span>Aule, laboratori e mezzi · l&#x27;iter delle prenotazioni</span></div>
+</section>
+
+<section class="slide">
+  <h2><span class="num">4</span>Il responsabile approva</h2>
+  <div class="shot"><div class="img alto"><img src="schermate/resp_risorse.png" alt=""></div>
+  <div><span class="tag">Responsabile · Le mie risorse</span><ul><li>Dalla propria Area personale, <b>«Le mie risorse»</b>: richieste da approvare e prenotazioni in arrivo</li><li>Approva o rifiuta: chi ha prenotato riceve l’email; il rifiuto libera lo slot per la lista d’attesa</li><li>Il responsabile è scelto dall’anagrafe del personale: nessun account da creare</li></ul></div></div>
+  <div class="piede"><span>Aule, laboratori e mezzi · l&#x27;iter delle prenotazioni</span></div>
+</section>
+
+<section class="slide">
+  <h2><span class="num">5</span>Il cruscotto della risorsa</h2>
+  <div class="shot"><div class="img alto"><img src="schermate/resp_cruscotto.png" alt=""></div>
+  <div><span class="tag">Responsabile · Numeri e scadenze</span><ul><li>Prenotazioni, <b>ore prenotate</b> e utilizzo nel periodo scelto</li><li>Le <b>fasce più richieste</b>: dicono se serve più disponibilità</li><li>«Chi la usa di più» e Excel con tutti i numeri</li><li><b>Scadenze</b> (bollo, assicurazione, taratura): avviso prima della data e il giorno stesso; «Rinnovata» azzera l’avviso</li></ul></div></div>
+  <div class="piede"><span>Aule, laboratori e mezzi · l&#x27;iter delle prenotazioni</span></div>
+</section>
+
+<section class="slide">
+  <h2><span class="num">6</span>Il diario di bordo</h2>
+  <div class="shot"><div class="img alto"><img src="schermate/resp_diario.png" alt=""></div>
+  <div><span class="tag">Chi ha prenotato · Auto e mezzi</span><ul><li>Dopo l’uso, chi ha prenotato (o un altro conducente indicato) compila il diario: km, rifornimenti, segnalazioni</li><li>I <b>km iniziali</b> si propongono dall’ultimo viaggio e non possono essere più bassi</li><li>Il responsabile verifica e corregge; ogni correzione azzera la verifica</li><li>Promemoria automatico; si può bloccare una nuova prenotazione finché il diario manca</li></ul></div></div>
+  <div class="piede"><span>Aule, laboratori e mezzi · l&#x27;iter delle prenotazioni</span></div>
+</section>
+
+<section class="slide">
+  <h2><span class="num">7</span>Le prenotazioni dell’area</h2>
+  <div class="shot"><div class="img alto"><img src="schermate/adm_prenotazioni.png" alt=""></div>
+  <div><span class="tag">Gestore · Pannello</span><ul><li>Elenco con stati (confermata, da approvare, rifiutata, annullata) e filtri</li><li>Orari, durata dello slot, approvazione e ripetizione si impostano per ogni risorsa</li><li>Le richieste ferme da oltre una settimana compaiono nel cruscotto del Direttore</li></ul></div></div>
+  <div class="piede"><span>Aule, laboratori e mezzi · l&#x27;iter delle prenotazioni</span></div>
+</section>
+
+<section class="slide">
+  <h2><span class="num">8</span>Chi riceve cosa, e quando</h2>
+  <p class="sotto">Le email partono da sole a ogni passaggio.</p>
+  <table class="m"><tr><th>Passaggio</th><th>Chi riceve l’email</th><th>Oggetto</th></tr><tr><td>Prenotazione registrata</td><td>Utente; responsabile (se serve l’approvazione)</td><td>Prenotazione confermata · Da approvare</td></tr><tr><td>Approvata o rifiutata</td><td>Utente</td><td>Prenotazione approvata · non approvata</td></tr><tr><td>Annullata</td><td>Responsabile (se annulla l’utente); utente (se annulla il gestore)</td><td>Annullata</td></tr><tr><td>Slot liberato</td><td>Primo in lista d’attesa (poi il successivo dopo 24 ore)</td><td>Si è liberato uno slot</td></tr><tr><td>Il giorno prima</td><td>Utente</td><td>Promemoria: prenotazione di domani</td></tr><tr><td>Diario da compilare</td><td>Utente e altri conducenti</td><td>Diario di bordo da compilare</td></tr><tr><td>Scadenza vicina o superata</td><td>Responsabile</td><td>In scadenza · Scaduta</td></tr></table>
+  <div class="piede"><span>Aule, laboratori e mezzi · l&#x27;iter delle prenotazioni</span></div>
+</section>
+</body>
+</html>

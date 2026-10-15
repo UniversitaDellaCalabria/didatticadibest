@@ -98,7 +98,7 @@ details > summary { cursor: pointer; font-weight: 700; }
 // ==========================================================================================
 // DATI — è la sola parte da aggiornare a ogni step (Claude lo fa per te).
 // ==========================================================================================
-var AGGIORNATO = "21/10/2026";
+var AGGIORNATO = "22/10/2026";
 
 var PACCHETTI = [
   {
@@ -562,14 +562,15 @@ var PACCHETTI = [
   },
   {
     id: "certificati-laurea-ds",
-    titolo: "Pacchetto 11 · Certificato di laurea, Diploma Supplement e anteprima dei moduli",
+    titolo: "Pacchetto 11 · Certificato unico (iscrizione, laurea, rinuncia), Diploma Supplement e anteprima dei moduli",
     stato: "pronto",
     statoTesto: "Pronto da caricare (dopo il pacchetto 10)",
     schema: "v63 (nessuna novità)",
-    riassunto: "Le altre due pratiche dei certificati, con i campi di Uniticket: <strong>«Richiesta Certificato di Laurea»</strong> (stesso iter del certificato di iscrizione, con le marche da bollo) e <strong>«Richiesta Diploma Supplement»</strong> (senza marca da bollo: l'ufficio del corso <strong>carica il documento</strong> e il Direttore lo firma). In più, l'<strong>anteprima dei moduli</strong> ora si vede anche se il modulo non è pubblicato.",
+    riassunto: "<strong>Un'unica «Richiesta Certificato»</strong> al posto dei due certificati separati (iscrizione e laurea): lo studente sceglie <strong>Iscrizione, Laurea o Rinuncia agli studi</strong> e compaiono i campi e l'elenco di caselle di quel tipo (la rinuncia ha le stesse voci dell'iscrizione: con esami, date, anni accademici, piano); iter con le marche da bollo come prima. Poi <strong>«Richiesta Diploma Supplement»</strong> (senza marca da bollo: l'ufficio del corso <strong>carica il documento</strong> e il Direttore lo firma). In più, l'<strong>anteprima dei moduli</strong> ora si vede anche se il modulo non è pubblicato.",
     passi: [["C1", "Certificato di laurea, Diploma Supplement, anteprima dei moduli"]],
     cartelle: [
       { cartella: "/ (radice del portale)", file: [
+        ["footer.php", "mod", "C1", "tolta la scritta «Sistema di Prenotazione e Gestione Eventi»"],
         ["modulo.php", "mod", "C1 · anche pacchetto 10", "anteprima per chi gestisce la Didattica anche se il modulo non è pubblicato (si vede ma non si invia)"]
       ]},
       { cartella: "admin/", file: [
@@ -577,7 +578,7 @@ var PACCHETTI = [
         ["admin/didattica_pratiche.php", "mod", "C1 · anche pacchetto 10", "riquadro «Documento da firmare» (carica il PDF e passa al Direttore)"]
       ]},
       { cartella: "src/Didattica/", file: [
-        ["src/Didattica/ModelliPratiche.php", "mod", "C1 · anche pacchetto 10", "crea anche «Richiesta Certificato di Laurea» e «Richiesta Diploma Supplement» (inattivi)"],
+        ["src/Didattica/ModelliPratiche.php", "mod", "C1 · anche pacchetto 10", "crea «Richiesta Certificato» (iscrizione, laurea, rinuncia: la voce di Uniticket «Certificato di iscrizione» non c'è più) e «Richiesta Diploma Supplement» (inattivi)"],
         ["src/Didattica/ServizioMarcheBollo.php", "mod", "C1 · anche pacchetto 10", "caricamento del documento da firmare (senza pagamento)"],
         ["src/Didattica/ServizioIter.php", "mod", "C1 · anche pacchetto 10", "passo «documento da firmare»"],
         ["src/Didattica/ServizioModuli.php", "mod", "C1 · anche pacchetto 10", "salva il passo «documento da firmare»"]
@@ -649,6 +650,132 @@ var PACCHETTI = [
     ],
     nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
     commit: "Pratiche: attestati di frequenza alle lezioni e di esame sostenuto con conferma dei docenti nel portale, attestato in PDF/A, firma del Direttore e protocollo in uscita"
+  },
+  {
+    id: "immatricolazioni",
+    titolo: "Pacchetto 13 · Trasferimento in entrata, iscrizione per rinuncia o decadenza, abbreviazione di corso",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare (dopo i pacchetti 10-12)",
+    schema: "v67",
+    riassunto: "Le tre pratiche di <strong>immatricolazione, passaggi e trasferimenti</strong>, con i campi dei moduli Uniticket: lo studente legge l'avviso sull'obbligo formativo aggiuntivo, <strong>paga la marca da bollo su UniPay e allega la ricevuta</strong>, carica autocertificazione e programmi degli esami; la pratica va al protocollo, poi all'ufficio del corso (referente) e alla Segreteria studenti, e <strong>passa nel verbale</strong> per la decisione del Consiglio. L'ufficio indica se l'OFA è estinto o da assolvere. Nella domanda in PDF/A il corso scelto come «Corso di destinazione» non viene più scritto come corso a cui lo studente è già iscritto.",
+    passi: [["C1", "Immatricolazioni, passaggi e trasferimenti"]],
+    cartelle: [
+      { cartella: "src/Didattica/", file: [
+        ["src/Didattica/ModelliPratiche.php", "mod", "C1 · anche pacchetti 10-12", "crea «Richiesta Trasferimento in Entrata», «Richiesta di Iscrizione per rinuncia e decadenza» e «Richiesta Abbreviazione di corso» (inattivi, con testo per il verbale)"],
+        ["src/Core/Schema/Migrazioni.php", "mod", "C1 · anche pacchetti 1-12", "versione dello schema: 67 (fa rifare i dati di partenza dei moduli)"],
+        ["src/Didattica/DomandaPdfa.php", "mod", "C1", "frase iniziale corretta quando il corso scelto è «di destinazione»"]
+      ]}
+    ],
+    dopo: [
+      "Apri una pagina del pannello: lo schema passa alla v67 (<code>cache/schema_v67.ok</code>) e si creano i tre moduli, inattivi, nella categoria «Immatricolazioni, passaggi e trasferimenti», e «Richiesta Certificato» al posto dei due certificati separati. Non serve cancellare nulla.",
+      "<strong>Moduli:</strong> Didattica → Moduli e documenti: guardali con «Anteprima», controlla i testi e attivali.",
+      "<strong>Prova veloce:</strong> da studente invia un trasferimento con la ricevuta del bollo; il protocollo registra il numero; l'ufficio del corso e la Segreteria la lavorano; poi la pratica si porta nel verbale."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Pratiche: trasferimento in entrata, iscrizione per rinuncia o decadenza e abbreviazione di corso, con bollo su UniPay, passaggio in verbale e OFA"
+  },
+  {
+    id: "carriera",
+    titolo: "Pacchetto 14 · Pratiche di carriera: inglese, piano di studi, curriculum, part-time, fuori piano, anticipo, titolo estero",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare (dopo il pacchetto 13)",
+    schema: "v67",
+    riassunto: "Otto pratiche della categoria <strong>Carriera</strong>, con i campi dei moduli Uniticket: <strong>convalida</strong> (con marca da bollo, certificazione B2) e <strong>esonero</strong> (certificazione B1) di English for Basic Academic Skills e Inglese, <strong>variazione del piano di studi</strong>, <strong>cambio di classe o curriculum</strong>, <strong>tempo pieno / part-time</strong>, <strong>insegnamenti fuori piano</strong>, <strong>anticipo di insegnamenti</strong>, <strong>riconoscimento del titolo estero</strong>. Iter uguale per tutte: protocollo → ufficio del corso (referente) → Segreteria studenti, con passaggio nel verbale e decisione del Consiglio. Per piano di studi e anticipo gli insegnamenti si scelgono dal catalogo in una tabella (al posto del PDF da scaricare, compilare e ricaricare).",
+    passi: [["C1", "Pratiche di carriera"]],
+    cartelle: [
+      { cartella: "src/Didattica/ e src/Core/Schema/", file: [
+        ["src/Didattica/ModelliPratiche.php", "mod", "C1 · anche pacchetti 10-13", "crea le otto pratiche di carriera (inattive, con testo per il verbale)"],
+        ["src/Core/Schema/Migrazioni.php", "mod", "C1 · anche pacchetti 1-13", "versione dello schema: 67"]
+      ]}
+    ],
+    dopo: [
+      "Apri una pagina del pannello: lo schema passa alla v67 e si creano gli otto moduli, inattivi, nella categoria «Carriera». Non serve cancellare nulla.",
+      "<strong>Moduli:</strong> Didattica → Moduli e documenti: guardali con «Anteprima», controlla i testi e attivali. La <strong>convalida esami</strong> (già presente) non è stata toccata.",
+      "<strong>Prova veloce:</strong> da studente invia una convalida di inglese; il protocollo spunta la marca da bollo e registra il numero; l'ufficio del corso la lavora e la porta nel verbale; dopo la delibera passa alla Segreteria."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Pratiche: convalida ed esonero di inglese, variazione del piano di studi, cambio di curriculum, tempo pieno/part-time, fuori piano, anticipo e titolo estero"
+  },
+  {
+    id: "tesi-mobilita",
+    titolo: "Pacchetto 15 · Tesi con conferma del relatore, cancellazione iscrizione, esonero dalla frequenza, mobilità internazionale",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare (dopo il pacchetto 14)",
+    schema: "v67",
+    riassunto: "Sei pratiche: una <strong>«Richiesta Tesi»</strong> unica (richiesta di tesi, tesi di Conservazione e Restauro, variazione: lo studente sceglie il tipo e compaiono i campi giusti) con la <strong>conferma del relatore nel portale</strong> prima del protocollo; <strong>cancellazione errata iscrizione</strong>; <strong>esonero dalla frequenza</strong> (salute, mobilità, ammissione ritardata: un solo modulo); e le tre pratiche di <strong>mobilità internazionale</strong> (svolgimento, variazione, fine attività) che passano dall'ufficio <strong>Internazionalizzazione</strong> (referente mobilità) prima del referente del corso. Tutte vanno nel verbale. La pagina di conferma del docente non parla più solo di attestati.",
+    passi: [["C1", "Tesi, cancellazione, esonero, mobilità internazionale"]],
+    cartelle: [
+      { cartella: "/ (radice del portale)", file: [
+        ["conferma_attestato.php", "mod", "C1 · anche pacchetto 12", "pagina di conferma del docente per qualunque richiesta (titolo e frase non più solo per gli attestati)"]
+      ]},
+      { cartella: "src/Didattica/ e src/Core/Schema/", file: [
+        ["src/Didattica/ModelliPratiche.php", "mod", "C1 · anche pacchetti 10-14", "crea le sei pratiche (inattive)"],
+        ["src/Didattica/ServizioConfermeDocenti.php", "mod", "C1 · anche pacchetto 12", "il relatore vede le risposte della richiesta (senza dati personali); email di conferma generica"],
+        ["src/Core/Schema/Migrazioni.php", "mod", "C1 · anche pacchetti 1-14", "versione dello schema: 67"]
+      ]}
+    ],
+    dopo: [
+      "Apri una pagina del pannello: lo schema passa alla v67 e si creano i sei moduli (inattivi). Non serve cancellare nulla.",
+      "<strong>Ufficio Internazionalizzazione:</strong> Didattica → Ufficio e ricevimento: controlla che ci siano le persone del tutor dell'internazionalizzazione.",
+      "<strong>Relatori:</strong> devono essere nell'anagrafe del personale con l'email: lo studente li sceglie dall'elenco.",
+      "<strong>Moduli:</strong> Didattica → Moduli e documenti: guardali con «Anteprima», controlla i testi e attivali.",
+      "<strong>Prova veloce:</strong> da studente invia una richiesta di tesi; il relatore riceve l'email e conferma dal link; poi protocollo e referente del corso; la pratica va nel verbale."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Pratiche: richiesta tesi unica con conferma del relatore, cancellazione errata iscrizione, esonero dalla frequenza e mobilità internazionale con referente"
+  },
+  {
+    id: "cruscotto-attesa-backup-guide",
+    titolo: "Pacchetto 16 · Cruscotto del Direttore, liste d'attesa e ripetizioni, verifica dei backup, guide per ruolo",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare (dopo il pacchetto 15)",
+    schema: "v68",
+    riassunto: "<strong>Cruscotto del Direttore</strong> (una pagina con firme da fare e cose ferme in tutti i moduli); <strong>prenotazioni ripetute</strong> ogni settimana, ogni due settimane o ogni mese e <strong>lista d'attesa</strong> per gli slot occupati (avviso al primo in coda, 24 ore, poi al successivo); <strong>verifica automatica dei backup</strong> e strumento per provare e fare il ripristino; <strong>guide «Come si fa» per ruolo</strong> con le schermate (nove, anche in PDF). La pagina di conferma dei docenti mostra le richieste di tesi in elenco leggibile.",
+    passi: [["G", "Collaudo: scenario di prova e iter di tutte le pratiche"], ["F1", "Cruscotto del Direttore"], ["F2", "Prenotazioni ricorrenti e liste d'attesa"], ["F3", "Verifica e ripristino dei backup"], ["F4", "Guide per ruolo"]],
+    cartelle: [
+      { cartella: "/ (radice del portale)", file: [
+        ["cruscotto_direttore.php", "nuovo", "F1", "il cruscotto del Direttore (e degli amministratori)"],
+        ["assets/guide/fsl_*.png", "nuovo", "F4", "schermate della guida per le scuole (convenzione FSL)"],
+        ["guida.php", "nuovo", "F4", "le guide per ruolo, con la versione da stampare"],
+        ["area_personale.php", "mod", "F1 F4", "card «Cruscotto del Direttore» (solo per chi può) e «Come si fa»"],
+        ["calendario_area.php", "mod", "F2", "frequenza della ripetizione, pulsante «lista d'attesa» sugli slot occupati, «Le tue liste d'attesa»"],
+        ["conferma_attestato.php", "mod", "C1 · anche pacchetto 15", "richieste di tesi in elenco leggibile (non in tabella stretta)"],
+        ["inc/risorse.php", "mod", "F2", "prenota_risorsa() con la frequenza"]
+      ]},
+      { cartella: "assets/", file: [
+        ["assets/guide/ (31 immagini)", "nuovo", "F4", "le schermate delle guide"],
+        ["assets/js/pannello.js", "mod", "F4", "il «?» del pannello rimanda alle guide"]
+      ]},
+      { cartella: "admin/ e src/Sistema/Backup/", file: [
+        ["admin/cron_backup.php", "mod", "F3", "verifica del database e dello ZIP dopo ogni backup, avviso se manca spazio"],
+        ["src/Sistema/Backup/VerificaBackup.php", "nuovo", "F3", "rilegge il backup per intero"]
+      ]},
+      { cartella: "src/Portale/ e src/Risorse/", file: [
+        ["src/Portale/CruscottoDirettore.php", "nuovo", "F1", "i nove gruppi del cruscotto"],
+        ["src/Portale/GuidePerRuolo.php", "nuovo", "F4", "il testo delle guide"],
+        ["src/Risorse/ListaAttesaRisorse.php", "nuovo", "F2", "la lista d'attesa: coda, avviso, scadenza"],
+        ["src/Risorse/ServizioRisorse.php", "mod", "F2", "ripetizione mensile e ogni due settimane; lista d'attesa; avviso quando si libera"],
+        ["src/Risorse/NotificheRisorse.php", "mod", "F2", "email «Si è liberato uno slot»"],
+        ["src/Risorse/PromemoriaPrenotazioni.php", "mod", "F2", "il cron fa passare l'avviso al successivo"],
+        ["src/Risorse/Costanti.php", "mod", "F2", "le frequenze"]
+      ]},
+      { cartella: "src/Didattica/, src/Core/Schema/ e strumenti/", file: [
+        ["src/Didattica/ModelliPratiche.php", "mod", "pacchetti 10-15", "mobilità dall'ufficio Internazionalizzazione già esistente (e correzione se era stato creato un ufficio a parte)"],
+        ["src/Didattica/ServizioConfermeDocenti.php", "mod", "C1 · anche pacchetto 15", "il relatore vede le risposte della richiesta"],
+        ["src/Core/Schema/Definizioni.php", "mod", "F2 · anche pacchetti 1-15", "tabella delle liste d'attesa"],
+        ["src/Core/Schema/Migrazioni.php", "mod", "F2 · anche pacchetti 1-15", "versione dello schema: 68"],
+        ["strumenti/ripristina_backup.php", "nuovo", "F3", "verifica, prova e ripristino dei backup da riga di comando (vedi la guida «Amministratore»)"]
+      ]}
+    ],
+    dopo: [
+      "Apri una pagina del pannello: lo schema passa alla v68 (nuova tabella delle liste d'attesa). Non serve cancellare nulla.",
+      "<strong>Direttore:</strong> controlla in FSL → Scuole e convenzioni che nome ed email del Direttore siano indicati: solo lui e gli amministratori vedono il cruscotto (card nella sua Area personale).",
+      "<strong>Backup:</strong> al prossimo giro di <code>admin/cron_backup.php</code> compaiono le righe «Verifica del database» e «Verifica dei file». Una volta al mese prova il ripristino: <code>php strumenti/ripristina_backup.php prova backup_DB_….sql.gz</code>.",
+      "<strong>Guide:</strong> <code>guida.php</code> è pubblica; il «?» del pannello e l'Area personale rimandano lì.",
+      "<strong>Prova veloce:</strong> prenota uno slot, da un altro utente mettiti in lista d'attesa su quello slot, poi annulla la prenotazione: il secondo riceve l'email."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>materiali/…</code>, <code>documentazione/…</code> e le altre cartelle di <code>strumenti/</code> (solo <code>strumenti/ripristina_backup.php</code>, se vuoi usarlo sul server).",
+    commit: "Cruscotto del Direttore, prenotazioni ripetute e liste d'attesa, verifica e ripristino dei backup, guide per ruolo"
   }
 ];
 
@@ -662,12 +789,12 @@ var PROSSIMI = [
   ["C1 · Procedura guidata delle pratiche studenti", "fatto: vedi Pacchetto 7"],
   ["B1–B3 · Risorse: responsabili, campi, contatori, diario di bordo", "fatto: vedi Pacchetto 8"],
   ["B4 · Report e cruscotto del responsabile", "fatto: vedi Pacchetto 9"],
-  ["G · Collaudo di pratiche, verbali e risorse", "prossimo step"],
-  ["F1 · Cruscotto unico per il Direttore (cose in sospeso)", "da fare"],
-  ["F2 · Prenotazioni ricorrenti e liste d'attesa per le risorse", "da fare"],
-  ["F3 · Backup e ripristino dei file caricati e del database", "da fare"],
-  ["F4 · Guide per ruolo («Come si fa»): referente, relatore, responsabile di risorsa, tutor, studente", "da fare dopo il collaudo"],
-  ["F5 · Assistente IA interno per i verbali (testi e vocali, gratis, dentro il server)", "da valutare: prima la prova sul server, comandi nel piano (F5)"],
+  ["G · Collaudo di pratiche, verbali e risorse", "fatto: scenario di prova, iter di tutte le pratiche e schermate (vedi Pacchetto 16)"],
+  ["F1 · Cruscotto unico per il Direttore (cose in sospeso)", "fatto: vedi Pacchetto 16"],
+  ["F2 · Prenotazioni ricorrenti e liste d'attesa per le risorse", "fatto: vedi Pacchetto 16"],
+  ["F3 · Backup e ripristino dei file caricati e del database", "fatto: il backup c'era già; ora verifica automatica e ripristino (Pacchetto 16)"],
+  ["F4 · Guide per ruolo («Come si fa»)", "fatto: dieci guide con schermate (compresa quella per le scuole sulla convenzione FSL), anche in PDF (Pacchetto 16)"],
+  ["F5 · Assistente IA interno per i verbali (testi e vocali, gratis, dentro il server)", "in stand-by (su decisione dell’utente): si riprende solo se serve; comandi di prova nel piano (F5)"],
   ["E1–E2 · Protocollo Titulus", "in attesa della risposta dell'Ateneo (servono i parametri, §6 del piano)"],
   ["Firma digitale remota (Aruba) in produzione", "in attesa dell'Ateneo: finché non ci sono le variabili ARUBA_* nel .env si carica il PDF firmato a mano"]
 ];

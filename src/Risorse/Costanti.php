@@ -18,6 +18,8 @@ final class Costanti
         'tutti' => 'Chiunque abbia fatto l\'accesso', 'studenti' => 'Studenti', 'docenti' => 'Docenti',
         'personale' => 'Docenti e personale di Ateneo',
     ];
+    /** Ogni quanto si può ripetere una prenotazione (se la risorsa lo consente). «mese» = lo stesso giorno della settimana di ogni mese (es. il secondo martedì). */
+    public const FREQUENZE = ['settimana' => 'ogni settimana', 'quindici' => 'ogni due settimane', 'mese' => 'ogni mese, lo stesso giorno della settimana'];
     public const GIORNI = [1 => 'Lunedì', 2 => 'Martedì', 3 => 'Mercoledì', 4 => 'Giovedì', 5 => 'Venerdì', 6 => 'Sabato', 7 => 'Domenica'];
     public const LEGENDA_CALENDARIO = [
         'libero' => ['Prenotabile', '#ffffff', '#334155'],

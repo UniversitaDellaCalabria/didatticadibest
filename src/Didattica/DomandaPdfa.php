@@ -96,6 +96,13 @@ final class DomandaPdfa
         $indirizzo = $dato(null, '/indirizzo/u');
         $cell = $dato(null, '/cellulare|telefono/u');
         $aa = $dato('anno_accademico', null);
+        // Il corso di studio è quello a cui lo studente si iscrive già, a meno che il campo sia «Corso di destinazione» (trasferimenti, abbreviazioni, rinunce)
+        $destinazione = false;
+        foreach ($risposte as $r) {
+            if (($r['tipo'] ?? '') === 'corso_studio' && str_contains(mb_strtolower((string) $r['etichetta']), 'destinazione')) {
+                $destinazione = true;
+            }
+        }
         $corso = $dato('corso_studio', null);
         $matr = $dato(null, '/^matricola/u') ?: (string)$p['matricola'];
         $nome = mb_strtoupper(trim($p['cognome'] . ' ' . $p['nome']));
@@ -123,7 +130,7 @@ final class DomandaPdfa
                . ($cf !== '' ? ', codice fiscale ' . $cf : '')
                . ($comune !== '' ? ', residente in ' . $comune . ($indirizzo !== '' ? ', ' . $indirizzo : '') : '')
                . ($cell !== '' ? ', cellulare ' . $cell : '') . ($p['email'] !== '' ? ', email ' . $p['email'] : '')
-               . ($aa !== '' || $corso !== '' ? ', iscritto/a' . ($aa !== '' ? ' per l\'a.a. ' . $aa : '') . ($corso !== '' ? (preg_match('/^corso/iu', $corso) ? ' al c' . mb_substr($corso, 1) : ' al Corso di Studio in ' . $corso) : '') : '')
+               . (!$destinazione && ($aa !== '' || $corso !== '') ? ', iscritto/a' . ($aa !== '' ? ' per l\'a.a. ' . $aa : '') . ($corso !== '' ? (preg_match('/^corso/iu', $corso) ? ' al c' . mb_substr($corso, 1) : ' al Corso di Studio in ' . $corso) : '') : '')
                . ($matr !== '' ? ', matricola n. ' . $matr : '') . ',';
         $pdf->paragrafo($frase, ['dopo' => 8, 'interlinea' => 1.4]);
         $pdf->paragrafo('**CHIEDE**', ['al' => 'centro', 'dopo' => 8, 'sz' => 12]);

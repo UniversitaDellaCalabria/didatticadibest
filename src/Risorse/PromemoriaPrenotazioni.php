@@ -9,7 +9,7 @@ use App\Iscritti\PromemoriaRisorse;
 /** Promemoria del giorno prima delle prenotazioni di aule, laboratori e sportelli (lo chiama il cron dei promemoria). */
 final class PromemoriaPrenotazioni implements PromemoriaRisorse
 {
-    public function __construct(private RisorsaRepository $risorse, private NotificheRisorse $notifiche, private DiarioBordoRepository $diario, private ServizioScadenzeRisorsa $scadenze)
+    public function __construct(private RisorsaRepository $risorse, private NotificheRisorse $notifiche, private DiarioBordoRepository $diario, private ServizioScadenzeRisorsa $scadenze, private ?ListaAttesaRisorse $attesa = null)
     {
     }
 
@@ -37,6 +37,9 @@ final class PromemoriaPrenotazioni implements PromemoriaRisorse
             $inviati += $this->notifiche->emailScadenza($s);
             $this->scadenze->segnaAvviso((int) $s['id'], $s['scaduta'] === '1');
         }
+
+        // Liste d'attesa: a chi è stato avvisato e non ha prenotato in tempo l'attesa scade e l'avviso passa al successivo
+        $inviati += $this->attesa?->scala() ?? 0;
 
         return $inviati;
     }

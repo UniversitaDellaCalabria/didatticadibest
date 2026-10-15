@@ -37,7 +37,7 @@ if ($c && $p && $io && $in_attesa && $_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Location: conferma_attestato.php?t=' . urlencode($tok) . '&r=' . time()); exit;
 }
 
-$page_cfg['titolo'] = 'Conferma dell\'attestato';
+$page_cfg['titolo'] = 'Conferma della richiesta';
 require_once 'header.php';
 $altre = $user_info ? array_values(array_filter($svc->inAttesaPerEmail((string)($user_info['email'] ?? '')), fn($x) => !$c || (int)$x['id'] !== (int)$c['id'])) : [];
 ?>
@@ -46,7 +46,7 @@ $altre = $user_info ? array_values(array_filter($svc->inAttesaPerEmail((string)(
     <?php if (!$c || !$p): ?>
         <h1 class="fw-bold h3">Richiesta non disponibile</h1><p>Il link non è valido o la richiesta è stata annullata.</p>
     <?php elseif (!$io): ?>
-        <h1 class="fw-bold h3">Conferma dell'attestato</h1>
+        <h1 class="fw-bold h3">Conferma della richiesta</h1>
         <div class="alert alert-warning">Questa pagina è per <strong><?php echo $h($svc->nomeVisibile((string)$c['nome'])); ?></strong>: accedi con le sue credenziali (Unical ID, SPID o CIE).</div>
         <a class="btn btn-outline-secondary" href="esci.php">Esci</a>
     <?php else:
@@ -56,8 +56,12 @@ $altre = $user_info ? array_values(array_filter($svc->inAttesaPerEmail((string)(
         <p class="text-secondary mb-3">Richiesto da <strong><?php echo $h(trim($p['nome'] . ' ' . $p['cognome'])); ?></strong><?php echo $p['matricola'] !== '' ? ' · matricola ' . $h($p['matricola']) : ''; ?> · pratica <?php echo $h($p['codice']); ?>.</p>
         <div class="card border-0 shadow-sm mb-3"><div class="card-body">
             <h2 class="h6 fw-bold mb-2">Cosa ti chiediamo di confermare</h2>
-            <p class="small mb-2">Lo studente indica di aver <?php echo str_contains(mb_strtolower((string)$p['modulo_titolo']), 'esame') ? 'sostenuto l\'esame' : 'seguito le lezioni'; ?> qui sotto con te come docente.<?php echo count($righe) > 1 ? ' Sono ' . count($righe) . ' righe.' : ''; ?></p>
-            <?php if ($righe): ?>
+            <p class="small mb-2"><?php $tit_m = mb_strtolower((string)$p['modulo_titolo']); echo str_contains($tit_m, 'attestato') ? 'Lo studente indica di aver ' . (str_contains($tit_m, 'esame') ? 'sostenuto l\'esame' : 'seguito le lezioni') . ' qui sotto con te come docente.' : 'Lo studente ti ha indicato come docente nella richiesta qui sotto: controlla i dati.'; ?><?php echo count($righe) > 1 ? ' Sono ' . count($righe) . ' righe.' : ''; ?></p>
+            <?php if ($righe && count($righe) === 1 && count($col) > 3): ?>
+            <dl class="row small mb-0"><?php foreach ($col as $n): $v_c = (string)($righe[0][$n] ?? ''); ?>
+                <dt class="col-sm-4 border-top pt-2"><?php echo $h($n); ?></dt><dd class="col-sm-8 border-top pt-2"><?php echo $h(preg_match('/^\d{4}-\d{2}-\d{2}$/', $v_c) ? date('d/m/Y', strtotime($v_c)) : $v_c); ?></dd>
+            <?php endforeach; ?></dl>
+            <?php elseif ($righe): ?>
             <div class="table-responsive"><table class="table table-sm table-bordered small mb-0">
                 <thead class="table-light"><tr><?php foreach ($col as $n): ?><th><?php echo $h($n); ?></th><?php endforeach; ?></tr></thead>
                 <tbody><?php foreach ($righe as $r): ?><tr><?php foreach ($col as $n): ?><td><?php echo $h(preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($r[$n] ?? '')) ? date('d/m/Y', strtotime($r[$n])) : ($r[$n] ?? '')); ?></td><?php endforeach; ?></tr><?php endforeach; ?></tbody>
@@ -90,7 +94,7 @@ $altre = $user_info ? array_values(array_filter($svc->inAttesaPerEmail((string)(
         <?php endif; ?>
         <?php if ($altre): ?>
         <div class="card border-0 shadow-sm mt-3"><div class="card-body">
-            <h2 class="h6 fw-bold mb-2">Altri attestati che aspettano la tua conferma</h2>
+            <h2 class="h6 fw-bold mb-2">Altre richieste che aspettano la tua conferma</h2>
             <ul class="mb-0 small"><?php foreach ($altre as $a): ?><li><a href="conferma_attestato.php?t=<?php echo $h(urlencode($a['token'])); ?>"><?php echo $h($a['modulo_titolo']); ?> · <?php echo $h(trim($a['studente_nome'] . ' ' . $a['studente_cognome'])); ?></a> <span class="text-secondary">(dal <?php echo date('d/m/Y', strtotime($a['richiesta_il'])); ?>)</span></li><?php endforeach; ?></ul>
         </div></div>
         <?php endif; ?>

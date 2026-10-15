@@ -199,7 +199,7 @@ final class ServizioConfermeDocenti
             $email,
             ($sollecito ? 'Promemoria · ' : '') . 'Da confermare: ' . $p['modulo_titolo'] . ' – ' . trim($p['cognome'] . ' ' . $p['nome']),
             '<p>Gentile ' . $h($nome) . ',</p><p>' . $h(trim($p['nome'] . ' ' . $p['cognome'])) . ($p['matricola'] !== '' ? ' (matricola ' . $h($p['matricola']) . ')' : '')
-            . ' ha chiesto un attestato (<strong>' . $h($p['modulo_titolo']) . '</strong>) e ti ha indicato come docente: ' . ($sollecito ? 'è ancora in attesa la tua conferma' : 'ti chiediamo di confermare')
+            . ' ha presentato una richiesta (<strong>' . $h($p['modulo_titolo']) . '</strong>) e ti ha indicato come docente: ' . ($sollecito ? 'è ancora in attesa la tua conferma' : 'ti chiediamo di confermare')
             . ' ' . ($righe === 1 ? 'una riga' : $righe . ' righe') . ' che ti riguarda' . ($righe === 1 ? '' : 'no') . '.</p>'
             . '<p>Accedi con le tue credenziali di Ateneo, controlla i dati e premi «Confermo» (oppure «Non confermo», indicando il motivo: lo studente può correggere).</p>'
             . $this->notifiche->bottone($this->sito->urlBase() . '/conferma_attestato.php?t=' . $token, 'Apri e conferma')
@@ -287,10 +287,15 @@ final class ServizioConfermeDocenti
                     $out[] = $o;
                 }
             } else {
-                // Campi singoli (esame): si mostrano tutte le altre risposte dell'attestazione
+                // Campi singoli: per l'attestato di esame sono i dati dell'esame; per le altre richieste (es. la tesi) tutte le risposte, senza i dati personali dello studente
+                $nomiEsame = array_map('mb_strtolower', ModelliPratiche::CAMPI_ATTESTAZIONE_ESAME);
+                $perEsame = (bool) array_filter($risposte, static fn ($x): bool => in_array(mb_strtolower((string) ($x['etichetta'] ?? '')), $nomiEsame, true));
                 foreach ($risposte as $x) {
-                    if (empty($x['nascosto']) && trim((string) ($x['valore'] ?? '')) !== '' && ($x['tipo'] ?? '') !== 'dichiarazione' && !in_array($x['tipo'] ?? '', ['tabella', 'file'], true)
-                        && in_array(mb_strtolower((string) $x['etichetta']), array_map('mb_strtolower', ModelliPratiche::CAMPI_ATTESTAZIONE_ESAME), true)) {
+                    $et = mb_strtolower((string) ($x['etichetta'] ?? ''));
+                    $visibile = empty($x['nascosto']) && trim((string) ($x['valore'] ?? '')) !== '' && ($x['tipo'] ?? '') !== 'dichiarazione' && !in_array($x['tipo'] ?? '', ['tabella', 'file'], true);
+                    $ammesso = $perEsame ? in_array($et, $nomiEsame, true)
+                        : !in_array($x['tipo'] ?? '', ['codice_fiscale', 'tel', 'email'], true) && !str_contains($et, 'nascita');
+                    if ($visibile && $ammesso) {
                         $out[0][(string) $x['etichetta']] = (string) $x['valore'];
                     }
                 }

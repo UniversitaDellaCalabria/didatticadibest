@@ -102,6 +102,28 @@ final class NotificheRisorse
     }
 
     /**
+     * Si è liberato uno slot per cui l'utente era in lista d'attesa: l'avviso con il link al calendario (lo slot non resta riservato).
+     *
+     * @param array<string, mixed> $a riga della lista d'attesa
+     * @param array<string, mixed> $r risorsa con risorsa_nome, slug e colore_primario
+     */
+    public function emailSlotLibero(array $a, array $r, int $ore): bool
+    {
+        if (empty($a['email'])) {
+            return false;
+        }
+        $h = static fn ($s): string => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
+        $quando = date('d/m/Y', (int) strtotime((string) $a['inizio'])) . ' ' . date('H:i', (int) strtotime((string) $a['inizio'])) . '–' . date('H:i', (int) strtotime((string) $a['fine']));
+        $link = $this->sito->urlBase() . '/' . rawurlencode((string) ($r['slug'] ?? '')) . '.php?risorsa=' . (int) $a['risorsa_id'] . '&dal=' . urlencode(date('Y-m-d', (int) strtotime((string) $a['inizio'])));
+        $corpo = '<p>Gentile <strong>' . $h(trim($a['nome'] . ' ' . $a['cognome'])) . '</strong>,</p>'
+               . '<p>si è liberato lo slot per cui eri in lista d\'attesa: <strong>' . $h($r['risorsa_nome']) . '</strong>, ' . $h($quando) . '.</p>'
+               . "<p>Hai tempo fino a circa $ore ore per prenotarlo: poi l'avviso passa alla persona successiva in coda. Lo slot non resta riservato, quindi conviene non aspettare.</p>"
+               . "<p><a href='" . $h($link) . "' style='background:#0f766e;color:#fff;padding:10px 18px;text-decoration:none;border-radius:6px;font-weight:bold;'>Prenota ora</a></p>";
+
+        return $this->mailer->invia((string) $a['email'], 'Si è liberato uno slot: ' . $r['risorsa_nome'] . ' – ' . date('d/m H:i', (int) strtotime((string) $a['inizio'])), $corpo, Colori::valido($r['colore_primario'] ?? ''));
+    }
+
+    /**
      * Avviso di una scadenza della risorsa (in arrivo o scaduta) ai responsabili e agli indirizzi di notifica.
      *
      * @param array<string, mixed> $s scadenza con risorsa_nome, risorsa_id, pagina_id, email_notifiche, scaduta

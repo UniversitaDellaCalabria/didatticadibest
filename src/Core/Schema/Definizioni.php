@@ -198,6 +198,13 @@ final class Definizioni
             id INT AUTO_INCREMENT PRIMARY KEY, risorsa_id INT NOT NULL, nome VARCHAR(100) NOT NULL DEFAULT '', scade_il DATE NOT NULL, preavviso_giorni SMALLINT NOT NULL DEFAULT 30,
             note VARCHAR(255) DEFAULT '', avviso_il DATETIME DEFAULT NULL, avviso_scaduta_il DATETIME DEFAULT NULL, INDEX idx_risorsa (risorsa_id), INDEX idx_data (scade_il)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        // v68: lista d'attesa delle risorse: chi trova lo slot occupato si mette in coda; se la prenotazione viene annullata o rifiutata il primo in coda riceve l'avviso
+        // (stato: attesa | avvisata | soddisfatta | scaduta | annullata)
+        'prenotazioni_risorse_attesa' => "CREATE TABLE IF NOT EXISTS prenotazioni_risorse_attesa (
+            id INT AUTO_INCREMENT PRIMARY KEY, risorsa_id INT NOT NULL, utente_id INT NOT NULL, nome VARCHAR(100) DEFAULT '', cognome VARCHAR(100) DEFAULT '', email VARCHAR(255) DEFAULT '',
+            inizio DATETIME NOT NULL, fine DATETIME NOT NULL, n_slot TINYINT NOT NULL DEFAULT 1, motivo VARCHAR(500) DEFAULT '', stato VARCHAR(12) NOT NULL DEFAULT 'attesa',
+            creata_il DATETIME DEFAULT CURRENT_TIMESTAMP, avvisata_il DATETIME DEFAULT NULL, INDEX idx_risorsa (risorsa_id, inizio, stato), INDEX idx_utente (utente_id, stato)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         // v61: diario di bordo (auto e mezzi): un diario per prenotazione, compilato da chi ha prenotato, dagli altri conducenti o dal responsabile
         'risorse_diario' => "CREATE TABLE IF NOT EXISTS risorse_diario (
             id INT AUTO_INCREMENT PRIMARY KEY, risorsa_id INT NOT NULL, prenotazione_id INT NOT NULL, data DATE DEFAULT NULL, conducente VARCHAR(200) DEFAULT '',

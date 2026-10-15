@@ -31,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['prenota_risorsa'])) {
         $esito = $err_campi ? ['errore' => implode(' ', $err_campi), 'codici' => [], 'saltate' => [], 'stato' => '', 'serie' => null]
             : prenota_risorsa($conn, $r, $utente, (string)($_POST['inizio'] ?? ''), (int)($_POST['n_slot'] ?? 1), (string)($_POST['motivo'] ?? ''),
                               !empty($_POST['ripeti']) ? (string)($_POST['ripeti_fino'] ?? '') : null, ['quantita' => array_map('intval', (array)($_POST['qta'] ?? [])), 'risposte_json' => $risposte_json,
-                               'co_conducenti_json' => (int)$r['diario_attivo'] ? \App\Core\App::per($conn)->get(\App\Risorse\ServizioDiarioBordo::class)->coConducentiDaForm($_POST) : null]);
+                               'co_conducenti_json' => (int)$r['diario_attivo'] ? \App\Core\App::per($conn)->get(\App\Risorse\ServizioDiarioBordo::class)->coConducentiDaForm($_POST) : null], (string)($_POST['frequenza'] ?? 'settimana'));
         if ($esito['errore']) flash_set($esito['errore'], 'danger');
         else {
             $pren = array_values(array_filter(array_map(fn($c) => prenotazione_risorsa($conn, $c), $esito['codici'])));
@@ -45,6 +45,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['prenota_risorsa'])) {
                  . " Ti abbiamo inviato un'email di riepilogo.";
             flash_set($msg, $esito['saltate'] ? 'warning' : 'success');
         }
+    }
+    header('Location: ' . $torna); exit;
+}
+
+// ── Lista d'attesa: ci si mette in coda per uno slot occupato, o si esce dalla coda ──
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['attesa_risorsa']) || isset($_POST['annulla_attesa']))) {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    $r = risorsa($conn, (int)($_POST['risorsa_id'] ?? 0));
+    $torna = $pagina_url . '?risorsa=' . (int)($r['id'] ?? 0) . '&dal=' . urlencode((string)($_POST['settimana'] ?? ''));
+    if (!$utente) flash_set("Accedi per metterti in lista d'attesa.", 'warning');
+    elseif (!$r || (int)$r['pagina_id'] !== $p_id) flash_set("Risorsa non trovata.", 'danger');
+    elseif (isset($_POST['annulla_attesa'])) {
+        flash_set(\App\Core\App::per($conn)->get(\App\Risorse\ListaAttesaRisorse::class)->annulla((int)$_POST['annulla_attesa'], (int)$utente['id']) ? "Sei uscito dalla lista d'attesa." : "Non è stato possibile togliere la lista d'attesa.", 'success');
+    } elseif (!check_rate_limit($conn, 'attesa_risorsa', 30, 600)) flash_set("Troppe richieste: riprova tra qualche minuto.", 'danger');
+    else {
+        $err_att = \App\Core\App::per($conn)->get(\App\Risorse\ServizioRisorse::class)->mettiInAttesa($r, $utente, (string)($_POST['inizio'] ?? ''), (int)($_POST['n_slot'] ?? 1), (string)($_POST['motivo'] ?? ''));
+        flash_set($err_att ?? "Sei in lista d'attesa: se lo slot si libera ricevi un'email e hai 24 ore per prenotarlo.", $err_att ? 'warning' : 'success');
     }
     header('Location: ' . $torna); exit;
 }
@@ -75,6 +92,8 @@ if ($utente) {
     $mie = $repo_ris->prenotazioniDellUtente((int)$p_id, (int)$utente['id']);
 }
 $puo = $sel && $utente ? puo_prenotare_risorsa($conn, $sel, $utente) : false;
+$svc_attesa = \App\Core\App::per($conn)->get(\App\Risorse\ListaAttesaRisorse::class);
+$mie_attese = $sel && $utente ? array_values(array_filter($svc_attesa->dellUtente((int)$utente['id']), fn($x) => (int)$x['risorsa_id'] === (int)$sel['id'])) : [];
 $url_login = 'saml_login.php?redirect=' . urlencode($pagina_url . ($sel ? '?risorsa=' . (int)$sel['id'] : ''));
 
 require_once 'header.php';
@@ -93,6 +112,8 @@ require_once 'header.php';
 .slot-libero:hover, .slot-libero:focus-visible { background: <?php echo $col; ?>; color: <?php echo $col_txt; ?>; border-color: <?php echo $col; ?>; }
 .slot-libero.scelto { background: <?php echo $col; ?>; color: <?php echo $col_txt; ?>; outline: 2px solid #0f172a; }
 .slot-no { background: #f1f5f9; color: #94a3b8; text-decoration: line-through; }
+.slot-attesa { cursor: pointer; text-decoration: none; }
+.slot-attesa:hover, .slot-attesa:focus-visible { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
 .slot-chiuso { background: #fef2f2; color: #991b1b; font-weight: 500; font-size: .75rem; }
 .legenda span { display: inline-flex; align-items: center; gap: .3rem; margin-right: 1rem; font-size: .8rem; }
 .legenda i { width: 14px; height: 14px; border-radius: 3px; display: inline-block; }
@@ -218,6 +239,7 @@ require_once 'header.php';
         <?php if (!$giorni): ?>
             <div class="alert alert-info">Nessun orario di apertura in questa settimana.</div>
         <?php else: ?>
+        <?php $in_coda_giorno = []; if ($sel) foreach (array_keys($giorni) as $gd) $in_coda_giorno[$gd] = $svc_attesa->incoda((int)$sel['id'], $gd); ?>
         <div class="sett mb-4" id="settimana">
             <?php foreach ($giorni as $d => $slot): $chiuso = $slot && $slot[0]['stato'] === 'chiuso' ? chiusura_risorsa($conn, $sel, $d) : null; ?>
             <div class="giorno<?php echo $d === date('Y-m-d') ? ' oggi' : ''; ?>">
@@ -229,6 +251,8 @@ require_once 'header.php';
                         <button type="button" class="slot slot-libero" data-inizio="<?php echo $h($s['inizio']); ?>" data-fine="<?php echo $h($s['fine']); ?>" data-fascia="<?php echo $d . '_' . $s['fascia']; ?>" data-k="<?php echo $k; ?>" data-giorno="<?php echo $d; ?>" aria-label="Prenota <?php echo $h(GIORNI_SETTIMANA[(int)date('N', strtotime($d))] . ' ' . date('d/m', strtotime($d)) . ' ' . $t); ?>"><?php echo $t; ?></button>
                     <?php elseif ($s['stato'] === 'libero'): ?>
                         <span class="slot slot-libero" style="cursor:default;"><?php echo $t; ?></span>
+                    <?php elseif ($s['stato'] === 'occupato' && $puo): $in_coda = $in_coda_giorno[$d][$s['inizio']] ?? 0; ?>
+                        <button type="button" class="slot slot-no slot-attesa" data-inizio="<?php echo $h($s['inizio']); ?>" title="Occupato: mettiti in lista d'attesa<?php echo $in_coda ? ' (' . $in_coda . ' in coda)' : ''; ?>" aria-label="Occupato alle <?php echo $h(date('H:i', strtotime($s['inizio']))); ?>: mettiti in lista d'attesa"><?php echo $t; ?><span class="d-block fw-normal" style="font-size:.65rem;text-decoration:none;"><i class="fa fa-hourglass-half me-1" aria-hidden="true"></i><?php echo $in_coda ? $in_coda . ' in coda' : "lista d'attesa"; ?></span></button>
                     <?php else: ?>
                         <span class="slot slot-no" title="<?php echo ['occupato' => 'Occupato', 'passato' => 'Non più prenotabile', 'lontano' => 'Non ancora prenotabile'][$s['stato']] ?? ''; ?>"><span class="visually-hidden"><?php echo ['occupato' => 'Occupato', 'passato' => 'Non più prenotabile', 'lontano' => 'Non ancora prenotabile'][$s['stato']] ?? ''; ?>: </span><?php echo $t; ?></span>
                     <?php endif; ?>
@@ -273,9 +297,11 @@ require_once 'header.php';
                 <?php endif; ?>
                 <?php if ((int)$sel['ripetizione']): ?>
                 <div class="col-12 d-flex flex-wrap align-items-center gap-2">
-                    <div class="form-check m-0"><input class="form-check-input" type="checkbox" name="ripeti" value="1" id="prRip"><label class="form-check-label small" for="prRip">Ripeti ogni settimana fino al</label></div>
+                    <div class="form-check m-0"><input class="form-check-input" type="checkbox" name="ripeti" value="1" id="prRip"><label class="form-check-label small" for="prRip">Ripeti</label></div>
+                    <select class="form-select form-select-sm w-auto" name="frequenza" aria-label="Frequenza della ripetizione"><?php foreach (\App\Risorse\Costanti::FREQUENZE as $fk => $fn): ?><option value="<?php echo $h($fk); ?>"><?php echo $h($fn); ?></option><?php endforeach; ?></select>
+                    <span class="small">fino al</span>
                     <input type="date" class="form-control form-control-sm" style="max-width:170px;" name="ripeti_fino" id="prRipFino" min="<?php echo date('Y-m-d', strtotime('+7 days', $dal)); ?>" max="<?php echo date('Y-m-d', $ultimo); ?>" aria-label="Ripeti fino al">
-                    <span class="small text-secondary">Le settimane non disponibili vengono saltate e te le indichiamo.</span>
+                    <span class="small text-secondary">Le date non disponibili vengono saltate e te le indichiamo.</span>
                 </div>
                 <?php endif; ?>
             </div>
@@ -285,6 +311,31 @@ require_once 'header.php';
             </div>
             <?php if ((int)$sel['approvazione']): ?><div class="small text-secondary mt-2">Questa risorsa richiede l'approvazione dei gestori: lo slot resta riservato finché non rispondono.</div><?php endif; ?>
         </form>
+        <form method="POST" id="formAttesa" class="d-none"><?php csrf_field(); ?>
+            <input type="hidden" name="risorsa_id" value="<?php echo (int)$sel['id']; ?>"><input type="hidden" name="settimana" value="<?php echo date('Y-m-d', $dal); ?>">
+            <input type="hidden" name="inizio" id="attInizio"><input type="hidden" name="n_slot" value="1"><input type="hidden" name="attesa_risorsa" value="1">
+        </form>
+        <script>
+        document.querySelectorAll('#settimana .slot-attesa').forEach(function (b) {
+            b.addEventListener('click', function () {
+                if (!confirm("Mettersi in lista d'attesa per questo orario? Se la prenotazione viene annullata ricevi un'email e hai 24 ore per prenotare lo slot.")) return;
+                document.getElementById('attInizio').value = b.dataset.inizio; document.getElementById('formAttesa').submit();
+            });
+        });
+        </script>
+        <?php if ($mie_attese): ?>
+        <div class="card shadow-sm border-0 p-3 mb-4" style="border-radius:12px;border-left:5px solid #b45309 !important;">
+            <h2 class="h6 fw-bold mb-2"><i class="fa fa-hourglass-half me-1" style="color:#b45309;" aria-hidden="true"></i>Le tue liste d'attesa per questa risorsa</h2>
+            <?php foreach ($mie_attese as $at): ?>
+                <form method="POST" class="d-flex flex-wrap align-items-center gap-2 border-top py-2 small"><?php csrf_field(); ?>
+                    <input type="hidden" name="risorsa_id" value="<?php echo (int)$sel['id']; ?>"><input type="hidden" name="settimana" value="<?php echo date('Y-m-d', $dal); ?>">
+                    <span class="fw-semibold"><?php echo $h(date('d/m/Y H:i', strtotime($at['inizio']))); ?>–<?php echo $h(date('H:i', strtotime($at['fine']))); ?></span>
+                    <span class="text-secondary"><?php echo $at['stato'] === 'avvisata' ? 'avvisato: hai tempo per prenotare lo slot' : 'in coda, posizione ' . (int)$at['posizione']; ?></span>
+                    <button type="submit" name="annulla_attesa" value="<?php echo (int)$at['id']; ?>" class="btn btn-sm btn-outline-danger ms-auto">Togli dalla lista</button>
+                </form>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
         <script>
         (function () {
             var form = document.getElementById('formPrenRis'), max = <?php echo (int)$sel['max_slot']; ?>, durata = <?php echo (int)$sel['durata_slot']; ?>;

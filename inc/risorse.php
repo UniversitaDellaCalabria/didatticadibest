@@ -57,8 +57,8 @@ if (!function_exists('prenota_risorsa')) {
     // La prima occorrenza deve riuscire; le successive in conflitto vengono saltate. Ritorna
     // ['codici' => [...], 'saltate' => ['Y-m-d' => motivo], 'errore' => null|string, 'stato' => confermata|da_approvare, 'serie' => ?].
     // $extra: ['quantita' => [id contatore => quantità], 'risposte_json' => risposte ai campi personalizzati]
-    function prenota_risorsa($conn, array $r, array $u, string $inizio, int $n_slot, string $motivo = '', ?string $ripeti_fino = null, array $extra = []): array {
-        return \App\Core\App::per($conn)->get(\App\Risorse\ServizioRisorse::class)->prenota($r, $u, $inizio, $n_slot, $motivo, $ripeti_fino, $extra);
+    function prenota_risorsa($conn, array $r, array $u, string $inizio, int $n_slot, string $motivo = '', ?string $ripeti_fino = null, array $extra = [], string $frequenza = 'settimana'): array {
+        return \App\Core\App::per($conn)->get(\App\Risorse\ServizioRisorse::class)->prenota($r, $u, $inizio, $n_slot, $motivo, $ripeti_fino, $extra, $frequenza);
     }
 }
 

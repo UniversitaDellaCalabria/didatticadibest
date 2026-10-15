@@ -29,6 +29,9 @@ $problemi = [];
 $nota = function (?bool $ok, string $msg) use (&$righe, &$problemi) { $righe[] = [$ok, $msg]; if ($ok === false) $problemi[] = $msg; };
 $mb = fn($byte) => number_format($byte / 1048576, 1, ',', '.') . ' MB';
 
+$libero_locale = @disk_free_space($backup_dir);
+if ($libero_locale !== false && $libero_locale < 1073741824) $nota(false, "Spazio quasi esaurito sul server: " . $mb($libero_locale) . " liberi nella cartella dei backup");
+
 // ---------------------------------------------------------------------
 // 1. DATABASE
 // ---------------------------------------------------------------------
@@ -42,6 +45,12 @@ if (!$gz) {
     [$n_tabelle, $n_righe] = $conteggi;
     $db_ok = is_file($file_db) && filesize($file_db) > 0;
     $nota($db_ok, $db_ok ? "Database esportato: $n_tabelle tabelle, $n_righe righe (" . $mb(filesize($file_db)) . ")" : "Database: esportazione non riuscita");
+    // Verifica: il file si rilegge fino in fondo e ha tutte le tabelle (un backup che non si riapre non serve)
+    if ($db_ok) {
+        $v_db = (new \App\Sistema\Backup\VerificaBackup())->database($file_db, max(1, (int)$n_tabelle));
+        $nota($v_db['ok'], $v_db['ok'] ? "Verifica del database: riletto per intero, {$v_db['tabelle']} tabelle e {$v_db['righe']} righe" : "Verifica del database non superata: " . $v_db['errore']);
+        $db_ok = $db_ok && $v_db['ok'];
+    }
 }
 
 // ---------------------------------------------------------------------
@@ -67,6 +76,11 @@ if (!extension_loaded('zip')) {
         }
         $zip_ok = $zip->close();
         $nota($zip_ok, $zip_ok ? "File del sito compressi: $n_file file (" . $mb(filesize($file_zip)) . ")" : "File del sito: chiusura dello ZIP non riuscita");
+        if ($zip_ok) {
+            $err_zip = (new \App\Sistema\Backup\VerificaBackup())->zip($file_zip, $n_file);
+            $nota($err_zip === null, $err_zip === null ? "Verifica dei file: lo ZIP si apre e contiene tutti i $n_file file" : "Verifica dei file non superata: $err_zip");
+            $zip_ok = $zip_ok && $err_zip === null;
+        }
     }
 }
 

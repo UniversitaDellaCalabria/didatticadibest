@@ -11,7 +11,7 @@ use App\Didattica\ServizioIter;
 use App\Didattica\ServizioMarcheBollo;
 use App\Didattica\ServizioPratiche;
 
-/** La richiesta di certificato di iscrizione: bozza, modifica fino alla presa in carico, marche da bollo e firma del Direttore. */
+/** La richiesta di certificato (iscrizione, laurea, rinuncia) e il Diploma Supplement: bozza, modifica fino alla presa in carico, marche da bollo e firma del Direttore. */
 final class CertificatoIscrizioneTest extends DidatticaBase
 {
     private int $prot;
@@ -26,12 +26,12 @@ final class CertificatoIscrizioneTest extends DidatticaBase
         parent::setUp();
         $this->db->esegui('INSERT INTO didattica_consigli (id, nome, ordine, corsi) VALUES (?, ?, ?, ?)', [1, 'Consiglio di Biologia', 4, '["Corso di laurea in Biologia"]']);
         $this->servizio(ServizioFlussoConvalide::class)->preparaFlusso();
-        $this->db->esegui("UPDATE didattica_moduli SET attivo = 1 WHERE chiave = 'certificato_iscrizione'");
+        $this->db->esegui("UPDATE didattica_moduli SET attivo = 1 WHERE chiave = 'certificato'");
         $this->prot = (int) $this->db->valore("SELECT id FROM didattica_uffici WHERE chiave = 'protocollo'");
         $this->cdl = (int) $this->db->valore("SELECT id FROM didattica_uffici WHERE chiave = 'cdl_1'");
         $this->operatore('Anna Protocollo', 'protocollo@x.it', 'pratiche', $this->prot);
         $this->operatore('Marco Segreteria', 'segreteria@x.it', 'pratiche', $this->cdl, '["Corso di laurea in Biologia"]');
-        $this->m = $this->db->riga("SELECT * FROM didattica_moduli WHERE chiave = 'certificato_iscrizione'");
+        $this->m = $this->db->riga("SELECT * FROM didattica_moduli WHERE chiave = 'certificato'");
     }
 
     /** Risposte del modulo compilato. */
@@ -42,7 +42,8 @@ final class CertificatoIscrizioneTest extends DidatticaBase
             ['etichetta' => 'Data di nascita', 'tipo' => 'date', 'valore' => '2002-01-01'], ['etichetta' => 'Cellulare', 'tipo' => 'tel', 'valore' => '3331234567'],
             ['etichetta' => 'Email personale', 'tipo' => 'email', 'valore' => 'luca@x.it'], ['etichetta' => "Iscritto per l'A.A.", 'tipo' => 'anno_accademico', 'valore' => '2026/2027'],
             ['etichetta' => 'Matricola', 'tipo' => 'text', 'valore' => '245678'], ['etichetta' => 'Al Corso di Laurea in', 'tipo' => 'corso_studio', 'valore' => 'Corso di laurea in Biologia'],
-            ['etichetta' => 'Chiede il rilascio del/i seguente/i certificato/i', 'tipo' => 'multicheck', 'valore' => 'Iscrizione, Iscrizione con esami'],
+            ['etichetta' => 'Tipo di certificato', 'tipo' => 'select', 'valore' => 'Iscrizione'],
+            ['etichetta' => 'Certificati di iscrizione richiesti', 'tipo' => 'multicheck', 'valore' => 'Iscrizione, Iscrizione con esami'],
             ['etichetta' => 'Dichiaro di aver letto e compreso quanto scritto sopra e di assumermi ogni responsabilità su quanto dichiarato', 'tipo' => 'dichiarazione', 'valore' => 'Sì'],
         ];
     }
@@ -69,8 +70,8 @@ final class CertificatoIscrizioneTest extends DidatticaBase
     public function testModuloPreparatoUnaVoltaConIterEDomanda(): void
     {
         $this->servizio(ServizioFlussoConvalide::class)->preparaFlusso();
-        $this->assertSame(1, (int) $this->db->valore("SELECT COUNT(*) FROM didattica_moduli WHERE chiave = 'certificato_iscrizione'"));
-        $this->assertSame(['Richiesta Certificato di Iscrizione', 'online', 'Certificati e attestati', 0], [$this->m['titolo'], $this->m['tipo'], $this->m['categoria'], (int) $this->m['in_verbale']], 'non va in verbale');
+        $this->assertSame(1, (int) $this->db->valore("SELECT COUNT(*) FROM didattica_moduli WHERE chiave = 'certificato'"));
+        $this->assertSame(['Richiesta Certificato', 'online', 'Certificati e attestati', 0], [$this->m['titolo'], $this->m['tipo'], $this->m['categoria'], (int) $this->m['in_verbale']], 'non va in verbale');
         $iter = $this->servizio(ServizioIter::class);
         $this->assertSame([$this->prot, \App\Didattica\Costanti::ITER_CDL, \App\Didattica\Costanti::ITER_DIRETTORE], $iter->iter($this->m));
         $this->assertSame([false, true, false], array_column($iter->definizione($this->m), 'pagamento'), 'il secondo passo aspetta il pagamento delle marche');
@@ -79,9 +80,14 @@ final class CertificatoIscrizioneTest extends DidatticaBase
         $campi = json_decode((string) $this->m['campi_json'], true);
         $corso = array_values(array_filter($campi, fn ($c) => $c['tipo'] === 'corso_studio'));
         $this->assertCount(1, $corso, 'il corso di laurea si sceglie dall\'anagrafe di Ateneo');
-        $multi = array_values(array_filter($campi, fn ($c) => $c['tipo'] === 'multicheck'))[0];
-        $this->assertSame(ModelliPratiche::CERTIFICATI_ISCRIZIONE, $multi['opzioni']);
-        $this->assertCount(9, $multi['opzioni']);
+        $multi = array_column(array_filter($campi, fn ($c) => $c['tipo'] === 'multicheck'), 'opzioni', 'etichetta');
+        $this->assertSame(ModelliPratiche::CERTIFICATI_ISCRIZIONE, $multi['Certificati di iscrizione richiesti']);
+        $this->assertSame(ModelliPratiche::CERTIFICATI_LAUREA, $multi['Certificati di laurea richiesti']);
+        $this->assertSame(ModelliPratiche::CERTIFICATI_RINUNCIA, $multi['Certificati di rinuncia richiesti']);
+        $this->assertCount(9, $multi['Certificati di iscrizione richiesti']);
+        $this->assertCount(7, $multi['Certificati di rinuncia richiesti']);
+        $tipo = array_values(array_filter($campi, fn ($c) => $c['etichetta'] === 'Tipo di certificato'))[0];
+        $this->assertSame(['select', ModelliPratiche::TIPI_CERTIFICATO], [$tipo['tipo'], $tipo['opzioni']], 'iscrizione, laurea o rinuncia agli studi');
         $this->assertSame(1, json_decode((string) $this->m['domanda_json'], true)['pdf']);
     }
 
@@ -240,21 +246,19 @@ final class CertificatoIscrizioneTest extends DidatticaBase
         $this->assertFalse($this->servizio(ServizioIter::class)->passoPagamento($this->m, ['stato' => 'bozza', 'passo' => 2]));
     }
 
-    public function testCertificatoDiLaureaEDiplomaSupplementPreparati(): void
+    public function testCertificatoUnicoCampiPerTipoEDiplomaSupplementPreparati(): void
     {
         $iter = $this->servizio(ServizioIter::class);
-        $this->assertSame(3, (int) $this->db->valore("SELECT COUNT(*) FROM didattica_moduli WHERE chiave IN ('certificato_iscrizione', 'certificato_laurea', 'diploma_supplement')"));
-        $laurea = $this->db->riga("SELECT * FROM didattica_moduli WHERE chiave = 'certificato_laurea'");
-        $this->assertSame(['Richiesta Certificato di Laurea', 0, 0], [$laurea['titolo'], (int) $laurea['attivo'], (int) $laurea['in_verbale']]);
-        $this->assertSame([false, true, false], array_column($iter->definizione($laurea), 'pagamento'), 'stesso iter del certificato di iscrizione: marche da bollo');
-        $campi = json_decode((string) $laurea['campi_json'], true);
-        $etichette = array_column($campi, 'etichetta');
-        foreach (['Laureato nell\'A.A.', 'In data', 'Con voto', 'Al Corso di Laurea in', 'Matricola'] as $e) {
-            $this->assertContains($e, $etichette);
+        $this->assertSame(0, (int) $this->db->valore("SELECT COUNT(*) FROM didattica_moduli WHERE chiave IN ('certificato_iscrizione', 'certificato_laurea')"), 'niente più certificati separati');
+        $this->assertSame(2, (int) $this->db->valore("SELECT COUNT(*) FROM didattica_moduli WHERE chiave IN ('certificato', 'diploma_supplement')"));
+        $campi = \App\Didattica\CampiModulo::da((string) $this->m['campi_json']);
+        $per = array_column($campi, null, 'etichetta');
+        foreach (["Laureato nell'A.A.", 'In data', 'Con voto', 'Certificati di laurea richiesti'] as $e) {
+            $this->assertSame(['Tipo di certificato', 'uguale', 'Laurea'], [$per[$e]['cond']['campo'], $per[$e]['cond']['op'], $per[$e]['cond']['valore']], $e . ' solo per la laurea');
         }
-        $multi = array_values(array_filter($campi, fn ($c) => $c['tipo'] === 'multicheck'))[0];
-        $this->assertSame(ModelliPratiche::CERTIFICATI_LAUREA, $multi['opzioni']);
-        $this->assertCount(7, $multi['opzioni']);
+        $this->assertSame('Rinuncia agli studi', $per['Certificati di rinuncia richiesti']['cond']['valore']);
+        $this->assertSame('diverso', $per["Iscritto per l'A.A."]['cond']['op'], 'iscrizione e rinuncia');
+        $this->assertSame([false, true, false], array_column($iter->definizione($this->m), 'pagamento'), 'marche da bollo per tutti i tipi');
         $ds = $this->db->riga("SELECT * FROM didattica_moduli WHERE chiave = 'diploma_supplement'");
         $this->assertSame([false, false, false], array_column($iter->definizione($ds), 'pagamento'), 'il Diploma Supplement non ha la marca da bollo');
         $this->assertSame([false, true, false], array_column($iter->definizione($ds), 'documento'), 'l\'ufficio carica il documento da far firmare');

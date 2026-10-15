@@ -49,7 +49,8 @@
     box.innerHTML = '<strong>' + (t ? t.textContent.trim() : 'Questa pagina') + '</strong><p></p>'
         + '<ul><li>Il pulsante colorato in alto è l\u2019azione principale della pagina.</li>'
         + '<li>Il pulsante <b>La mia scrivania</b> nel menu laterale riporta all\u2019elenco delle cose da fare.</li>'
-        + '<li>Se ti perdi, torna alla scrivania: non perdi nulla di ciò che hai salvato.</li></ul>';
+        + '<li>Se ti perdi, torna alla scrivania: non perdi nulla di ciò che hai salvato.</li>'
+        + '<li><a href="' + (location.pathname.indexOf('/admin/') >= 0 ? '../' : '') + 'guida.php">Guide per ruolo («Come si fa»)</a></li></ul>';
     box.querySelector('p').textContent = aiuto.textContent.trim();
     document.body.appendChild(box); document.body.appendChild(btn);
     function chiudi() { box.hidden = true; btn.setAttribute('aria-expanded', 'false'); }

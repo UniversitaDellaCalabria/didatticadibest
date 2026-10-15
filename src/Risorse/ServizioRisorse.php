@@ -14,8 +14,80 @@ use App\Core\Orologio;
  */
 final class ServizioRisorse
 {
-    public function __construct(private RisorsaRepository $risorse, private NotificheRisorse $notifiche, private Orologio $orologio, private ServizioContatoriRisorse $contatori, private DiarioBordoRepository $diario)
+    public function __construct(private RisorsaRepository $risorse, private NotificheRisorse $notifiche, private Orologio $orologio, private ServizioContatoriRisorse $contatori, private DiarioBordoRepository $diario, private ?ListaAttesaRisorse $attesa = null)
     {
+    }
+
+    /**
+     * Le date di una prenotazione ripetuta, a partire dalla prima, secondo la frequenza ('settimana', 'quindici' o 'mese') e fino alla data indicata (al massimo
+     * $massimo ripetizioni oltre la prima). «mese» = lo stesso giorno della settimana nella stessa posizione del mese (es. il secondo martedì; il quinto diventa l'ultimo).
+     *
+     * @return list<string> date Y-m-d, la prima compresa
+     */
+    public static function dateRipetute(int $t0, string $ripetiFino, string $frequenza = 'settimana', int $massimo = 40): array
+    {
+        $date = [date('Y-m-d', $t0)];
+        $ordinali = [1 => 'first', 2 => 'second', 3 => 'third', 4 => 'fourth', 5 => 'last'];
+        $n = min(5, (int) ceil((int) date('j', $t0) / 7));
+        for ($k = 1; $k <= $massimo; ++$k) {
+            $t = match ($frequenza) {
+                'quindici' => strtotime('+' . (2 * $k) . ' week', $t0),
+                'mese' => strtotime($ordinali[$n] . ' ' . date('l', $t0) . ' of ' . date('Y-m', (int) strtotime('first day of +' . $k . ' month', $t0)) . ' ' . date('H:i:s', $t0)),
+                default => strtotime("+$k week", $t0),
+            };
+            if (!$t || date('Y-m-d', $t) > $ripetiFino) {
+                break;
+            }
+            $date[] = date('Y-m-d', $t);
+        }
+
+        return $date;
+    }
+
+    /**
+     * Mette in lista d'attesa per uno slot occupato. Ritorna un messaggio d'errore oppure null.
+     *
+     * @param array<string, mixed> $r
+     * @param array<string, mixed> $u
+     */
+    public function mettiInAttesa(array $r, array $u, string $inizio, int $nSlot, string $motivo = ''): ?string
+    {
+        if ($this->attesa === null) {
+            return 'La lista d\'attesa non è disponibile.';
+        }
+        if (!(int) $r['attiva'] || !$this->puoPrenotare($r, $u)) {
+            return 'Non sei abilitato a prenotare questa risorsa.';
+        }
+        $t0 = strtotime($inizio);
+        if (!$t0) {
+            return 'Orario non valido.';
+        }
+        $d = date('Y-m-d', $t0);
+        $slot = $this->slot($r, $d);
+        $idx = null;
+        foreach ($slot as $k => $s) {
+            if ($s['inizio'] === date('Y-m-d H:i:s', $t0)) {
+                $idx = $k;
+                break;
+            }
+        }
+        if ($idx === null) {
+            return 'Orario non disponibile.';
+        }
+        $nSlot = max(1, min(max(1, (int) $r['max_slot']), $nSlot));
+        $occupato = false;
+        for ($j = 0; $j < $nSlot; ++$j) {
+            $s = $slot[$idx + $j] ?? null;
+            if (!$s || $s['fascia'] !== $slot[$idx]['fascia'] || !in_array($s['stato'], ['libero', 'occupato'], true)) {
+                return 'Per questo orario non si può prenotare.';
+            }
+            $occupato = $occupato || $s['stato'] === 'occupato';
+        }
+        if (!$occupato) {
+            return 'Lo slot è libero: puoi prenotarlo subito.';
+        }
+
+        return $this->attesa->aggiungi($r, $u, $slot[$idx]['inizio'], $slot[$idx + $nSlot - 1]['fine'], $nSlot, $motivo);
     }
 
     /**
@@ -118,14 +190,14 @@ final class ServizioRisorse
     }
 
     /**
-     * Prenota $nSlot slot consecutivi da $inizio (Y-m-d H:i:s) e, se la risorsa lo consente, ogni settimana fino a $ripetiFino.
+     * Prenota $nSlot slot consecutivi da $inizio (Y-m-d H:i:s) e, se la risorsa lo consente, anche ripetuta (ogni settimana, ogni due settimane o ogni mese: $frequenza) fino a $ripetiFino.
      * La prima occorrenza deve riuscire; le successive in conflitto vengono saltate.
      *
      * @param array<string, mixed> $r
      * @param array<string, mixed> $u
      * @return array{codici: list<string>, saltate: array<string, string>, errore: ?string, stato: string, serie: ?string}
      */
-    public function prenota(array $r, array $u, string $inizio, int $nSlot, string $motivo = '', ?string $ripetiFino = null, array $extra = []): array
+    public function prenota(array $r, array $u, string $inizio, int $nSlot, string $motivo = '', ?string $ripetiFino = null, array $extra = [], string $frequenza = 'settimana'): array
     {
         $esito = ['codici' => [], 'saltate' => [], 'errore' => null, 'stato' => (int) $r['approvazione'] === 1 ? 'da_approvare' : 'confermata', 'serie' => null];
         if (!(int) $r['attiva']) {
@@ -153,13 +225,7 @@ final class ServizioRisorse
         }
         $date = [date('Y-m-d', $t0)];
         if ($ripetiFino && (int) $r['ripetizione'] === 1 && preg_match('/^\d{4}-\d{2}-\d{2}$/', $ripetiFino)) {
-            for ($k = 1; $k <= 25; ++$k) {
-                $d = date('Y-m-d', strtotime("+$k week", $t0));
-                if ($d > $ripetiFino) {
-                    break;
-                }
-                $date[] = $d;
-            }
+            $date = self::dateRipetute($t0, $ripetiFino, isset(Costanti::FREQUENZE[$frequenza]) ? $frequenza : 'settimana');
             if (count($date) > 1) {
                 $esito['serie'] = strtoupper(bin2hex(random_bytes(4)));
             }
@@ -227,6 +293,7 @@ final class ServizioRisorse
                 $codice = 'RS-' . strtoupper(bin2hex(random_bytes(4)));
                 if ($this->risorse->inserisciPrenotazione($rid, (int) $u['id'], (string) ($u['nome'] ?? ''), (string) ($u['cognome'] ?? ''), strtolower((string) ($u['email'] ?? '')), $ini, $fin, $motivo, $esito['stato'], $esito['serie'], $codice)) {
                     $esito['codici'][] = $codice;
+                    $this->attesa?->soddisfatta((int) $u['id'], $rid, $ini, $fin);
                     if ($contatori || $risposte !== null || $coConducenti !== null) {
                         $nuova = $this->risorse->prenotazione($codice);
                         if ($nuova) {
@@ -275,6 +342,10 @@ final class ServizioRisorse
             return false;
         }
         $p['stato'] = $nuovo;
+        // Annullata o rifiutata: lo slot torna libero e il primo in lista d'attesa viene avvisato
+        if (in_array($nuovo, ['annullata', 'rifiutata'], true)) {
+            $this->attesa?->liberato($p);
+        }
         if ($daGestore) {
             $this->notifiche->emailPrenotazione($p, $nuovo === 'confermata' ? 'approvata' : ($nuovo === 'rifiutata' ? 'rifiutata' : 'annullata_gestore'));
         } else {

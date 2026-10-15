@@ -62,7 +62,6 @@ if (isset($conn) && $conn instanceof mysqli) {
                         <a href="https://www.unical.it" target="_blank" class="text-white text-decoration-none small"><i class="fa fa-university me-1"></i> Portale Unical</a>
                     </div>
                     <div class="text-white small opacity-75 mt-3 pt-2 border-top" style="border-color: rgba(255,255,255,0.2) !important;">
-                        Sistema di Prenotazione e Gestione Eventi<br>
                         <strong class="text-white"><?php echo htmlspecialchars($footer_realizzato_da); ?></strong><br>
                         <span class="mt-1 d-inline-block">Per assistenza: <span class="text-white fw-bold"><?php echo htmlspecialchars($footer_assistenza); ?></span></span>
                     </div>

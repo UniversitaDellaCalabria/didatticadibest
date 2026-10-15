@@ -69,6 +69,18 @@ table.m th { background: #f1f5f9; text-align: left; padding: 10px 14px; font-siz
 table.m td { padding: 11px 14px; border-top: 1px solid var(--linea); vertical-align: top; line-height: 1.35; }
 table.m td:first-child { font-weight: 700; white-space: nowrap; }
 .pallino { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+/* schermate */
+.shot { display: grid; grid-template-columns: 1.62fr 1fr; gap: 28px; align-items: start; margin-top: 4px; }
+.shot .img { background: #fff; border: 1px solid var(--linea); border-radius: 12px; padding: 8px; box-shadow: 0 3px 14px rgba(15,23,42,.12); }
+.shot .img img { width: 100%; display: block; border-radius: 6px; object-fit: cover; object-position: top; }
+.shot .img.alto img { max-height: 520px; }
+.shot .tag { display: inline-block; background: var(--rosso); color: #fff; font-weight: 700; padding: 6px 16px; border-radius: 999px; font-size: 15px; margin-bottom: 14px; }
+.shot ul { margin: 0; padding-left: 22px; } .shot li { font-size: 19px; line-height: 1.42; margin-bottom: 10px; color: #1e293b; }
+.shot .nota { margin-top: 14px; font-size: 16px; padding: 12px 16px; }
+.titolo-schermata { font-size: 32px; margin: 0 0 14px; }
+.m.fitto { font-size: 14px; } .m.fitto th { padding: 7px 12px; } .m.fitto td { padding: 6px 12px; line-height: 1.28; }
+.copertina.verde { background: linear-gradient(135deg, #0f3d33 0%, #0f766e 100%); }
+.copertina.rosso { background: linear-gradient(135deg, #5b1111 0%, #b91c1c 100%); }
 </style>
 </head>
 <body>
@@ -133,19 +145,73 @@ table.m td:first-child { font-weight: 700; white-space: nowrap; }
 
 <!-- 4b · Firme e percorsi -->
 <section class="slide">
-  <h2><span class="num">2b</span>Firme nell'iter e percorsi diversi</h2>
-  <p class="sotto">Ogni tipo di pratica ha il suo percorso, deciso dall'Ufficio didattico con una procedura guidata: non serve toccare il codice.</p>
-  <div class="percorso" style="margin-bottom:20px">
-    <div class="passo" style="border-top-color:var(--viola)"><em style="background:var(--viola)">Tesi</em><b>Firma del relatore</b><span>La persona indicata dallo studente nel modulo riceve un link personale e firma (o rifiuta con un motivo).</span></div>
-    <div class="passo" style="border-top-color:var(--ambra)"><em style="background:var(--ambra)">Tutte</em><b>Protocollo</b><span>Numero, data e, dove serve, la marca da bollo.</span></div>
-    <div class="passo" style="border-top-color:var(--blu)"><em style="background:var(--blu)">Carriera</em><b>Referente → segreteria</b><span>Il referente del corso istruisce, la segreteria registra.</span></div>
-    <div class="passo" style="border-top-color:var(--rosso)"><em style="background:var(--rosso)">Certificati</em><b>Firma del Direttore</b><span>La segreteria carica il certificato o l'attestato, il Direttore lo firma in PAdES.</span></div>
-  </div>
-  <div class="griglia g3">
-    <div class="card viola"><h3>Tempi per ogni passo</h3><p>Dopo i giorni indicati chi deve agire riceve un promemoria; chi deve firmare ne riceve fino a tre.</p></div>
-    <div class="card teal"><h3>Con o senza verbale</h3><p>Le pratiche per il Consiglio vanno in seduta; certificati e attestati si concludono senza passare dal verbale.</p></div>
-    <div class="card blu"><h3>Procedura guidata</h3><p>Sette passi: che pratica è, cosa compila lo studente, chi la lavora, cosa compilano gli uffici, cosa va nel verbale, email, pubblica. Con bozza, copia e modelli già pronti.</p></div>
-  </div>
+  <h2><span class="num">2b</span>I percorsi: ogni pratica ha il suo</h2>
+  <p class="sotto">Il percorso lo decide l'Ufficio didattico con la procedura guidata: non serve toccare il codice. Qui i gruppi di pratiche presenti nel portale.</p>
+  <table class="m fitto">
+    <tr><th>Gruppo</th><th>Pratiche</th><th>Percorso</th><th>Verbale</th></tr>
+    <tr><td>Certificati</td><td>Certificato (iscrizione, laurea, rinuncia) · Diploma Supplement</td><td>Protocollo → ufficio del corso (marche da bollo su Esse3) → Direttore firma</td><td>No</td></tr>
+    <tr><td>Attestati</td><td>Frequenza alle lezioni · Esame sostenuto</td><td>Conferma dei docenti → Ufficio attestati → Direttore firma → protocollo in uscita</td><td>No</td></tr>
+    <tr><td>Immatricolazioni</td><td>Trasferimento in entrata · Iscrizione per rinuncia o decadenza · Abbreviazione di corso</td><td>Marca da bollo su UniPay (ricevuta allegata) → protocollo → referente del corso → segreteria</td><td>Sì</td></tr>
+    <tr><td>Carriera</td><td>Convalide (esami, inglese) · Esonero inglese · Piano di studi · Curriculum · Tempo pieno / part-time · Fuori piano · Anticipo · Titolo estero</td><td>Protocollo (con marca da bollo per la convalida di inglese) → referente del corso → segreteria</td><td>Sì</td></tr>
+    <tr><td>Tesi</td><td>Richiesta tesi (anche Conservazione e Restauro) · Variazione</td><td><b>Conferma del relatore</b> → protocollo → referente del corso</td><td>Sì</td></tr>
+    <tr><td>Cancellazione ed esoneri</td><td>Cancellazione errata iscrizione · Esonero dalla frequenza</td><td>Protocollo → referente del corso</td><td>Sì</td></tr>
+    <tr><td>Mobilità</td><td>Svolgimento · Variazione · Fine attività di studio all'estero</td><td>Protocollo → <b>Internazionalizzazione</b> → referente del corso → segreteria</td><td>Sì</td></tr>
+  </table>
+  <div class="evidenza" style="margin-top:14px"><b>Tempi per ogni passo:</b> dopo i giorni indicati chi deve agire riceve un promemoria. <b>Cruscotto del Direttore:</b> le pratiche ferme oltre il tempo del loro modulo compaiono nella pagina del Direttore.</div>
+  <div class="piede"><span>Pratiche studenti e verbali · l'iter completo</span></div>
+</section>
+
+<!-- schermate · tesi -->
+<section class="slide">
+  <h2><span class="num">2c</span>Esempio: la richiesta di tesi</h2>
+  <div class="shot"><div class="img alto"><img src="schermate/stud_modulo_tesi.png" alt=""></div>
+  <div><span class="tag">Studente · Un solo modulo</span><ul>
+    <li>Sceglie il <b>tipo</b>: richiesta di tesi, Conservazione e Restauro o variazione</li>
+    <li>Compaiono i campi di quel tipo, divisi in pagine; «Salva come bozza» riprende dopo</li>
+    <li>Indica il <b>relatore</b> dall'elenco del personale</li></ul>
+    <div class="nota">Non serve più generare e mandare un link: il portale avvisa il relatore.</div></div></div>
+  <div class="piede"><span>Pratiche studenti e verbali · l'iter completo</span></div>
+</section>
+
+<section class="slide">
+  <h2><span class="num">2d</span>Il relatore conferma dal portale</h2>
+  <div class="shot"><div class="img alto"><img src="schermate/rel_conferma.png" alt=""></div>
+  <div><span class="tag">Docente · Link personale</span><ul>
+    <li>Email con il link: accede con le credenziali di Ateneo</li>
+    <li>Vede i dati della richiesta e preme <b>«Confermo»</b> o «Non confermo» con il motivo</li>
+    <li>Con la conferma la richiesta va al protocollo e al referente del corso</li>
+    <li>Se non conferma, la richiesta torna allo studente e la conferma riparte dopo la correzione</li></ul></div></div>
+  <div class="piede"><span>Pratiche studenti e verbali · l'iter completo</span></div>
+</section>
+
+<section class="slide">
+  <h2><span class="num">2e</span>L'ufficio del protocollo</h2>
+  <div class="shot"><div class="img alto"><img src="schermate/proto_scheda.png" alt=""></div>
+  <div><span class="tag">Ufficio protocollo</span><ul>
+    <li>Scarica la <b>domanda in PDF/A</b> e la protocolla nel sistema di Ateneo</li>
+    <li>Scrive numero e data; se serve spunta la verifica della <b>marca da bollo</b></li>
+    <li>La pratica passa da sola all'ufficio successivo e lo studente è avvisato</li></ul></div></div>
+  <div class="piede"><span>Pratiche studenti e verbali · l'iter completo</span></div>
+</section>
+
+<section class="slide">
+  <h2><span class="num">2f</span>L'ufficio del corso lavora la pratica</h2>
+  <div class="shot"><div class="img alto"><img src="schermate/ref_scheda.png" alt=""></div>
+  <div><span class="tag">Ufficio del corso · Referente</span><ul>
+    <li>In alto l'<b>iter</b> con i passi e chi ha in carico la pratica</li>
+    <li>Il riquadro verde dice <b>cosa fare ora</b></li>
+    <li>Messaggi allo studente e note interne; richieste di integrazione</li>
+    <li>«Passa al passo successivo»: segreteria, mobilità, Direttore…</li></ul></div></div>
+  <div class="piede"><span>Pratiche studenti e verbali · l'iter completo</span></div>
+</section>
+
+<section class="slide">
+  <h2><span class="num">2g</span>Mobilità internazionale</h2>
+  <div class="shot"><div class="img alto"><img src="schermate/mob_scheda.png" alt=""></div>
+  <div><span class="tag">Internazionalizzazione · Referente</span><ul>
+    <li>Dopo il protocollo la pratica passa dal <b>referente della mobilità</b></li>
+    <li>Poi dal referente del corso, quindi va nel verbale e alla segreteria</li>
+    <li>Svolgimento (con il Learning Agreement), variazione e fine attività (con il TOR)</li></ul></div></div>
   <div class="piede"><span>Pratiche studenti e verbali · l'iter completo</span></div>
 </section>
 
@@ -197,6 +263,16 @@ table.m td:first-child { font-weight: 700; white-space: nowrap; }
     <div class="passo" style="border-top-color:var(--rosso)"><em style="background:var(--rosso)">7</em><b>Firme</b><span>Segretario, poi coordinatore.</span></div>
   </div>
   <div class="evidenza">Il portale propone ogni volta <b>il passo successivo</b>: se mancano ancora delle decisioni lo dice, e si può sempre tornare indietro. L'ordine del giorno si scrive una volta (un punto per riga) e guida tutto il resto.</div>
+  <div class="piede"><span>Pratiche studenti e verbali · l'iter completo</span></div>
+</section>
+
+<section class="slide">
+  <h2><span class="num">5b</span>Esempio: la seduta guidata</h2>
+  <div class="shot"><div class="img alto"><img src="schermate/ref_seduta.png" alt=""></div>
+  <div><span class="tag">Referente del consiglio</span><ul>
+    <li>Le sette tappe in alto: si vede cosa è fatto e cosa manca</li>
+    <li>Il portale propone il passo successivo; si può sempre tornare indietro</li>
+    <li>Qui il verbale è in firma: segretario, poi coordinatore; il sollecito parte da solo</li></ul></div></div>
   <div class="piede"><span>Pratiche studenti e verbali · l'iter completo</span></div>
 </section>
 
@@ -301,13 +377,13 @@ table.m td:first-child { font-weight: 700; white-space: nowrap; }
 <!-- 12 · Cosa c'è e cosa viene dopo -->
 <section class="slide">
   <h2><span class="num">10</span>A che punto siamo e cosa viene dopo</h2>
-  <p class="sotto">L'iter descritto è già costruito, archivio e pagina pubblica compresi; resta da attivare la pagina pubblica (dopo il parere del DPO) e da semplificare la configurazione delle pratiche.</p>
+  <p class="sotto">L'iter descritto è già costruito, archivio e pagina pubblica compresi; resta da attivare la pagina pubblica dei verbali (dopo il parere del DPO).</p>
   <div class="griglia g3">
     <div class="card verde"><div class="attore" style="color:var(--verde)">Già disponibile</div><ul><li>Moduli online con logica e anagrafi</li><li>Protocollo, uffici, iter e promemoria</li><li>Convalide e piani di studio</li><li>Consigli, convocazioni, presenze</li><li>Seduta guidata e decisioni</li><li><b>Verbale punto per punto in Word</b></li><li><b>Archivio dei verbali con ricerca</b></li><li>Firma PAdES e estratti agli studenti</li></ul></div>
     <div class="card blu"><div class="attore" style="color:var(--blu)">Archivio dei verbali</div><ul><li>Un'unica pagina con tutti i verbali, nuovi e vecchi</li><li>Filtri per consiglio, anno accademico e tipo, e <b>ricerca nel testo</b> (anche nei PDF vecchi)</li><li>Verbali storici in PDF caricati a decine, anche da una cartella: data e numero dal nome del file</li><li>Ognuno vede i verbali del proprio consiglio; l'Ufficio didattico tutti</li></ul></div>
     <div class="card ambra"><div class="attore" style="color:var(--ambra)">Verbali pubblici · da attivare</div><ul><li><b>Pagina con password</b> per gli esterni: solo i verbali firmati che l'Ufficio didattico sceglie di pubblicare, per i consigli e il periodo indicati</li><li>Dati personali: si pubblica una <b>versione con omissis</b> oppure si conferma che il PDF non ne contiene</li><li>Accessi registrati, password revocabili in qualsiasi momento</li><li>Prima di usarla va chiarita con il DPO</li></ul></div>
   </div>
-  <div class="nota" style="margin-top:20px"><b>Da decidere insieme (con il DPO):</b> chi sono gli esterni, quali organi vedono, per quanto tempo restano accessibili i verbali, chi gestisce le password. Prossimo passo di sviluppo: la configurazione guidata delle pratiche.</div>
+  <div class="nota" style="margin-top:20px"><b>Da decidere insieme (con il DPO):</b> chi sono gli esterni, quali organi vedono, per quanto tempo restano accessibili i verbali, chi gestisce le password. La configurazione guidata delle pratiche (sette passi, con bozza, copia e modelli) è già disponibile.</div>
   <div class="piede"><span>Pratiche studenti e verbali · l'iter completo</span></div>
 </section>
 

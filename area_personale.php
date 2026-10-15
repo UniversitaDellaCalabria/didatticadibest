@@ -371,6 +371,30 @@ require_once 'header.php';
         </a>
     <?php endif; endif; ?>
 
+    <a href="guida.php" class="card border-0 shadow-sm mb-4 text-decoration-none" style="border-radius: 12px; border-left: 5px solid #64748b !important;">
+        <div class="card-body d-flex align-items-center gap-3 flex-wrap">
+            <i class="fa fa-circle-question fs-3" style="color:#64748b;" aria-hidden="true"></i>
+            <div class="flex-grow-1"><div class="fw-bold text-dark">Come si fa</div><div class="small text-secondary">Guide brevi con le schermate: pratiche, conferme, firme, prenotazioni, sedute, backup</div></div>
+            <span class="btn btn-sm btn-outline-secondary fw-bold">Apri</span>
+        </div>
+    </a>
+
+    <?php
+    // Cruscotto del Direttore (e degli amministratori): firme e cose ferme in tutti i moduli
+    $cru_dir = \App\Core\App::per($conn)->get(\App\Portale\CruscottoDirettore::class);
+    if ($cru_dir->puoVedere($user_info)): $cd_riep = $cru_dir->riepilogo(); ?>
+        <a href="cruscotto_direttore.php" class="card border-0 shadow-sm mb-4 text-decoration-none" style="border-radius: 12px; border-left: 5px solid #0f2a4a !important;">
+            <div class="card-body d-flex align-items-center gap-3 flex-wrap">
+                <i class="fa fa-gauge-high fs-3" style="color:#0f2a4a;" aria-hidden="true"></i>
+                <div class="flex-grow-1">
+                    <div class="fw-bold text-dark">Cruscotto del Direttore</div>
+                    <div class="small text-secondary"><?php echo $cd_riep['totale'] ? '<strong>' . $cd_riep['totale'] . ' cose da guardare</strong>' . ($cd_riep['ferme'] ? ' · ' . $cd_riep['ferme'] . ' ferme da oltre ' . \App\Portale\CruscottoDirettore::GIORNI_FERMA . ' giorni' : '') : 'tutto in ordine'; ?> · firme, pratiche, verbali, convenzioni, tutorato, risorse</div>
+                </div>
+                <span class="btn btn-sm fw-bold text-white" style="background:#0f2a4a;">Apri</span>
+            </div>
+        </a>
+    <?php endif; ?>
+
     <?php
     // Risorse di cui l'utente è responsabile (scelto dall'admin dall'anagrafe): richieste da approvare e prenotazioni in arrivo
     $mie_ris = \App\Core\App::per($conn)->get(\App\Risorse\ServizioResponsabiliRisorse::class)->risorseDi($user_info);
