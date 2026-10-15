@@ -809,12 +809,12 @@ var PACCHETTI = [
   },
   {
     id: "da-fare-report",
-    titolo: "Pacchetto 18 · «Da fare per te», riepilogo settimanale e Report PCTO",
+    titolo: "Pacchetto 18 · «Da fare per te», riepilogo settimanale e Report FSL",
     stato: "pronto",
     statoTesto: "Pronto da caricare",
     schema: "v69 (nuova tabella riepilogo_persone)",
-    riassunto: "Tre novità. <strong>1) «Da fare per te»</strong> nell'Area personale: ognuno vede le cose che aspettano lui (attestati da confermare, firme, registri e lettere del tutorato, schede di valutazione FSL e elenchi degli studenti da compilare, prenotazioni di risorse da approvare, verbali da firmare, pratiche da lavorare), con il link per farle e i giorni di attesa. <strong>2) Riepilogo settimanale:</strong> il mercoledì mattina arriva la stessa lista per email, solo a chi ha qualcosa da fare (il Direttore trova anche il cruscotto), con il link per non riceverlo più. <strong>3) Report PCTO</strong> nel pannello FSL: per ogni scuola attività, classi, studenti e ore di formazione dell'anno scolastico, con l'Excel (riepilogo, per scuola, per attività, ore per studente).",
-    passi: [["F7", "Da fare per te, riepilogo settimanale e Report PCTO"]],
+    riassunto: "Tre novità. <strong>1) «Da fare per te»</strong> nell'Area personale: ognuno vede le cose che aspettano lui (attestati da confermare, firme, registri e lettere del tutorato, schede di valutazione FSL e elenchi degli studenti da compilare, prenotazioni di risorse da approvare, verbali da firmare, pratiche da lavorare), con il link per farle e i giorni di attesa. <strong>2) Riepilogo settimanale:</strong> il mercoledì mattina arriva la stessa lista per email, solo a chi ha qualcosa da fare (il Direttore trova anche il cruscotto), con il link per non riceverlo più. <strong>3) Report FSL</strong> nel pannello FSL: per ogni scuola attività, classi, studenti e ore di formazione dell'anno scolastico, con l'Excel (riepilogo, per scuola, per attività, ore per studente).",
+    passi: [["F7", "Da fare per te, riepilogo settimanale e Report FSL"]],
     cartelle: [
       { cartella: "/ (radice del portale)", file: [
         ["area_personale.php", "mod", "F7", "scheda «Da fare per te»"],
@@ -823,14 +823,16 @@ var PACCHETTI = [
         [".env.example", "mod", "F7", "solo esempio: non sovrascrivere il tuo .env"]
       ]},
       { cartella: "admin/", file: [
-        ["admin/fsl.php", "mod", "F7", "scheda «Report PCTO» con il download Excel"]
+        ["admin/fsl.php", "mod", "F7", "scheda «Convenzioni da seguire» (iter guidato delle convenzioni caricate dalle scuole), Direttore in evidenza e scheda «Report FSL» con il download Excel"],
+        ["admin/inizio.php", "mod", "F7", "il promemoria delle convenzioni da seguire porta alla nuova scheda"]
       ]},
       { cartella: "src/Portale/", file: [
         ["src/Portale/DaFarePersona.php", "nuovo", "F7", "calcola le cose da fare di una persona"],
         ["src/Portale/RiepilogoPersone.php", "nuovo", "F7", "email settimanale e disiscrizione"]
       ]},
       { cartella: "src/Fsl/", file: [
-        ["src/Fsl/ReportPcto.php", "nuovo", "F7", "numeri e Excel del Report PCTO"]
+        ["src/Fsl/ReportFsl.php", "nuovo", "F7", "numeri e Excel del Report FSL"],
+        ["src/Fsl/NotificheConvenzioni.php", "mod", "F7", "i link delle email agli uffici portano alla scheda «Convenzioni da seguire»"]
       ]},
       { cartella: "src/Core/Schema/", file: [
         ["src/Core/Schema/Definizioni.php", "mod", "F7", "tabella riepilogo_persone"],
@@ -840,11 +842,12 @@ var PACCHETTI = [
     dopo: [
       "Apri una pagina del pannello: il portale crea da solo <code>cache/schema_v69.ok</code> con la tabella del riepilogo.",
       "<strong>Riepilogo email:</strong> è attivo di default; per spegnerlo scrivi <code>RIEPILOGO_PERSONE=0</code> nel <code>.env</code>. Il cron c'è già (<code>cron_background.php</code>): parte il mercoledì dalle 7, una volta a settimana per persona.",
-      "<strong>Prova:</strong> accedi con un docente che ha una conferma o una firma in attesa e guarda la scheda «Da fare per te» nell'Area personale; in Formazione Scuola Lavoro apri «Report PCTO» e scarica l'Excel.",
+      "<strong>Prova:</strong> accedi con un docente che ha una conferma o una firma in attesa e guarda la scheda «Da fare per te» nell'Area personale; in Formazione Scuola Lavoro apri «Report FSL» e scarica l'Excel.",
+      "<strong>Convenzioni FSL:</strong> in Formazione Scuola Lavoro → «Scuole e convenzioni» la prima voce è ora <strong>Convenzioni da seguire</strong>: cinque passi con le cose che toccano a te (protocollo in entrata → il Direttore riceve l'email → protocollo definitivo e registrazione). Il Direttore che firma si imposta lì (vale per tutto il portale).",
       "Le ore del report sono: ore del progetto (o durata del turno dell'evento) × studenti <strong>presenti</strong>; i nomi dei singoli studenti compaiono solo per le classi con l'elenco inserito."
     ],
     nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
-    commit: "Da fare per te, riepilogo settimanale via email e Report PCTO per scuola; attestato FSL con la scuola"
+    commit: "Da fare per te, riepilogo settimanale via email e Report FSL per scuola; attestato FSL con la scuola"
   }
 ];
 
@@ -864,7 +867,7 @@ var PROSSIMI = [
   ["F3 · Backup e ripristino dei file caricati e del database", "fatto: il backup c'era già; ora verifica automatica e ripristino (Pacchetto 16)"],
   ["F4 · Guide per ruolo («Come si fa»)", "fatto: dieci guide con schermate (compresa quella per le scuole sulla convenzione FSL), anche in PDF (Pacchetto 16)"],
   ["F5 · Assistente IA interno per i verbali (testi e vocali, gratis, dentro il server)", "in stand-by (su decisione dell’utente): si riprende solo se serve; comandi di prova nel piano (F5)"],
-  ["F7 · Da fare per te, riepilogo settimanale e Report PCTO", "fatto: vedi Pacchetto 18"],
+  ["F7 · Da fare per te, riepilogo settimanale e Report FSL", "fatto: vedi Pacchetto 18"],
   ["Idea · Tempi per passo delle pratiche (dove si fermano, quanto aspettano)", "da fare: statistica dei giorni medi in ogni passo, per accorgersi dei colli di bottiglia"],
   ["Idea · Valutazione dello studente FSL con attestato delle competenze", "da fare: la struttura ospitante valuta lo studente e l'attestato riporta le competenze"],
   ["Idea · Cerca ovunque nel pannello", "da fare: un'unica casella per trovare pratiche, persone, scuole, verbali e risorse"],

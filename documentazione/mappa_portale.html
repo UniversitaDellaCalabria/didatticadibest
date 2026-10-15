@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mappa del portale Didattica DiBEST</title>
+<style>
+:root {
+  --bg: #f5f6f8; --carta: #ffffff; --testo: #1f2937; --tenue: #5b6474; --linea: #e2e5ea; --morbido: #f0f2f5;
+  --rosso: #b30000; --blu: #0056b3; --verde: #047857; --viola: #7c3aed; --ardesia: #334155; --ambra: #b45309;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #15181d; --carta: #1e2228; --testo: #e5e7eb; --tenue: #a3abb8; --linea: #343a43; --morbido: #262b33; }
+}
+:root[data-theme="dark"] { --bg: #15181d; --carta: #1e2228; --testo: #e5e7eb; --tenue: #a3abb8; --linea: #343a43; --morbido: #262b33; }
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--testo); font: 16px/1.6 "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif; }
+a { color: var(--blu); }
+.guscio { display: grid; grid-template-columns: 270px 1fr; max-width: 1360px; margin: 0 auto; }
+nav.indice { position: sticky; top: 0; height: 100vh; overflow: auto; padding: 24px 16px; border-right: 1px solid var(--linea); font-size: .9rem; }
+nav.indice b { display: block; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--tenue); margin: 16px 0 4px; }
+nav.indice a { display: block; padding: 5px 10px; border-radius: 8px; color: var(--testo); text-decoration: none; }
+nav.indice a:hover { background: var(--morbido); }
+main { padding: 32px 40px 100px; min-width: 0; }
+h1 { font-size: 2rem; margin: 0 0 6px; }
+h2 { font-size: 1.5rem; margin: 64px 0 6px; padding-top: 10px; border-top: 3px solid var(--linea); }
+h3 { font-size: 1.15rem; margin: 34px 0 6px; }
+h4 { margin: 18px 0 4px; font-size: 1rem; }
+.sotto { color: var(--tenue); margin: 0 0 16px; max-width: 78ch; }
+.carta { background: var(--carta); border: 1px solid var(--linea); border-radius: 14px; padding: 18px 22px; margin: 12px 0; }
+.griglia { display: grid; gap: 14px; }
+.g2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.g3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.g4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.zona { border-top: 6px solid var(--c); }
+.zona h4 { color: var(--c); margin-top: 0; }
+.chip { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: .75rem; font-weight: 600; background: var(--morbido); color: var(--tenue); white-space: nowrap; }
+.chip.pub { background: #dbeafe; color: #1d4ed8; } .chip.log { background: #fef3c7; color: #92400e; } .chip.pan { background: #fee2e2; color: #991b1b; } .chip.tok { background: #ede9fe; color: #5b21b6; }
+code { font-family: Consolas, monospace; font-size: .85em; background: var(--morbido); padding: 1px 5px; border-radius: 5px; }
+table { border-collapse: collapse; width: 100%; font-size: .88rem; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--linea); vertical-align: top; }
+th { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--tenue); background: var(--morbido); position: sticky; top: 0; }
+.scorre { overflow-x: auto; border: 1px solid var(--linea); border-radius: 12px; background: var(--carta); }
+figure { margin: 14px 0; }
+figure img { width: 100%; max-width: 980px; border: 1px solid var(--linea); border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,.08); cursor: zoom-in; display: block; }
+figure.piccola img { max-width: 620px; }
+figcaption { font-size: .85rem; color: var(--tenue); margin-top: 6px; max-width: 980px; }
+.coppia { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.coppia figure img { max-width: 100%; }
+.pagina { background: var(--carta); border: 1px solid var(--linea); border-left: 6px solid var(--c, var(--blu)); border-radius: 12px; padding: 16px 20px; margin: 18px 0; }
+.pagina h4 { margin: 0 0 2px; font-size: 1.05rem; }
+.pagina .meta { font-size: .82rem; color: var(--tenue); margin-bottom: 8px; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.pagina p { margin: 6px 0; }
+.pagina ul { margin: 6px 0 6px 18px; padding: 0; }
+.nota { background: #fef3c7; color: #78350f; border-radius: 10px; padding: 10px 14px; margin: 12px 0; font-size: .92rem; }
+:root[data-theme="dark"] .nota { background: #3b2c0c; color: #fde68a; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .nota { background: #3b2c0c; color: #fde68a; } }
+.passi { counter-reset: p; list-style: none; padding: 0; margin: 10px 0; }
+.passi li { counter-increment: p; display: grid; grid-template-columns: 34px 1fr; gap: 10px; padding: 8px 0; border-bottom: 1px dashed var(--linea); }
+.passi li::before { content: counter(p); width: 30px; height: 30px; border-radius: 50%; background: var(--rosso); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: .85rem; }
+.albero { font-family: Consolas, monospace; font-size: .82rem; white-space: pre; overflow-x: auto; background: var(--carta); border: 1px solid var(--linea); border-radius: 12px; padding: 14px 18px; line-height: 1.5; }
+.lightbox { position: fixed; inset: 0; background: rgba(0,0,0,.85); display: none; align-items: center; justify-content: center; z-index: 50; padding: 20px; cursor: zoom-out; }
+.lightbox.on { display: flex; }
+.lightbox img { max-width: 100%; max-height: 100%; border-radius: 8px; }
+.tema { position: fixed; right: 14px; bottom: 14px; z-index: 5; font: inherit; font-size: .8rem; padding: 6px 12px; border-radius: 99px; border: 1px solid var(--linea); background: var(--carta); color: var(--testo); cursor: pointer; }
+@media (max-width: 960px) { .guscio { grid-template-columns: 1fr; } nav.indice { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--linea); } main { padding: 20px 16px 80px; } .g2,.g3,.g4,.coppia { grid-template-columns: 1fr; } }
+@media print { nav.indice, .tema { display: none; } .guscio { display: block; } h2 { break-before: page; } figure img { max-width: 70%; } }
+</style>
+</head>
+<body>
+<div class="guscio">
+<nav class="indice" id="indice"></nav>
+<main id="main">
+
+<h1>Mappa del portale «Didattica DiBEST»</h1>
+<p class="sotto">Una guida illustrata a tutto il portale: cosa c'è, dove si trova, chi lo usa, quale menu creare per mostrarlo, quali file ci stanno dietro. Le schermate vengono dall'ambiente di prova (dati inventati). Clic su un'immagine per ingrandirla.</p>
+
+<!-- ======================================================================================= -->
+<h2 id="insieme">1 · Il portale in una pagina</h2>
+<p class="sotto">Se devi spiegarlo a qualcuno in due minuti, parti da qui.</p>
+<div class="carta">
+<p><strong>Didattica DiBEST è un unico sito web del Dipartimento</strong> che sostituisce fogli Excel, email sparse e moduli cartacei. Ha <strong>cinque grandi funzioni</strong>, ciascuna con il suo «modulo» nel pannello di gestione:</p>
+<div class="griglia g3">
+ <div class="carta zona" style="--c:#0056b3"><h4>Eventi e seminari</h4><p>Welcome Week, OpenLab, seminari, public engagement. Si prenota con un turno, si fa il check-in con il QR, si rilascia l'attestato, si misura la Terza missione.</p></div>
+ <div class="carta zona" style="--c:#b30000"><h4>Formazione Scuola Lavoro</h4><p>Le scuole prenotano le attività, firmano la convenzione, caricano l'elenco degli studenti; a fine percorso attestati e valutazione. Report FSL per scuola.</p></div>
+ <div class="carta zona" style="--c:#7c3aed"><h4>Prenotazioni e risorse</h4><p>Aule, laboratori, sportelli, auto del Dipartimento: calendario a slot, approvazione, lista d'attesa, diario di bordo, scadenze.</p></div>
+ <div class="carta zona" style="--c:#047857"><h4>Didattica</h4><p>Modulistica e <strong>pratiche degli studenti</strong> (certificati, tesi, convalide…) con iter, firme digitali e uffici; sedute dei consigli e verbali; tutorato (bandi, lettere, registro, pagamenti).</p></div>
+ <div class="carta zona" style="--c:#334155"><h4>Gestione del portale</h4><p>Anagrafi di Ateneo e scuole, aspetto e menu del sito, utenti e permessi, email, backup, controlli automatici.</p></div>
+ <div class="carta zona" style="--c:#b45309"><h4>Aiuti trasversali</h4><p>«Da fare per te» in Area personale e riepilogo settimanale via email, guide per ruolo, cruscotto del Direttore, ricerca globale.</p></div>
+</div>
+<p><strong>Chi lo usa:</strong> studenti, docenti, uffici (protocollo, ufficio del corso, internazionalizzazione), referenti dei consigli, responsabili di risorse, tutor, scuole, il Direttore, gli amministratori. Ognuno vede <em>solo</em> ciò che lo riguarda.</p>
+<p><strong>Come si entra:</strong> con SSO di Ateneo (SPID/CIE per gli esterni). Molte azioni (firma, conferma, valutazione) si fanno anche <strong>da un link personale ricevuto per email</strong>, senza cercare nulla nel sito.</p>
+</div>
+
+<!-- ======================================================================================= -->
+<h2 id="zone">2 · Le quattro «zone» del portale</h2>
+<p class="sotto">Per orientarsi basta sapere in quale zona ci si trova. Sono diverse per chi le usa e per come ci si arriva.</p>
+<div class="griglia g2">
+ <div class="carta zona" style="--c:#1d4ed8"><h4>① Sito pubblico</h4><p>Quello che vede chiunque: home, agenda, orientamento, pagine delle aree (OpenLab, FSL…), schede evento, ricerca, guida, verifica attestati. Si naviga con il <strong>menu del sito</strong> (sezione 3).</p><p><span class="chip pub">senza accesso</span> <span class="chip log">con accesso per prenotare</span></p></div>
+ <div class="carta zona" style="--c:#92400e"><h4>② Area personale</h4><p>La «scrivania» di ogni persona dopo l'accesso: prenotazioni, pratiche, «Da fare per te», registro tutorato, le mie risorse, cruscotto del Direttore… Mostra solo le card che servono a quel ruolo. Voce di menu: <em>Area riservata</em>.</p><p><span class="chip log">con accesso</span></p></div>
+ <div class="carta zona" style="--c:#991b1b"><h4>③ Pannello di gestione (<code>/admin/</code>)</h4><p>Per amministratori, gestori e uffici. Organizzato in <strong>moduli</strong> (colori diversi) con menu laterale a gruppi. Si entra da «Gestione» o dall'indirizzo <code>…/admin/</code>.</p><p><span class="chip pan">solo abilitati</span></p></div>
+ <div class="carta zona" style="--c:#5b21b6"><h4>④ Pagine a link personale</h4><p>Firme digitali, conferme dei docenti, lettere di incarico, valutazioni FSL, giustifica assenza, disiscrizione riepilogo: arrivano <strong>per email con un link personale</strong> (<code>?t=…</code>). Non vanno inserite nei menu.</p><p><span class="chip tok">link nell'email</span></p></div>
+</div>
+<div class="nota"><strong>Regola d'oro per il menu:</strong> nel menu del sito vanno solo le pagine delle zone ① e ② (quelle che una persona cerca da sola). Le pagine della zona ④ non vanno mai nel menu; il pannello ③ ha il suo menu laterale.</div>
+
+<!-- ======================================================================================= -->
+<h2 id="menu">3 · Il menu del sito: cosa creare</h2>
+<p class="sotto">Il menu è su tre livelli (voce → colonna → collegamenti) e si gestisce dal pannello: <strong>Gestione del portale → Sito pubblico → Menu</strong> (<code>admin/menu.php</code>). Le voci si riordinano trascinandole, si possono nascondere e limitare a chi è entrato o a un ruolo.</p>
+<div class="coppia">
+<figure><img src="schermate/map_pub_home.png" alt=""><figcaption>La home con il menu a cinque voci: Home · Orientamento · Studenti · Eventi e seminari · Area riservata.</figcaption></figure>
+<figure><img src="schermate/map_adm_menu.png" alt=""><figcaption>Il pannello «Menu»: l'albero delle voci, con maniglie per trascinare, occhio per nascondere e form per aggiungere.</figcaption></figure>
+</div>
+
+<h3>La via più veloce: «Organizzazione proposta»</h3>
+<ol class="passi">
+<li><div>Accedi come amministratore → <strong>Gestione del portale → Sito pubblico → Testata e home</strong> (<code>admin/testata.php</code>), scheda <strong>Widget</strong>.</div></li>
+<li><div>Nel riquadro verde <strong>«Organizzazione proposta: il sito per pubblico»</strong> lascia spuntati <em>home</em> e <em>menu</em> e conferma: il portale fa prima una <em>copia di sicurezza</em> (ripristinabile) e poi imposta home e menu per pubblico.</div></li>
+<li><div>Se preferisci andarci piano: «Crea le voci nascoste» e poi mostrale una per una da <em>Menu</em>, oppure «Mostra il menu proposto» tutte insieme.</div></li>
+<li><div>Le aree (OpenLab, FSL, Aule e laboratori…) entrano da sole al posto giusto, in base al loro tipo e ambito. Le voci già presenti che la proposta non conosce (es. «Link utili») restano in fondo.</div></li>
+</ol>
+<figure><img src="schermate/map_adm_testata.png" alt=""><figcaption>Testata e home: logo, colori, widget della home (con ordine a trascinamento) e il pulsante dell'organizzazione proposta.</figcaption></figure>
+
+<h3>Il menu proposto, voce per voce</h3>
+<div class="scorre"><table>
+<thead><tr><th>Voce (1° livello)</th><th>Colonna (2°)</th><th>Collegamenti (3°)</th><th>Indirizzo</th><th>A chi serve</th></tr></thead>
+<tbody>
+<tr><td><strong>Home</strong></td><td>—</td><td>—</td><td><code>index.php</code></td><td>Tutti</td></tr>
+<tr><td rowspan="2"><strong>Orientamento</strong><br><code>orientamento.php</code></td><td>Futuri studenti</td><td>Una voce per ogni area di orientamento (es. OpenLab) · Prossimi appuntamenti</td><td><code>openlab.php</code> · <code>agenda.php?ambito=orientamento</code></td><td>Futuri studenti, famiglie</td></tr>
+<tr><td>Per le scuole</td><td>Formazione Scuola Lavoro · Tutte le attività per le scuole</td><td><code>fsl.php</code> · <code>agenda.php?scuole=1</code></td><td>Docenti delle scuole</td></tr>
+<tr><td rowspan="3"><strong>Studenti</strong><br><code>modulistica.php</code></td><td>Modulistica e pratiche</td><td><strong>Modulistica</strong> · <strong>Le mie pratiche</strong></td><td><code>modulistica.php</code> · <code>pratiche.php</code></td><td>Studenti (serve l'accesso)</td></tr>
+<tr><td>Ricevimento e sportelli</td><td>Ricevimento dei docenti · Aule e laboratori (aree «calendario»)</td><td><code>ricevimento.php</code> · <code>aule-laboratori.php</code></td><td>Studenti, docenti</td></tr>
+<tr><td>Tutorato</td><td>Registro delle attività</td><td><code>registro_tutorato.php</code></td><td>Tutor</td></tr>
+<tr><td rowspan="2"><strong>Eventi e seminari</strong><br><code>agenda.php</code></td><td>Agenda</td><td>Orientamento · Ricerca · Public engagement · Didattica · Per le scuole · Avvisi per email</td><td><code>agenda.php?ambito=…</code> · <code>avvisi.php</code></td><td>Tutti</td></tr>
+<tr><td>Archivio</td><td>Un archivio per ogni area (eventi passati)</td><td><code>&lt;slug&gt;_archivio.php</code></td><td>Tutti</td></tr>
+<tr><td><strong>Area riservata</strong></td><td>—</td><td>—</td><td><code>area_personale.php</code></td><td>Chi è entrato</td></tr>
+</tbody></table></div>
+
+<h3>Voci in più che conviene aggiungere a mano (da «Menu → Aggiungi voce»)</h3>
+<div class="scorre"><table>
+<thead><tr><th>Etichetta suggerita</th><th>Dove metterla</th><th>Indirizzo da scrivere</th><th>Visibilità</th><th>Perché</th></tr></thead>
+<tbody>
+<tr><td>Come si fa (guide)</td><td>Area riservata o Studenti</td><td><code>guida.php</code></td><td>Tutti</td><td>Dieci guide per ruolo con schermate, anche da stampare</td></tr>
+<tr><td>Verifica un attestato</td><td>Eventi e seminari</td><td><code>verifica_attestato.php</code></td><td>Tutti</td><td>Chi riceve un attestato lo verifica dal codice o dal QR</td></tr>
+<tr><td>Programma FSL della scuola</td><td>Orientamento → Per le scuole</td><td><code>programma_fsl.php</code></td><td>Chi è entrato</td><td>La scuola raccoglie le attività scelte e prenota insieme</td></tr>
+<tr><td>Cruscotto del Direttore</td><td>Area riservata (o solo link diretto)</td><td><code>cruscotto_direttore.php</code></td><td>Solo ruolo scelto</td><td>Documenti da firmare e cose ferme</td></tr>
+<tr><td>Le mie risorse</td><td>Area riservata</td><td><code>risorse_responsabile.php</code></td><td>Chi è entrato</td><td>Per i responsabili di aule/auto (compare anche come card in Area personale)</td></tr>
+<tr><td>Verbali (con password)</td><td>Solo se serve, dopo il parere del DPO</td><td><code>verbali.php</code></td><td>Tutti</td><td>Accesso pubblico con password ai verbali dei consigli</td></tr>
+<tr><td>Privacy · Crediti</td><td>Piè di pagina / Link utili</td><td><code>privacy.php</code> · <code>crediti.php</code></td><td>Tutti</td><td>Informativa GDPR e credits</td></tr>
+</tbody></table></div>
+<div class="nota">Le <strong>aree</strong> (OpenLab, FSL, Aule e laboratori, o una nuova) hanno un indirizzo <code>nome-area.php</code> creato da solo: non c'è un file per area, le serve <code>area.php</code> tramite <code>.htaccess</code>. Per aggiungerne una: Gestione → <em>Aree di tutti i moduli</em> → <em>Nuova area</em>.</div>
+
+<!-- ======================================================================================= -->
+<h2 id="pubblico">4 · Il sito pubblico, pagina per pagina</h2>
+<p class="sotto">Per ogni pagina: file, indirizzo, chi la usa e cosa fa. Il badge dice se serve l'accesso.</p>
+
+<div class="pagina" style="--c:#1d4ed8"><h4>Home</h4><div class="meta"><code>index.php</code><span class="chip pub">pubblica</span></div>
+<p>Pagina composta da <strong>widget</strong> che si ordinano dal pannello (carosello, «Cosa cerchi?», agenda, scadenze della modulistica, card delle aree, ultimi posti, numeri del dipartimento…). Chi ha già prenotato vede «la mia prossima prenotazione» con la ricevuta QR.</p>
+<figure><img src="schermate/map_pub_home.png" alt=""><figcaption>Home con «Cosa cerchi?» e i prossimi appuntamenti.</figcaption></figure></div>
+
+<div class="pagina" style="--c:#1d4ed8"><h4>Agenda eventi e seminari</h4><div class="meta"><code>agenda.php</code> · <code>agenda_ics.php</code><span class="chip pub">pubblica</span></div>
+<p>Tutti gli eventi di tutte le aree, per mese, con filtri per <strong>ambito</strong> (Orientamento, Ricerca, Public engagement, Didattica), «per le scuole» e ricerca. Il pulsante «Aggiungi al tuo calendario» dà un indirizzo <code>.ics</code> da incollare in Google/Outlook. In fondo, l'iscrizione agli avvisi per email.</p>
+<figure><img src="schermate/map_pub_agenda.png" alt=""></figure></div>
+
+<div class="pagina" style="--c:#1d4ed8"><h4>Orientamento</h4><div class="meta"><code>orientamento.php</code><span class="chip pub">pubblica</span></div>
+<p>Vetrina per futuri studenti, famiglie e scuole: spiega come funzionano gli appuntamenti, elenca le aree di orientamento e i prossimi eventi.</p>
+<figure><img src="schermate/map_pub_orientamento.png" alt=""></figure></div>
+
+<div class="pagina" style="--c:#1d4ed8"><h4>Pagina di un'area (OpenLab, FSL…) e archivio</h4><div class="meta"><code>area.php</code> via <code>&lt;slug&gt;.php</code> · <code>&lt;slug&gt;_archivio.php</code><span class="chip pub">pubblica</span></div>
+<p>Ogni area ha colore, testata e <strong>layout</strong> a scelta fra 8 (griglia, lista, elenco con ricerca, calendario, timeline, agenda a schede, gruppi, progetti) impostabili da <em>Impostazioni area</em>. Gli eventi passati vanno nell'archivio (automaticamente dal cron).</p>
+<div class="coppia"><figure><img src="schermate/map_pub_area.png" alt=""><figcaption>Area OpenLab con elenco avanzato (filtri a sinistra).</figcaption></figure>
+<figure><img src="schermate/map_pub_fsl.png" alt=""><figcaption>Area Formazione Scuola Lavoro con layout «progetti».</figcaption></figure></div></div>
+
+<div class="pagina" style="--c:#1d4ed8"><h4>Scheda di un evento</h4><div class="meta"><code>&lt;slug&gt;.php?evento=ID</code><span class="chip pub">pubblica</span><span class="chip log">accesso per prenotare</span></div>
+<p>Descrizione completa con locandina, luogo (link a Google Maps), referenti, <strong>turni</strong> con posti liberi, pulsante «Prenota ora», «Aggiungi al calendario», link da condividere. Lista d'attesa se i posti sono finiti.</p>
+<figure><img src="schermate/map_pub_evento.png" alt=""></figure></div>
+
+<div class="pagina" style="--c:#1d4ed8"><h4>Ricerca globale · Avvisi per email · Guida · Verifica attestato</h4><div class="meta"><code>ricerca.php</code> · <code>avvisi.php</code> · <code>guida.php</code> · <code>verifica_attestato.php</code></div>
+<div class="coppia">
+<figure><img src="schermate/map_pub_ricerca.png" alt=""><figcaption><strong>Ricerca</strong>: la casella nella testata cerca in eventi, progetti, aule…</figcaption></figure>
+<figure><img src="schermate/map_pub_avvisi.png" alt=""><figcaption><strong>Avvisi</strong>: ci si iscrive scegliendo gli ambiti; ogni evento nuovo arriva una volta sola.</figcaption></figure>
+<figure><img src="schermate/map_pub_guida.png" alt=""><figcaption><strong>Guide «Come si fa»</strong>: dieci guide per ruolo, versione stampabile con <code>?stampa=1</code>.</figcaption></figure>
+<figure><img src="schermate/map_pub_verifica.png" alt=""><figcaption><strong>Verifica attestato</strong>: pubblica; si digita il codice o si inquadra il QR dell'attestato.</figcaption></figure>
+</div></div>
+
+<div class="pagina" style="--c:#7c3aed"><h4>Aule, laboratori e sportelli</h4><div class="meta"><code>&lt;slug-area&gt;.php</code> (aree di tipo «calendario») · <code>risorsa_ics.php</code><span class="chip pub">elenco pubblico</span><span class="chip log">accesso per prenotare</span></div>
+<p>Elenco delle risorse con orari; da ciascuna si apre il calendario settimanale a slot e si prenota (anche ripetuto). Se lo slot è occupato ci si mette in <strong>lista d'attesa</strong>. Chi può prenotare (tutti, studenti, docenti, personale) lo decide l'amministratore.</p>
+<div class="coppia"><figure><img src="schermate/map_pub_risorse.png" alt=""><figcaption>Elenco delle risorse.</figcaption></figure><figure><img src="schermate/stud_prenota.png" alt=""><figcaption>Prenotazione di uno slot libero.</figcaption></figure></div></div>
+
+<div class="pagina" style="--c:#047857"><h4>Modulistica e moduli online</h4><div class="meta"><code>modulistica.php</code> · <code>modulo.php?id=N</code><span class="chip pub">elenco pubblico</span><span class="chip log">accesso per i moduli</span></div>
+<p>I documenti da scaricare e i <strong>moduli online</strong> (richiesta certificato, tesi, convalide…) divisi per categoria, con le scadenze. Compilare un modulo apre una <strong>pratica</strong>.</p>
+<div class="coppia"><figure><img src="schermate/stud_moduli.png" alt=""><figcaption>Modulistica.</figcaption></figure><figure><img src="schermate/stud_modulo_tesi.png" alt=""><figcaption>Un modulo online (tesi), con campi condizionali e tabella degli esami.</figcaption></figure></div></div>
+
+<div class="pagina" style="--c:#047857"><h4>Ricevimento dei docenti</h4><div class="meta"><code>ricevimento.php</code><span class="chip log">docenti con accesso</span></div>
+<p>Il docente gestisce il proprio sportello (giorni, orari, durata): gli studenti prenotano dalla pagina pubblica e il docente riceve il promemoria.</p>
+<figure class="piccola"><img src="schermate/map_pub_ricevimento.png" alt=""></figure></div>
+
+<div class="pagina" style="--c:#b30000"><h4>Programma FSL della scuola</h4><div class="meta"><code>programma_fsl.php</code><span class="chip log">docente di scuola</span></div>
+<p>Il docente raccoglie le attività FSL scelte e le prenota insieme; il programma ricorda convenzione, elenco studenti e autorizzazione.</p>
+<figure class="piccola"><img src="schermate/map_pub_programma_fsl.png" alt=""></figure></div>
+
+<div class="scorre"><table>
+<thead><tr><th>Altre pagine pubbliche</th><th>File</th><th>Cosa fa</th></tr></thead><tbody>
+<tr><td>Pagina del docente</td><td><code>persona.php?id=</code></td><td>Scheda pubblica di un referente (foto, ruolo, contatti, ricevimento) dall'anagrafe di Ateneo</td></tr>
+<tr><td>Verbali con password</td><td><code>verbali.php</code></td><td>Accesso pubblico con password ai verbali dei consigli (da usare dopo il parere del DPO)</td></tr>
+<tr><td>Convenzione online</td><td><code>convenzione_online.php</code></td><td>La scuola compila Convenzione e Allegato A con un modulo guidato e carica il PDF firmato</td></tr>
+<tr><td>Questionario</td><td><code>sondaggio.php?t=</code></td><td>Compilazione anonima dei sondaggi collegati agli eventi</td></tr>
+<tr><td>Scanner e check-in dello studente</td><td><code>scanner_studente.php</code> · <code>self_checkin.php</code> · <code>checkin.php</code></td><td>Lo studente inquadra il QR in aula e registra la presenza</td></tr>
+<tr><td>Privacy e crediti</td><td><code>privacy.php</code> · <code>crediti.php</code></td><td>Informativa GDPR (con i tempi di conservazione) e credits</td></tr>
+<tr><td>Installazione</td><td><code>install.php</code></td><td>Solo alla prima installazione del portale</td></tr>
+</tbody></table></div>
+
+<!-- ======================================================================================= -->
+<h2 id="area">5 · L'Area personale, per ruolo</h2>
+<p class="sotto"><code>area_personale.php</code> (voce di menu «Area riservata»). Mostra card diverse a seconda di chi sei. In cima, per chi ha cose in attesa, la scheda <strong>«Da fare per te»</strong>: conferme di attestati, firme, registri e lettere del tutorato, schede e elenchi FSL, prenotazioni da approvare, verbali da firmare, pratiche da lavorare — con i giorni di attesa. Una volta a settimana la stessa lista arriva anche per email (con link per disiscriversi).</p>
+<div class="coppia">
+<figure><img src="schermate/map_area_studente.png" alt=""><figcaption><strong>Studente</strong>: presenze e attestati, scanner QR, guide, «Le mie pratiche», prenotazioni.</figcaption></figure>
+<figure><img src="schermate/map_area_docente.png" alt=""><figcaption><strong>Docente/relatore</strong>: compare «Da fare per te» con le conferme da dare.</figcaption></figure>
+<figure><img src="schermate/map_area_direttore.png" alt=""><figcaption><strong>Direttore</strong>: card del cruscotto con i documenti da firmare.</figcaption></figure>
+<figure><img src="schermate/map_profilo.png" alt=""><figcaption><strong>Profilo</strong> (<code>profilo.php</code>): dati dell'accesso e email personale.</figcaption></figure>
+</div>
+<div class="scorre"><table>
+<thead><tr><th>Pagina collegata</th><th>File</th><th>Chi</th><th>Cosa fa</th></tr></thead><tbody>
+<tr><td>Le mie pratiche</td><td><code>pratiche.php</code></td><td>Studente</td><td>Elenco e stato delle pratiche; allega documenti, vede messaggi e PDF dell'esito. <code>allegato_pratica.php</code> scarica gli allegati</td></tr>
+<tr><td>Registro del tutorato</td><td><code>registro_tutorato.php</code></td><td>Tutor</td><td>Segna giorni, ore e attività; dichiara la fine. Il docente approva. <code>dichiarazione_tutorato.php</code>: dichiarazione individuale (IBAN cifrato)</td></tr>
+<tr><td>Pagamenti tutorato</td><td><code>pagamenti_tutorato.php</code></td><td>Ufficio pagamenti</td><td>Elenco dei pagamenti da disporre</td></tr>
+<tr><td>Le mie risorse</td><td><code>risorse_responsabile.php</code></td><td>Responsabile di risorsa</td><td>Approva/rifiuta prenotazioni di aule, laboratori, auto</td></tr>
+<tr><td>Cruscotto di una risorsa</td><td><code>risorse_cruscotto.php?r=</code></td><td>Responsabile, admin</td><td>Utilizzo, fasce richieste, km e consumi, scadenze (bollo, assicurazione), Excel</td></tr>
+<tr><td>Diario di bordo</td><td><code>diario_bordo.php</code></td><td>Conducente</td><td>Km e note dopo l'uso di un mezzo</td></tr>
+<tr><td>Elenco studenti (FSL/eventi)</td><td><code>elenco_studenti.php</code></td><td>Docente di scuola</td><td>Inserisce nomi e cognomi (incolla da Excel) per gli attestati; carica l'autorizzazione della scuola</td></tr>
+<tr><td>Attestati</td><td><code>stampa_attestato.php</code> · <code>attestati_gruppo.php</code></td><td>Studenti, docenti</td><td>PDF con codice e QR; per le classi gli attestati di tutti gli studenti</td></tr>
+<tr><td>Ricevuta</td><td><code>stampa_ricevuta.php</code></td><td>Chi ha prenotato</td><td>Ricevuta con QR</td></tr>
+<tr><td>Cruscotto del Direttore</td><td><code>cruscotto_direttore.php</code></td><td>Direttore, admin</td><td>Documenti da firmare e cose ferme</td></tr>
+<tr><td>Convenzioni scaricabili</td><td><code>documento_scuola.php</code> · <code>convenzione_precompilata.php</code></td><td>Docente di scuola</td><td>Scarica convenzione/Allegato A già compilati</td></tr>
+</tbody></table></div>
+<div class="coppia">
+<figure><img src="schermate/stud_pratiche.png" alt=""><figcaption>Le mie pratiche.</figcaption></figure>
+<figure><img src="schermate/map_dir_cruscotto.png" alt=""><figcaption>Cruscotto del Direttore.</figcaption></figure>
+</div>
+
+<!-- ======================================================================================= -->
+<h2 id="link">6 · Le pagine a link personale (zona ④)</h2>
+<p class="sotto">Non si mettono nel menu: partono da un'email. Il link contiene un codice personale e scade o si consuma all'uso.</p>
+<div class="scorre"><table>
+<thead><tr><th>Pagina</th><th>File</th><th>Chi riceve il link</th><th>Cosa fa</th></tr></thead><tbody>
+<tr><td>Conferma attestato</td><td><code>conferma_attestato.php</code></td><td>Docente</td><td>Conferma (o no) le righe dell'attestato di frequenza/esame dello studente</td></tr>
+<tr><td>Firma pratica</td><td><code>firma_pratica.php</code></td><td>Relatore, Direttore</td><td>Firma digitale PAdES su una pratica</td></tr>
+<tr><td>Firma verbale</td><td><code>firma_verbale.php</code></td><td>Segretario, coordinatore</td><td>Firma del verbale di seduta</td></tr>
+<tr><td>Lettera di incarico</td><td><code>incarico.php</code> · <code>firma_incarico.php</code></td><td>Tutor, docente, Direttore</td><td>Accettazione con SPID/CIE e firma della lettera</td></tr>
+<tr><td>Firma convenzione</td><td><code>firma_convenzione.php</code></td><td>Direttore</td><td>Firma la convenzione FSL già firmata dalla scuola</td></tr>
+<tr><td>Giustifica assenza</td><td><code>giustifica.php</code></td><td>Componente di un consiglio</td><td>Giustifica l'assenza dalla seduta</td></tr>
+<tr><td>Valutazione struttura (FSL)</td><td><code>valutazione_fsl.php</code></td><td>Docente della scuola</td><td>8 aspetti da 1 a 5 e commenti a fine attività</td></tr>
+<tr><td>Riepilogo settimanale</td><td><code>riepilogo_persone.php</code></td><td>Chiunque lo riceva</td><td>Smette (o riprende) di ricevere l'email «Da fare per te»</td></tr>
+<tr><td>Download protetti</td><td><code>documento_tutorato.php</code> · <code>autorizzazione_scuola.php</code> · <code>documento_scuola.php</code></td><td>Persone autorizzate</td><td>I file riservati stanno fuori dal web e si scaricano solo dopo il controllo dei permessi</td></tr>
+</tbody></table></div>
+<div class="coppia">
+<figure><img src="schermate/rel_conferma_attestato.png" alt=""><figcaption>Conferma dell'attestato dal link ricevuto dal docente.</figcaption></figure>
+<figure><img src="schermate/dir_firma.png" alt=""><figcaption>Firma di una pratica da parte del Direttore.</figcaption></figure>
+</div>
+
+<!-- ======================================================================================= -->
+<h2 id="pannello">7 · Il pannello di gestione</h2>
+<p class="sotto">Si entra da <code>admin/</code>. La prima pagina (<code>admin/inizio.php</code>) è una «scrivania» a moduli: si sceglie il modulo e poi l'area. Il menu laterale cambia con il modulo, ricorda quali gruppi hai aperto e mostra pallini con le cose da fare.</p>
+<div class="coppia">
+<figure><img src="schermate/map_adm_inizio.png" alt=""><figcaption>Scrivania del pannello: cose da fare in alto, poi le card dei moduli con i numeri.</figcaption></figure>
+<figure><img src="schermate/map_adm_aree.png" alt=""><figcaption>«Aree»: le aree visibili a chi è entrato (abilitazioni per area, per progetti, per eventi).</figcaption></figure>
+</div>
+<div class="griglia g3">
+<div class="carta zona" style="--c:#0056b3"><h4>Eventi e seminari</h4><p>Attività · Partecipanti · Statistiche · Impostazioni area · Report per ambito</p></div>
+<div class="carta zona" style="--c:#b30000"><h4>Formazione Scuola Lavoro</h4><p>Riepilogo · Convenzioni · Da stipulare · Verifica iscrizioni · Valutazioni · Report FSL · Scheda scuola</p></div>
+<div class="carta zona" style="--c:#7c3aed"><h4>Prenotazioni e risorse</h4><p>Agenda e prenotazioni · Risorse e orari · Cruscotti · Scadenze</p></div>
+<div class="carta zona" style="--c:#047857"><h4>Didattica</h4><p>Pratiche · Sedute e verbali · Moduli e documenti · Ufficio e ricevimento · Statistiche · Tutorato</p></div>
+<div class="carta zona" style="--c:#334155"><h4>Gestione del portale</h4><p>Anagrafi · Aree · Sito pubblico (Testata, Menu) · Utenti · Uffici di Ateneo · Sistema e registri</p></div>
+</div>
+
+<h3 id="p-eventi" style="color:#0056b3">Modulo Eventi e seminari</h3>
+<div class="pagina" style="--c:#0056b3"><h4>Dashboard dell'area</h4><div class="meta"><code>admin/dashboard.php</code></div><p>KPI (prenotazioni, presenze), grafici, messaggi non letti e avvisi (es. elenchi degli studenti mancanti).</p><figure><img src="schermate/map_adm_dashboard.png" alt=""></figure></div>
+<div class="pagina" style="--c:#0056b3"><h4>Eventi e turni · Progetti · Moduli di iscrizione · Archivio</h4><div class="meta"><code>admin/eventi.php</code> · <code>admin/progetti.php</code> · <code>admin/form_builder.php</code> · <code>admin/archivio.php</code></div>
+<p><strong>Eventi</strong>: titolo, descrizione, locandina, ambiti, turni (data, orari, posti, approvazione, annullabile fino a…), duplicazione. <strong>Progetti</strong>: scheda completa con corso di laurea, periodo, ore, moduli, referenti, edizioni (usati per la Formazione Scuola Lavoro). <strong>Moduli di iscrizione</strong>: campi personalizzati (anche «Scuola» dall'anagrafe del Ministero). <strong>Archivio</strong>: eventi conclusi e clonazione.</p>
+<div class="coppia"><figure><img src="schermate/map_adm_eventi.png" alt=""><figcaption>Eventi e turni.</figcaption></figure><figure><img src="schermate/map_adm_progetti.png" alt=""><figcaption>Progetti (FSL) con le edizioni.</figcaption></figure>
+<figure><img src="schermate/map_adm_form.png" alt=""><figcaption>Form builder.</figcaption></figure><figure><img src="schermate/map_adm_archivio.png" alt=""><figcaption>Archivio.</figcaption></figure></div></div>
+<div class="pagina" style="--c:#0056b3"><h4>Iscritti e presenze · Scanner · Badge · Studenti e attestati · Sondaggi · Statistiche</h4><div class="meta"><code>admin/iscritti.php</code> · <code>scanner.php</code> · <code>stampa_badge.php</code> · <code>partecipanti.php</code> · <code>sondaggi.php</code> · <code>statistiche.php</code></div>
+<p><strong>Iscritti</strong>: elenco con azioni di massa (presenze, approvazione, promozione dalla lista d'attesa), prenotazione manuale, stampa lista. <strong>Scanner</strong>: check-in con QR (anche lettori USB) con contatore in tempo reale; stampa dei QR per l'aula e dei badge. <strong>Studenti e attestati</strong>: per le classi, l'elenco dei nomi e l'invio degli attestati. <strong>Sondaggi</strong>: questionari con 15 tipi di campo, NPS, Excel. <strong>Statistiche</strong>: tasso di presenza, trend, export.</p>
+<div class="coppia"><figure><img src="schermate/map_adm_iscritti.png" alt=""></figure><figure><img src="schermate/map_adm_statistiche.png" alt=""></figure><figure><img src="schermate/map_adm_sondaggi.png" alt=""></figure><figure><img src="schermate/map_adm_impostazioni_area.png" alt=""><figcaption><code>admin/impostazioni_area.php</code>: layout, colori, frase dell'attestato, chi gestisce l'area.</figcaption></figure></div></div>
+<div class="pagina" style="--c:#0056b3"><h4>Report per ambito (Terza missione)</h4><div class="meta"><code>admin/report_ambiti.php</code></div><p>Per anno solare o accademico: eventi, ore, iscritti, presenze e scuole raggiunte per ambito; Excel per la scheda della Terza missione.</p><figure><img src="schermate/map_adm_report_ambiti.png" alt=""></figure></div>
+
+<h3 id="p-fsl" style="color:#b30000">Modulo Formazione Scuola Lavoro</h3>
+<div class="pagina" style="--c:#b30000"><h4>Pannello FSL a schede</h4><div class="meta"><code>admin/fsl.php</code> · <code>admin/allegato_a.php</code> · <code>admin/convenzione_file.php</code></div>
+<ul><li><strong>Riepilogo</strong> per anno scolastico: attività, scuole, studenti, presenze, convenzioni mancanti.</li>
+<li><strong>Scuole e convenzioni → Convenzioni da seguire</strong>: la procedura guidata in cinque passi (la scuola carica il PDF firmato → tu scarichi, protocolli e registri il protocollo in entrata → il Direttore riceve l'email e firma → tu scarichi il firmato, protocolli e registri il protocollo → il sistema registra la convenzione e conferma le prenotazioni). In cima il <strong>Direttore che firma</strong> (si imposta qui, vale per tutto il portale).</li>
+<li><strong>Da stipulare</strong>, <strong>Convenzioni in vigore / scadute</strong> e <strong>Iscrizioni senza convenzione</strong>: una card per scuola con Allegato A e Convenzione già precompilati, registro per scuola, verifica.</li>
+<li><strong>Verifica iscrizioni</strong> e <strong>Valutazioni</strong> della struttura ospitante.</li>
+<li><strong>Report FSL</strong> (nuovo): per ogni scuola attività, classi, studenti, ore di formazione, con Excel a quattro fogli (riepilogo, per scuola, per attività, ore per studente).</li></ul>
+<div class="coppia"><figure><img src="schermate/map_adm_fsl_riepilogo.png" alt=""><figcaption>Riepilogo.</figcaption></figure><figure><img src="schermate/map_adm_fsl_report.png" alt=""><figcaption>Report FSL.</figcaption></figure>
+<figure><img src="schermate/map_adm_fsl_stipulare.png" alt=""><figcaption>Da stipulare.</figcaption></figure></div>
+<h4>Convenzioni da seguire: le quattro situazioni</h4>
+<div class="coppia"><figure><img src="schermate/fsl_iter_1_da_prendere.png" alt=""><figcaption>② La scuola ha caricato: scarichi, protocolli, scrivi numero e data.</figcaption></figure><figure><img src="schermate/fsl_iter_2_dal_direttore.png" alt=""><figcaption>③ Dal Direttore: puoi rimandare il link.</figcaption></figure>
+<figure><img src="schermate/fsl_iter_3_da_registrare.png" alt=""><figcaption>④ Firmata: protocollo definitivo e validità, poi «Registra».</figcaption></figure><figure><img src="schermate/fsl_iter_4_registrata.png" alt=""><figcaption>⑤ Registrata: prenotazioni confermate.</figcaption></figure></div></div>
+<div class="pagina" style="--c:#b30000"><h4>Anagrafe delle scuole</h4><div class="meta"><code>admin/scuole.php</code></div><p>Elenco ufficiale del Ministero (statali e paritarie): si carica il file open data; i moduli lo usano per scegliere la scuola con regione/provincia/comune.</p><figure><img src="schermate/map_adm_scuole.png" alt=""></figure></div>
+
+<h3 id="p-ris" style="color:#7c3aed">Modulo Prenotazioni e risorse</h3>
+<div class="pagina" style="--c:#7c3aed"><h4>Risorse e prenotazioni</h4><div class="meta"><code>admin/risorse.php</code> · <code>admin/prenotazioni_risorse.php</code></div>
+<p><strong>Risorse</strong>: aule, laboratori, sportelli, auto con orari settimanali, durata slot, preavviso, chi può prenotare, approvazione, responsabili (dall'anagrafe), campi e contatori personalizzati, scadenze (bollo, assicurazione…), diario di bordo. <strong>Prenotazioni</strong>: agenda e lista, approvazione, ripetizioni, liste d'attesa.</p>
+<div class="coppia"><figure><img src="schermate/map_adm_risorse.png" alt=""></figure><figure><img src="schermate/adm_prenotazioni.png" alt=""></figure><figure><img src="schermate/resp_cruscotto.png" alt=""><figcaption>Cruscotto del responsabile.</figcaption></figure><figure><img src="schermate/resp_diario.png" alt=""><figcaption>Diario di bordo di un mezzo.</figcaption></figure></div></div>
+
+<h3 id="p-did" style="color:#047857">Modulo Didattica</h3>
+<div class="pagina" style="--c:#047857"><h4>Pratiche degli studenti</h4><div class="meta"><code>admin/didattica.php?tab=pratiche</code> · <code>admin/didattica_pratiche.php</code></div>
+<p>La coda degli uffici: ogni pratica ha <strong>iter</strong> (passaggi a un ufficio, a una persona o al Direttore), istruttoria, integrazioni con lo studente, messaggi, marche da bollo, protocollo, firme PAdES, Excel e Word. Chi ha avuto in carico la pratica continua a vederla nel filtro «Passate ad altri uffici».</p>
+<div class="coppia"><figure><img src="schermate/map_adm_did_pratiche.png" alt=""></figure><figure><img src="schermate/proto_scheda.png" alt=""><figcaption>La scheda di una pratica.</figcaption></figure></div></div>
+<div class="pagina" style="--c:#047857"><h4>Sedute e verbali</h4><div class="meta"><code>admin/didattica.php?tab=sedute</code> · <code>didattica_sedute.php</code> · <code>didattica_archivio.php</code> · <code>didattica_accessi.php</code></div>
+<p>I 5 consigli dei corsi di studio, con referenti e componenti; per ogni seduta: convocazione per email, giustifica assenze, presenze, pratiche con esiti e delibere, <strong>verbale punto per punto</strong> (Word con testata del Dipartimento), firma di segretario e coordinatore, estratto allo studente. <strong>Archivio dei verbali</strong> (anche PDF storici, ricerca nel testo) e <strong>accessi con password</strong> alla pagina pubblica.</p>
+<div class="coppia"><figure><img src="schermate/map_adm_did_sedute.png" alt=""></figure><figure><img src="schermate/ref_seduta.png" alt=""><figcaption>Una seduta.</figcaption></figure></div></div>
+<div class="pagina" style="--c:#047857"><h4>Moduli e documenti</h4><div class="meta"><code>admin/didattica.php?tab=moduli</code> · <code>didattica_moduli.php</code></div>
+<p>Creazione guidata (7 passi) dei moduli online: campi, tabelle con insegnamenti dal catalogo di Ateneo, logica condizionale, iter, verbale, anteprima. Moduli pronti per certificati, tesi, convalide, piano di studi…</p><figure><img src="schermate/map_adm_did_moduli.png" alt=""></figure></div>
+<div class="pagina" style="--c:#047857"><h4>Ufficio e ricevimento · Statistiche</h4><div class="meta"><code>didattica_ufficio.php</code> · <code>didattica_statistiche.php</code></div>
+<p>Uffici e operatori (scelti dall'anagrafe), sportello di ricevimento. Statistiche per modulo, per corso di studio e tempi dell'iter.</p>
+<div class="coppia"><figure><img src="schermate/map_adm_did_ufficio.png" alt=""></figure><figure><img src="schermate/map_adm_did_statistiche.png" alt=""></figure></div></div>
+<div class="pagina" style="--c:#047857"><h4>Tutorato</h4><div class="meta"><code>admin/tutorato.php</code></div>
+<p>Bando con decreti, import dei vincitori dal Word, lettere di incarico (Word/PDF), iter: email → accettazione con SPID/CIE → firma del docente e del Direttore → registro delle attività → dichiarazione di fine attività → pagamenti. Solleciti automatici delle firme ferme.</p><figure><img src="schermate/map_adm_tutorato.png" alt=""></figure></div>
+
+<h3 id="p-por" style="color:#334155">Modulo Gestione del portale</h3>
+<div class="pagina" style="--c:#334155"><h4>Anagrafi</h4><div class="meta"><code>admin/anagrafe_personale.php</code> · <code>anagrafe_docenti.php</code> · <code>anagrafe_pta.php</code> · <code>anagrafe_insegnamenti.php</code> · <code>cerca_personale.php</code></div>
+<p>Docenti, personale tecnico-amministrativo, insegnamenti e corsi di studio, letti ogni settimana dalle API pubbliche di Ateneo. Servono a: scegliere referenti e responsabili, abilitare i gestori anche prima del loro primo accesso, collegare chi accede all'anagrafe, pagine pubbliche dei docenti.</p>
+<div class="coppia"><figure><img src="schermate/map_adm_anagrafe_docenti.png" alt=""></figure><figure><img src="schermate/map_adm_anagrafe_strutture.png" alt=""><figcaption>Strutture da aggiornare.</figcaption></figure></div></div>
+<div class="pagina" style="--c:#334155"><h4>Aree · Nuova area</h4><div class="meta"><code>admin/aree.php</code> · <code>nuova_area.php</code></div>
+<p>Crea un'area scegliendo il tipo (eventi, Formazione Scuola Lavoro, aule/laboratori, gruppi degli insegnamenti): titolo, indirizzo, colore, layout. Compare nel menu con «Organizzazione proposta».</p><figure><img src="schermate/map_adm_nuova_area.png" alt=""></figure></div>
+<div class="pagina" style="--c:#334155"><h4>Sito pubblico: Testata e home · Menu</h4><div class="meta"><code>admin/testata.php</code> · <code>admin/menu.php</code></div><p>Vedi sezione 3.</p></div>
+<div class="pagina" style="--c:#334155"><h4>Utenti e abilitazioni · Uffici di Ateneo</h4><div class="meta"><code>admin/utenti.php</code> · <code>uffici_ateneo.php</code></div>
+<p><strong>Utenti</strong>: ruoli (Admin, Gestore, Studente, Dipendente, Ospite) e abilitazioni per perimetro (tutta un'area, tutti i progetti/eventi, attività scelte, FSL, Didattica…). Si può abilitare una persona dall'anagrafe prima del suo primo accesso. <strong>Uffici di Ateneo</strong>: es. «Ufficio pagamenti tutorato», con le persone associate.</p>
+<div class="coppia"><figure><img src="schermate/map_adm_utenti.png" alt=""></figure><figure><img src="schermate/map_adm_uffici.png" alt=""></figure></div></div>
+<div class="pagina" style="--c:#334155"><h4>Sistema e registri · Messaggi</h4><div class="meta"><code>admin/sistema.php</code> · <code>audit_log.php</code> · <code>log_accessi.php</code> · <code>messaggi.php</code> · <code>cron_backup.php</code></div>
+<p><strong>Sistema</strong>: SMTP e modelli email, registro degli invii, email di prova, controllo automatico del sito («Controlla ora»), stato dei backup. <strong>Registro operazioni</strong> (audit): chi ha fatto cosa. <strong>Accessi</strong>. <strong>Messaggi</strong>: la casella centralizzata come ticket.</p>
+<div class="coppia"><figure><img src="schermate/map_adm_sistema.png" alt=""></figure><figure><img src="schermate/map_adm_audit.png" alt=""></figure></div></div>
+
+<!-- ======================================================================================= -->
+<h2 id="flussi">8 · I flussi, dall'inizio alla fine</h2>
+<h3>Una pratica dello studente (es. certificato di laurea)</h3>
+<ol class="passi">
+<li><div>Lo studente apre <strong>Modulistica</strong> (<code>modulistica.php</code>), sceglie il modulo e lo compila (<code>modulo.php</code>). Nasce la pratica in <strong>Le mie pratiche</strong>.</div></li>
+<li><div>Se serve, paga le marche da bollo; la pratica resta in bozza/attesa finché non sono a posto.</div></li>
+<li><div>La pratica entra nella coda dell'ufficio (<strong>Didattica → Pratiche</strong>): l'operatore la prende in carico, chiede integrazioni, la smista ad altri uffici.</div></li>
+<li><div>Se il modulo lo prevede: conferma del docente (link per email), firma del relatore/Direttore (<code>firma_pratica.php</code>), passaggio in seduta del consiglio per l'esito.</div></li>
+<li><div>Protocollo in uscita e PDF finale allo studente; email solo ai passaggi importanti. Tutto resta tracciato nell'iter.</div></li>
+</ol>
+<h3>Formazione Scuola Lavoro</h3>
+<ol class="passi">
+<li><div>La scuola prenota l'attività dalla pagina FSL (dati della classe, scuola dall'anagrafe del Ministero) o raccoglie più attività nel <strong>Programma</strong>.</div></li>
+<li><div>Se non c'è la convenzione: scarica Convenzione e Allegato A precompilati, li firma e li carica (<code>convenzione_online.php</code>); l'ufficio la prende in carico e la protocolla; il Direttore firma (link nell'email).</div></li>
+<li><div>Il docente carica <strong>elenco studenti</strong> e <strong>autorizzazione</strong> (<code>elenco_studenti.php</code>) entro la scadenza; il cron manda i promemoria.</div></li>
+<li><div>Il giorno dell'attività: presenze registrate (QR o manuale).</div></li>
+<li><div>A fine attività: attestati con il nome della scuola, scheda di <strong>valutazione</strong> della struttura (link al docente), poi <strong>Report FSL</strong> con ore e studenti per scuola.</div></li>
+</ol>
+<h3>Un evento (es. OpenLab)</h3>
+<ol class="passi">
+<li><div>Il gestore crea l'evento con turni e posti (<em>Eventi e turni</em>), eventuale modulo di iscrizione e sondaggio.</div></li>
+<li><div>Gli utenti lo trovano in agenda/area, prenotano (lista d'attesa se pieno), ricevono email e ricevuta QR.</div></li>
+<li><div>In aula: scanner QR o self check-in; il gestore vede i presenti in tempo reale.</div></li>
+<li><div>Dopo l'evento il cron invia attestato e sondaggio; l'evento passa in archivio; i numeri finiscono nel <strong>Report per ambito</strong>.</div></li>
+</ol>
+<h3>Una prenotazione di risorsa</h3>
+<ol class="passi">
+<li><div>L'utente sceglie aula/laboratorio/auto, vede il calendario a slot e prenota (anche ripetuto).</div></li>
+<li><div>Se serve approvazione, il responsabile riceve l'avviso e approva da <em>Le mie risorse</em>. Slot occupato → lista d'attesa con 24 ore per confermare.</div></li>
+<li><div>Per i mezzi: dopo l'uso si compila il <strong>diario di bordo</strong>; il cruscotto mostra km, consumi e scadenze.</div></li>
+</ol>
+<h3>Tutorato</h3>
+<ol class="passi">
+<li><div>L'ufficio crea il bando e importa i vincitori; per ognuno prepara la lettera di incarico.</div></li>
+<li><div>Il tutor accetta con SPID/CIE e compila la dichiarazione; firmano docente e Direttore.</div></li>
+<li><div>Il tutor aggiorna il <strong>registro</strong>; il docente approva; a fine periodo dichiarazione di fine attività e pagamento.</div></li>
+</ol>
+
+<!-- ======================================================================================= -->
+<h2 id="ruoli">9 · Chi può fare cosa</h2>
+<div class="scorre"><table>
+<thead><tr><th>Ruolo</th><th>Cosa vede</th></tr></thead><tbody>
+<tr><td><strong>Super amministratore</strong></td><td>Tutto il pannello, tutte le aree, utenti, sistema, anagrafi.</td></tr>
+<tr><td><strong>Gestore area/evento</strong></td><td>Solo le aree (o i progetti/eventi) per cui è abilitato; può avere anche i moduli FSL o Didattica.</td></tr>
+<tr><td><strong>Ufficio protocollo / ufficio del corso / internazionalizzazione</strong></td><td>Le pratiche del proprio ufficio nel modulo Didattica.</td></tr>
+<tr><td><strong>Referente del consiglio</strong></td><td>Sedute e verbali del proprio consiglio.</td></tr>
+<tr><td><strong>Responsabile di risorsa</strong></td><td>«Le mie risorse» dall'Area personale, senza accesso al pannello.</td></tr>
+<tr><td><strong>Direttore</strong></td><td>Cruscotto, documenti da firmare.</td></tr>
+<tr><td><strong>Studente / Dipendente / Ospite</strong></td><td>Sito pubblico e Area personale con le sole card pertinenti.</td></tr>
+</tbody></table></div>
+<p>Per la lettura passo passo di ogni ruolo ci sono le <strong>dieci guide «Come si fa»</strong> (pagina <code>guida.php</code>, PDF in <code>documentazione/guide/</code>).</p>
+
+<!-- ======================================================================================= -->
+<h2 id="auto">10 · Cosa fa da solo (cron) e le email</h2>
+<p class="sotto">Il file <code>cron_background.php</code> va richiamato ogni 15 minuti dal server (<code>admin/cron_backup.php</code> una volta al giorno). Esegue:</p>
+<div class="scorre"><table>
+<thead><tr><th>Automatismo</th><th>Cosa succede</th></tr></thead><tbody>
+<tr><td>Archiviazione</td><td>Gli eventi finiti vanno in archivio</td></tr>
+<tr><td>Post-evento</td><td>Attestati e sondaggi per email</td></tr>
+<tr><td>Elenco studenti e FSL</td><td>Promemoria al docente per elenco, autorizzazione, convenzione in scadenza, scheda di valutazione</td></tr>
+<tr><td>Firme ferme</td><td>Solleciti a docenti, Direttore, segretario e coordinatore</td></tr>
+<tr><td>Tutorato e risorse</td><td>Promemoria registro, scadenze di bollo/assicurazione, lista d'attesa, diario di bordo</td></tr>
+<tr><td>«Da fare per te»</td><td>Riepilogo del mercoledì a chi ha cose in attesa</td></tr>
+<tr><td>Privacy</td><td>Cancella i nomi degli studenti e i dati oltre i tempi di conservazione</td></tr>
+<tr><td>Controllo del sito (di notte)</td><td>Verifica database, cartelle, spazio, backup, pagine; email agli admin solo se qualcosa non va</td></tr>
+<tr><td>Anagrafe (settimanale)</td><td>Aggiorna docenti, personale e corsi dalle API di Ateneo</td></tr>
+<tr><td>Backup</td><td>Database e file, copia sul NAS e verifica di rilettura</td></tr>
+<tr><td>Riepilogo agli amministratori</td><td>Report settimanale delle email inviate</td></tr>
+</tbody></table></div>
+
+<!-- ======================================================================================= -->
+<h2 id="file">11 · Dove sono i file</h2>
+<p class="sotto">Utile quando si carica sul server o si cerca il punto in cui cambiare qualcosa. Il dettaglio dei pacchetti da caricare è in <code>mappa_file_da_caricare.html</code>.</p>
+<div class="albero">sito_claude/                      ← la cartella del portale sul server
+├─ *.php                       pagine del sito pubblico e dell'Area personale (sezioni 4-6)
+├─ admin/                      pannello di gestione (sezione 7)
+├─ src/                        la logica, divisa per tema (classi PHP):
+│   ├─ Core/        contenitore, database, schema (Definizioni.php = tutte le tabelle), versioni
+│   ├─ Auth/        accesso, ruoli, abilitazioni, SPID/CIE
+│   ├─ Eventi/ Iscrizioni/ Iscritti/ Attestati/ Sondaggi/ Avvisi/   eventi, prenotazioni, presenze, attestati
+│   ├─ Fsl/         Formazione Scuola Lavoro: convenzioni, Allegato A, valutazioni, Report FSL
+│   ├─ Risorse/     aule, laboratori, auto, lista d'attesa, diario di bordo
+│   ├─ Didattica/   moduli, pratiche, iter, sedute, verbali, convalide
+│   ├─ Tutorato/    bandi, lettere, registro, pagamenti
+│   ├─ Anagrafi/ Ateneo/   personale, corsi, scuole da Ateneo e Ministero
+│   ├─ Portale/     home, menu, aree, Da fare per te, cruscotto Direttore, guide per ruolo
+│   ├─ Sistema/     email, backup, controlli, registro operazioni
+│   └─ Infrastructure/  PDF, Word, Excel, firme, email
+├─ inc/                        funzioni condivise dalle pagine (le «colle» tra pagine e src/)
+├─ assets/                     css, js, font, modelli Word, immagini delle guide (assets/guide)
+├─ modelli_documenti/          modelli dei documenti (bloccata al web)
+├─ uploads/                    file caricati (cartelle riservate bloccate al web)
+├─ database/schema.sql         schema di partenza; le novità si applicano da sole (cache/schema_vNN.ok)
+├─ cache/  backups/            file temporanei e copie di sicurezza (bloccate al web)
+├─ documentazione/             mappe, piano, guide PDF, schermate (NON va sul server)
+├─ strumenti/                  ambiente locale di prova, schermate, ripristino backup (NON va sul server)
+├─ tests/                      prove automatiche (NON vanno sul server)
+└─ .env                        impostazioni riservate del server (SMTP, chiavi, cron…): mai sovrascrivere</div>
+<div class="nota">Regola pratica: <strong>una pagina</strong> in radice o in <code>admin/</code> mostra e raccoglie dati; la <strong>logica</strong> sta in <code>src/</code>; le <strong>tabelle</strong> si definiscono solo in <code>src/Core/Schema/Definizioni.php</code>. Per caricare un aggiornamento si copiano i file indicati nel pacchetto e si apre una pagina del pannello: lo schema si aggiorna da solo.</div>
+
+<!-- ======================================================================================= -->
+<h2 id="presenta">12 · Come presentarlo ad altri (scaletta di 10 minuti)</h2>
+<ol class="passi">
+<li><div><strong>Il problema</strong> (1′): fogli Excel, email, moduli cartacei, firme da inseguire. Il portale mette tutto in un posto con un iter tracciato.</div></li>
+<li><div><strong>Il sito pubblico</strong> (2′): home → agenda → scheda evento → prenotazione. Mostra il menu e la ricerca.</div></li>
+<li><div><strong>L'Area personale</strong> (2′): accedi come studente (pratiche), come docente («Da fare per te»), come Direttore (cruscotto).</div></li>
+<li><div><strong>Una pratica</strong> (2′): dal modulo alla firma: le sezioni «Pratiche» del pannello e l'iter.</div></li>
+<li><div><strong>FSL e risorse</strong> (2′): convenzione e Report FSL; calendario di un'aula con lista d'attesa.</div></li>
+<li><div><strong>Sicurezza e governance</strong> (1′): ruoli, abilitazioni, registro delle operazioni, backup verificati, privacy (cancellazione automatica dei dati).</div></li>
+</ol>
+<h3>Parole da conoscere</h3>
+<div class="scorre"><table><tbody>
+<tr><td><strong>Area</strong></td><td>Una sezione del sito con colore e indirizzo propri (OpenLab, FSL, Aule e laboratori…). Ha un tipo che decide cosa può contenere.</td></tr>
+<tr><td><strong>Ambito</strong></td><td>L'argomento di un evento: Orientamento, Ricerca, Public engagement, Didattica.</td></tr>
+<tr><td><strong>Turno</strong></td><td>Una data/orario prenotabile di un evento, con posti.</td></tr>
+<tr><td><strong>Progetto</strong></td><td>Evento complesso con ore, moduli, edizioni (es. un'attività FSL).</td></tr>
+<tr><td><strong>Pratica</strong></td><td>Una richiesta di uno studente creata da un modulo online, che percorre un iter.</td></tr>
+<tr><td><strong>Iter</strong></td><td>La sequenza dei passaggi (ufficio, persona, Direttore, seduta) di una pratica.</td></tr>
+<tr><td><strong>PAdES</strong></td><td>Firma digitale dentro il PDF, richiesta per convenzioni, lettere, verbali.</td></tr>
+<tr><td><strong>Link personale</strong></td><td>Indirizzo con codice che arriva per email e permette di agire senza cercare nel sito.</td></tr>
+<tr><td><strong>Modulo (del pannello)</strong></td><td>Una delle cinque aree di gestione, ciascuna con un colore.</td></tr>
+</tbody></table></div>
+
+<p class="sotto" style="margin-top:50px">Le schermate si rifanno con <code>php -d extension=gd strumenti/locale/schermate_mappa.php</code> sull'ambiente di prova (vedi <code>strumenti/locale/avvia.sh</code>).</p>
+</main>
+</div>
+<div class="lightbox" id="lb"><img alt=""></div>
+<button class="tema" id="tema" type="button">Chiaro / scuro</button>
+<script>
+// Indice laterale dai titoli h2/h3
+(function () {
+  var nav = document.getElementById("indice"), html = '<b>Mappa del portale</b>';
+  document.querySelectorAll("main h2, main h3[id]").forEach(function (h) {
+    if (h.tagName === "H2") html += '<a href="#' + h.id + '"><strong>' + h.textContent + "</strong></a>";
+    else html += '<a href="#' + h.id + '" style="padding-left:22px;font-size:.84rem">' + h.textContent.replace(/^Modulo /, "") + "</a>";
+  });
+  nav.innerHTML = html;
+  var lb = document.getElementById("lb");
+  document.querySelectorAll("figure img").forEach(function (i) { i.addEventListener("click", function () { lb.querySelector("img").src = i.src; lb.classList.add("on"); }); });
+  lb.addEventListener("click", function () { lb.classList.remove("on"); });
+  document.getElementById("tema").addEventListener("click", function () {
+    var r = document.documentElement, scuro = r.dataset.theme === "dark" || (!r.dataset.theme && matchMedia("(prefers-color-scheme: dark)").matches);
+    r.dataset.theme = scuro ? "light" : "dark";
+  });
+})();
+</script>
+</body>
+</html>

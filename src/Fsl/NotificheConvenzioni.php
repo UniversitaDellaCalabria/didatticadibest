@@ -61,7 +61,7 @@ final class NotificheConvenzioni
     public function firmataCaricata(string $scuola, string $firmatario, bool $sostituita, array $destinatari): int
     {
         $h = static fn ($s): string => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
-        $link = $this->sito->urlBase() . '/admin/fsl.php?tab=convenzioni';
+        $link = $this->sito->urlBase() . '/admin/fsl.php?tab=iter';
         $corpo = '<p>La scuola <strong>' . $h($scuola) . '</strong> ha ' . ($sostituita ? 'caricato una <strong>nuova versione</strong> della' : 'caricato la') . ' convenzione firmata'
                . ($firmatario !== '' ? ' (firma di <strong>' . $h($firmatario) . '</strong>)' : '') . '.</p>'
                . '<p>Va <strong>protocollata in entrata</strong>: scarica il PDF, protocollalo e registra solo il numero nel portale (senza ricaricare il file). Subito dopo la convenzione va in automatico al Direttore per la firma.</p>'
@@ -145,7 +145,7 @@ final class NotificheConvenzioni
      */
     public function firmataDalDirettore(string $scuola, array $destinatari): int
     {
-        $link = $this->sito->urlBase() . '/admin/fsl.php?tab=convenzioni';
+        $link = $this->sito->urlBase() . '/admin/fsl.php?tab=iter';
         $corpo = '<p>Il Direttore ha <strong>firmato</strong> la convenzione con <strong>' . $this->h($scuola) . '</strong>.</p>'
                . '<p>Ora va <strong>protocollata in via definitiva</strong>: scarica il PDF firmato, protocollalo, poi nel portale registra numero e data e carica il PDF protocollato. Le prenotazioni in attesa della scuola si confermano alla registrazione.</p>'
                . "<p style='margin-top:15px;'><a href='" . $this->h($link) . "' style='background:#B80000; color:#ffffff; padding:10px 18px; text-decoration:none; border-radius:6px; font-weight:bold;'>Apri le convenzioni</a></p>";

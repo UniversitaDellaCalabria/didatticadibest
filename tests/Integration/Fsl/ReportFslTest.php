@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Integration\Fsl;
 
-use App\Fsl\ReportPcto;
+use App\Fsl\ReportFsl;
 
-/** Report PCTO: ore e studenti per scuola, per attività e per studente nell'anno scolastico. */
-final class ReportPctoTest extends FslBase
+/** Report FSL: ore e studenti per scuola, per attività e per studente nell'anno scolastico. */
+final class ReportFslTest extends FslBase
 {
     protected function setUp(): void
     {
@@ -18,7 +18,7 @@ final class ReportPctoTest extends FslBase
 
     private function report(): array
     {
-        return $this->servizio(ReportPcto::class)->dati('2026-09-01', '2027-08-31');
+        return $this->servizio(ReportFsl::class)->dati('2026-09-01', '2027-08-31');
     }
 
     public function testNumeriPerScuolaEAttivita(): void
@@ -51,7 +51,7 @@ final class ReportPctoTest extends FslBase
     public function testFuoriAnnoScolasticoENonFsl(): void
     {
         $this->pren(100, ['presente' => 1]);
-        $this->assertSame(0, $this->servizio(ReportPcto::class)->dati('2025-09-01', '2026-08-31')['totali']['classi']);
+        $this->assertSame(0, $this->servizio(ReportFsl::class)->dati('2025-09-01', '2026-08-31')['totali']['classi']);
         $this->db->esegui('UPDATE progetti_dettagli SET convenzione = 0 WHERE evento_id = 10');
         $this->assertSame(0, $this->report()['totali']['classi'], 'senza convenzione non è FSL');
     }
@@ -62,7 +62,7 @@ final class ReportPctoTest extends FslBase
             $this->markTestSkipped('ZipArchive non disponibile');
         }
         $this->pren(200, ['presente' => 1]);
-        $r = $this->servizio(ReportPcto::class);
+        $r = $this->servizio(ReportFsl::class);
         $f = $r->esporta($r->dati('2026-09-01', '2027-08-31'), '2026/2027');
         $this->assertNotNull($f);
         $this->assertFileExists($f);

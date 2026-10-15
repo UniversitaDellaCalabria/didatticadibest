@@ -99,7 +99,7 @@ final class ConvenzioneFirmataTest extends FslBase
         $avviso = array_values(array_filter($this->mailer->inviate, static fn (array $m): bool => $m['a'] === 'conv@x.it'))[0];
         $this->assertStringContainsString('Liceo Galilei', $avviso['oggetto']);
         $this->assertStringContainsString('Maria Rossi', $avviso['corpo']);
-        $this->assertStringContainsString('admin/fsl.php?tab=convenzioni', $avviso['corpo']);
+        $this->assertStringContainsString('admin/fsl.php?tab=iter', $avviso['corpo']);
     }
 
     public function testRifiutaFileCheNonVannoBene(): void

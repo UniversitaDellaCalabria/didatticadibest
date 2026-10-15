@@ -74,7 +74,7 @@ try {
     });
     if ($puo_fsl_convenzioni) $sicuro('convenzioni caricate', function () use (&$cose, $cdf) {
         $n_cf = $cdf->convenzioniDaPrendereInCarico();
-        if ($n_cf > 0) $cose[] = ['fsl', $n_cf, $n_cf === 1 ? 'Convenzione della scuola da seguire' : 'Convenzioni delle scuole da seguire', 'Formazione Scuola Lavoro · caricate dalle scuole: da prendere in carico, far firmare al Direttore e protocollare', 'fsl.php?tab=convenzioni', true];
+        if ($n_cf > 0) $cose[] = ['fsl', $n_cf, $n_cf === 1 ? 'Convenzione della scuola da seguire' : 'Convenzioni delle scuole da seguire', 'Formazione Scuola Lavoro · caricate dalle scuole: da prendere in carico, far firmare al Direttore e protocollare', 'fsl.php?tab=iter', true];
     });
     if ($puo_fsl_convenzioni) $sicuro('convenzioni da stipulare', function () use (&$cose, $conn) {
         $n_st = count(array_filter(\App\Core\App::per($conn)->get(\App\Fsl\ServizioConvenzioniScuole::class)->scuole(), fn($g) => $g['da_stipulare']));

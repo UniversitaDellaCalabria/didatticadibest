@@ -10,11 +10,11 @@ use App\Eventi\Progetti;
 use App\Infrastructure\Documenti\Excel;
 
 /**
- * Report della Formazione Scuola Lavoro (PCTO) per anno scolastico: per ogni scuola quante attività, classi e studenti e quante ore di formazione hanno fatto
+ * Report della Formazione Scuola Lavoro (FSL) per anno scolastico: per ogni scuola quante attività, classi e studenti e quante ore di formazione hanno fatto
  * gli studenti presenti (ore dell'attività × studenti presenti); per attività; e, quando l'elenco dei nomi è stato inserito, le ore di ogni studente, utili alla
  * scuola per certificare il percorso. Non scrive nulla: legge le prenotazioni delle attività FSL (con la convenzione), confermate. Excel con tre fogli.
  */
-final class ReportPcto
+final class ReportFsl
 {
     public function __construct(private Database $db)
     {
