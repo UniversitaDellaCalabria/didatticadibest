@@ -252,6 +252,11 @@ final class Definizioni
             motivo VARCHAR(500) DEFAULT '', accesso_json TEXT DEFAULT NULL, solleciti TINYINT NOT NULL DEFAULT 0, sollecito_il DATETIME DEFAULT NULL,
             UNIQUE KEY uq_token (token), INDEX idx_pratica (pratica_id, stato), INDEX idx_email (email)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        // v69: riepilogo settimanale «Da fare per te» per email: chi non lo vuole (escluso), il suo link personale per disiscriversi, quando è stato mandato e la settimana (anno-numero) dell'ultimo controllo
+        'riepilogo_persone' => "CREATE TABLE IF NOT EXISTS riepilogo_persone (
+            email VARCHAR(150) NOT NULL PRIMARY KEY, token VARCHAR(40) NOT NULL, escluso TINYINT(1) NOT NULL DEFAULT 0, ultimo_invio DATETIME DEFAULT NULL, settimana VARCHAR(8) NOT NULL DEFAULT '',
+            UNIQUE KEY uq_token (token)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         // v57: pagina pubblica dei verbali con password: accessi (una password per gruppo di esterni, con i consigli che possono vedere e la scadenza)
         // e registro di chi è entrato e cosa ha scaricato (IP con l'ultimo numero azzerato)
         'verbali_accessi' => "CREATE TABLE IF NOT EXISTS verbali_accessi (

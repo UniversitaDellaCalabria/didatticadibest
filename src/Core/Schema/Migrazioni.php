@@ -17,7 +17,7 @@ use Closure;
 final class Migrazioni
 {
     /** 66: nessuna tabella nuova; fa rifare i dati di partenza dei moduli (certificato unico, immatricolazioni e trasferimenti, pratiche di carriera). */
-    public const VERSIONE = 68;
+    public const VERSIONE = 69;
 
     /**
      * @param list<string> $gruppiPersonale gruppi assegnati al login in base al ruolo in Ateneo (GRUPPI_PERSONALE)

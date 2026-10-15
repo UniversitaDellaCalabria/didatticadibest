@@ -38,6 +38,7 @@ require_once 'header.php';
                 <div class="d-flex align-items-center gap-2 text-success fw-bold fs-5 mb-3"><i class="fa fa-circle-check fs-3" aria-hidden="true"></i>Attestato valido</div>
                 <dl class="row mb-0">
                     <dt class="col-sm-4 text-secondary">Rilasciato a</dt><dd class="col-sm-8 fw-bold fs-5"><?php echo h(mb_strtoupper($dati['nome'])); ?><?php if (!empty($dati['anonimizzato'])): ?><div class="small fw-normal text-secondary">Per la tutela della privacy, trascorsi <?php echo (int)MESI_CONSERVAZIONE_STUDENTI; ?> mesi dalla fine del progetto si conservano solo le iniziali: confrontale con il nome stampato sull'attestato.</div><?php endif; ?></dd>
+                    <?php if (!empty($dati['scuola'])): ?><dt class="col-sm-4 text-secondary">Scuola</dt><dd class="col-sm-8"><?php echo h($dati['scuola'] . (!empty($dati['scuola_comune']) ? ' di ' . $dati['scuola_comune'] : '')); ?></dd><?php endif; ?>
                     <dt class="col-sm-4 text-secondary">Attività</dt><dd class="col-sm-8 fw-semibold"><?php echo h($dati['evento']); ?></dd>
                     <?php if ($dati['quando'] !== ''): ?><dt class="col-sm-4 text-secondary">Periodo</dt><dd class="col-sm-8"><?php echo h($dati['quando']); ?></dd><?php endif; ?>
                     <?php if ($dati['ore'] !== ''): ?><dt class="col-sm-4 text-secondary">Ore</dt><dd class="col-sm-8"><?php echo h($dati['ore']); ?></dd><?php endif; ?>

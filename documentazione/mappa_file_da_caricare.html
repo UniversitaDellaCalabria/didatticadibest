@@ -750,6 +750,10 @@ var PACCHETTI = [
         ["admin/cron_backup.php", "mod", "F3", "verifica del database e dello ZIP dopo ogni backup, avviso se manca spazio"],
         ["src/Sistema/Backup/VerificaBackup.php", "nuovo", "F3", "rilegge il backup per intero"]
       ]},
+      { cartella: "admin/ e src/Fsl/ (correzione)", file: [
+        ["admin/iscritti.php", "mod", "correzione", "un link con il codice di una prenotazione apre da solo l'archivio se l'attività è archiviata"],
+        ["src/Fsl/PannelloRepository.php", "mod", "correzione", "le prenotazioni del pannello FSL portano anche se l'attività è archiviata"]
+      ]},
       { cartella: "src/Portale/ e src/Risorse/", file: [
         ["src/Portale/CruscottoDirettore.php", "nuovo", "F1", "i nove gruppi del cruscotto"],
         ["src/Portale/GuidePerRuolo.php", "nuovo", "F4", "il testo delle guide"],
@@ -776,6 +780,71 @@ var PACCHETTI = [
     ],
     nonServe: "Non vanno sul server: <code>tests/…</code>, <code>materiali/…</code>, <code>documentazione/…</code> e le altre cartelle di <code>strumenti/</code> (solo <code>strumenti/ripristina_backup.php</code>, se vuoi usarlo sul server).",
     commit: "Cruscotto del Direttore, prenotazioni ripetute e liste d'attesa, verifica e ripristino dei backup, guide per ruolo"
+  },
+  {
+    id: "attestato-fsl",
+    titolo: "Pacchetto 17 · Attestato della Formazione Scuola Lavoro con la scuola",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare",
+    schema: "v68 (nessuna novità)",
+    riassunto: "L'attestato delle attività di <strong>Formazione Scuola Lavoro</strong> è diverso da quello degli eventi: ha la fascia «Formazione Scuola Lavoro», riporta il <strong>nome della scuola e il comune</strong> dello studente («studente/studentessa dell'Istituto … di …») e il titolo comincia con «Formazione Scuola Lavoro:». Gli attestati degli eventi restano uguali. La scuola compare anche nella verifica pubblica del codice.",
+    passi: [["F5", "Attestato FSL con il nome della scuola"]],
+    cartelle: [
+      { cartella: "/ (radice del portale)", file: [
+        ["verifica_attestato.php", "mod", "F5", "la verifica pubblica mostra anche la scuola"]
+      ]},
+      { cartella: "src/Attestati/", file: [
+        ["src/Attestati/DatiAttestato.php", "mod", "F5", "dati dell'attestato con la scuola (nome in minuscolo con le iniziali, comune)"],
+        ["src/Attestati/AttestatoRepository.php", "mod", "F5", "legge scuola e comune della prenotazione"],
+        ["src/Attestati/Vista/PaginaAttestati.php", "mod", "F5", "impaginazione dell'attestato FSL"]
+      ]}
+    ],
+    dopo: [
+      "Non serve nessuna operazione: gli attestati FSL (attività con la convenzione) escono già nel nuovo formato, quelli degli eventi no.",
+      "<strong>Controlla la scuola:</strong> il nome arriva dalla scuola scelta nella prenotazione (anagrafe delle scuole). Se la prenotazione ha la scuola scritta a mano, si stampa quel testo senza il comune.",
+      "<strong>Prova:</strong> apri l'attestato di uno studente di un progetto FSL già concluso (attestati di gruppo) e controlla scuola, titolo e ore."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Attestato della Formazione Scuola Lavoro con fascia, nome della scuola e comune; la scuola compare anche nella verifica pubblica"
+  },
+  {
+    id: "da-fare-report",
+    titolo: "Pacchetto 18 · «Da fare per te», riepilogo settimanale e Report PCTO",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare",
+    schema: "v69 (nuova tabella riepilogo_persone)",
+    riassunto: "Tre novità. <strong>1) «Da fare per te»</strong> nell'Area personale: ognuno vede le cose che aspettano lui (attestati da confermare, firme, registri e lettere del tutorato, schede di valutazione FSL e elenchi degli studenti da compilare, prenotazioni di risorse da approvare, verbali da firmare, pratiche da lavorare), con il link per farle e i giorni di attesa. <strong>2) Riepilogo settimanale:</strong> il mercoledì mattina arriva la stessa lista per email, solo a chi ha qualcosa da fare (il Direttore trova anche il cruscotto), con il link per non riceverlo più. <strong>3) Report PCTO</strong> nel pannello FSL: per ogni scuola attività, classi, studenti e ore di formazione dell'anno scolastico, con l'Excel (riepilogo, per scuola, per attività, ore per studente).",
+    passi: [["F7", "Da fare per te, riepilogo settimanale e Report PCTO"]],
+    cartelle: [
+      { cartella: "/ (radice del portale)", file: [
+        ["area_personale.php", "mod", "F7", "scheda «Da fare per te»"],
+        ["riepilogo_persone.php", "nuovo", "F7", "pagina per non ricevere (o riattivare) il riepilogo, dal link nell'email"],
+        ["cron_background.php", "mod", "F7", "invio del riepilogo settimanale"],
+        [".env.example", "mod", "F7", "solo esempio: non sovrascrivere il tuo .env"]
+      ]},
+      { cartella: "admin/", file: [
+        ["admin/fsl.php", "mod", "F7", "scheda «Report PCTO» con il download Excel"]
+      ]},
+      { cartella: "src/Portale/", file: [
+        ["src/Portale/DaFarePersona.php", "nuovo", "F7", "calcola le cose da fare di una persona"],
+        ["src/Portale/RiepilogoPersone.php", "nuovo", "F7", "email settimanale e disiscrizione"]
+      ]},
+      { cartella: "src/Fsl/", file: [
+        ["src/Fsl/ReportPcto.php", "nuovo", "F7", "numeri e Excel del Report PCTO"]
+      ]},
+      { cartella: "src/Core/Schema/", file: [
+        ["src/Core/Schema/Definizioni.php", "mod", "F7", "tabella riepilogo_persone"],
+        ["src/Core/Schema/Migrazioni.php", "mod", "F7", "versione schema 69"]
+      ]}
+    ],
+    dopo: [
+      "Apri una pagina del pannello: il portale crea da solo <code>cache/schema_v69.ok</code> con la tabella del riepilogo.",
+      "<strong>Riepilogo email:</strong> è attivo di default; per spegnerlo scrivi <code>RIEPILOGO_PERSONE=0</code> nel <code>.env</code>. Il cron c'è già (<code>cron_background.php</code>): parte il mercoledì dalle 7, una volta a settimana per persona.",
+      "<strong>Prova:</strong> accedi con un docente che ha una conferma o una firma in attesa e guarda la scheda «Da fare per te» nell'Area personale; in Formazione Scuola Lavoro apri «Report PCTO» e scarica l'Excel.",
+      "Le ore del report sono: ore del progetto (o durata del turno dell'evento) × studenti <strong>presenti</strong>; i nomi dei singoli studenti compaiono solo per le classi con l'elenco inserito."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Da fare per te, riepilogo settimanale via email e Report PCTO per scuola; attestato FSL con la scuola"
   }
 ];
 
@@ -795,6 +864,12 @@ var PROSSIMI = [
   ["F3 · Backup e ripristino dei file caricati e del database", "fatto: il backup c'era già; ora verifica automatica e ripristino (Pacchetto 16)"],
   ["F4 · Guide per ruolo («Come si fa»)", "fatto: dieci guide con schermate (compresa quella per le scuole sulla convenzione FSL), anche in PDF (Pacchetto 16)"],
   ["F5 · Assistente IA interno per i verbali (testi e vocali, gratis, dentro il server)", "in stand-by (su decisione dell’utente): si riprende solo se serve; comandi di prova nel piano (F5)"],
+  ["F7 · Da fare per te, riepilogo settimanale e Report PCTO", "fatto: vedi Pacchetto 18"],
+  ["Idea · Tempi per passo delle pratiche (dove si fermano, quanto aspettano)", "da fare: statistica dei giorni medi in ogni passo, per accorgersi dei colli di bottiglia"],
+  ["Idea · Valutazione dello studente FSL con attestato delle competenze", "da fare: la struttura ospitante valuta lo studente e l'attestato riporta le competenze"],
+  ["Idea · Cerca ovunque nel pannello", "da fare: un'unica casella per trovare pratiche, persone, scuole, verbali e risorse"],
+  ["Idea · Sostituzioni degli operatori", "da fare: indicare chi sostituisce un operatore assente, così le pratiche non restano ferme"],
+  ["Idea · Sondaggio a fine pratica", "da fare: due domande allo studente a pratica chiusa, per misurare il servizio"],
   ["E1–E2 · Protocollo Titulus", "in attesa della risposta dell'Ateneo (servono i parametri, §6 del piano)"],
   ["Firma digitale remota (Aruba) in produzione", "in attesa dell'Ateneo: finché non ci sono le variabili ARUBA_* nel .env si carica il PDF firmato a mano"]
 ];

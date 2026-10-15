@@ -100,12 +100,13 @@ final class AttestatoRepository
             'SELECT pr.*, t.data_turno, t.orario_inizio, t.orario_fine, t.nome_turno, t.evento_id, t.min_partecipanti, t.max_partecipanti,
                     e.titolo AS evento_titolo, e.luogo AS evento_luogo, e.tipo AS evento_tipo, e.pagina_id,
                     pe.titolo AS pagina_titolo, pe.firma_nome, pe.firma_titolo, pe.logo_attestato_path, pe.colore_primario, pe.testo_attestato,
-                    cp.logo_path, cp.nome_portale, cp.sottotitolo_portale,
+                    cp.logo_path, cp.nome_portale, cp.sottotitolo_portale, sc.denominazione AS scuola_nome, sc.comune AS scuola_comune,
                     d.per_scuole, d.attestati, d.data_inizio, d.data_fine, d.ore_totali, IFNULL(d.convenzione, 0) AS fsl
              FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id
              LEFT JOIN pagine_eventi pe ON e.pagina_id = pe.id
              LEFT JOIN progetti_dettagli d ON d.evento_id = e.id
              LEFT JOIN configurazione_portale cp ON cp.id = 1
+             LEFT JOIN scuole sc ON sc.codice = pr.scuola_codice
              WHERE pr.id = ? LIMIT 1',
             [$prenotazioneId]
         ));

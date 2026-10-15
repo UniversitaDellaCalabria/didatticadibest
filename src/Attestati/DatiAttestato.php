@@ -9,6 +9,42 @@ use App\Eventi\Progetti;
 /** Campi stampati su un attestato. */
 final class DatiAttestato
 {
+    /** Parole che nei nomi delle scuole restano minuscole (articoli e preposizioni). */
+    private const MINUSCOLE = ['di', 'del', 'della', 'delle', 'dei', 'degli', 'dello', 'e', 'ed', 'da', 'in', 'per', 'a', 'al', 'alla', 'con'];
+
+    /** «LICEO SCIENTIFICO GALILEI» → «Liceo Scientifico Galilei» (l'elenco del Ministero è tutto maiuscolo); un nome già misto resta com'è. */
+    public static function nomeScuola(string $nome): string
+    {
+        $nome = trim($nome);
+        if ($nome === '' || $nome !== mb_strtoupper($nome)) {
+            return $nome;
+        }
+        $parole = preg_split('/(\s+)/u', mb_strtolower($nome), -1, PREG_SPLIT_DELIM_CAPTURE) ?: [];
+        $out = '';
+        foreach ($parole as $i => $w) {
+            $out .= ($i > 0 && in_array($w, self::MINUSCOLE, true)) || trim($w) === '' ? $w : self::iniziale($w);
+        }
+
+        return $out;
+    }
+
+    /** «cosenza» → «Cosenza», «reggio-calabria» → «Reggio-Calabria». */
+    private static function iniziale(string $s): string
+    {
+        return implode('-', array_map(static fn (string $p): string => mb_strtoupper(mb_substr($p, 0, 1)) . mb_substr($p, 1), explode('-', $s)));
+    }
+
+    /** «COSENZA» → «Cosenza»; il resto delle parole resta com'è. */
+    private static function maiuscolaIniziale(string $s): string
+    {
+        $s = trim($s);
+        if ($s === '' || $s !== mb_strtoupper($s)) {
+            return $s;
+        }
+
+        return self::iniziale(mb_strtolower($s));
+    }
+
     /**
      * Campi dell'attestato a partire da una prenotazione (con i dati dell'evento). Nei progetti: ore totali e periodo del
      * progetto; negli eventi: data e durata del turno.
@@ -36,7 +72,18 @@ final class DatiAttestato
             }
         }
 
+        $fsl = !empty($p['fsl']);
+        $scuola = self::nomeScuola((string) ($p['scuola_nome'] ?? ''));
+        if ($scuola === '' && $fsl) {
+            // Scuola scritta a mano nella prenotazione («Liceo Galilei – Cosenza»)
+            $custom = (array) json_decode((string) ($p['dati_custom_json'] ?? ''), true);
+            $scuola = trim((string) ($custom['scuola'] ?? ''));
+        }
+
         return [
+            'fsl' => $fsl,
+            'scuola' => $fsl ? $scuola : '',
+            'scuola_comune' => $fsl && trim((string) ($p['scuola_nome'] ?? '')) !== '' ? self::maiuscolaIniziale((string) ($p['scuola_comune'] ?? '')) : '',
             'nome' => $nomeCompleto,
             'matricola' => $matricola,
             'evento' => (string) ($p['evento_titolo'] ?? ''),

@@ -133,6 +133,12 @@ if (date('N') >= 1) {
 }
 
 // =========================================================================
+// TASK 1j: RIEPILOGO SETTIMANALE «DA FARE PER TE» alle persone che hanno cose in attesa (conferme, firme, registri, schede, verbali, pratiche…),
+// una volta a settimana, dal lunedì al venerdì dalle 7; il Direttore ci trova anche il cruscotto. RIEPILOGO_PERSONE=0 nel .env lo spegne.
+// =========================================================================
+echo \App\Core\App::get(\App\Portale\RiepilogoPersone::class)->cron();
+
+// =========================================================================
 // TASK 1h: CONTROLLO AUTOMATICO DEL PORTALE, una volta al giorno dalle 3 di notte
 // (pagine, file riservati, spazio su disco, backup, email): avviso agli amministratori solo se qualcosa non va
 // =========================================================================

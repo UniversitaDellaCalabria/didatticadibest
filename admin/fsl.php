@@ -14,7 +14,7 @@ if (!$puo_fsl_convenzioni) nega_accesso();
 function admin_redirect($url) { echo "<script>window.location.replace(" . json_encode($url) . ");</script>"; exit; }
 
 $SCHEDE = ['riepilogo' => ['Riepilogo', 'fa-chart-column'], 'stipulare' => ['Da stipulare', 'fa-file-circle-exclamation'], 'convenzioni' => ['Convenzioni', 'fa-file-signature'],
-           'verifica' => ['Verifica iscrizioni', 'fa-list-check'], 'valutazioni' => ['Valutazioni', 'fa-star'], 'scuola' => ['Scheda scuola', 'fa-school']];
+           'verifica' => ['Verifica iscrizioni', 'fa-list-check'], 'valutazioni' => ['Valutazioni', 'fa-star'], 'report' => ['Report PCTO', 'fa-file-excel'], 'scuola' => ['Scheda scuola', 'fa-school']];
 // Abilitati alle sole convenzioni: solo quella scheda
 if (!$puo_fsl) $SCHEDE = array_intersect_key($SCHEDE, ['stipulare' => 1, 'convenzioni' => 1, 'scuola' => 1]);
 $tab = isset($SCHEDE[$_GET['tab'] ?? '']) ? $_GET['tab'] : array_key_first($SCHEDE);
@@ -118,6 +118,16 @@ $anno = (int)($_GET['anno'] ?? $anno_corr);
 if ($anno < 2015 || $anno > $anno_corr + 1) $anno = $anno_corr;
 $dal_a = "$anno-09-01"; $al_a = ($anno + 1) . "-08-31";
 
+// Report PCTO dell'anno scolastico (ore per scuola, per attività e per studente) con il file Excel
+if ($tab === 'report' && $puo_fsl) {
+    $rep_pcto = \App\Core\App::per($conn)->get(\App\Fsl\ReportPcto::class);
+    $dati_pcto = $rep_pcto->dati($dal_a, $al_a);
+    if (isset($_GET['xlsx']) && ($f_pcto = $rep_pcto->esporta($dati_pcto, "$anno/" . ($anno + 1)))) {
+        registra_log_audit($conn, "Report PCTO esportato", ["Anno scolastico" => "$anno/" . ($anno + 1)]);
+        invia_file_scaricabile($f_pcto, 'Report_PCTO_' . $anno . '_' . ($anno + 1) . '.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    }
+}
+
 // Iscrizioni alle attività FSL che iniziano nell'anno scolastico (esclusi annullamenti, rifiuti, scadute), numeri per scuola e per attività, schede di valutazione
 ['righe' => $righe, 'conf' => $conf, 'per_scuola' => $per_scuola, 'per_att' => $per_att, 'n_studenti' => $n_studenti, 'n_conv_mancanti' => $n_conv_mancanti,
  'valutazioni' => $valutazioni, 'somme' => $somme, 'rip' => $rip, 'n_inviti' => $n_inviti] = $pannello_fsl->riepilogo($dal_a, $al_a);
@@ -164,6 +174,7 @@ $sezioni_fsl = [];
 if ($puo_fsl) $sezioni_fsl['riepilogo'] = ['href' => $url_fsl('riepilogo', '&anno=' . $anno), 'testo' => 'Panoramica', 'icona' => 'fa-chart-column'];
 $sezioni_fsl['scuole'] = ['href' => $url_fsl('stipulare'), 'testo' => 'Scuole e convenzioni', 'icona' => 'fa-file-signature', 'numero' => $n_scuole_da_stipulare, 'avviso' => true, 'titolo' => 'Scuole con una convenzione da stipulare'];
 if ($puo_fsl) $sezioni_fsl['valutazioni'] = ['href' => $url_fsl('valutazioni', '&anno=' . $anno), 'testo' => 'Valutazioni', 'icona' => 'fa-star'];
+if ($puo_fsl) $sezioni_fsl['report'] = ['href' => $url_fsl('report', '&anno=' . $anno), 'testo' => 'Report PCTO', 'icona' => 'fa-file-excel'];
 ob_start();
 if ($tab === 'convenzioni'): ?>
     <a href="<?php echo $h($url_fsl('convenzioni', '&nuova=1') . '#convForm'); ?>" class="btn btn-danger fw-bold"><i class="fa fa-plus me-1" aria-hidden="true"></i>Registra una convenzione</a>
@@ -171,6 +182,7 @@ if ($tab === 'convenzioni'): ?>
 $azioni_fsl = ob_get_clean();
 $aiuto_fsl = ['riepilogo' => 'Il percorso delle scuole, dall\'iscrizione all\'attestato, con i numeri dell\'anno scolastico. Clicca una tappa per vedere chi c\'è dentro.',
               'valutazioni' => 'Le schede di valutazione della struttura ospitante compilate dai docenti.',
+              'report' => 'Per ogni scuola: attività, classi, studenti e ore di formazione dell\'anno scolastico, con l\'Excel per le scuole e per il Ministero.',
               'scuole' => 'Per ogni scuola: prenotazioni, documenti già compilati da scaricare e convenzione. Scegli sotto quali scuole vedere.'][$gruppo_fsl] ?? '';
 echo pn_testata('Formazione Scuola Lavoro', 'fa-briefcase', $aiuto_fsl, $azioni_fsl);
 echo pn_schede($sezioni_fsl, $gruppo_fsl, 'Sezioni della Formazione Scuola Lavoro');
@@ -269,6 +281,32 @@ echo pn_percorso([
             </tr>
         <?php endforeach; ?>
         </tbody>
+    </table></div>
+    <?php endif; ?>
+</section>
+
+<?php elseif ($tab === 'report' && $puo_fsl): $tp = $dati_pcto['totali']; ?>
+<section class="fsl-sez" id="report">
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+        <form method="GET" class="d-flex align-items-center gap-2 m-0"><input type="hidden" name="p_id" value="<?php echo (int)$filtro_p; ?>"><input type="hidden" name="tab" value="report">
+            <label class="small fw-bold" for="repAnno">Anno scolastico</label>
+            <select class="form-select form-select-sm" id="repAnno" name="anno" onchange="this.form.submit()" style="width:auto;"><?php foreach ($anni as $a_r): ?><option value="<?php echo $a_r; ?>"<?php echo $a_r === $anno ? ' selected' : ''; ?>><?php echo $a_r . '/' . ($a_r + 1); ?></option><?php endforeach; ?></select></form>
+        <a class="btn btn-success fw-bold ms-auto" href="<?php echo $h($url_fsl('report', '&anno=' . $anno . '&xlsx=1')); ?>"><i class="fa fa-file-excel me-1" aria-hidden="true"></i>Scarica l'Excel</a>
+    </div>
+    <p class="text-secondary small">Attività di Formazione Scuola Lavoro confermate dal <?php echo $d($dal_a); ?> al <?php echo $d($al_a); ?>. Le <strong>ore di formazione</strong> sono le ore dell'attività per gli studenti <strong>presenti</strong>; nell'Excel trovi anche le ore di ogni studente, per le classi con l'elenco dei nomi inserito.</p>
+    <?php echo pn_percorso([
+        ['numero' => $tp['scuole'], 'testo' => 'Scuole', 'nota' => $tp['attivita'] . ' attività'],
+        ['numero' => $tp['classi'], 'testo' => 'Classi', 'nota' => 'iscrizioni confermate'],
+        ['numero' => $tp['studenti'], 'testo' => 'Studenti iscritti', 'nota' => $tp['presenti'] . ' presenti'],
+        ['numero' => number_format((float)$tp['ore_studente'], 0, ',', '.'), 'testo' => 'Ore di formazione', 'nota' => 'ore × studenti presenti'],
+    ], 'Numeri dell\'anno scolastico'); ?>
+    <?php if (!$dati_pcto['scuole']): ?><p class="text-muted small mb-0">Nessuna attività FSL confermata in questo anno scolastico.</p><?php else: ?>
+    <div class="table-responsive"><table class="table table-sm align-middle small" id="tabRep">
+        <thead class="table-light"><tr><th>Scuola</th><th>Comune</th><th class="text-center">Attività</th><th class="text-center">Classi</th><th class="text-center">Studenti</th><th class="text-center">Presenti</th><th class="text-end">Ore complessive</th><th class="text-end">Ore medie</th></tr></thead>
+        <tbody><?php foreach ($dati_pcto['scuole'] as $s_r): ?>
+            <tr><td class="fw-semibold"><?php echo $h($s_r['nome']); ?></td><td><?php echo $h($s_r['comune']); ?></td><td class="text-center"><?php echo (int)$s_r['attivita']; ?></td><td class="text-center"><?php echo (int)$s_r['classi']; ?></td>
+                <td class="text-center"><?php echo (int)$s_r['studenti']; ?></td><td class="text-center"><?php echo (int)$s_r['presenti']; ?></td><td class="text-end"><?php echo number_format((float)$s_r['ore_studente'], 1, ',', '.'); ?></td><td class="text-end"><?php echo number_format((float)$s_r['ore_medie'], 1, ',', '.'); ?></td></tr>
+        <?php endforeach; ?></tbody>
     </table></div>
     <?php endif; ?>
 </section>

@@ -56,6 +56,15 @@ final class PaginaAttestati
         .cert-signature { width: 300px; text-align: center; font-size: 1.1rem; }
         .signature-text { font-family: 'Dancing Script', cursive; font-size: 2.6rem; color: #1e293b; line-height: 0.6; margin-bottom: 10px; transform: rotate(-3deg); white-space: nowrap; }
         .cert-stamp { position: absolute; bottom: 50%; left: 50%; transform: translate(-50%, 50%); opacity: 0.05; font-size: 15rem; color: #B30000; pointer-events: none; }
+        .cert-fsl-fascia { display: inline-block; background: #0056b3; color: #fff; font-family: 'Helvetica Neue', Arial, sans-serif; font-weight: 700; font-size: .95rem; letter-spacing: 3px; text-transform: uppercase; padding: 4px 22px; border-radius: 999px; margin-bottom: 12px; }
+        /* L'attestato FSL ha più righe (fascia, scuola): caratteri un po' più piccoli per restare in una pagina */
+        .cert-fsl .cert-title { font-size: 2.5rem; margin-bottom: 4px; white-space: nowrap; }
+        .cert-fsl .cert-subtitle { font-size: 1.2rem; margin-bottom: 8px; }
+        .cert-fsl .cert-name { font-size: 2rem; margin: 4px 0; }
+        .cert-fsl .cert-body { font-size: 1.15rem; line-height: 1.4; }
+        .cert-fsl .cert-event { font-size: 1.4rem; margin: 6px 0; }
+        .cert-scuola { font-size: 1.2rem; margin-top: 2px; }
+        .cert-scuola strong { color: #0056b3; }
         .cert-id { position: absolute; bottom: 5px; left: 10px; font-size: 0.75rem; color: #94a3b8; font-family: monospace; }
     </style>
 </head>
@@ -77,7 +86,7 @@ final class PaginaAttestati
         <p id="attAvanzamento" class="fw-semibold mt-2 mb-0" aria-live="polite"></p>
     </div>
     <?php foreach ($lista as $a): $urlVer = $urlBase . '/verifica_attestato.php?c=' . urlencode($a['codice']); ?>
-    <div class="cert-container" data-file="<?php echo $h(($a['file'] ?? '') !== '' ? $a['file'] : 'attestato_' . NomeFile::slug($a['nome'])); ?>">
+    <div class="cert-container<?php echo !empty($a['fsl']) ? ' cert-fsl' : ''; ?>" data-file="<?php echo $h(($a['file'] ?? '') !== '' ? $a['file'] : 'attestato_' . NomeFile::slug($a['nome'])); ?>">
         <div class="cert-border-outer">
             <div class="cert-border-inner">
                 <i class="fa fa-award cert-stamp" aria-hidden="true"></i>
@@ -89,13 +98,15 @@ final class PaginaAttestati
                     </div>
                 </div>
                 <div class="cert-main-content">
+                    <?php if (!empty($a['fsl'])): ?><div><span class="cert-fsl-fascia">Formazione Scuola Lavoro</span></div><?php endif; ?>
                     <h1 class="cert-title">Attestato di Partecipazione</h1>
                     <div class="cert-subtitle">Si attesta che</div>
                     <div class="cert-body">
                         <span class="cert-name"><?php echo $h(mb_strtoupper($a['nome'])); ?></span><br>
                         <?php if ($a['matricola'] !== ''): ?><span style="font-size: 1.1rem; color: #64748b;">(Matricola: <?php echo $h($a['matricola']); ?>)</span><br><?php endif; ?>
+                        <?php if (!empty($a['fsl']) && !empty($a['scuola'])): ?><span class="cert-scuola d-block">studente/studentessa dell'Istituto <strong><?php echo $h($a['scuola']); ?></strong><?php echo !empty($a['scuola_comune']) ? ' di ' . $h($a['scuola_comune']) : ''; ?></span><?php endif; ?>
                         <span class="mt-3 d-block"><?php echo $h($a['formula']); ?></span>
-                        <span class="cert-event">"<?php echo $h($a['evento']); ?>"</span>
+                        <span class="cert-event">"<?php echo $h(!empty($a['fsl']) && stripos($a['evento'], 'Formazione Scuola Lavoro') !== 0 ? 'Formazione Scuola Lavoro: ' . $a['evento'] : $a['evento']); ?>"</span>
                         <span class="d-block mt-2">
                             <?php echo $a['quando'] !== '' ? $h($a['quando']) . ',' : 'Svoltasi'; ?> presso <?php echo $h($a['luogo'] ?: 'le nostre strutture'); ?><?php if ($a['ore'] !== ''): ?>
                             <strong>per un numero di ore pari a <?php echo $h($a['ore']); ?></strong><?php endif; ?>.
