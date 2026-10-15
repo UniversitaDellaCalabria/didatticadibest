@@ -824,6 +824,7 @@ var PACCHETTI = [
       ]},
       { cartella: "admin/", file: [
         ["admin/fsl.php", "mod", "F7", "scheda «Convenzioni da seguire» (iter guidato delle convenzioni caricate dalle scuole), Direttore in evidenza e scheda «Report FSL» con il download Excel"],
+        ["admin/sistema.php", "mod", "F7", "scheda «Direttore del Dipartimento»: si indica una volta sola per tutto il portale"],
         ["admin/inizio.php", "mod", "F7", "il promemoria delle convenzioni da seguire porta alla nuova scheda"]
       ]},
       { cartella: "src/Portale/", file: [
@@ -832,6 +833,8 @@ var PACCHETTI = [
       ]},
       { cartella: "src/Fsl/", file: [
         ["src/Fsl/ReportFsl.php", "nuovo", "F7", "numeri e Excel del Report FSL"],
+        ["src/Fsl/ServizioFirmaDirettore.php", "mod", "F7", "messaggio che rimanda a Sistema e registri"],
+        ["src/Didattica/FirmaPratica.php", "mod", "F7", "messaggio che rimanda a Sistema e registri"],
         ["src/Fsl/NotificheConvenzioni.php", "mod", "F7", "i link delle email agli uffici portano alla scheda «Convenzioni da seguire»"]
       ]},
       { cartella: "src/Core/Schema/", file: [
@@ -843,7 +846,7 @@ var PACCHETTI = [
       "Apri una pagina del pannello: il portale crea da solo <code>cache/schema_v69.ok</code> con la tabella del riepilogo.",
       "<strong>Riepilogo email:</strong> è attivo di default; per spegnerlo scrivi <code>RIEPILOGO_PERSONE=0</code> nel <code>.env</code>. Il cron c'è già (<code>cron_background.php</code>): parte il mercoledì dalle 7, una volta a settimana per persona.",
       "<strong>Prova:</strong> accedi con un docente che ha una conferma o una firma in attesa e guarda la scheda «Da fare per te» nell'Area personale; in Formazione Scuola Lavoro apri «Report FSL» e scarica l'Excel.",
-      "<strong>Convenzioni FSL:</strong> in Formazione Scuola Lavoro → «Scuole e convenzioni» la prima voce è ora <strong>Convenzioni da seguire</strong>: cinque passi con le cose che toccano a te (protocollo in entrata → il Direttore riceve l'email → protocollo definitivo e registrazione). Il Direttore che firma si imposta lì (vale per tutto il portale).",
+      "<strong>Convenzioni FSL:</strong> in Formazione Scuola Lavoro → «Scuole e convenzioni» la prima voce è ora <strong>Convenzioni da seguire</strong>: cinque passi con le cose che toccano a te (protocollo in entrata → il Direttore riceve l'email → protocollo definitivo e registrazione). Il <strong>Direttore del Dipartimento</strong> si imposta una volta sola in Gestione del portale → Sistema e registri (vale per convenzioni, pratiche e cruscotto; resta modificabile anche dalla scheda FSL).",
       "Le ore del report sono: ore del progetto (o durata del turno dell'evento) × studenti <strong>presenti</strong>; i nomi dei singoli studenti compaiono solo per le classi con l'elenco inserito."
     ],
     nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",

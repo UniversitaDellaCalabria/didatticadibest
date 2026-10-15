@@ -96,7 +96,7 @@ final class FirmaPratica
             $d = $this->impostazioni->direttoreConvenzioni();
             [$nome, $email, $ruolo] = [$d['nome'], $d['email'], 'Direttore'];
             if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                return 'Indica prima il Direttore (nome ed email) in Formazione Scuola Lavoro → Scuole e convenzioni → «Direttore che firma le convenzioni»: vale per tutte le firme.';
+                return 'Indica prima il Direttore (nome ed email) in Gestione del portale → Sistema e registri → «Direttore del Dipartimento»: si indica una volta sola e vale per tutte le firme.';
             }
         } else {
             $ruolo = $def['campo'];

@@ -102,7 +102,7 @@ if ($tappa === 'compila') {
     $es = $firmata->protocolloIngresso($id, '2154', date('Y-m-d'), 'Ufficio FSL');
     echo json_encode($es) . "\n";
 } elseif ($tappa === 'firmata') {
-    $rep->segnaFirmataDirettore($id, $salva(\App\Fsl\Costanti::DIR_FIRMATE, 'CONVENZIONE FSL (firmata dal Direttore)'), 'Mario Bianchi (Direttore)');
+    $rep->segnaFirmataDirettore($id, $salva(\App\Fsl\Costanti::DIR_CONVENZIONI, 'CONVENZIONE FSL (firmata dal Direttore)'), 'Mario Bianchi (Direttore)');
     echo "Firmata dal Direttore.\n";
 } elseif ($tappa === 'attiva') {
     $es = $firmata->completa($id, '', ['protocollo' => '2201', 'protocollo_data' => date('Y-m-d'), 'data_stipula' => date('Y-m-d'), 'scadenza' => date('Y-m-d', strtotime('+1 year -1 day'))], 'Ufficio FSL');

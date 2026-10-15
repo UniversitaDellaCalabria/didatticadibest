@@ -52,6 +52,15 @@ if (isset($_POST['controlla_sito'])) {
     admin_redirect("sistema.php?p_id=$filtro_p&r=" . time() . "#controllo");
 }
 
+// 1e. DIRETTORE DEL DIPARTIMENTO: una volta sola per tutto il portale (firma di convenzioni FSL, pratiche degli studenti, Cruscotto del Direttore, riepilogo settimanale)
+if (isset($_POST['salva_direttore'])) {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    $err_dir = \App\Core\App::per($conn)->get(\App\Fsl\ServizioFirmaDirettore::class)->salvaDirettore((string)($_POST['dir_nome'] ?? ''), (string)($_POST['dir_email'] ?? ''), (string)($_POST['dir_cf'] ?? ''));
+    if (!$err_dir && function_exists('registra_log_audit')) registra_log_audit($conn, "Direttore del Dipartimento impostato", ["Email" => (string)($_POST['dir_email'] ?? '')]);
+    flash_set($err_dir ?? "Direttore salvato: vale per le convenzioni, le pratiche degli studenti e il Cruscotto del Direttore.", $err_dir ? 'danger' : 'success');
+    admin_redirect("sistema.php?p_id=$filtro_p&r=" . time() . "#direttore");
+}
+
 // 2. SALVATAGGIO CONFIGURAZIONI SMTP E TEMPLATE
 if (isset($_POST['save_system_settings'])) {
     csrf_verify($_POST['csrf_token'] ?? '');
@@ -80,6 +89,18 @@ if (isset($_POST['save_system_settings'])) {
         <button type="submit" name="run_reminders_manual" class="btn btn-warning fw-bold shadow-sm text-dark" data-confirm="Vuoi inviare ora i promemoria a tutti gli utenti con eventi programmati nelle prossime 72 ore? L\'operazione potrebbe richiedere alcuni secondi.">
             <i class="fa fa-paper-plane me-1"></i> Invia Promemoria Ora (Eventi prossime 72h)
         </button>
+    </form>
+</div>
+
+<?php $dir_sis = \App\Core\App::per($conn)->get(\App\Fsl\ServizioFirmaDirettore::class)->direttore(); ?>
+<div class="card shadow-sm border-0 p-4 mb-4" id="direttore"<?php echo $dir_sis['email'] === '' ? ' style="border-left:6px solid #dc2626 !important;"' : ''; ?>>
+    <h5 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="fa fa-user-tie me-1"></i> Direttore del Dipartimento<?php echo $dir_sis['email'] === '' ? ' <span class="badge bg-danger">da indicare</span>' : ''; ?></h5>
+    <p class="small text-secondary">Si indica <strong>una volta sola</strong> e vale per tutto il portale: firma delle <strong>convenzioni FSL</strong>, firma del Direttore nelle <strong>pratiche degli studenti</strong>, <strong>Cruscotto del Direttore</strong> e riepilogo settimanale. Per firmare accede con la sua email Unical (o SPID/CIE con il codice fiscale indicato): con il codice fiscale il portale controlla anche che il certificato di firma sia il suo.</p>
+    <form method="POST" class="row g-2"><?php csrf_field(); ?>
+        <div class="col-md-4"><label class="form-label small fw-bold mb-0" for="sisDirN">Nome e cognome</label><input class="form-control form-control-sm" id="sisDirN" name="dir_nome" value="<?php echo htmlspecialchars($dir_sis['nome']); ?>" maxlength="150" required></div>
+        <div class="col-md-4"><label class="form-label small fw-bold mb-0" for="sisDirE">Email (riceve i link per firmare)</label><input type="email" class="form-control form-control-sm" id="sisDirE" name="dir_email" value="<?php echo htmlspecialchars($dir_sis['email']); ?>" maxlength="150" required></div>
+        <div class="col-md-3"><label class="form-label small fw-bold mb-0" for="sisDirC">Codice fiscale (facoltativo)</label><input class="form-control form-control-sm font-monospace" id="sisDirC" name="dir_cf" value="<?php echo htmlspecialchars($dir_sis['cf']); ?>" maxlength="16" style="text-transform:uppercase;"></div>
+        <div class="col-md-1 d-flex align-items-end"><button type="submit" name="salva_direttore" value="1" class="btn btn-sm btn-primary w-100">Salva</button></div>
     </form>
 </div>
 

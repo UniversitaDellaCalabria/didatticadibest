@@ -80,7 +80,7 @@ final class ServizioFirmaDirettore
             return 'Prima prendi in carico la convenzione, poi puoi mandarla al Direttore.';
         }
         if (!$this->configurato()) {
-            return 'Indica prima il Direttore che firma le convenzioni (nome ed email): il link di firma arriva a quell\'indirizzo.';
+            return 'Indica prima il Direttore del Dipartimento (nome ed email, in Sistema e registri): il link di firma arriva a quell\'indirizzo.';
         }
         $token = bin2hex(random_bytes(20));
         $this->compilate->daFirmare($id, $token);

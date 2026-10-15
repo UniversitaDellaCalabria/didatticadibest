@@ -380,13 +380,13 @@ $n_iter = count($fasi_cv['caricata']) + count($fasi_cv['firmata']) + count(array
 
     <!-- Il Direttore che firma -->
     <details class="border rounded p-2 mb-2" id="direttoreConv"<?php echo $dir_cv['email'] === '' ? ' open style="border-color:#dc2626 !important;background:#fef2f2;"' : ''; ?>>
-        <summary class="fw-bold small"><i class="fa fa-user-tie me-1" aria-hidden="true"></i>Il Direttore che firma le convenzioni (vale per tutto il portale)<?php echo $dir_cv['email'] === '' ? ' · <span class="badge bg-danger">da indicare</span>' : ': <span class="text-success">' . $h($dir_cv['nome']) . '</span> · ' . $h($dir_cv['email']) . ' · cambia'; ?></summary>
+        <summary class="fw-bold small"><i class="fa fa-user-tie me-1" aria-hidden="true"></i>Il Direttore del Dipartimento (vale per convenzioni, pratiche e cruscotto: si può cambiare anche da Gestione del portale → Sistema e registri)<?php echo $dir_cv['email'] === '' ? ' · <span class="badge bg-danger">da indicare</span>' : ': <span class="text-success">' . $h($dir_cv['nome']) . '</span> · ' . $h($dir_cv['email']) . ' · cambia'; ?></summary>
         <form method="POST" class="row g-2 mt-1"><?php csrf_field(); ?>
             <div class="col-md-4"><label class="form-label small fw-bold mb-0" for="dirN">Nome e cognome</label><input class="form-control form-control-sm" id="dirN" name="dir_nome" value="<?php echo $h($dir_cv['nome']); ?>" maxlength="150" required></div>
             <div class="col-md-4"><label class="form-label small fw-bold mb-0" for="dirE">Email (riceve il link per firmare)</label><input type="email" class="form-control form-control-sm" id="dirE" name="dir_email" value="<?php echo $h($dir_cv['email']); ?>" maxlength="150" required></div>
             <div class="col-md-3"><label class="form-label small fw-bold mb-0" for="dirC">Codice fiscale (facoltativo)</label><input class="form-control form-control-sm font-monospace" id="dirC" name="dir_cf" value="<?php echo $h($dir_cv['cf']); ?>" maxlength="16" style="text-transform:uppercase;"></div>
             <div class="col-md-1 d-flex align-items-end"><button type="submit" name="cv_direttore" value="1" class="btn btn-sm btn-outline-primary w-100">Salva</button></div>
-            <div class="form-text">È la stessa persona che compare nel Cruscotto del Direttore, nelle firme delle pratiche e nelle convenzioni. Per firmare accede al portale con la sua email Unical (o SPID/CIE con il codice fiscale indicato): con il codice fiscale il portale controlla anche che il certificato di firma sia il suo.</div>
+            <div class="form-text">È una sola impostazione per tutto il portale: la stessa persona firma le convenzioni, le pratiche degli studenti e vede il Cruscotto del Direttore. Per firmare accede al portale con la sua email Unical (o SPID/CIE con il codice fiscale indicato): con il codice fiscale il portale controlla anche che il certificato di firma sia il suo.</div>
         </form>
     </details>
 
