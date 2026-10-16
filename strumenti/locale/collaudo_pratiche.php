@@ -119,7 +119,7 @@ foreach ($moduli as $m) {
         }
         $nomePasso = $passi[$idx + 1] ?? '?';
         $uffId = (int) ($p['ufficio_id'] ?? 0);
-        $ufficio = $uffId ? (string) ($db->valore('SELECT tipo FROM didattica_uffici WHERE id = ?', [$uffId]) ?: '') : '';
+        $ufficio = $uffId ? (string) ($db->valore('SELECT tipo FROM uffici WHERE id = ?', [$uffId]) ?: '') : '';
         if ($ufficio === 'protocollo') {
             [$er] = $flusso->registraProtocollo($id, ($giro + 100) . '/2026', date('Y-m-d'), 8, 'Anna Protocollo', $domanda->config($m)['bollo']);
             $log[] = 'protocollo' . ($er ? " (ERRORE: $er)" : '');

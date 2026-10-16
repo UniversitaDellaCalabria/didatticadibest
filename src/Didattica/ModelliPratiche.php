@@ -61,14 +61,15 @@ final class ModelliPratiche
             }
         }
         // Le pratiche di mobilità passano dall'ufficio «Internazionalizzazione» (già esistente): se in una versione precedente era stato creato un ufficio a parte, si unifica
-        $intern = (int) $this->db->valore("SELECT id FROM didattica_uffici WHERE chiave = 'internazionalizzazione'");
-        $vecchio = (int) $this->db->valore("SELECT id FROM didattica_uffici WHERE chiave = 'mobilita'");
+        $intern = (int) $this->db->valore("SELECT id FROM uffici WHERE chiave = 'internazionalizzazione'");
+        $vecchio = (int) $this->db->valore("SELECT id FROM uffici WHERE chiave = 'mobilita'");
         if ($vecchio) {
             if ($intern) {
                 $this->db->esegui("UPDATE didattica_moduli SET iter_json = REPLACE(iter_json, '\"mobilita\"', '\"internazionalizzazione\"') WHERE chiave LIKE 'mobilita\\_%'");
                 $this->db->esegui('UPDATE pratiche SET ufficio_id = ? WHERE ufficio_id = ?', [$intern, $vecchio]);
-                $this->db->esegui('UPDATE ufficio_didattica SET ufficio_id = ? WHERE ufficio_id = ?', [$intern, $vecchio]);
-                $this->db->esegui('DELETE FROM didattica_uffici WHERE id = ?', [$vecchio]);
+                $this->db->esegui('UPDATE IGNORE uffici_persone SET ufficio_id = ? WHERE ufficio_id = ?', [$intern, $vecchio]);
+                $this->db->esegui('DELETE FROM uffici_persone WHERE ufficio_id = ?', [$vecchio]);
+                $this->db->esegui('DELETE FROM uffici WHERE id = ?', [$vecchio]);
             }
         }
         // I due certificati separati (iscrizione, laurea) sono sostituiti dalla richiesta unica: si eliminano se non hanno pratiche, altrimenti si spengono
@@ -373,15 +374,15 @@ SEDE",
 
     /**
      * L'ufficio che segue gli attestati (di solito il manager dell'Ufficio didattico): controlla l'attestato preparato dal portale, lo manda al Direttore e
-     * registra il protocollo in uscita. Si crea una volta; le persone si indicano in «Ufficio e ricevimento».
+     * registra il protocollo in uscita. Si crea una volta; le persone si indicano in «Uffici e persone» (Gestione del portale).
      */
     private function ufficioAttestati(): void
     {
-        if ($this->db->valore("SELECT id FROM didattica_uffici WHERE chiave = 'attestati'")) {
+        if ($this->db->valore("SELECT id FROM uffici WHERE chiave = 'attestati'")) {
             return;
         }
         $this->db->esegui(
-            "INSERT INTO didattica_uffici (nome, descrizione, chiave, smista, segue_corsi, ordine, tipo) VALUES ('Ufficio attestati', ?, 'attestati', 0, 0, 5, '')",
+            "INSERT INTO uffici (nome, descrizione, chiave, ambito, smista, segue_corsi, ordine, tipo) VALUES ('Ufficio attestati', ?, 'attestati', 'dipartimento', 0, 0, 5, '')",
             ['Controlla gli attestati preparati dal portale (frequenza, esame sostenuto), li manda al Direttore e registra il protocollo in uscita: di solito è il manager dell\'Ufficio didattico']
         );
     }

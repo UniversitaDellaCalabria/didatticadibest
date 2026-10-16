@@ -4,7 +4,7 @@
 // - Sedute e verbali: sedute del Consiglio con o.d.g. e presenze, pratiche assegnate, verbale in Word ed Excel;
 // - Moduli e documenti: documenti da scaricare e moduli online (campi guidati dalle anagrafi, tabelle, campi dell'ufficio,
 //   come compaiono nel verbale), con modelli pronti;
-// - Ufficio e ricevimento: operatori scelti dall'anagrafe di Ateneo con i loro compiti, sportello di ricevimento dell'ufficio.
+// - Ricevimento: sportello a appuntamenti dell'Ufficio didattico (uffici e persone sono in uffici.php).
 // Pagine pubbliche: modulistica.php, modulo.php, pratiche.php.
 // Ogni scheda sta in un suo file (didattica_pratiche.php, didattica_sedute.php, didattica_moduli.php, didattica_ufficio.php,
 // didattica_statistiche.php) con le sue azioni e la sua pagina; questo file prepara i dati comuni e le include.
@@ -108,7 +108,7 @@ $aiuto_did = ['pratiche' => 'Le domande degli studenti: ogni riga dice a che pun
               'statistiche' => 'Quante pratiche, di che tipo e quanto tempo servono.'][$tab] ?? '';
 $schede_did = [];
 foreach (['pratiche' => ['fa-inbox', 'Pratiche', $n_aperte, true], 'sedute' => ['fa-gavel', 'Sedute e verbali', count($sedute), false], 'moduli' => ['fa-file-lines', 'Moduli e documenti', count($moduli), false],
-          'ufficio' => ['fa-people-group', 'Ufficio e ricevimento', 0, false], 'statistiche' => ['fa-chart-column', 'Statistiche', 0, false]] as $k_d => [$ico_d, $txt_d, $num_d, $av_d]) {
+          'ufficio' => ['fa-user-clock', 'Ricevimento', 0, false], 'statistiche' => ['fa-chart-column', 'Statistiche', 0, false]] as $k_d => [$ico_d, $txt_d, $num_d, $av_d]) {
     if ($solo_ref && $k_d !== 'sedute') continue;
     $schede_did[$k_d] = ['href' => $base . '&tab=' . $k_d, 'testo' => $txt_d, 'icona' => $ico_d, 'numero' => $num_d, 'avviso' => $av_d];
 }

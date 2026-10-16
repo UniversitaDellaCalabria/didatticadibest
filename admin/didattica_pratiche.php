@@ -279,7 +279,7 @@ echo pn_prossima($prossima_p[0], $prossima_p[1], $prossima_p[2], $prossima_p[3])
             <div class="col-md-4"><label class="form-label small fw-bold mb-0" for="itOp">Operatore</label>
                 <select class="form-select form-select-sm" id="itOp" name="operatore_id" required><option value="">--</option>
                     <?php foreach ($sugg as $o): ?><option value="<?php echo (int)$o['id']; ?>"><?php echo ($o['_consigliato'] ? '★ ' : '') . $h(etichetta_operatore($o)); ?></option><?php endforeach; ?></select>
-                <?php if (!$operatori): ?><div class="form-text text-danger">Aggiungi prima gli operatori in «Ufficio e ricevimento».</div><?php endif; ?></div>
+                <?php if (!$operatori): ?><div class="form-text text-danger">Aggiungi prima le persone agli uffici in «Uffici e persone» (Gestione del portale).</div><?php endif; ?></div>
             <div class="col-md-3"><label class="form-label small fw-bold mb-0" for="itNota">Nota per l'operatore (interna)</label><input type="text" class="form-control form-control-sm" id="itNota" name="nota_passaggio" maxlength="3000" placeholder="facoltativa"></div>
             <div class="col-md-2"><button type="submit" name="assegna_pratica" value="1" class="btn btn-sm btn-primary fw-bold w-100"><i class="fa fa-share me-1" aria-hidden="true"></i><?php echo $p['assegnata_a'] ? 'Passa' : 'Smista'; ?></button></div>
             <div class="col-12 small text-secondary">★ = persona dell'ufficio previsto per quel passo (e che segue il corso della pratica). Chi riceve la pratica ha un'email; lo studente vede il passaggio, non la nota.</div>
@@ -587,7 +587,7 @@ echo pn_prossima($prossima_p[0], $prossima_p[1], $prossima_p[2], $prossima_p[3])
             </span>
             <span class="d-flex gap-1 align-items-center flex-wrap">
                 <label class="small fw-bold" for="ddSeg">Invia alla segreteria studenti</label>
-                <select class="form-select form-select-sm" id="ddSeg" name="segreteria_id" style="max-width:260px;"><?php if (!$segreterie): ?><option value="0">nessuna segreteria: creala in «Ufficio e ricevimento»</option><?php endif; ?>
+                <select class="form-select form-select-sm" id="ddSeg" name="segreteria_id" style="max-width:260px;"><?php if (!$segreterie): ?><option value="0">nessuna segreteria: creala in «Uffici e persone» (tipo: segreteria studenti)</option><?php endif; ?>
                     <?php foreach ($segreterie as $k_s => $u_s): ?><option value="<?php echo (int)$k_s; ?>"><?php echo $h($u_s['nome']); ?></option><?php endforeach; ?></select>
                 <button type="submit" name="invia_segreteria" value="1" class="btn btn-sm btn-success fw-bold"<?php echo $segreterie ? '' : ' disabled'; ?> data-confirm="Inviare le pratiche selezionate alla segreteria studenti? Ricevono l'estratto e il verbale della seduta; le persone della segreteria ricevono un'email di riepilogo.">Invia</button>
             </span>

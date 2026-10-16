@@ -20,7 +20,7 @@ $funzioni_modulo = [
         $puo_didattica_tutto ? ['Pratiche degli studenti', 'Moduli online, pratiche con stato, istruttoria e messaggi', 'fa-inbox', 'didattica.php?tab=pratiche'] : null,
         ['Sedute e verbali', 'Consigli dei corsi di studio, presenze, convalide e piani di studio, verbale in Word ed Excel', 'fa-gavel', 'didattica.php?tab=sedute'],
         $puo_didattica_tutto ? ['Moduli e documenti', 'Modulistica: documenti da scaricare e moduli online guidati', 'fa-file-lines', 'didattica.php?tab=moduli'] : null,
-        $puo_didattica_tutto ? ['Ufficio e ricevimento', 'Operatori dell’Ufficio didattico e sportello di ricevimento', 'fa-people-group', 'didattica.php?tab=ufficio'] : null,
+        $puo_didattica_tutto ? ['Ricevimento', 'Sportello a appuntamenti dell’Ufficio didattico', 'fa-user-clock', 'didattica.php?tab=ufficio'] : null,
         $puo_tutorato ? ['Tutorato · lettere di incarico', 'Bandi e lettere dei vincitori: conferma con SPID/CIE, firme PAdES del docente e del direttore, protocollo', 'fa-user-graduate', 'tutorato.php'] : null,
     ])) : [],
     'portale'      => array_values(array_filter([
@@ -30,7 +30,7 @@ $funzioni_modulo = [
         $is_full_admin ? ['Testata e home', 'Logo, testata, carosello e widget della home', 'fa-image', 'testata.php'] : null,
         $is_full_admin ? ['Menu del sito', 'Voci del menu di navigazione del sito pubblico', 'fa-link', 'menu.php'] : null,
         $is_full_admin ? ['Utenti e abilitazioni', 'Amministratori, abilitati per area, per modulo e per la FSL', 'fa-users-cog', 'utenti.php'] : null,
-        $is_full_admin ? ['Uffici di Ateneo', 'Uffici che ricevono le pratiche (per esempio i pagamenti del tutorato) e persone dell’anagrafe che ne fanno parte', 'fa-building-columns', 'uffici_ateneo.php'] : null,
+        $is_full_admin ? ['Uffici e persone', 'Uffici del Dipartimento e di Ateneo (Direzione, protocollo, corsi di studio, pagamenti…) con le persone scelte dall’anagrafe: si richiamano in pratiche, tutorato, risorse e convenzioni', 'fa-sitemap', 'uffici.php'] : null,
         $is_full_admin ? ['Sistema e registri', 'Email, backup, controllo notturno, registro operazioni e accessi', 'fa-gear', 'sistema.php'] : null,
     ])),
 ];

@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace App\Portale;
 
 use App\Core\Database;
+use App\Uffici\Direzione;
 
 /**
  * Il cruscotto del Direttore: una sola pagina con le cose che aspettano o che si sono fermate nei moduli del portale (firme, pratiche, conferme, verbali,
  * convenzioni, tutorato, risorse). Non scrive nulla e non ha tabelle sue: legge quello che c'è. Ogni gruppo è a sé: se una tabella manca (installazione
  * non ancora aggiornata) il gruppo resta vuoto e l'errore va nel log.
  *
- * Vi accedono gli amministratori e il Direttore indicato nelle impostazioni (lo stesso che firma le convenzioni).
+ * Vi accedono gli amministratori, il Direttore e il vice direttore (persone della Direzione: Gestione del portale → Uffici).
  */
 final class CruscottoDirettore
 {
@@ -21,12 +22,12 @@ final class CruscottoDirettore
     /** Entro quanti giorni una convenzione o una scadenza di una risorsa si segnala come «in scadenza». */
     public const GIORNI_SCADENZA = 60;
 
-    public function __construct(private Database $db)
+    public function __construct(private Database $db, private Direzione $direzione)
     {
     }
 
     /**
-     * Chi può vedere il cruscotto: i super amministratori e il Direttore (email indicata nelle impostazioni di sistema).
+     * Chi può vedere il cruscotto: i super amministratori, il Direttore e il vice direttore.
      *
      * @param array<string, mixed>|null $utente
      */
@@ -38,13 +39,7 @@ final class CruscottoDirettore
         if ((int) ($utente['ruolo_id'] ?? 0) === 1) {
             return true;
         }
-        $email = mb_strtolower(trim((string) ($utente['email'] ?? '')));
-        if ($email === '') {
-            return false;
-        }
-        $dir = mb_strtolower(trim((string) $this->db->valore('SELECT conv_direttore_email FROM impostazioni_sistema WHERE id = 1')));
-
-        return $dir !== '' && $dir === $email;
+        return $this->direzione->direttoreOVice($utente);
     }
 
     /**
@@ -130,7 +125,7 @@ final class CruscottoDirettore
             AND DATEDIFF(NOW(), COALESCE(p.aggiornata_il, p.creata_il)) >= GREATEST(m.giorni_promemoria, 1)";
         $n = (int) $this->db->valore("SELECT COUNT(*) FROM pratiche p JOIN didattica_moduli m ON m.id = p.modulo_id WHERE $dove");
         $r = $this->db->righe("SELECT p.id, p.codice, p.nome, p.cognome, p.stato, m.titolo, u.nome AS ufficio, DATEDIFF(NOW(), COALESCE(p.aggiornata_il, p.creata_il)) AS gg
-            FROM pratiche p JOIN didattica_moduli m ON m.id = p.modulo_id LEFT JOIN didattica_uffici u ON u.id = p.ufficio_id WHERE $dove
+            FROM pratiche p JOIN didattica_moduli m ON m.id = p.modulo_id LEFT JOIN uffici u ON u.id = p.ufficio_id WHERE $dove
             ORDER BY COALESCE(p.aggiornata_il, p.creata_il) LIMIT 15");
 
         return $this->gruppo('pratiche', 'Pratiche degli studenti ferme', 'fa-inbox', '#b45309', $n, $r, fn (array $x): array => [

@@ -12,7 +12,7 @@ use App\Core\Sito;
 use Tests\Doppi\AnagrafiClientApiFinto;
 use Tests\Integration\DatabaseDiProva;
 
-/** Uffici di Ateneo: creazione, persone dall'anagrafe o a mano, appartenenza a più uffici, avvisi e blocco dell'eliminazione. */
+/** Uffici di Ateneo: creazione, persone dall'anagrafe (mai a mano), appartenenza a più uffici, avvisi e blocco dell'eliminazione. */
 final class UfficiAteneoTest extends DatabaseDiProva
 {
     private Container $c;
@@ -20,9 +20,8 @@ final class UfficiAteneoTest extends DatabaseDiProva
     protected function tabelle(): array
     {
         return [
-            'uffici_ateneo' => "CREATE TABLE uffici_ateneo (id INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(150) NOT NULL DEFAULT '', descrizione VARCHAR(500) DEFAULT '', attivo TINYINT(1) NOT NULL DEFAULT 1, creato_il DATETIME DEFAULT CURRENT_TIMESTAMP)",
-            'uffici_ateneo_persone' => "CREATE TABLE uffici_ateneo_persone (id INT AUTO_INCREMENT PRIMARY KEY, ufficio_id INT NOT NULL, persona_id VARCHAR(80) NULL, email VARCHAR(150) NOT NULL DEFAULT '',
-                nominativo VARCHAR(200) NOT NULL DEFAULT '', struttura VARCHAR(255) DEFAULT '', creato_il DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY uq (ufficio_id, email))",
+            'uffici' => "CREATE TABLE uffici (id INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(150) NOT NULL DEFAULT '', descrizione VARCHAR(500) DEFAULT '', chiave VARCHAR(30) NULL, ambito VARCHAR(12) NOT NULL DEFAULT 'dipartimento', smista TINYINT(1) NOT NULL DEFAULT 0, segue_corsi TINYINT(1) NOT NULL DEFAULT 0, ordine INT NOT NULL DEFAULT 0, tipo VARCHAR(20) NOT NULL DEFAULT '', consiglio_id INT NULL, attivo TINYINT(1) NOT NULL DEFAULT 1, creato_il DATETIME DEFAULT CURRENT_TIMESTAMP)",
+            'uffici_persone' => "CREATE TABLE uffici_persone (id INT AUTO_INCREMENT PRIMARY KEY, ufficio_id INT NOT NULL, persona_id VARCHAR(80) NULL, email VARCHAR(150) NOT NULL DEFAULT '', nominativo VARCHAR(200) NOT NULL DEFAULT '', struttura VARCHAR(255) DEFAULT '', ruolo VARCHAR(100) DEFAULT '', compiti VARCHAR(100) NOT NULL DEFAULT '', corsi TEXT NULL, op_id INT NULL, creato_il DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY uq (ufficio_id, email))",
             'tutorato_bandi' => 'CREATE TABLE tutorato_bandi (id INT AUTO_INCREMENT PRIMARY KEY, ufficio_ateneo_id INT NULL)',
             'personale_ateneo' => "CREATE TABLE personale_ateneo (id VARCHAR(80) PRIMARY KEY, nome VARCHAR(100) DEFAULT '', cognome VARCHAR(100) DEFAULT '', email VARCHAR(150) DEFAULT '', struttura VARCHAR(255) DEFAULT '')",
         ];
@@ -37,7 +36,7 @@ final class UfficiAteneoTest extends DatabaseDiProva
         $c->istanza(ClientApiAteneo::class, new AnagrafiClientApiFinto());
         $c->istanza(Sito::class, new Sito(dirname(__DIR__, 3), 'https://portale.test/eventi'));
         $this->c = $c;
-        $this->db->esegui("INSERT INTO personale_ateneo (id, nome, cognome, email, struttura) VALUES ('r.zicarelli', 'Rossana', 'Zicarelli', 'R.Zicarelli@Unical.it', 'Area Risorse Umane'), ('senza.mail', 'Mario', 'Rossi', '', 'X')");
+        $this->db->esegui("INSERT INTO personale_ateneo (id, nome, cognome, email, struttura) VALUES ('r.zicarelli', 'Rossana', 'Zicarelli', 'R.Zicarelli@Unical.it', 'Area Risorse Umane'), ('senza.mail', 'Mario', 'Rossi', '', 'X'), ('p.neri', 'Paolo', 'Neri', 'P.Neri@Unical.it', 'X')");
     }
 
     private function servizio(): ServizioUfficiAteneo
@@ -61,7 +60,7 @@ final class UfficiAteneoTest extends DatabaseDiProva
         $this->assertSame('Ufficio non trovato.', $s->salva(99, 'X', '')[1]);
     }
 
-    public function testPersoneDallAnagrafeEAMano(): void
+    public function testPersoneSoloDallAnagrafe(): void
     {
         $s = $this->servizio();
         [$id] = $s->salva(0, 'Ufficio pagamenti', '');
@@ -74,9 +73,8 @@ final class UfficiAteneoTest extends DatabaseDiProva
         $this->assertStringContainsString('non ha un\'email', (string) $s->aggiungiDaAnagrafe($id, 'senza.mail'));
         $this->assertStringContainsString('non trovata', (string) $s->aggiungiDaAnagrafe($id, 'non.esiste'));
 
-        $this->assertStringContainsString('nome ed email', (string) $s->aggiungiAMano($id, 'Paolo', 'non-email'));
-        $this->assertNull($s->aggiungiAMano($id, 'Paolo Neri', 'P.Neri@unical.it'));
-        $this->assertStringContainsString('già parte', (string) $s->aggiungiAMano($id, 'Paolo Neri', 'p.neri@unical.it'));
+        $this->assertNull($s->aggiungiDaAnagrafe($id, 'p.neri'));
+        $this->assertStringContainsString('già parte', (string) $s->aggiungiDaAnagrafe($id, 'p.neri'));
         $this->assertCount(2, $s->persone($id));
 
         $s->togliPersona((int) $s->persone($id)[0]['id']);
@@ -108,7 +106,7 @@ final class UfficiAteneoTest extends DatabaseDiProva
         $s = $this->servizio();
         [$id] = $s->salva(0, 'Pagamenti', '');
         $s->aggiungiDaAnagrafe($id, 'r.zicarelli');
-        $s->aggiungiAMano($id, 'Paolo Neri', 'p.neri@unical.it');
+        $s->aggiungiDaAnagrafe($id, 'p.neri');
         $e = $s->emailDelUfficio($id);
         sort($e);
         $this->assertSame(['p.neri@unical.it', 'r.zicarelli@unical.it'], $e);

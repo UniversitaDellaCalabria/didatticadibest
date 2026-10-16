@@ -16,6 +16,7 @@ use Tests\Doppi\AnagrafiClientApiFinto;
 use Tests\Doppi\IscrizioniRegistroFinto;
 use Tests\Doppi\MailerFinto;
 use Tests\Doppi\OrologioFisso;
+use Tests\Integration\ConDirezione;
 use Tests\Integration\DatabaseDiProva;
 
 /**
@@ -24,6 +25,8 @@ use Tests\Integration\DatabaseDiProva;
  */
 abstract class FslBase extends DatabaseDiProva
 {
+    use ConDirezione;
+
     protected MailerFinto $mailer;
     protected Container $c;
     protected string $radice;
@@ -31,6 +34,7 @@ abstract class FslBase extends DatabaseDiProva
     protected function tabelle(): array
     {
         return [
+            ...$this->tabelleUffici(),
             'pagine_eventi' => "CREATE TABLE pagine_eventi (id INT PRIMARY KEY, slug VARCHAR(80) DEFAULT '', titolo VARCHAR(150) DEFAULT '', colore_primario VARCHAR(20) DEFAULT '#0056B3', visibile TINYINT DEFAULT 1,
                 limite_iscrizioni VARCHAR(20) DEFAULT 'nessuno', conv_url_modello VARCHAR(255) NULL, conv_url_allegato VARCHAR(255) NULL, conv_pec VARCHAR(150) NULL)",
             'eventi' => "CREATE TABLE eventi (id INT AUTO_INCREMENT PRIMARY KEY, pagina_id INT, titolo VARCHAR(150) DEFAULT '', tipo VARCHAR(20) DEFAULT 'evento', archiviato TINYINT DEFAULT 0,
@@ -52,8 +56,8 @@ abstract class FslBase extends DatabaseDiProva
                 in_carico_il DATETIME NULL, in_carico_da VARCHAR(255) NOT NULL DEFAULT \'\', nota_ufficio VARCHAR(500) NOT NULL DEFAULT \'\', convenzione_id INT NULL, protocollata_il DATETIME NULL,
                 token_direttore VARCHAR(40) NULL, da_firmare_il DATETIME NULL, file_definitivo VARCHAR(255) NULL, firmata_direttore_il DATETIME NULL, firmatario_direttore VARCHAR(255) NOT NULL DEFAULT \'\',
                 file_allegato_scuola VARCHAR(255) NULL, protocollo_ingresso VARCHAR(80) NOT NULL DEFAULT \'\', protocollo_ingresso_data DATE NULL)',
-            'impostazioni_sistema' => 'CREATE TABLE impostazioni_sistema (id INT PRIMARY KEY, conv_direttore_nome VARCHAR(150) NOT NULL DEFAULT \'\', conv_direttore_email VARCHAR(150) NOT NULL DEFAULT \'\', conv_direttore_cf VARCHAR(16) NOT NULL DEFAULT \'\')',
-            'utenti' => 'CREATE TABLE utenti (id INT PRIMARY KEY, email VARCHAR(150) NULL, ruolo_id INT DEFAULT 5, scuola_codice VARCHAR(10) NULL)',
+            'impostazioni_sistema' => 'CREATE TABLE impostazioni_sistema (id INT PRIMARY KEY, direttore_assente TINYINT(1) NOT NULL DEFAULT 0, direttore_assente_fino DATE NULL, direttore_assente_da VARCHAR(150) NOT NULL DEFAULT \'\', direttore_assente_il DATETIME NULL)',
+            'utenti' => 'CREATE TABLE utenti (id INT PRIMARY KEY, email VARCHAR(150) NULL, codice_fiscale VARCHAR(16) NULL, ruolo_id INT DEFAULT 5, scuola_codice VARCHAR(10) NULL)',
             'abilitazioni_ambito' => 'CREATE TABLE abilitazioni_ambito (id INT AUTO_INCREMENT PRIMARY KEY, utente_id INT NOT NULL, tipo VARCHAR(20) NOT NULL, pagina_id INT NOT NULL DEFAULT 0)',
             'valutazioni_fsl' => 'CREATE TABLE valutazioni_fsl (id INT AUTO_INCREMENT PRIMARY KEY, prenotazione_id INT NOT NULL, evento_id INT NOT NULL, scuola_codice VARCHAR(10) NULL, compilata_da VARCHAR(150) NULL,
                 risposte_json TEXT NULL, media DECIMAL(3,2) NULL, ripeterebbe VARCHAR(10) NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY uq (prenotazione_id))',

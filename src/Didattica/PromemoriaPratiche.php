@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Didattica;
 
+use App\Portale\SospensionePromemoria;
+
 /** Promemoria del cron: pratiche aperte ferme da più dei giorni indicati nel modulo. */
 final class PromemoriaPratiche
 {
@@ -15,7 +17,8 @@ final class PromemoriaPratiche
         private ModuloRepository $moduli,
         private ServizioIter $iter,
         private FirmaPratica $firme,
-        private ServizioConfermeDocenti $conferme
+        private ServizioConfermeDocenti $conferme,
+        private SospensionePromemoria $sospensione
     )
     {
     }
@@ -29,6 +32,10 @@ final class PromemoriaPratiche
         // Chi deve ancora firmare riceve il suo promemoria; per le altre pratiche vale il tempo massimo del passo (o quello del modulo)
         $n = $this->firme->solleciti() + $this->conferme->solleciti();
         $h = fn ($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
+        // Promemoria al Direttore e agli uffici sospesi: le pratiche ferme non si segnano, così alla riattivazione il promemoria riparte
+        if ($this->sospensione->attiva()) {
+            return $n;
+        }
         foreach ($this->pratiche->candidatePromemoria() as $x) {
             $gg = $this->iter->giorniPasso($this->moduli->perId((int) $x['modulo_id']), (int) $x['passo']);
             if ($gg <= 0 || (int) $x['giorni_fermi'] < $gg || ($x['giorni_dal_promemoria'] !== null && (int) $x['giorni_dal_promemoria'] < $gg)) {

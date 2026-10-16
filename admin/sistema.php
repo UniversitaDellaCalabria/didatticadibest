@@ -52,13 +52,14 @@ if (isset($_POST['controlla_sito'])) {
     admin_redirect("sistema.php?p_id=$filtro_p&r=" . time() . "#controllo");
 }
 
-// 1e. DIRETTORE DEL DIPARTIMENTO: una volta sola per tutto il portale (firma di convenzioni FSL, pratiche degli studenti, Cruscotto del Direttore, riepilogo settimanale)
-if (isset($_POST['salva_direttore'])) {
+// 1f. PROMEMORIA AL DIRETTORE E AGLI UFFICI: si sospendono e si riattivano (alla riattivazione il cron rimanda quanto è dovuto)
+if (isset($_POST['sospendi_promemoria'])) {
     csrf_verify($_POST['csrf_token'] ?? '');
-    $err_dir = \App\Core\App::per($conn)->get(\App\Fsl\ServizioFirmaDirettore::class)->salvaDirettore((string)($_POST['dir_nome'] ?? ''), (string)($_POST['dir_email'] ?? ''), (string)($_POST['dir_cf'] ?? ''));
-    if (!$err_dir && function_exists('registra_log_audit')) registra_log_audit($conn, "Direttore del Dipartimento impostato", ["Email" => (string)($_POST['dir_email'] ?? '')]);
-    flash_set($err_dir ?? "Direttore salvato: vale per le convenzioni, le pratiche degli studenti e il Cruscotto del Direttore.", $err_dir ? 'danger' : 'success');
-    admin_redirect("sistema.php?p_id=$filtro_p&r=" . time() . "#direttore");
+    $sospendi_pr = $_POST['sospendi_promemoria'] === '1';
+    \App\Core\App::per($conn)->get(\App\Portale\SospensionePromemoria::class)->imposta($sospendi_pr, trim((string)($utente_admin['nome'] ?? '') . ' ' . (string)($utente_admin['cognome'] ?? '')) ?: (string)($utente_admin['email'] ?? ''));
+    if (function_exists('registra_log_audit')) registra_log_audit($conn, $sospendi_pr ? "Promemoria al Direttore e agli uffici sospesi" : "Promemoria al Direttore e agli uffici riattivati", []);
+    flash_set($sospendi_pr ? "Promemoria sospesi: il Direttore e gli uffici non ricevono più il riepilogo settimanale né i promemoria delle pratiche e delle firme." : "Promemoria riattivati: al prossimo passaggio del sistema partono i promemoria ancora dovuti.", $sospendi_pr ? 'warning' : 'success');
+    admin_redirect("sistema.php?p_id=$filtro_p&r=" . time() . "#promemoria");
 }
 
 // 2. SALVATAGGIO CONFIGURAZIONI SMTP E TEMPLATE
@@ -95,12 +96,22 @@ if (isset($_POST['save_system_settings'])) {
 <?php $dir_sis = \App\Core\App::per($conn)->get(\App\Fsl\ServizioFirmaDirettore::class)->direttore(); ?>
 <div class="card shadow-sm border-0 p-4 mb-4" id="direttore"<?php echo $dir_sis['email'] === '' ? ' style="border-left:6px solid #dc2626 !important;"' : ''; ?>>
     <h5 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="fa fa-user-tie me-1"></i> Direttore del Dipartimento<?php echo $dir_sis['email'] === '' ? ' <span class="badge bg-danger">da indicare</span>' : ''; ?></h5>
-    <p class="small text-secondary">Si indica <strong>una volta sola</strong> e vale per tutto il portale: firma delle <strong>convenzioni FSL</strong>, firma del Direttore nelle <strong>pratiche degli studenti</strong>, <strong>Cruscotto del Direttore</strong> e riepilogo settimanale. Per firmare accede con la sua email Unical (o SPID/CIE con il codice fiscale indicato): con il codice fiscale il portale controlla anche che il certificato di firma sia il suo.</p>
-    <form method="POST" class="row g-2"><?php csrf_field(); ?>
-        <div class="col-md-4"><label class="form-label small fw-bold mb-0" for="sisDirN">Nome e cognome</label><input class="form-control form-control-sm" id="sisDirN" name="dir_nome" value="<?php echo htmlspecialchars($dir_sis['nome']); ?>" maxlength="150" required></div>
-        <div class="col-md-4"><label class="form-label small fw-bold mb-0" for="sisDirE">Email (riceve i link per firmare)</label><input type="email" class="form-control form-control-sm" id="sisDirE" name="dir_email" value="<?php echo htmlspecialchars($dir_sis['email']); ?>" maxlength="150" required></div>
-        <div class="col-md-3"><label class="form-label small fw-bold mb-0" for="sisDirC">Codice fiscale (facoltativo)</label><input class="form-control form-control-sm font-monospace" id="sisDirC" name="dir_cf" value="<?php echo htmlspecialchars($dir_sis['cf']); ?>" maxlength="16" style="text-transform:uppercase;"></div>
-        <div class="col-md-1 d-flex align-items-end"><button type="submit" name="salva_direttore" value="1" class="btn btn-sm btn-primary w-100">Salva</button></div>
+    <p class="small text-secondary mb-2">Il Direttore e il vice direttore si scelgono dall'anagrafe di Ateneo nella <strong>Direzione del Dipartimento</strong>, in Gestione del portale → Uffici: valgono per tutto il portale (convenzioni FSL, firme nelle pratiche degli studenti, Cruscotto del Direttore, riepilogo settimanale).</p>
+    <p class="mb-2"><?php echo $dir_sis['email'] === '' ? '<strong class="text-danger">Nessun Direttore indicato.</strong>' : 'Firma ora: <strong>' . htmlspecialchars($dir_sis['nome']) . '</strong> (' . htmlspecialchars($dir_sis['email']) . ').'; ?></p>
+    <a class="btn btn-sm btn-primary fw-bold align-self-start" href="uffici.php?u=direzione"><i class="fa fa-sitemap me-1"></i>Apri la Direzione</a>
+</div>
+
+<?php $sosp_pr = \App\Core\App::per($conn)->get(\App\Portale\SospensionePromemoria::class)->stato(); ?>
+<div class="card shadow-sm border-0 p-4 mb-4" id="promemoria" style="border-left:6px solid <?php echo $sosp_pr['attiva'] ? '#f59e0b' : '#15803d'; ?> !important;">
+    <h5 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="fa fa-bell-slash me-1"></i> Promemoria al Direttore e agli uffici <?php echo $sosp_pr['attiva'] ? '<span class="badge bg-warning text-dark">sospesi</span>' : '<span class="badge bg-success">attivi</span>'; ?></h5>
+    <p class="small text-secondary mb-2">Il portale manda al Direttore, al vice e alle persone degli uffici il <strong>riepilogo settimanale «Da fare per te»</strong>, i <strong>promemoria delle pratiche ferme</strong> e i <strong>solleciti di firma al Direttore</strong>. Per il periodo di avvio puoi sospenderli: <strong>non cambia altro</strong> (le email di una richiesta, come il link di firma, partono sempre; docenti, studenti e scuole ricevono i loro promemoria). Quando li <strong>riattivi</strong> il sistema non ha segnato nulla come mandato: al primo passaggio rimanda quello che è ancora dovuto.</p>
+    <form method="POST" class="d-flex flex-wrap gap-2 align-items-center"><?php csrf_field(); ?>
+        <?php if ($sosp_pr['attiva']): ?>
+            <span class="small text-secondary">Sospesi<?php echo $sosp_pr['da'] !== '' ? ' da ' . htmlspecialchars($sosp_pr['da']) : ''; ?><?php echo $sosp_pr['il'] ? ' il ' . htmlspecialchars(date('d/m/Y H:i', strtotime($sosp_pr['il']))) : ''; ?>.</span>
+            <button type="submit" name="sospendi_promemoria" value="0" class="btn btn-success fw-bold" data-confirm="Riattivare i promemoria? Al prossimo passaggio partono quelli ancora dovuti."><i class="fa fa-bell me-1"></i>Riattiva i promemoria</button>
+        <?php else: ?>
+            <button type="submit" name="sospendi_promemoria" value="1" class="btn btn-warning fw-bold" data-confirm="Sospendere i promemoria al Direttore e agli uffici?"><i class="fa fa-bell-slash me-1"></i>Sospendi i promemoria al Direttore e agli uffici</button>
+        <?php endif; ?>
     </form>
 </div>
 

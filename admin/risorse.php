@@ -81,13 +81,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['elimina_risorsa'])) {
 }
 
 // ── Responsabili della risorsa (persone dell'anagrafe di Ateneo) ──
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['aggiungi_responsabile']) || isset($_POST['salva_responsabili']) || isset($_POST['togli_responsabile']))) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['aggiungi_responsabile']) || isset($_POST['salva_responsabili']) || isset($_POST['togli_responsabile']) || isset($_POST['aggiungi_ufficio_resp']) || isset($_POST['togli_ufficio_resp']))) {
     csrf_verify($_POST['csrf_token'] ?? '');
     $svc_resp = \App\Core\App::per($conn)->get(\App\Risorse\ServizioResponsabiliRisorse::class);
     $rid = (int)($_POST['risorsa_id'] ?? 0);
     $r_resp = $rid ? risorsa($conn, $rid) : null;
     if (!$r_resp || (int)$r_resp['pagina_id'] !== (int)$filtro_p) { flash_set("Risorsa non trovata.", 'danger'); $torna(); exit; }
-    if (isset($_POST['aggiungi_responsabile'])) {
+    if (isset($_POST['aggiungi_ufficio_resp'])) {
+        $err = $svc_resp->aggiungiUfficio($rid, (int)($_POST['ufficio_id'] ?? 0));
+        if (!$err) registra_log_audit($conn, "Risorsa: ufficio responsabile aggiunto", ["Risorsa" => $r_resp['nome'], "Ufficio" => (int)($_POST['ufficio_id'] ?? 0)]);
+        flash_set($err ?? "Ufficio aggiunto: tutte le sue persone ricevono le richieste e le gestiscono da «Le mie risorse».", $err ? 'danger' : 'success');
+    } elseif (isset($_POST['togli_ufficio_resp'])) {
+        $xu = $svc_resp->ufficioPerId((int)$_POST['togli_ufficio_resp']);
+        if ($xu && (int)$xu['risorsa_id'] === $rid) { $svc_resp->togliUfficio((int)$xu['id']); registra_log_audit($conn, "Risorsa: ufficio responsabile tolto", ["Risorsa" => $r_resp['nome'], "Ufficio" => (int)$xu['ufficio_id']]); }
+        flash_set("Ufficio tolto dai responsabili.", 'warning');
+    } elseif (isset($_POST['aggiungi_responsabile'])) {
         $err = $svc_resp->aggiungi($rid, (string)($_POST['persona_id'] ?? ''));
         if (!$err) registra_log_audit($conn, "Risorsa: responsabile aggiunto", ["Risorsa" => $r_resp['nome'], "Persona" => $_POST['persona_id'] ?? '']);
         flash_set($err ?? "Responsabile aggiunto: riceve le richieste e le gestisce da «Le mie risorse» nella sua Area personale.", $err ? 'danger' : 'success');
@@ -97,6 +105,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['aggiungi_responsabil
         flash_set("Responsabile tolto.", 'warning');
     } else {
         foreach ($svc_resp->elenco($rid) as $x) $svc_resp->imposta((int)$x['id'], !empty($_POST['notifiche'][$x['id']]), !empty($_POST['approva'][$x['id']]));
+        foreach ($svc_resp->elencoUffici($rid) as $xu) $svc_resp->impostaUfficio((int)$xu['id'], !empty($_POST['notifiche_u'][$xu['id']]), !empty($_POST['approva_u'][$xu['id']]));
         flash_set("Permessi dei responsabili salvati.");
     }
     $torna("&modifica=$rid#responsabili"); exit;
@@ -285,11 +294,12 @@ $url_pub = '../' . $page_cfg['slug'] . '.php';
 <?php endif; ?>
 
 <?php if ($modifica):
-    $svc_resp = \App\Core\App::per($conn)->get(\App\Risorse\ServizioResponsabiliRisorse::class); $resp_r = $svc_resp->elenco((int)$modifica['id']); ?>
+    $svc_resp = \App\Core\App::per($conn)->get(\App\Risorse\ServizioResponsabiliRisorse::class); $resp_r = $svc_resp->elenco((int)$modifica['id']); $uff_r = $svc_resp->elencoUffici((int)$modifica['id']);
+    $uff_tutti = \App\Core\App::per($conn)->get(\App\Uffici\ServizioUffici::class)->elenco(null, true); ?>
 <div class="card border-0 shadow-sm mb-4" id="responsabili" style="border-left:4px solid #0f766e !important;"><div class="card-body">
     <h6 class="fw-bold mb-1"><i class="fa fa-user-shield me-1 text-success" aria-hidden="true"></i>Chi se ne occupa</h6>
     <p class="small text-secondary mb-3">I responsabili si scelgono dall'anagrafe di Ateneo. Ricevono un'email a ogni richiesta e vedono solo questa risorsa (e le altre di cui sono responsabili) in <strong>«Le mie risorse»</strong>, nella loro Area personale: non serve abilitarli al pannello. Se la risorsa richiede approvazione, i responsabili abilitati accettano o rifiutano le richieste.</p>
-    <?php if ($resp_r): ?>
+    <?php if ($resp_r || $uff_r): ?>
     <form method="POST" class="mb-3"><?php csrf_field(); ?><input type="hidden" name="risorsa_id" value="<?php echo (int)$modifica['id']; ?>">
         <div class="table-responsive"><table class="table table-sm align-middle small mb-2">
             <thead class="table-light"><tr><th>Responsabile</th><th class="text-center">Riceve le email</th><th class="text-center">Approva e rifiuta</th><th style="width:40px;"></th></tr></thead><tbody>
@@ -299,6 +309,12 @@ $url_pub = '../' . $page_cfg['slug'] . '.php';
                     <td class="text-center"><input class="form-check-input" type="checkbox" name="approva[<?php echo (int)$x['id']; ?>]" value="1"<?php echo (int)$x['puo_approvare'] ? ' checked' : ''; ?> aria-label="Approva e rifiuta: <?php echo $h($x['nominativo']); ?>"></td>
                     <td><button type="submit" name="togli_responsabile" value="<?php echo (int)$x['id']; ?>" class="btn btn-sm btn-link text-danger p-0" data-confirm="Togliere <?php echo $h($x['nominativo']); ?> dai responsabili?" aria-label="Togli"><i class="fa fa-user-minus" aria-hidden="true"></i></button></td></tr>
             <?php endforeach; ?>
+            <?php foreach ($uff_r as $xu): ?>
+                <tr class="table-light"><td><i class="fa fa-sitemap me-1 text-secondary" aria-hidden="true"></i><strong><?php echo $h($xu['nome']); ?></strong><div class="text-secondary">ufficio · <?php echo (int)$xu['n_persone']; ?> persone</div></td>
+                    <td class="text-center"><input class="form-check-input" type="checkbox" name="notifiche_u[<?php echo (int)$xu['id']; ?>]" value="1"<?php echo (int)$xu['riceve_notifiche'] ? ' checked' : ''; ?> aria-label="Riceve le email: <?php echo $h($xu['nome']); ?>"></td>
+                    <td class="text-center"><input class="form-check-input" type="checkbox" name="approva_u[<?php echo (int)$xu['id']; ?>]" value="1"<?php echo (int)$xu['puo_approvare'] ? ' checked' : ''; ?> aria-label="Approva e rifiuta: <?php echo $h($xu['nome']); ?>"></td>
+                    <td><button type="submit" name="togli_ufficio_resp" value="<?php echo (int)$xu['id']; ?>" class="btn btn-sm btn-link text-danger p-0" data-confirm="Togliere l'ufficio <?php echo $h($xu['nome']); ?> dai responsabili?" aria-label="Togli"><i class="fa fa-trash" aria-hidden="true"></i></button></td></tr>
+            <?php endforeach; ?>
         </tbody></table></div>
         <button type="submit" name="salva_responsabili" value="1" class="btn btn-sm btn-outline-primary"><i class="fa fa-save me-1" aria-hidden="true"></i>Salva i permessi</button>
     </form>
@@ -306,6 +322,12 @@ $url_pub = '../' . $page_cfg['slug'] . '.php';
     <form method="POST" class="dd-scelta-persona"><?php csrf_field(); ?><input type="hidden" name="risorsa_id" value="<?php echo (int)$modifica['id']; ?>"><input type="hidden" name="persona_id" value=""><input type="hidden" name="aggiungi_responsabile" value="1">
         <div class="small fw-bold mb-1">Aggiungi un responsabile dall'anagrafe</div>
         <?php echo html_ricerca_personale($conn, 'Aggiungi'); ?>
+    </form>
+    <form method="POST" class="d-flex flex-wrap gap-2 align-items-end mt-3"><?php csrf_field(); ?><input type="hidden" name="risorsa_id" value="<?php echo (int)$modifica['id']; ?>">
+        <div><label class="form-label small fw-bold mb-0" for="rUff">Oppure un ufficio intero</label>
+            <select class="form-select form-select-sm" id="rUff" name="ufficio_id"><option value="0">— scegli l'ufficio —</option><?php foreach ($uff_tutti as $uf): ?><option value="<?php echo (int)$uf['id']; ?>"><?php echo $h($uf['nome']); ?> (<?php echo (int)$uf['n_persone']; ?>)</option><?php endforeach; ?></select></div>
+        <button type="submit" name="aggiungi_ufficio_resp" value="1" class="btn btn-sm btn-outline-primary fw-bold"><i class="fa fa-sitemap me-1" aria-hidden="true"></i>Aggiungi l'ufficio</button>
+        <div class="form-text w-100">Tutte le persone dell'ufficio ricevono le richieste e le gestiscono da «Le mie risorse». Gli uffici e le persone si gestiscono in <a href="uffici.php">Gestione del portale → Uffici e persone</a>.</div>
     </form>
     <script>
     document.querySelectorAll('.dd-scelta-persona').forEach(function (f) {

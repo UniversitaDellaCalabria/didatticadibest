@@ -851,11 +851,86 @@ var PACCHETTI = [
     ],
     nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
     commit: "Da fare per te, riepilogo settimanale via email e Report FSL per scuola; attestato FSL con la scuola"
+  },
+  {
+    id: "uffici-unici-messaggi-scuole",
+    titolo: "Pacchetto 19 · Uffici di Dipartimento e di Ateneo in un solo posto, Direttore assente, messaggi alle scuole",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare (dopo i pacchetti 16, 17 e 18)",
+    schema: "v71 (comprende la v70: messaggi alle scuole; dopo la v69 del pacchetto 18)",
+    riassunto: "<strong>Una sola anagrafe degli uffici</strong> (Gestione del portale → <em>Uffici e persone</em>): l'amministratore crea gli uffici del Dipartimento (Direzione, protocollo, uffici dei corsi di studio, segreteria…) e di Ateneo (pagamenti…) e vi inserisce le persone, <strong>sempre scelte dall'anagrafe di Ateneo</strong> (niente più nome ed email a mano). Pratiche degli studenti, tutorato, prenotazioni di risorse e convenzioni FSL prendono da lì i destinatari. <strong>Direzione:</strong> Direttore e vice direttore dall'anagrafe; con l'interruttore <strong>«Direttore assente»</strong> (lo attivano Direttore, vice, segreteria di direzione e amministratori, anche dall'Area personale) firme, link e avvisi passano al vice. In più, nella pagina <strong>Convenzioni da seguire</strong> dell'FSL: <strong>promemoria «carica il PDF»</strong> (a una scuola o a tutte) e <strong>messaggi</strong> tra ufficio e scuola.",
+    passi: [["F8", "Uffici di Dipartimento e di Ateneo unificati, persone solo dall'anagrafe"], ["F8", "Direzione: Direttore, vice e «Direttore assente»"], ["F8", "Uffici richiamati da risorse e convenzioni FSL"], ["FSL", "Promemoria e messaggi alla scuola sulla convenzione"]],
+    cartelle: [
+      { cartella: "/ (radice del portale)", file: [
+        ["direttore_assente.php", "nuovo", "F8", "pagina dell'interruttore «Direttore assente» (Direttore, vice, segreteria di direzione)"],
+        ["area_personale.php", "mod", "F8", "card «Direttore assente» per chi può attivarlo"],
+        ["cruscotto_direttore.php", "mod", "F8", "chi firma ora e collegamento a «Direttore assente»; lo vedono anche il vice"],
+        ["convenzione_online.php", "mod", "FSL", "riquadro «Messaggi con il Dipartimento»: la scuola legge e risponde"],
+        ["inc/didattica.php", "mod", "F8", "commenti: gli uffici sono nella tabella uffici"],
+        ["inc/convalide.php", "mod", "F8", "commenti: gli uffici sono nella tabella uffici"],
+        ["inc/sezioni.php", "mod", "F8", "la pagina Uffici è del modulo Gestione del portale"],
+        ["pagamenti_tutorato.php", "mod", "F8", "commento: gli uffici sono in admin/uffici.php"]
+      ]},
+      { cartella: "admin/", file: [
+        ["admin/uffici.php", "nuovo", "F8", "la pagina «Uffici e persone»: uffici del Dipartimento e di Ateneo, persone dall'anagrafe, Direzione e «Direttore assente»"],
+        ["admin/uffici_ateneo.php", "mod", "F8", "vecchio indirizzo: rimanda a uffici.php"],
+        ["admin/admin_header.php", "mod", "F8", "voce «Uffici e persone»; chi è nell'ufficio convenzioni FSL lavora le convenzioni"],
+        ["admin/inizio.php", "mod", "F8", "scheda «Uffici e persone»; «Ricevimento» al posto di «Ufficio e ricevimento»"],
+        ["admin/didattica.php", "mod", "F8", "scheda «Ricevimento»"],
+        ["admin/didattica_ufficio.php", "mod", "F8", "restano solo lo sportello di ricevimento: uffici e persone si gestiscono in Uffici e persone"],
+        ["admin/didattica_pratiche.php", "mod", "F8", "rimandi a «Uffici e persone»"],
+        ["admin/fsl.php", "mod", "FSL F8", "promemoria «carica il PDF», messaggi con la scuola; il Direttore che firma viene dalla Direzione"],
+        ["admin/sistema.php", "mod", "F8", "il Direttore non si imposta più qui: rimando alla Direzione"],
+        ["admin/risorse.php", "mod", "F8", "responsabile di una risorsa: anche un ufficio intero"],
+        ["admin/tutorato.php", "mod", "F8", "messaggio verso «Uffici e persone»"]
+      ]},
+      { cartella: "src/Uffici/ (nuova cartella)", file: [
+        ["src/Uffici/UfficiRepository.php", "nuovo", "F8", "uffici e persone nel database (un'unica anagrafe, con l'op_id dell'operatore)"],
+        ["src/Uffici/ServizioUffici.php", "nuovo", "F8", "regole: persone solo dall'anagrafe, uffici fissi, cosa impedisce l'eliminazione"],
+        ["src/Uffici/Direzione.php", "nuovo", "F8", "Direttore, vice, «Direttore assente», chi firma ora"]
+      ]},
+      { cartella: "src/Didattica/ e src/Ateneo/", file: [
+        ["src/Didattica/UfficioRepository.php", "mod", "F8", "legge e scrive gli uffici del Dipartimento nella tabella uffici"],
+        ["src/Didattica/OperatoreRepository.php", "mod", "F8", "gli operatori sono le persone degli uffici (stesso numero di prima per le pratiche assegnate)"],
+        ["src/Didattica/ServizioUffici.php", "mod", "F8", "rilegge gli uffici prima di controllare l'uso"],
+        ["src/Didattica/FirmaPratica.php", "mod", "F8", "la firma del Direttore va a chi è in carica (vice se il Direttore è assente)"],
+        ["src/Didattica/ModelliPratiche.php", "mod", "F8", "uffici nella nuova tabella"],
+        ["src/Didattica/ServizioFlussoConvalide.php", "mod", "F8", "uffici nella nuova tabella"],
+        ["src/Didattica/Costanti.php", "mod", "F8", "commento"],
+        ["src/Ateneo/UfficioAteneoRepository.php", "mod", "F8", "uffici di Ateneo nella tabella uffici"],
+        ["src/Ateneo/ServizioUfficiAteneo.php", "mod", "F8", "tolto l'inserimento a mano: solo anagrafe"]
+      ]},
+      { cartella: "src/Fsl/, src/Portale/, src/Risorse/ e src/Core/Schema/", file: [
+        ["src/Fsl/MessaggiConvenzioneRepository.php", "nuovo", "FSL", "i messaggi tra ufficio e scuola"],
+        ["src/Fsl/ServizioMessaggiConvenzione.php", "nuovo", "FSL", "promemoria «carica il PDF» (una volta ogni 24 ore), messaggi, risposte della scuola"],
+        ["src/Fsl/NotificheConvenzioni.php", "mod", "FSL", "email: promemoria, messaggio dell'ufficio, messaggio della scuola"],
+        ["src/Fsl/ServizioFirmaDirettore.php", "mod", "F8", "il Direttore viene dalla Direzione; firma il vice se il Direttore è assente"],
+        ["src/Fsl/ConvenzioneCompilataRepository.php", "mod", "F8", "avvisi anche all'ufficio convenzioni FSL"],
+        ["src/Portale/CruscottoDirettore.php", "mod", "F8", "lo vedono Direttore e vice"],
+        ["src/Portale/RiepilogoPersone.php", "mod", "F8", "il riepilogo del Direttore va a chi è in carica"],
+        ["src/Portale/DaFarePersona.php", "mod", "F8", "le persone degli uffici ricevono il riepilogo"],
+        ["src/Risorse/ResponsabileRisorsaRepository.php", "mod", "F8", "responsabili: persone e uffici"],
+        ["src/Risorse/ServizioResponsabiliRisorse.php", "mod", "F8", "aggiungere un ufficio come responsabile"],
+        ["src/Core/Schema/Definizioni.php", "mod", "F8 FSL · anche pacchetti 1-17", "tabelle uffici, uffici_persone, risorse_uffici, convenzioni_messaggi; colonne «Direttore assente»"],
+        ["src/Core/Schema/Migrazioni.php", "mod", "F8 FSL · anche pacchetti 1-17", "versione dello schema: 71; copia uffici e persone dalle tabelle di prima"]
+      ]}
+    ],
+    dopo: [
+      "Apri una pagina del pannello: lo schema passa alla v71 e <strong>copia da solo</strong> uffici e persone delle quattro tabelle di prima nelle nuove (stessi numeri per gli uffici e per le pratiche già assegnate: non si perde niente). Le vecchie tabelle restano ma non si usano più. Non serve cancellare la cache.",
+      "<strong>Admin → Gestione del portale → Uffici e persone</strong>: controlla che ci siano gli uffici di prima (protocollo, uffici dei corsi…) con le loro persone. Le persone inserite a mano in passato hanno il bollino «non collegata all'anagrafe»: toglile e aggiungile dall'anagrafe.",
+      "<strong>Direzione:</strong> il Direttore delle impostazioni è passato nella Direzione (ruolo «Direttore»). Aggiungi il <strong>vice direttore</strong> (ruolo «Vice direttore») e le persone della <strong>Segreteria di direzione</strong>: potranno attivare «Direttore assente» dall'Area personale.",
+      "<strong>Ufficio convenzioni FSL:</strong> le persone che aggiungi qui ricevono l'avviso «convenzione da prendere in carico» e aprono la pagina delle convenzioni senza altre abilitazioni.",
+      "<strong>Compiti:</strong> in un ufficio del flusso delle pratiche una persona nuova ha di partenza «pratiche, sedute, ricevimento»; negli altri uffici nessun compito (è nell'ufficio e riceve gli avvisi, ma non apre il pannello Didattica).",
+      "<strong>Prova veloce:</strong> in FSL → Convenzioni da seguire, su una scuola che non ha ancora caricato il PDF premi «Ricorda di caricare il PDF» e poi scrivile un messaggio: la scuola lo vede nella sua pagina e può rispondere; da Direzione prova «Direttore assente» con un vice indicato."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Uffici di Dipartimento e di Ateneo in un'unica anagrafe con persone solo dall'anagrafe, Direzione con «Direttore assente», uffici richiamabili da risorse e convenzioni, promemoria e messaggi alle scuole sulla convenzione"
   }
 ];
 
 var PROSSIMI = [
-  ["★ PRIORITÀ ALTA · da fare per primo · F8 · Uffici di Dipartimento (organigramma)", "da fare: nuova sezione in Gestione del portale accanto a «Uffici di Ateneo». Direttore e vice direttore, uffici della didattica, dei consigli, segreteria, protocollo, amministrazione, ricerca… ognuno con le sue persone prese dall'anagrafe di Ateneo. Il Direttore dell'organigramma diventa quello unico del portale (convenzioni, pratiche, cruscotto); il vice ha gli stessi permessi ma subentra solo con l'interruttore «Direttore assente» (lo attivano Direttore, vice e segreteria, anche dalla pagina personale del Direttore); gli uffici della didattica (consigli, protocollo, ufficio del corso…) si tolgono dalla Didattica e si prendono tutti da qui. Anche in «Uffici di Ateneo» il personale solo dall'anagrafe (si toglie il campo «nome ed email a mano»). Dettagli nel piano (F8)"],
+  ["F8 · Uffici di Dipartimento e di Ateneo in un'unica anagrafe, Direttore e vice, «Direttore assente»", "fatto in locale: vedi Pacchetto 19 (restano da decidere la pagina pubblica «Organigramma» e un selettore unico per gli eventi)"],
+  ["FSL · Promemoria e messaggi alle scuole sulla convenzione", "fatto in locale: vedi Pacchetto 19"],
   ["D1 · Tutorato: pagamenti", "fatto: vedi Pacchetto 2"],
   ["D2 · Tutorato: import dei vincitori del bando", "fatto: vedi Pacchetto 3"],
   ["D3 · Tutorato: collaudo del flusso intero", "fatto: nessuna modifica ai file"],

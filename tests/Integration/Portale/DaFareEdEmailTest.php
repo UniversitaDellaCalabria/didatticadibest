@@ -15,28 +15,32 @@ use App\Portale\RiepilogoPersone;
 use App\Sistema\FileEnv;
 use Tests\Doppi\MailerFinto;
 use Tests\Doppi\OrologioFisso;
+use Tests\Integration\ConDirezione;
 use Tests\Integration\DatabaseDiProva;
 
 /** «Da fare per te» (l'elenco di ciò che aspetta una persona nei vari moduli) e il riepilogo settimanale per email. */
 final class DaFareEdEmailTest extends DatabaseDiProva
 {
+    use ConDirezione;
+
     private Container $c;
     private MailerFinto $mailer;
     private string $envFile;
 
     /** Tabelle con lo schema vero (colonne aggiunte comprese). */
     private const REALI = ['pratiche', 'pratiche_conferme', 'pratiche_firme', 'didattica_moduli', 'tutorato_incarichi', 'tutorato_registro', 'risorse', 'risorse_responsabili', 'prenotazioni_risorse',
-                           'didattica_sedute', 'didattica_consigli_persone', 'ufficio_didattica', 'riepilogo_persone', 'valutazioni_fsl', 'partecipanti_prenotazione', 'progetti_dettagli', 'risorse_scadenze'];
+                           'didattica_sedute', 'didattica_consigli_persone', 'uffici_persone', 'riepilogo_persone', 'valutazioni_fsl', 'partecipanti_prenotazione', 'progetti_dettagli', 'risorse_scadenze'];
 
     protected function tabelle(): array
     {
         return [
+            ...$this->tabelleUffici(),
             'pagine_eventi' => 'CREATE TABLE pagine_eventi (id INT PRIMARY KEY, titolo VARCHAR(150) DEFAULT \'\')',
             'eventi' => 'CREATE TABLE eventi (id INT AUTO_INCREMENT PRIMARY KEY, pagina_id INT, titolo VARCHAR(150) DEFAULT \'\', tipo VARCHAR(20) DEFAULT \'evento\', archiviato TINYINT DEFAULT 0)',
             'turni' => 'CREATE TABLE turni (id INT AUTO_INCREMENT PRIMARY KEY, evento_id INT, data_turno DATE NULL, orario_inizio TIME NULL, orario_fine TIME NULL)',
             'prenotazioni' => 'CREATE TABLE prenotazioni (id INT AUTO_INCREMENT PRIMARY KEY, turno_id INT, stato VARCHAR(30) NULL DEFAULT \'confermata\', codice_prenotazione VARCHAR(40) DEFAULT \'\', nome VARCHAR(100) NULL,
                 cognome VARCHAR(100) NULL, email VARCHAR(150) NULL, valutazione_token VARCHAR(40) NULL, valutazione_inviata DATETIME NULL)',
-            'impostazioni_sistema' => 'CREATE TABLE impostazioni_sistema (id INT PRIMARY KEY, conv_direttore_nome VARCHAR(150) NOT NULL DEFAULT \'\', conv_direttore_email VARCHAR(150) NOT NULL DEFAULT \'\', conv_direttore_cf VARCHAR(16) NOT NULL DEFAULT \'\')',
+            'impostazioni_sistema' => 'CREATE TABLE impostazioni_sistema (id INT PRIMARY KEY, direttore_assente TINYINT(1) NOT NULL DEFAULT 0, direttore_assente_fino DATE NULL, direttore_assente_da VARCHAR(150) NOT NULL DEFAULT \'\', direttore_assente_il DATETIME NULL)',
         ];
     }
 
@@ -149,7 +153,7 @@ final class DaFareEdEmailTest extends DatabaseDiProva
         $this->db->esegui("INSERT INTO didattica_consigli_persone (consiglio_id, ruolo, email, nominativo) VALUES (1, 'segretario', 'seg@x.it', 'Maria Segretaria'), (1, 'componente', 'comp@x.it', 'Paolo')");
         $this->db->esegui("INSERT INTO didattica_sedute (consiglio_id, organo, data, verbale_stato, verbale_token) VALUES (1, 'Consiglio di Biologia', '2026-10-01', 'segretario', 'vt1')");
         // pratiche dell'operatore
-        $op = $this->db->inserisci("INSERT INTO ufficio_didattica (email, nominativo, ufficio_id) VALUES ('op@x.it', 'Gianna', 7)");
+        $op = $this->db->inserisci("INSERT INTO uffici_persone (email, nominativo, ufficio_id) VALUES ('op@x.it', 'Gianna', 7)");
         $p1 = $this->pratica('in_lavorazione');
         $this->db->esegui('UPDATE pratiche SET assegnata_a = ? WHERE id = ?', [$op, $p1]);
         $p2 = $this->pratica('inviata');
@@ -177,7 +181,7 @@ final class DaFareEdEmailTest extends DatabaseDiProva
     {
         $p = $this->pratica();
         $this->db->esegui("INSERT INTO pratiche_conferme (pratica_id, passo, nome, email, token) VALUES (?, 1, 'Verdi Anna', 'anna.verdi@x.it', 'tc1'), (?, 1, 'Neri Giulia', 'giulia.neri@x.it', 'tc2')", [$p, $p]);
-        $this->db->esegui("INSERT INTO ufficio_didattica (email, nominativo) VALUES ('senza@x.it', 'Senza Pratiche')");
+        $this->db->esegui("INSERT INTO uffici_persone (email, nominativo, ufficio_id) VALUES ('senza@x.it', 'Senza Pratiche', 7)");
         $r = $this->c->get(RiepilogoPersone::class);
         $this->assertTrue($r->ora(new \DateTimeImmutable('2026-10-14 08:00:00')));
         $this->assertFalse($r->ora(new \DateTimeImmutable('2026-10-14 06:30:00')), 'non prima delle 7');
@@ -222,7 +226,7 @@ final class DaFareEdEmailTest extends DatabaseDiProva
 
     public function testIlDirettoreRiceveAncheIlCruscotto(): void
     {
-        $this->db->esegui("INSERT INTO impostazioni_sistema (id, conv_direttore_nome, conv_direttore_email) VALUES (1, 'Mario Bianchi', 'direttore@x.it')");
+        $this->impostaDirettore('Mario Bianchi', 'direttore@x.it');
         $p = $this->pratica();
         $this->db->esegui("INSERT INTO pratiche_firme (pratica_id, passo, tipo, nome, email, token) VALUES (?, 3, 'direttore', 'Mario Bianchi', 'direttore@x.it', 'tf9')", [$p]);
         $r = $this->c->get(RiepilogoPersone::class);

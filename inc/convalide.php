@@ -6,7 +6,7 @@
 //   della pratica, scelto in automatico dal consiglio che ha quel corso → convalide del referente (richiesto → convalidato con un
 //   insegnamento dell'anagrafe, anche inserimento nel piano come a scelta) → seduta e verbale → invio alla segreteria studenti
 //   scelta dal referente, con il verbale; lo studente riceve la sua parte del verbale (estratto) quando si applicano gli esiti.
-// - Uffici con un tipo (didattica_uffici.tipo): 'protocollo', 'cdl' (con il consiglio dei corsi), 'segreteria'.
+// - Uffici con un tipo (uffici.tipo): 'protocollo', 'cdl' (con il consiglio dei corsi), 'segreteria'.
 // La logica sta in src/Didattica/ (ServizioFlussoConvalide, DomandaPdfa, EditorDecisioni): qui restano le facciate.
 // Caricato da functions.php (nell'ordine indicato lì): non includerlo da solo.
 

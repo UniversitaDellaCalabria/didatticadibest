@@ -10,7 +10,7 @@ use App\Core\Sito;
 /**
  * Il flusso delle pratiche che passano dal protocollo (la «Richiesta di convalida/riconoscimento esami»): ufficio protocollo →
  * ufficio del corso di studio della pratica (scelto dal consiglio che ha quel corso) → convalide del referente → seduta e verbale →
- * invio alla segreteria studenti scelta dal referente, con il verbale. Uffici con un tipo (didattica_uffici.tipo): «protocollo»,
+ * invio alla segreteria studenti scelta dal referente, con il verbale. Uffici con un tipo (uffici.tipo): «protocollo»,
  * «cdl» (con il consiglio dei corsi), «segreteria».
  */
 final class ServizioFlussoConvalide implements FlussoPratica
@@ -87,17 +87,17 @@ final class ServizioFlussoConvalide implements FlussoPratica
         $this->uffici->tutti(true);
         if (!$this->ufficiDiTipo('protocollo')) {
             $this->db->esegui(
-                "INSERT INTO didattica_uffici (nome, descrizione, chiave, smista, segue_corsi, ordine, tipo) VALUES (?, ?, 'protocollo', 0, 0, 0, 'protocollo')",
+                "INSERT INTO uffici (nome, descrizione, chiave, ambito, smista, segue_corsi, ordine, tipo) VALUES (?, ?, 'protocollo', 'dipartimento', 0, 0, 0, 'protocollo')",
                 ['Ufficio protocollo', 'Scarica le domande, le protocolla nel sistema di Ateneo e registra numero e data: la pratica passa da sola all\'ufficio del corso di studio']
             );
         }
         foreach ($this->consigli->tutti() as $c) {
-            if ($this->db->valore("SELECT id FROM didattica_uffici WHERE consiglio_id = ?", [(int)$c['id']])) {
+            if ($this->db->valore("SELECT id FROM uffici WHERE consiglio_id = ?", [(int)$c['id']])) {
                 continue;
             }
             $nome = Costanti::NOMI_UFFICI_CONSIGLI[(int)$c['ordine']] ?? ('Ufficio del ' . mb_substr((string)$c['nome'], 0, 130));
             $this->db->esegui(
-                "INSERT INTO didattica_uffici (nome, descrizione, chiave, smista, segue_corsi, ordine, tipo, consiglio_id) VALUES (?, ?, ?, 0, 1, ?, 'cdl', ?)",
+                "INSERT INTO uffici (nome, descrizione, chiave, ambito, smista, segue_corsi, ordine, tipo, consiglio_id) VALUES (?, ?, ?, 'dipartimento', 0, 1, ?, 'cdl', ?)",
                 [$nome, mb_substr('Pratiche dei corsi del ' . $c['nome'], 0, 500), 'cdl_' . (int)$c['id'], 10 + (int)$c['ordine'], (int)$c['id']]
             );
         }

@@ -71,7 +71,7 @@ final class ConvenzioneFirmataTest extends FslBase
 
     private function direttoreConfigurato(): void
     {
-        $this->db->esegui("INSERT INTO impostazioni_sistema (id, conv_direttore_nome, conv_direttore_email) VALUES (1, 'Prof. Mario Bianchi', 'direttore@unical.it')");
+        $this->impostaDirettore('Prof. Mario Bianchi', 'direttore@unical.it');
     }
 
     private function pdf(string $marcatore = '%%FIRMA'): string

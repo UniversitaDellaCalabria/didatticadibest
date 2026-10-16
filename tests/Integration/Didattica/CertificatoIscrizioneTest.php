@@ -27,8 +27,8 @@ final class CertificatoIscrizioneTest extends DidatticaBase
         $this->db->esegui('INSERT INTO didattica_consigli (id, nome, ordine, corsi) VALUES (?, ?, ?, ?)', [1, 'Consiglio di Biologia', 4, '["Corso di laurea in Biologia"]']);
         $this->servizio(ServizioFlussoConvalide::class)->preparaFlusso();
         $this->db->esegui("UPDATE didattica_moduli SET attivo = 1 WHERE chiave = 'certificato'");
-        $this->prot = (int) $this->db->valore("SELECT id FROM didattica_uffici WHERE chiave = 'protocollo'");
-        $this->cdl = (int) $this->db->valore("SELECT id FROM didattica_uffici WHERE chiave = 'cdl_1'");
+        $this->prot = (int) $this->db->valore("SELECT id FROM uffici WHERE chiave = 'protocollo'");
+        $this->cdl = (int) $this->db->valore("SELECT id FROM uffici WHERE chiave = 'cdl_1'");
         $this->operatore('Anna Protocollo', 'protocollo@x.it', 'pratiche', $this->prot);
         $this->operatore('Marco Segreteria', 'segreteria@x.it', 'pratiche', $this->cdl, '["Corso di laurea in Biologia"]');
         $this->m = $this->db->riga("SELECT * FROM didattica_moduli WHERE chiave = 'certificato'");
@@ -143,7 +143,7 @@ final class CertificatoIscrizioneTest extends DidatticaBase
         $this->assertContains('Richiesta modificata dallo studente prima della presa in carico.', $testi);
         $this->assertSame('Pratica non trovata.', $s->modifica($id, $this->m, ['id' => 3] + $this->studente, []), 'solo il proprietario');
         // l'operatore del protocollo la prende in carico
-        $op = (int) $this->db->valore("SELECT id FROM ufficio_didattica WHERE email = 'protocollo@x.it'");
+        $op = (int) $this->db->valore("SELECT op_id FROM uffici_persone WHERE email = 'protocollo@x.it'");
         $this->db->esegui('UPDATE pratiche SET assegnata_a = ? WHERE id = ?', [$op, $id]);
         $this->assertFalse(ServizioPratiche::modificabile($this->pratica($id)));
         $this->assertStringContainsString('già stata presa in carico', (string) $s->modifica($id, $this->m, $this->studente, $this->risposte()));
@@ -206,7 +206,7 @@ final class CertificatoIscrizioneTest extends DidatticaBase
 
     public function testPagamentoPortaAllaFirmaDelDirettoreEStudenteRiceveIlDocumento(): void
     {
-        $this->db->esegui("INSERT INTO impostazioni_sistema (id, conv_direttore_nome, conv_direttore_email) VALUES (1, 'Mario Bianchi', 'direttore@x.it')");
+        $this->impostaDirettore('Mario Bianchi', 'direttore@x.it');
         $id = $this->allaSegreteria();
         $marche = $this->servizio(ServizioMarcheBollo::class);
         $marche->avvisaMarche($id, 1, 'Marco');
@@ -268,7 +268,7 @@ final class CertificatoIscrizioneTest extends DidatticaBase
 
     public function testDiplomaSupplementSenzaPagamentoVaAlDirettore(): void
     {
-        $this->db->esegui("INSERT INTO impostazioni_sistema (id, conv_direttore_nome, conv_direttore_email) VALUES (1, 'Mario Bianchi', 'direttore@x.it')");
+        $this->impostaDirettore('Mario Bianchi', 'direttore@x.it');
         $this->db->esegui("UPDATE didattica_moduli SET attivo = 1 WHERE chiave = 'diploma_supplement'");
         $m = $this->db->riga("SELECT * FROM didattica_moduli WHERE chiave = 'diploma_supplement'");
         $id = $this->servizioPratiche()->crea($m, $this->studente, [

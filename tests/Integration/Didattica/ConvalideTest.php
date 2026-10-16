@@ -33,7 +33,7 @@ final class ConvalideTest extends DidatticaBase
     {
         $f = $this->flusso();
         $f->preparaFlusso();
-        $uffici = $this->db->righe('SELECT nome, chiave, tipo, consiglio_id, segue_corsi, ordine FROM didattica_uffici ORDER BY id');
+        $uffici = $this->db->righe('SELECT nome, chiave, tipo, consiglio_id, segue_corsi, ordine FROM uffici ORDER BY id');
         $this->assertSame(['protocollo', 'protocollo', null, 0, 0], [$uffici[0]['chiave'], $uffici[0]['tipo'], $uffici[0]['consiglio_id'], $uffici[0]['segue_corsi'], $uffici[0]['ordine']]);
         $this->assertSame(['Ufficio CdS Scienze Geologiche', 'cdl_2', 12], [$uffici[1]['nome'], $uffici[1]['chiave'], $uffici[1]['ordine']]);
         $this->assertSame(['Ufficio CdS Biologia, Scienze e Tecnologie Biologiche, Health Biotechnology', 'cdl_1', 14], [$uffici[2]['nome'], $uffici[2]['chiave'], $uffici[2]['ordine']]);
@@ -41,7 +41,7 @@ final class ConvalideTest extends DidatticaBase
         $this->assertSame(['attestati', ''], [$uffici[4]['chiave'], $uffici[4]['tipo']], 'ufficio degli attestati (manager) si crea con le pratiche del portale');
         $this->assertCount(5, $uffici);
         $f->preparaFlusso();
-        $this->assertSame(5, (int) $this->db->valore('SELECT COUNT(*) FROM didattica_uffici'), 'una sola volta');
+        $this->assertSame(5, (int) $this->db->valore('SELECT COUNT(*) FROM uffici'), 'una sola volta');
         $m = $this->db->riga("SELECT * FROM didattica_moduli WHERE chiave = 'convalida_esami'");
         $this->assertSame(['Richiesta di convalida/riconoscimento esami', 0, 'studenti', '["protocollo","@cdl","@segreteria"]'], [$m['titolo'], $m['attivo'], $m['destinatari'], $m['iter_json']]);
         $campi = json_decode($m['campi_json'], true);
@@ -53,8 +53,8 @@ final class ConvalideTest extends DidatticaBase
     {
         $f = $this->flusso();
         $f->preparaFlusso();
-        $bio = (int) $this->db->valore("SELECT id FROM didattica_uffici WHERE chiave = 'cdl_1'");
-        $geo = (int) $this->db->valore("SELECT id FROM didattica_uffici WHERE chiave = 'cdl_2'");
+        $bio = (int) $this->db->valore("SELECT id FROM uffici WHERE chiave = 'cdl_1'");
+        $geo = (int) $this->db->valore("SELECT id FROM uffici WHERE chiave = 'cdl_2'");
         $this->assertSame($bio, $f->ufficioDelCorso(' CORSO di laurea in biologia '), 'dai corsi del consiglio');
         $this->assertSame($geo, $f->ufficioDelCorso('Scienze Geologiche'), 'dal nome del consiglio se non ha i corsi indicati');
         $this->assertNull($f->ufficioDelCorso('Scienze Geo'), 'la parola deve finire');
@@ -69,8 +69,8 @@ final class ConvalideTest extends DidatticaBase
     {
         $this->flusso()->preparaFlusso();
         $this->db->esegui("UPDATE didattica_moduli SET attivo = 1 WHERE chiave = 'convalida_esami'");
-        $this->operatore('Anna Protocollo', 'protocollo@x.it', 'pratiche', (int) $this->db->valore("SELECT id FROM didattica_uffici WHERE chiave = 'protocollo'"));
-        $bio = (int) $this->db->valore("SELECT id FROM didattica_uffici WHERE chiave = 'cdl_1'");
+        $this->operatore('Anna Protocollo', 'protocollo@x.it', 'pratiche', (int) $this->db->valore("SELECT id FROM uffici WHERE chiave = 'protocollo'"));
+        $bio = (int) $this->db->valore("SELECT id FROM uffici WHERE chiave = 'cdl_1'");
         $this->operatore('Maria Referente', 'maria.verdi@x.it', 'pratiche', $bio, '["Corso di laurea in Biologia"]');
         $this->operatore('Paolo Altro', 'paolo@x.it', 'pratiche', $bio);
         $m = $this->db->riga("SELECT * FROM didattica_moduli WHERE chiave = 'convalida_esami'");
@@ -93,7 +93,7 @@ final class ConvalideTest extends DidatticaBase
     {
         $this->flusso()->preparaFlusso();
         $this->db->esegui("UPDATE didattica_moduli SET attivo = 1 WHERE chiave = 'convalida_esami'");
-        $prot = (int) $this->db->valore("SELECT id FROM didattica_uffici WHERE chiave = 'protocollo'");
+        $prot = (int) $this->db->valore("SELECT id FROM uffici WHERE chiave = 'protocollo'");
         $this->operatore('Anna Protocollo', 'protocollo@x.it', 'pratiche', $prot);
         $m = $this->db->riga("SELECT * FROM didattica_moduli WHERE chiave = 'convalida_esami'");
         $id = $this->servizio(ServizioPratiche::class)->crea($m, ['id' => 2, 'nome' => 'Luca', 'cognome' => 'Rossi', 'email' => 'luca@x.it'], []);
@@ -130,7 +130,7 @@ final class ConvalideTest extends DidatticaBase
         [$err, $msg] = $f->registraProtocollo($id, '', '', 1, 'Anna', true);
         $this->assertSame([null, 'Protocollo registrato: la pratica è passata a «Ufficio CdS Biologia, Scienze e Tecnologie Biologiche, Health Biotechnology».'], [$err, $msg]);
         $p = $this->servizio(ServizioPratiche::class)->pratica($id);
-        $maria = (int) $this->db->valore("SELECT id FROM ufficio_didattica WHERE email = 'maria.verdi@x.it'");
+        $maria = (int) $this->db->valore("SELECT op_id FROM uffici_persone WHERE email = 'maria.verdi@x.it'");
         $this->assertSame([$maria, 2, 'in_lavorazione', 'Anna'], [$p['assegnata_a'], $p['passo'], $p['stato'], $p['bollo_da']], 'la persona che segue il corso della pratica');
         $this->assertSame($p['ufficio_id'], $p['cdl_id']);
         $this->assertEqualsCanonicalizing(['maria.verdi@x.it', 'paolo@x.it', 'luca@x.it'], array_column($this->mailer->inviate, 'a'), 'le persone dell\'ufficio e lo studente');

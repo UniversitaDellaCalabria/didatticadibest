@@ -1,6 +1,6 @@
 <?php
 // pagamenti_tutorato.php - Ufficio pagamenti del tutorato (serve l'accesso con le credenziali Unical): le persone associate a un ufficio di Ateneo
-// (admin/uffici_ateneo.php) vedono le pratiche che il referente ha validato e passato, con tutti i documenti (decreti, UNILAV, lettera di incarico
+// (admin/uffici.php) vedono le pratiche che il referente ha validato e passato, con tutti i documenti (decreti, UNILAV, lettera di incarico
 // protocollata, registro, fine attività, dichiarazione individuale), le lavorano e segnano «pagato» (data e riferimento) oppure le rimandano al
 // referente con una nota. L'IBAN è mascherato: mostrarlo si registra. Logica in src/Tutorato/ServizioPagamenti.php.
 require_once __DIR__ . '/middleware.php';

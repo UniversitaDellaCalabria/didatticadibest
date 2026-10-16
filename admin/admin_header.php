@@ -136,7 +136,8 @@ if ($filtro_p > 0) {
 // ==============================================================================
 $uid_rbac = (int)$u_id_curr;
 $puo_fsl             = $is_full_admin || ha_modulo($conn, $uid_rbac, 'fsl'); // modulo FSL, perimetro «fsl» o modulo Orientamento (come prima)
-$puo_fsl_convenzioni = $puo_fsl || ha_ambito($conn, $uid_rbac, 'fsl_convenzioni');
+// Le persone dell'ufficio «Ufficio convenzioni FSL» (Gestione del portale → Uffici) lavorano le convenzioni delle scuole
+$puo_fsl_convenzioni = $puo_fsl || ha_ambito($conn, $uid_rbac, 'fsl_convenzioni') || \App\Core\App::per($conn)->get(\App\Uffici\ServizioUffici::class)->utenteMembro($utente_admin, 'convenzioni_fsl');
 $puo_fsl_scuole      = $puo_fsl || ha_ambito($conn, $uid_rbac, 'fsl_scuole');
 $puo_didattica_tutto = $is_full_admin || ha_modulo($conn, $uid_rbac, 'didattica') || utente_operatore_ufficio($conn, $utente_admin);
 // Referenti dei consigli dei corsi di studio: solo le sedute dei loro consigli
@@ -426,7 +427,8 @@ $colore_lato = $modulo_corrente === 'portale' ? '#64748b' : $colore_modulo; // l
                     $voce_menu([], 'didattica.php?tab=sedute', 'fa-gavel', $puo_didattica_tutto ? 'Sedute e verbali' : 'Sedute del consiglio', $tab_did === 'sedute', \App\Core\App::get(\App\Portale\CoseDaFare::class)->verbaliInFirma($puo_didattica_tutto ? null : $consigli_referente));
                     if ($puo_didattica_tutto) {
                         $voce_menu([], 'didattica.php?tab=moduli', 'fa-file-lines', 'Moduli e documenti', $tab_did === 'moduli');
-                        $voce_menu([], 'didattica.php?tab=ufficio', 'fa-people-group', 'Ufficio e ricevimento', $tab_did === 'ufficio');
+                        $voce_menu([], 'didattica.php?tab=ufficio', 'fa-user-clock', 'Ricevimento', $tab_did === 'ufficio');
+                        if (!$is_full_admin) $voce_menu(['uffici.php'], 'uffici.php', 'fa-sitemap', 'Uffici e persone');
                         $voce_menu([], 'didattica.php?tab=statistiche', 'fa-chart-column', 'Statistiche', $tab_did === 'statistiche');
                     }
                     if ($puo_tutorato) { $n_tut_val = 0; try { $n_tut_val = \App\Core\App::get(\App\Portale\CoseDaFare::class)->tutoratoDaValidare(); } catch (\Throwable $e) { error_log('Menu, tutorato: ' . $e->getMessage()); } $voce_menu(['tutorato.php'], 'tutorato.php', 'fa-user-graduate', 'Tutorato · lettere di incarico', false, $n_tut_val); } ?>
@@ -453,7 +455,7 @@ $colore_lato = $modulo_corrente === 'portale' ? '#64748b' : $colore_modulo; // l
                             <?php $voce_menu(['menu.php'], 'menu.php', 'fa-link', 'Menu'); ?>
                         <?php $chiudi_gruppo(); ?>
                         <?php $voce_menu(['utenti.php'], 'utenti.php', 'fa-users-cog', 'Utenti e abilitazioni'); ?>
-                        <?php $voce_menu(['uffici_ateneo.php'], 'uffici_ateneo.php', 'fa-building-columns', 'Uffici di Ateneo'); ?>
+                        <?php $voce_menu(['uffici.php', 'uffici_ateneo.php'], 'uffici.php', 'fa-sitemap', 'Uffici e persone'); ?>
                         <?php $voce_menu(['sistema.php', 'audit_log.php', 'log_accessi.php'], 'sistema.php', 'fa-gear', 'Sistema e registri'); ?>
                     <?php endif; ?>
                 <?php endif; ?>

@@ -70,7 +70,7 @@ final class DaFarePersona
             "SELECT pr.email FROM prenotazioni pr JOIN turni t ON t.id = pr.turno_id JOIN progetti_dettagli pd ON pd.evento_id = t.evento_id WHERE pd.attestati = 1 AND pr.email <> ''",
             "SELECT email FROM risorse_responsabili WHERE puo_approvare = 1",
             "SELECT email FROM didattica_consigli_persone WHERE ruolo IN ('segretario', 'coordinatore')",
-            "SELECT email FROM ufficio_didattica",
+            "SELECT email FROM uffici_persone",
         ];
         $emails = [];
         foreach ($fonti as $q) {
@@ -235,7 +235,7 @@ final class DaFarePersona
     /** Pratiche degli studenti in carico alla persona (operatore dell'Ufficio didattico) o da prendere in carico nel suo ufficio. */
     private function pratiche(string $email): array
     {
-        $op = $this->db->riga('SELECT id, ufficio_id FROM ufficio_didattica WHERE LOWER(email) = ? LIMIT 1', [$email]);
+        $op = $this->db->riga('SELECT op_id AS id, ufficio_id FROM uffici_persone WHERE LOWER(email) = ? AND op_id IS NOT NULL ORDER BY id LIMIT 1', [$email]);
         if (!$op) {
             return $this->gruppo('pratiche', 'Pratiche da lavorare', 'fa-inbox', '#047857', 0, [], static fn (array $x): array => []);
         }

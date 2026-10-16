@@ -29,7 +29,7 @@ $q = fn(string $sql) => $conn->query($sql) ?: print("ERRORE SQL: {$conn->error}\
 
 // ── Pulizia dello scenario precedente ──
 foreach (['pratiche_eventi', 'pratiche_firme', 'pratiche_conferme', 'pratiche_operatori', 'pratiche', 'didattica_sedute_presenze', 'didattica_sedute_punti', 'didattica_sedute',
-          'prenotazioni_risorse_attesa', 'prenotazioni_risorse', 'risorse_scadenze', 'risorse_orari', 'risorse_responsabili', 'risorse', 'ufficio_didattica', 'personale_ateneo', 'corsi_studio'] as $t) {
+          'prenotazioni_risorse_attesa', 'prenotazioni_risorse', 'risorse_scadenze', 'risorse_orari', 'risorse_responsabili', 'risorse', 'uffici_persone', 'personale_ateneo', 'corsi_studio'] as $t) {
     @$conn->query("DELETE FROM $t");
 }
 $q("DELETE FROM utenti WHERE id >= 5");
@@ -58,11 +58,17 @@ $q("INSERT INTO corsi_studio (codice, nome, tipo, tipo_descrizione, visibile, pr
 $q("UPDATE didattica_consigli SET corsi = '[\"Corso di laurea in Biologia\", \"Corso di laurea in Scienze e Tecnologie Biologiche\", \"Corso di laurea magistrale in Biologia\"]' WHERE id = 4");
 $q("UPDATE didattica_consigli SET corsi = '[\"Corso di laurea in Scienze Naturali e Ambientali\"]' WHERE id = 1");
 $q("UPDATE didattica_consigli SET corsi = '[\"Corso di laurea magistrale a ciclo unico in Conservazione e Restauro dei Beni Culturali\"]' WHERE id = 5");
-$q("UPDATE impostazioni_sistema SET conv_direttore_nome = 'Mario Bianchi', conv_direttore_email = 'mario.bianchi@example.org', conv_direttore_cf = 'BNCMRA65A01D086Z' WHERE id = 1");
+$q("UPDATE impostazioni_sistema SET direttore_assente = 0, direttore_assente_fino = NULL WHERE id = 1");
+// La Direzione: Mario Bianchi Direttore (dall'anagrafe di prova, in uffici_persone con ruolo)
+$q("INSERT INTO uffici_persone (ufficio_id, email, nominativo, ruolo) SELECT id, 'mario.bianchi@example.org', 'Mario Bianchi', 'Direttore' FROM uffici WHERE chiave = 'direzione'");
 
 // ── Uffici e persone ──
-$uff = fn(string $chiave): int => (int) $db->valore('SELECT id FROM didattica_uffici WHERE chiave = ?', [$chiave]);
-$op = fn(string $nome, string $email, string $compiti, string $ufficio, ?string $corsi = null) => $db->inserisci('INSERT INTO ufficio_didattica (nominativo, email, compiti, ufficio_id, corsi, ruolo) VALUES (?, ?, ?, ?, ?, ?)', [$nome, $email, $compiti, $uff($ufficio), $corsi, 'Ufficio didattico']);
+$uff = fn(string $chiave): int => (int) $db->valore('SELECT id FROM uffici WHERE chiave = ?', [$chiave]);
+$op = function (string $nome, string $email, string $compiti, string $ufficio, ?string $corsi = null) use ($db, $uff) {
+    $o = (int) ($db->valore('SELECT MIN(op_id) FROM uffici_persone WHERE email = ? AND op_id IS NOT NULL', [$email]) ?? 0);
+    $id = $db->inserisci('INSERT INTO uffici_persone (ufficio_id, email, nominativo, ruolo, compiti, corsi, op_id) VALUES (?, ?, ?, ?, ?, ?, ?)', [$uff($ufficio), $email, $nome, 'Ufficio didattico', $compiti, $corsi, $o ?: null]);
+    if (!$o) $db->esegui('UPDATE uffici_persone SET op_id = id WHERE id = ?', [$id]);
+};
 $op('Anna Protocollo', 'anna.protocollo@example.org', 'pratiche', 'protocollo');
 $op('Marco Referente', 'marco.referente@example.org', 'pratiche,sedute', 'cdl_4', '["Corso di laurea in Biologia", "Corso di laurea in Scienze e Tecnologie Biologiche", "Corso di laurea magistrale in Biologia"]');
 $op('Chiara Internazionale', 'chiara.internazionale@example.org', 'pratiche', 'internazionalizzazione');

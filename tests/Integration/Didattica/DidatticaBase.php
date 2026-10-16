@@ -31,6 +31,7 @@ use Tests\Doppi\FirmaRemotaFinta;
 use Tests\Doppi\FirmeFinte;
 use Tests\Doppi\MailerFinto;
 use Tests\Doppi\OrologioFisso;
+use Tests\Integration\ConDirezione;
 use Tests\Integration\DatabaseDiProva;
 
 /**
@@ -39,6 +40,8 @@ use Tests\Integration\DatabaseDiProva;
  */
 abstract class DidatticaBase extends DatabaseDiProva
 {
+    use ConDirezione;
+
     protected MailerFinto $mailer;
     protected AuthSessioneInMemoria $sessione;
     protected Container $c;
@@ -49,36 +52,8 @@ abstract class DidatticaBase extends DatabaseDiProva
     protected function tabelle(): array
     {
         return [
-            'didattica_uffici' => <<<'SQL'
-                CREATE TABLE `didattica_uffici` (
-                  `id` int(11) NOT NULL AUTO_INCREMENT,
-                  `nome` varchar(150) NOT NULL DEFAULT '',
-                  `descrizione` varchar(500) DEFAULT '',
-                  `chiave` varchar(30) DEFAULT NULL,
-                  `smista` tinyint(1) NOT NULL DEFAULT 0,
-                  `segue_corsi` tinyint(1) NOT NULL DEFAULT 0,
-                  `ordine` int(11) NOT NULL DEFAULT 0,
-                  `creato_il` datetime DEFAULT current_timestamp(),
-                  `tipo` varchar(20) NOT NULL DEFAULT '',
-                  `consiglio_id` int(11) DEFAULT NULL,
-                  PRIMARY KEY (`id`)
-                )
-                SQL,
-            'ufficio_didattica' => <<<'SQL'
-                CREATE TABLE `ufficio_didattica` (
-                  `id` int(11) NOT NULL AUTO_INCREMENT,
-                  `persona_id` varchar(80) DEFAULT NULL,
-                  `email` varchar(150) NOT NULL DEFAULT '',
-                  `nominativo` varchar(200) NOT NULL DEFAULT '',
-                  `ruolo` varchar(100) DEFAULT '',
-                  `compiti` varchar(100) NOT NULL DEFAULT '',
-                  `creato_il` datetime DEFAULT current_timestamp(),
-                  `ufficio_id` int(11) DEFAULT NULL,
-                  `corsi` text DEFAULT NULL,
-                  PRIMARY KEY (`id`),
-                  UNIQUE KEY `uq_email` (`email`)
-                )
-                SQL,
+            'uffici' => "CREATE TABLE uffici (id INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(150) NOT NULL DEFAULT '', descrizione VARCHAR(500) DEFAULT '', chiave VARCHAR(30) NULL, ambito VARCHAR(12) NOT NULL DEFAULT 'dipartimento', smista TINYINT(1) NOT NULL DEFAULT 0, segue_corsi TINYINT(1) NOT NULL DEFAULT 0, ordine INT NOT NULL DEFAULT 0, tipo VARCHAR(20) NOT NULL DEFAULT '', consiglio_id INT NULL, attivo TINYINT(1) NOT NULL DEFAULT 1, creato_il DATETIME DEFAULT CURRENT_TIMESTAMP)",
+            'uffici_persone' => "CREATE TABLE uffici_persone (id INT AUTO_INCREMENT PRIMARY KEY, ufficio_id INT NOT NULL, persona_id VARCHAR(80) NULL, email VARCHAR(150) NOT NULL DEFAULT '', nominativo VARCHAR(200) NOT NULL DEFAULT '', struttura VARCHAR(255) DEFAULT '', ruolo VARCHAR(100) DEFAULT '', compiti VARCHAR(100) NOT NULL DEFAULT '', corsi TEXT NULL, op_id INT NULL, creato_il DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY uq (ufficio_id, email))",
             'didattica_moduli' => <<<'SQL'
                 CREATE TABLE `didattica_moduli` (
                   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -243,9 +218,10 @@ abstract class DidatticaBase extends DatabaseDiProva
             'impostazioni_sistema' => <<<'SQL'
                 CREATE TABLE `impostazioni_sistema` (
                   `id` int(11) NOT NULL,
-                  `conv_direttore_nome` varchar(150) NOT NULL DEFAULT '',
-                  `conv_direttore_email` varchar(150) NOT NULL DEFAULT '',
-                  `conv_direttore_cf` varchar(16) NOT NULL DEFAULT '',
+                  `direttore_assente` tinyint(1) NOT NULL DEFAULT 0,
+                  `direttore_assente_fino` date DEFAULT NULL,
+                  `direttore_assente_da` varchar(150) NOT NULL DEFAULT '',
+                  `direttore_assente_il` datetime DEFAULT NULL,
                   PRIMARY KEY (`id`)
                 )
                 SQL,
@@ -391,13 +367,17 @@ abstract class DidatticaBase extends DatabaseDiProva
     /** Un ufficio dell'Ufficio didattico. */
     protected function ufficio(string $nome, string $tipo = '', int $smista = 0, ?string $chiave = null): int
     {
-        return $this->db->inserisci('INSERT INTO didattica_uffici (nome, tipo, smista, chiave, segue_corsi) VALUES (?, ?, ?, ?, 1)', [$nome, $tipo, $smista, $chiave]);
+        return $this->db->inserisci('INSERT INTO uffici (nome, tipo, smista, chiave, segue_corsi) VALUES (?, ?, ?, ?, 1)', [$nome, $tipo, $smista, $chiave]);
     }
 
     /** Un operatore (email e compiti), eventualmente in un ufficio e con i corsi che segue. */
     protected function operatore(string $nome, string $email, string $compiti = 'pratiche', ?int $ufficio = null, ?string $corsiJson = null): int
     {
-        return $this->db->inserisci('INSERT INTO ufficio_didattica (nominativo, email, compiti, ufficio_id, corsi) VALUES (?, ?, ?, ?, ?)', [$nome, $email, $compiti, $ufficio, $corsiJson]);
+        $ufficio ??= (int) ($this->db->valore("SELECT id FROM uffici WHERE chiave = 'operatore'") ?: $this->db->inserisci("INSERT INTO uffici (nome, chiave) VALUES ('Segreteria didattica', 'operatore')"));
+        $id = $this->db->inserisci('INSERT INTO uffici_persone (nominativo, email, compiti, ufficio_id, corsi) VALUES (?, ?, ?, ?, ?)', [$nome, $email, $compiti, $ufficio, $corsiJson]);
+        $this->db->esegui('UPDATE uffici_persone SET op_id = id WHERE id = ?', [$id]);
+
+        return $id;
     }
 
     /** Un modulo online. */

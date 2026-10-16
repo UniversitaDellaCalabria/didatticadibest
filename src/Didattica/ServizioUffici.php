@@ -247,6 +247,7 @@ final class ServizioUffici
      */
     public function usoUfficio(int $id): array
     {
+        $this->uffici->tutti(true);
         $inIter = 0;
         foreach (Righe::testo($this->db->righe('SELECT iter_json FROM didattica_moduli WHERE iter_json IS NOT NULL')) as $mi) {
             foreach (json_decode((string) $mi['iter_json'], true) ?: [] as $x) {

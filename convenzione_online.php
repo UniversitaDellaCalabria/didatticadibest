@@ -65,6 +65,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['carica_firmata'])) {
     $cc = $conv_online->perToken($cc['token']) ?: $cc;
 }
 
+// ── Messaggi con il Dipartimento: la scuola risponde o scrive all'ufficio ──
+$msg_serv = \App\Core\App::per($conn)->get(\App\Fsl\ServizioMessaggiConvenzione::class);
+$msg_rep = \App\Core\App::per($conn)->get(\App\Fsl\MessaggiConvenzioneRepository::class);
+$errore_msg = null;
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['scrivi_ufficio'])) {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    $errore_msg = $msg_serv->rispondi($cc, (string)($_POST['testo'] ?? ''));
+    if ($errore_msg === null) {
+        flash_set("Messaggio mandato: l'ufficio lo riceve per email e ti risponde appena può.");
+        header('Location: convenzione_online.php?t=' . $cc['token'] . '&r=' . time() . '#messaggi'); exit;
+    }
+}
+
 // ── Salvataggio del modulo ──
 $errori = [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['salva_convenzione'])) {
@@ -156,6 +169,24 @@ require_once 'header.php';
     </div></section>
     <?php endif; ?>
     <?php endif; ?>
+
+    <?php $conv_msg = $msg_rep->della((int)$cc['id']); $msg_rep->segnaLetti((int)$cc['id'], 'scuola'); ?>
+    <section id="messaggi" class="card border-0 shadow-sm mb-4" style="border-left:5px solid #0056b3 !important;"><div class="card-body">
+        <h2 class="h5 fw-bold"><i class="fa fa-comments me-1" style="color:#0056b3;" aria-hidden="true"></i>Messaggi con il Dipartimento</h2>
+        <?php if ($errore_msg): ?><div class="alert alert-danger" role="alert"><i class="fa fa-triangle-exclamation me-1" aria-hidden="true"></i><?php echo $h($errore_msg); ?></div><?php endif; ?>
+        <?php if ($conv_msg): ?><div class="d-flex flex-column gap-2 my-3" style="max-height:320px;overflow:auto;">
+            <?php foreach ($conv_msg as $m): $mia = $m['da'] === 'scuola'; ?>
+                <div class="rounded-3 p-2 px-3 small" style="max-width:90%;<?php echo $mia ? 'align-self:flex-end;background:#eff6ff;' : 'align-self:flex-start;background:#fef2f2;'; ?>">
+                    <div class="text-secondary"><?php echo $mia ? 'Tu' : 'Dipartimento'; ?> · <?php echo $h(date('d/m/Y H:i', strtotime((string)$m['creato_il']))); ?></div>
+                    <div><?php echo nl2br($h($m['testo'])); ?></div></div>
+            <?php endforeach; ?></div>
+        <?php else: ?><p class="small text-secondary">Qui trovi i messaggi dell'ufficio e puoi scrivergli per dubbi o problemi con la convenzione.</p><?php endif; ?>
+        <form method="POST" class="d-flex flex-column gap-2"><?php csrf_field(); ?>
+            <label class="form-label small fw-bold mb-0" for="cvTesto">Scrivi all'ufficio</label>
+            <textarea class="form-control" id="cvTesto" name="testo" rows="3" maxlength="1500" required placeholder="Es. Il Dirigente ha firmato ma il file non viene accettato…"></textarea>
+            <div><button type="submit" name="scrivi_ufficio" value="1" class="btn fw-bold text-white" style="background:#0056b3;"><i class="fa fa-paper-plane me-1" aria-hidden="true"></i>Manda il messaggio</button></div>
+        </form>
+    </div></section>
 
     <form method="POST" enctype="multipart/form-data">
         <?php csrf_field(); ?>

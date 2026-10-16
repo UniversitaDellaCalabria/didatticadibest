@@ -16,8 +16,8 @@ use Closure;
  */
 final class Migrazioni
 {
-    /** 66: nessuna tabella nuova; fa rifare i dati di partenza dei moduli (certificato unico, immatricolazioni e trasferimenti, pratiche di carriera). */
-    public const VERSIONE = 69;
+    /** 72: interruttore per sospendere i promemoria al Direttore e agli uffici. 71: uffici di Dipartimento e di Ateneo in un'unica anagrafe (tabelle uffici e uffici_persone): la migrazione copia i dati delle quattro tabelle di prima. */
+    public const VERSIONE = 72;
 
     /**
      * @param list<string> $gruppiPersonale gruppi assegnati al login in base al ruolo in Ateneo (GRUPPI_PERSONALE)
@@ -124,19 +124,12 @@ final class Migrazioni
             $this->db->comando('ALTER TABLE scuole ADD INDEX idx_luogo (regione, provincia, comune)');
         }
 
-        // 4c. v37: uffici di partenza dell'Ufficio didattico (si cambiano dal pannello) e personale già assegnato a un profilo
-        if ((int) ($this->db->valore('SELECT COUNT(*) n FROM didattica_uffici') ?? 1) === 0) {
-            $this->db->comando("INSERT INTO didattica_uffici (nome, descrizione, chiave, smista, segue_corsi, ordine) VALUES
-                ('Manager dell’Ufficio didattico', 'Riceve le pratiche nuove e le smista', 'manager', 1, 0, 1),
-                ('Referenti dei corsi di studio', 'Istruttoria e verbali dei consigli di corso', 'referente_cdl', 0, 1, 2),
-                ('Carriere studenti', 'Registrazione in carriera', 'carriere', 0, 0, 3),
-                ('Internazionalizzazione', 'Mobilità e attività all’estero', 'internazionalizzazione', 0, 0, 4),
-                ('Segreteria didattica', 'Operatori dell’ufficio', 'operatore', 0, 0, 5)");
-        }
+        // 4c. v37: personale già assegnato a un profilo (tabella di prima, poi copiata negli uffici); v71: uffici e persone in un solo posto
         $profilo = $this->db->comando("SHOW COLUMNS FROM ufficio_didattica LIKE 'profilo'");
         if ($profilo instanceof \mysqli_result && $profilo->num_rows) {
             $this->db->comando('UPDATE ufficio_didattica o JOIN didattica_uffici u ON u.chiave = o.profilo SET o.ufficio_id = u.id WHERE o.ufficio_id IS NULL');
         }
+        $this->migraUffici();
 
         // 4d. v38: i consigli dei corsi di studio del Dipartimento (si cambiano dal pannello Didattica → Sedute e verbali → Consigli)
         if ((int) ($this->db->valore('SELECT COUNT(*) n FROM didattica_consigli') ?? 1) === 0) {
@@ -159,6 +152,91 @@ final class Migrazioni
                       WHERE smtp_from_name LIKE '%Eventi%DiBEST%'");
         if ($this->dopo !== null) {
             ($this->dopo)();
+        }
+    }
+
+    /**
+     * v71: copia uffici e persone delle quattro tabelle di prima nell'organigramma (uffici, uffici_persone), una volta sola (finché non c'è l'ufficio
+     * «direzione»), poi crea gli uffici di partenza. Gli uffici del Dipartimento tengono lo stesso id (le pratiche in corso e l'iter dei moduli non cambiano);
+     * quelli di Ateneo ne hanno uno nuovo e i bandi di tutorato che li usano sono aggiornati. Le tabelle di prima restano, non più usate.
+     */
+    private function migraUffici(): void
+    {
+        $giaFatto = (int) ($this->db->valore("SELECT COUNT(*) n FROM uffici WHERE chiave = 'direzione'") ?? 1) > 0;
+        if (!$giaFatto) {
+            // 1. uffici dell'Ufficio didattico: stessi id
+            $this->db->comando("INSERT IGNORE INTO uffici (id, nome, descrizione, chiave, ambito, smista, segue_corsi, ordine, tipo, consiglio_id, creato_il)
+                SELECT id, nome, descrizione, chiave, 'dipartimento', smista, segue_corsi, ordine, tipo, consiglio_id, creato_il FROM didattica_uffici");
+            // 2. personale dell'Ufficio didattico: una riga per ufficio (il principale e gli altri); chi non ha ufficio va nella segreteria didattica
+            $generico = (int) ($this->db->valore("SELECT id FROM uffici WHERE chiave = 'operatore' LIMIT 1") ?? 0);
+            if ($generico === 0 && (int) $this->db->valore('SELECT COUNT(*) FROM ufficio_didattica') > 0) {
+                $generico = $this->db->inserisci("INSERT INTO uffici (nome, descrizione, chiave, ambito, ordine) VALUES ('Segreteria didattica', 'Operatori dell’ufficio', 'operatore', 'dipartimento', 99)");
+            }
+            // Due passate: prima l'appartenenza principale con lo stesso id di prima (pratiche.assegnata_a punta a quell'id), poi le altre
+            $altre = [];
+            foreach ($this->db->righe('SELECT * FROM ufficio_didattica ORDER BY id') as $o) {
+                $ids = [];
+                if (!empty($o['ufficio_id'])) {
+                    $ids[] = (int) $o['ufficio_id'];
+                }
+                foreach (json_decode((string) ($o['uffici_json'] ?? ''), true) ?: [] as $x) {
+                    if ((int) $x > 0) {
+                        $ids[] = (int) $x;
+                    }
+                }
+                $ids = array_values(array_unique($ids)) ?: [$generico];
+                $this->db->esegui('INSERT IGNORE INTO uffici_persone (id, ufficio_id, persona_id, email, nominativo, ruolo, compiti, corsi, op_id, creato_il) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    [(int) $o['id'], array_shift($ids), $o['persona_id'], strtolower((string) $o['email']), $o['nominativo'], $o['ruolo'], $o['compiti'], $o['corsi'], (int) $o['id'], $o['creato_il']]);
+                $altre[] = [$o, $ids];
+            }
+            foreach ($altre as [$o, $ids]) {
+                foreach ($ids as $uid) {
+                    $this->db->esegui('INSERT IGNORE INTO uffici_persone (ufficio_id, persona_id, email, nominativo, ruolo, compiti, corsi, op_id, creato_il) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                        [$uid, $o['persona_id'], strtolower((string) $o['email']), $o['nominativo'], $o['ruolo'], $o['compiti'], $o['corsi'], (int) $o['id'], $o['creato_il']]);
+                }
+            }
+            // 3. uffici di Ateneo: nuovi id; le persone seguono; i bandi di tutorato puntano ai nuovi id (un solo UPDATE: nessun scambio a catena)
+            $mappa = [];
+            foreach ($this->db->righe('SELECT * FROM uffici_ateneo ORDER BY id') as $ua) {
+                $nuovo = $this->db->inserisci("INSERT INTO uffici (nome, descrizione, ambito, attivo, creato_il) VALUES (?, ?, 'ateneo', ?, ?)", [$ua['nome'], $ua['descrizione'], $ua['attivo'], $ua['creato_il']]);
+                $mappa[(int) $ua['id']] = $nuovo;
+                $this->db->esegui('INSERT IGNORE INTO uffici_persone (ufficio_id, persona_id, email, nominativo, struttura, creato_il)
+                    SELECT ?, persona_id, email, nominativo, struttura, creato_il FROM uffici_ateneo_persone WHERE ufficio_id = ?', [$nuovo, (int) $ua['id']]);
+            }
+            if ($mappa) {
+                $casi = '';
+                foreach ($mappa as $vecchio => $nuovo) {
+                    $casi .= ' WHEN ' . (int) $vecchio . ' THEN ' . (int) $nuovo;
+                }
+                $this->db->comando('UPDATE tutorato_bandi SET ufficio_ateneo_id = CASE ufficio_ateneo_id' . $casi . ' ELSE ufficio_ateneo_id END WHERE ufficio_ateneo_id IN (' . implode(',', array_keys($mappa)) . ')');
+            }
+        }
+
+        // Uffici di partenza di una installazione nuova (si cambiano dal pannello)
+        if ((int) ($this->db->valore("SELECT COUNT(*) n FROM uffici WHERE ambito = 'dipartimento'") ?? 1) === 0) {
+            $this->db->comando("INSERT INTO uffici (nome, descrizione, chiave, ambito, smista, segue_corsi, ordine) VALUES
+                ('Manager dell’Ufficio didattico', 'Riceve le pratiche nuove e le smista', 'manager', 'dipartimento', 1, 0, 1),
+                ('Referenti dei corsi di studio', 'Istruttoria e verbali dei consigli di corso', 'referente_cdl', 'dipartimento', 0, 1, 2),
+                ('Carriere studenti', 'Registrazione in carriera', 'carriere', 'dipartimento', 0, 0, 3),
+                ('Internazionalizzazione', 'Mobilità e attività all’estero', 'internazionalizzazione', 'dipartimento', 0, 0, 4),
+                ('Segreteria didattica', 'Operatori dell’ufficio', 'operatore', 'dipartimento', 0, 0, 5)");
+        }
+        // Direzione del Dipartimento (Direttore e vice) e segreteria di direzione: sempre presenti. Il Direttore delle impostazioni diventa il primo membro.
+        if (!$giaFatto) {
+            $dir = $this->db->inserisci("INSERT INTO uffici (nome, descrizione, chiave, ambito, ordine) VALUES ('Direzione del Dipartimento', 'Direttore e vice direttore: firmano convenzioni e pratiche', 'direzione', 'dipartimento', 0)");
+            if ((int) $this->db->valore("SELECT COUNT(*) FROM uffici WHERE chiave = 'segreteria_direzione'") === 0) {
+                $this->db->inserisci("INSERT INTO uffici (nome, descrizione, chiave, ambito, ordine) VALUES ('Segreteria di direzione', 'Può attivare «Direttore assente»', 'segreteria_direzione', 'dipartimento', 0)");
+            }
+            if ((int) $this->db->valore("SELECT COUNT(*) FROM uffici WHERE chiave = 'convenzioni_fsl'") === 0) {
+                $this->db->inserisci("INSERT INTO uffici (nome, descrizione, chiave, ambito, ordine) VALUES ('Ufficio convenzioni FSL', 'Prende in carico le convenzioni delle scuole (Formazione Scuola Lavoro): protocollo in entrata e definitivo', 'convenzioni_fsl', 'dipartimento', 90)");
+            }
+            $imp = $this->db->riga('SELECT conv_direttore_nome, conv_direttore_email FROM impostazioni_sistema WHERE id = 1');
+            $mail = strtolower(trim((string) ($imp['conv_direttore_email'] ?? '')));
+            if ($mail !== '') {
+                $pid = $this->db->valore('SELECT id FROM personale_ateneo WHERE LOWER(email) = ? LIMIT 1', [$mail]);
+                $this->db->esegui("INSERT IGNORE INTO uffici_persone (ufficio_id, persona_id, email, nominativo, ruolo, compiti) VALUES (?, ?, ?, ?, 'Direttore', '')",
+                    [$dir, $pid === null ? null : (string) $pid, $mail, (string) ($imp['conv_direttore_nome'] ?? '')]);
+            }
         }
     }
 }

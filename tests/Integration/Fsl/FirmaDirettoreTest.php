@@ -57,7 +57,8 @@ final class FirmaDirettoreTest extends FslBase
     /** Convenzione già firmata dalla scuola e presa in carico dall'ufficio (file reale nella cartella delle firmate). @return array<string, mixed> */
     private function inCarico(): array
     {
-        $this->assertNull($this->firma()->salvaDirettore('Prof. Mario Bianchi', 'Direttore@Unical.it', 'bnchmr60a01h501x'));
+        $this->db->esegui("INSERT IGNORE INTO utenti (id, email, codice_fiscale) VALUES (50, 'direttore@unical.it', NULL)");
+        $this->impostaDirettore('Prof. Mario Bianchi', 'Direttore@Unical.it', 'bnchmr60a01h501x');
         $pdf = "%PDF-1.7\n<< /Type /Pages /Count 3 /Kids [] >>\n%%FIRMA\n%%EOF";
         $nome = 'scuola.pdf';
         file_put_contents($this->radiceProva . '/' . Costanti::DIR_FIRMATE . $nome, $pdf);
@@ -67,22 +68,27 @@ final class FirmaDirettoreTest extends FslBase
         return $this->riga('convenzioni_compilate', $id) ?? [];
     }
 
-    public function testIlDirettoreSiImpostaConControlli(): void
+    public function testIlDirettoreVieneDallaDirezione(): void
     {
         $s = $this->firma();
         $this->assertFalse($s->configurato());
-        $this->assertStringContainsString('nome ed email', (string) $s->salvaDirettore('', 'x@y.it', ''));
-        $this->assertStringContainsString('nome ed email', (string) $s->salvaDirettore('Mario', 'non-email', ''));
-        $this->assertStringContainsString('16 caratteri', (string) $s->salvaDirettore('Mario', 'm@y.it', 'ABC'));
-        $this->assertNull($s->salvaDirettore(' Mario Bianchi ', ' M@Y.IT ', 'bnc mrm 60a01 h501x '));
-        $this->assertSame(['nome' => 'Mario Bianchi', 'email' => 'm@y.it', 'cf' => 'BNCMRM60A01H501X'], $s->direttore());
+        $this->db->esegui("INSERT INTO utenti (id, email, codice_fiscale) VALUES (51, 'm@y.it', NULL), (52, 'vice@y.it', NULL)");
+        $this->impostaDirettore('Mario Bianchi', 'M@Y.IT', 'bnchmr60a01h501x');
+        $this->assertSame(['nome' => 'Mario Bianchi', 'email' => 'm@y.it', 'cf' => 'BNCHMR60A01H501X'], $s->direttore());
         $this->assertTrue($s->configurato());
 
         $this->assertTrue($s->puoFirmare(['id' => 5, 'email' => 'M@Y.it']));
-        $this->assertTrue($s->puoFirmare(['id' => 5, 'email' => 'altra@y.it', 'codice_fiscale' => 'bncmrm60a01h501x']), 'accesso con SPID/CIE: dal codice fiscale');
         $this->assertFalse($s->puoFirmare(['id' => 5, 'email' => 'altra@y.it', 'codice_fiscale' => 'XXXXXXXXXXXXXXXX']));
         $this->assertFalse($s->puoFirmare(null));
         $this->assertFalse($s->puoFirmare(['email' => 'm@y.it']), 'senza utente collegato');
+
+        // Direttore assente: firma il vice
+        $this->impostaDirettore('Vera Vice', 'vice@y.it', '', 'Vice direttore');
+        $this->db->esegui('INSERT IGNORE INTO impostazioni_sistema (id) VALUES (1)');
+        $this->db->esegui('UPDATE impostazioni_sistema SET direttore_assente = 1 WHERE id = 1');
+        $this->assertSame('vice@y.it', $s->direttore()['email']);
+        $this->assertTrue($s->puoFirmare(['id' => 6, 'email' => 'vice@y.it']));
+        $this->assertFalse($s->puoFirmare(['id' => 5, 'email' => 'm@y.it']), 'assente: non firma lui');
     }
 
     public function testLUfficioMandaLaConvenzioneAlDirettore(): void
@@ -90,9 +96,9 @@ final class FirmaDirettoreTest extends FslBase
         $s = $this->firma();
         $cc = $this->inCarico();
         $this->mailer->inviate = [];
-        $this->db->esegui("UPDATE impostazioni_sistema SET conv_direttore_email = '' WHERE id = 1");
+        $this->togliDirettore();
         $this->assertStringContainsString('Indica prima il Direttore', (string) $s->invia((int) $cc['id']));
-        $this->db->esegui("UPDATE impostazioni_sistema SET conv_direttore_email = 'direttore@unical.it' WHERE id = 1");
+        $this->impostaDirettore('Prof. Mario Bianchi', 'direttore@unical.it');
         $this->db->esegui("UPDATE convenzioni_compilate SET stato_iter = 'caricata_scuola'");
         $this->assertStringContainsString('prendi in carico', (string) $s->invia((int) $cc['id']), 'prima va presa in carico');
         $this->db->esegui("UPDATE convenzioni_compilate SET stato_iter = 'in_carico'");

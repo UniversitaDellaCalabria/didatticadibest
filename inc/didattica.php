@@ -31,7 +31,7 @@ if (!defined('LOGO_VERBALE')) define('LOGO_VERBALE', \App\Didattica\Costanti::LO
 // ==============================================================================
 
 if (!function_exists('uffici_didattica')) {
-    // Uffici dell'Ufficio didattico (didattica_uffici), definiti dal pannello: [id => riga]. 'smista' = riceve le pratiche
+    // Uffici dell'Ufficio didattico (tabella uffici), definiti da Gestione del portale → Uffici: [id => riga]. 'smista' = riceve le pratiche
     // nuove e le smista (manager); 'segue_corsi' = il personale indica i corsi di studio seguiti (referenti dei corsi).
     function uffici_didattica($conn, bool $rileggi = false): array {
         return \App\Core\App::per($conn)->get(\App\Didattica\UfficioRepository::class)->tutti($rileggi);
@@ -65,7 +65,7 @@ if (!function_exists('utente_gestisce_didattica')) {
 
 if (!function_exists('aggiungi_operatore_ufficio')) {
     // Aggiunge (o aggiorna) un operatore scelto dall'anagrafe di Ateneo. Ritorna un messaggio di errore o null.
-    // $ufficio_id: ufficio dell'Ufficio didattico (didattica_uffici); $corsi: corsi di studio seguiti (uffici che seguono i corsi)
+    // $ufficio_id: ufficio dell'Ufficio didattico (tabella uffici); $corsi: corsi di studio seguiti (uffici che seguono i corsi)
     function aggiungi_operatore_ufficio($conn, string $persona_id, string $ruolo, array $compiti, int $ufficio_id = 0, array $corsi = [], array $uffici = []): ?string {
         return \App\Core\App::per($conn)->get(\App\Didattica\ServizioUffici::class)->aggiungi($persona_id, $ruolo, $compiti, $ufficio_id, $corsi, $uffici);
     }

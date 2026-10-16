@@ -141,14 +141,15 @@ final class ConvenzioneCompilataRepository
     }
 
     /**
-     * Email delle persone che ricevono l'avviso della convenzione caricata: amministratori e utenti abilitati a tutta la FSL o alle sole convenzioni.
+     * Email delle persone che ricevono l'avviso della convenzione caricata: amministratori, utenti abilitati a tutta la FSL o alle sole convenzioni e persone dell'«Ufficio convenzioni FSL».
      *
      * @return list<string>
      */
     public function emailAbilitati(): array
     {
         $righe = $this->db->righe("SELECT DISTINCT u.email FROM utenti u
-            WHERE u.email <> '' AND (u.ruolo_id = 1 OR u.id IN (SELECT utente_id FROM abilitazioni_ambito WHERE tipo IN ('fsl', 'fsl_convenzioni')))");
+            WHERE u.email <> '' AND (u.ruolo_id = 1 OR u.id IN (SELECT utente_id FROM abilitazioni_ambito WHERE tipo IN ('fsl', 'fsl_convenzioni')))
+            UNION SELECT p.email FROM uffici_persone p JOIN uffici f ON f.id = p.ufficio_id WHERE f.chiave = 'convenzioni_fsl' AND p.email <> ''");
 
         return array_values(array_filter(array_map(static fn (array $r): string => trim((string) $r['email']), $righe), static fn (string $e): bool => filter_var($e, FILTER_VALIDATE_EMAIL) !== false));
     }

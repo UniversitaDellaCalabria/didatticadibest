@@ -6,7 +6,8 @@ namespace App\Didattica;
 
 use App\Core\Sito;
 use App\Fsl\ServizioFirmaDirettore;
-use App\Sistema\ImpostazioniSistemaRepository;
+use App\Portale\SospensionePromemoria;
+use App\Uffici\Direzione;
 use App\Tutorato\FirmaRemota;
 use App\Tutorato\VerificaPdfFirmato;
 
@@ -29,7 +30,8 @@ final class FirmaPratica
         private StoricoPratica $storico,
         private NotifichePratiche $notifiche,
         private ServizioUffici $ufficio,
-        private ImpostazioniSistemaRepository $impostazioni,
+        private Direzione $direzione,
+        private SospensionePromemoria $sospensione,
         private FirmaRemota $firmaRemota,
         private VerificaPdfFirmato $verifica,
         private Sito $sito,
@@ -93,7 +95,7 @@ final class FirmaPratica
             return 'Questo passo dell\'iter non è una firma.';
         }
         if ($def['t'] === 'direttore') {
-            $d = $this->impostazioni->direttoreConvenzioni();
+            $d = $this->direzione->chiFirma();
             [$nome, $email, $ruolo] = [$d['nome'], $d['email'], 'Direttore'];
             if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 return 'Indica prima il Direttore (nome ed email) in Gestione del portale → Sistema e registri → «Direttore del Dipartimento»: si indica una volta sola e vale per tutte le firme.';
@@ -176,7 +178,7 @@ final class FirmaPratica
         }
         if ($f['tipo'] === 'direttore') {
             $cf = strtoupper(trim((string) ($utente['codice_fiscale'] ?? '')));
-            $d = $this->impostazioni->direttoreConvenzioni();
+            $d = $this->direzione->chiFirma();
 
             return $cf !== '' && $d['cf'] !== '' && $cf === strtoupper($d['cf']);
         }
@@ -230,7 +232,7 @@ final class FirmaPratica
         if ($f['stato'] !== 'attesa' || ($p = $this->pdfDaFirmare($f)) === null) {
             return 'Il documento non è più in attesa della tua firma.';
         }
-        $cf = $f['tipo'] === 'direttore' ? $this->impostazioni->direttoreConvenzioni()['cf'] : '';
+        $cf = $f['tipo'] === 'direttore' ? $this->direzione->chiFirma()['cf'] : '';
         [$err, $info] = $this->verifica->verifica((string) file_get_contents($p), $firmato, $cf);
         if ($err) {
             return $err;
@@ -302,7 +304,11 @@ final class FirmaPratica
     public function solleciti(): int
     {
         $n = 0;
+        $sospesi = $this->sospensione->attiva();
         foreach ($this->firme->attese() as $f) {
+            if ($sospesi && $f['tipo'] === 'direttore') {
+                continue; // sospeso: il promemoria al Direttore non si segna e riparte alla riattivazione
+            }
             $gg = $this->iter->giorniPasso($this->moduli->perId((int) $f['modulo_id']), (int) $f['passo']);
             $p = $this->pratiche->perId((int) $f['pratica_id']);
             if ($gg > 0 && $p && (int) $f['giorni_ultimo'] >= $gg && (int) $f['solleciti'] < self::MAX_SOLLECITI) {

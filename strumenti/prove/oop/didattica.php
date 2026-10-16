@@ -35,12 +35,13 @@ prova(str_contains(html_campo_pratica(campi_modulo($json_c)[0], 'x', null, true)
 
 // Dati di prova
 foreach (["DELETE FROM pratiche_eventi WHERE pratica_id IN (SELECT id FROM pratiche WHERE modulo_id = 9980)", "DELETE FROM pratiche_operatori WHERE pratica_id IN (SELECT id FROM pratiche WHERE modulo_id = 9980)",
-          "DELETE FROM pratiche WHERE modulo_id = 9980", "DELETE FROM didattica_moduli WHERE id = 9980", "DELETE FROM ufficio_didattica WHERE email = 'prova.did80@example.org'",
-          "DELETE FROM didattica_uffici WHERE nome = 'Ufficio prova 80'"] as $sql) $q($sql);
-$q("INSERT INTO didattica_uffici (nome, tipo, smista, segue_corsi) VALUES ('Ufficio prova 80', '', 0, 0)");
+          "DELETE FROM pratiche WHERE modulo_id = 9980", "DELETE FROM didattica_moduli WHERE id = 9980", "DELETE FROM uffici_persone WHERE email = 'prova.did80@example.org'",
+          "DELETE FROM uffici WHERE nome = 'Ufficio prova 80'"] as $sql) $q($sql);
+$q("INSERT INTO uffici (nome, tipo, smista, segue_corsi) VALUES ('Ufficio prova 80', '', 0, 0)");
 $uff80 = uffici_didattica($conn, true);
 $id_uff80 = (int)array_search('Ufficio prova 80', array_column($uff80, 'nome', 'id'), true);
-$q("INSERT INTO ufficio_didattica (nominativo, email, compiti, ufficio_id) VALUES ('Prova Ottanta', 'prova.did80@example.org', 'pratiche', $id_uff80)");
+$q("INSERT INTO uffici_persone (nominativo, email, compiti, ufficio_id) VALUES ('Prova Ottanta', 'prova.did80@example.org', 'pratiche', $id_uff80)");
+op_fix($q);
 prova($id_uff80 > 0 && ufficio_didattica_id($conn, $id_uff80) === $id_uff80 && ufficio_didattica_id($conn, 'boh') === null && $uff80 == $s_uff_t = $c_did->get(\App\Didattica\UfficioRepository::class)->tutti(), "uffici: lettura e ricerca per id");
 $op80 = operatore_ufficio($conn, 0, ['email' => 'PROVA.DID80@example.org']);
 prova($op80 && $op80['nominativo'] === 'Prova Ottanta' && etichetta_operatore($op80) === 'Prova Ottanta · Ufficio prova 80' && in_array('prova.did80@example.org', email_ufficio_didattica($conn), true)
@@ -68,7 +69,7 @@ $all->proteggi();
 prova(is_file(RADICE_SITO . '/' . $all->cartella() . '.htaccess') && $all->cartella() === DIR_PRATICHE, "cartella degli allegati delle pratiche protetta (.htaccess)");
 
 foreach (["DELETE FROM pratiche_eventi WHERE pratica_id = $id_pr80", "DELETE FROM pratiche_operatori WHERE pratica_id = $id_pr80", "DELETE FROM pratiche WHERE id = $id_pr80", "DELETE FROM didattica_moduli WHERE id = 9980",
-          "DELETE FROM ufficio_didattica WHERE email = 'prova.did80@example.org'", "DELETE FROM didattica_uffici WHERE id = $id_uff80"] as $sql) $q($sql);
+          "DELETE FROM uffici_persone WHERE email = 'prova.did80@example.org'", "DELETE FROM uffici WHERE id = $id_uff80"] as $sql) $q($sql);
 uffici_didattica($conn, true);
 
 // Fasi delle pratiche: dove si trova una pratica e che cosa fare (App\Didattica\FasePratica)
@@ -209,7 +210,7 @@ if (count($tt_) < 6) {
 prova(count($tt_) === 6 && array_unique(array_map('intval', array_column($tt_, 'attivo'))) === [0] && array_unique(array_map('intval', array_column($tt_, 'in_verbale'))) === [1]
     && $tt_['tesi']['categoria'] === 'Lauree' && $tt_['mobilita_fine']['categoria'] === 'Mobilità internazionale' && $tt_['esonero_frequenza']['categoria'] === 'Carriera',
     "Tesi, cancellazione, esonero e mobilità: sei moduli inattivi, in verbale, nelle loro categorie");
-$mob_uff_ = (int) $conn->query("SELECT id FROM didattica_uffici WHERE chiave = 'internazionalizzazione'")->fetch_assoc()['id'];
+$mob_uff_ = (int) $conn->query("SELECT id FROM uffici WHERE chiave = 'internazionalizzazione'")->fetch_assoc()['id'];
 $it_t_ = $c_did->get(ServizioIter::class);
 $p_mob_ = $it_t_->iter($tt_['mobilita_fine'], ['cdl_id' => 0, 'segreteria_id' => 0]);
 prova($mob_uff_ > 0 && $p_mob_[1] === $mob_uff_ && count($p_mob_) === 4 && json_decode($tt_['esonero_frequenza']['iter_json'], true) === ['protocollo', '@cdl']
@@ -260,7 +261,8 @@ prova(count($rd_) === 1 && array_keys($rd_[0]) === ['Relatore/trice', 'Progetto 
 
 // Cruscotto del Direttore: chi lo vede e i gruppi (nessuna eccezione anche senza dati)
 $cru_dir_ = $c_did->get(\App\Portale\CruscottoDirettore::class);
-$conn->query("UPDATE impostazioni_sistema SET conv_direttore_email = 'Direttore@Unical.it' WHERE id = 1");
+$conn->query("DELETE FROM uffici_persone WHERE ufficio_id IN (SELECT id FROM uffici WHERE chiave = 'direzione')");
+$conn->query("INSERT INTO uffici_persone (ufficio_id, email, nominativo, ruolo) SELECT id, 'direttore@unical.it', 'Prof. Direttore', 'Direttore' FROM uffici WHERE chiave = 'direzione'");
 prova($cru_dir_->puoVedere(['ruolo_id' => 1, 'email' => 'a@b.it']) && $cru_dir_->puoVedere(['ruolo_id' => 4, 'email' => 'direttore@unical.it']) && !$cru_dir_->puoVedere(['ruolo_id' => 4, 'email' => 'altro@unical.it']) && !$cru_dir_->puoVedere(null),
     "Cruscotto del Direttore: lo vedono gli amministratori e il Direttore indicato nelle impostazioni");
 $gr_dir_ = $cru_dir_->gruppi();

@@ -93,6 +93,55 @@ final class NotificheConvenzioni
         return $this->mailer->invia($email, 'Convenzione ricevuta: ' . $scuola, $corpo);
     }
 
+    /** Alla scuola: promemoria di caricare la convenzione firmata in PDF (o di caricarla di nuovo dopo il rifiuto). */
+    public function promemoriaPdf(string $email, string $scuola, string $tokenPagina, string $motivoRifiuto, bool $rifiutata): bool
+    {
+        $corpo = '<p>Gentile <strong>' . $this->h($scuola) . '</strong>,</p>';
+        if ($rifiutata) {
+            $corpo .= '<p>ti ricordiamo che la convenzione che avevi caricato <strong>non è stata accettata</strong>'
+                . ($motivoRifiuto !== '' ? ' per questo motivo:</p>' . "<blockquote style='margin:12px 0;padding:8px 14px;border-left:4px solid #B80000;background:#fef2f2;'>" . nl2br($this->h($motivoRifiuto)) . '</blockquote><p>' : '.</p><p>')
+                . 'Correggi il documento e <strong>caricalo di nuovo</strong> dalla pagina della convenzione.</p>';
+        } else {
+            $corpo .= '<p>ti ricordiamo di <strong>caricare la convenzione firmata digitalmente dal Dirigente Scolastico</strong> (PDF in formato PAdES) insieme all\'Allegato A: '
+                . 'senza la convenzione le prenotazioni della scuola restano in attesa.</p>'
+                . '<p>La carichi dalla pagina della convenzione, riquadro «Convenzione firmata». Se hai bisogno di aiuto scrivici dalla stessa pagina.</p>';
+        }
+
+        return $this->scrivi($email, 'Promemoria: carica la convenzione firmata - ' . $scuola, $corpo . $this->pulsante($tokenPagina, 'Apri la pagina della convenzione'));
+    }
+
+    /** Alla scuola: un messaggio dell'ufficio, con il link alla pagina dove si può rispondere. */
+    public function messaggioDallUfficio(string $email, string $scuola, string $tokenPagina, string $testo): bool
+    {
+        $corpo = '<p>Gentile <strong>' . $this->h($scuola) . '</strong>,</p>'
+               . '<p>il Dipartimento ti scrive a proposito della convenzione per la Formazione Scuola Lavoro:</p>'
+               . "<blockquote style='margin:12px 0;padding:8px 14px;border-left:4px solid #B80000;background:#f8fafc;'>" . nl2br($this->h($testo)) . '</blockquote>'
+               . '<p>Puoi rispondere dalla pagina della convenzione.</p>' . $this->pulsante($tokenPagina, 'Apri la pagina e rispondi');
+
+        return $this->scrivi($email, 'Messaggio dal Dipartimento sulla convenzione: ' . $scuola, $corpo);
+    }
+
+    /**
+     * A chi gestisce le convenzioni: la scuola ha scritto dalla sua pagina.
+     *
+     * @param list<string> $destinatari
+     */
+    public function messaggioDallaScuola(array $destinatari, string $scuola, string $testo): int
+    {
+        $link = $this->sito->urlBase() . '/admin/fsl.php?tab=iter';
+        $corpo = '<p>La scuola <strong>' . $this->h($scuola) . '</strong> ha scritto a proposito della convenzione:</p>'
+               . "<blockquote style='margin:12px 0;padding:8px 14px;border-left:4px solid #0056b3;background:#f8fafc;'>" . nl2br($this->h($testo)) . '</blockquote>'
+               . "<p style='margin-top:15px;'><a href='" . $this->h($link) . "' style='background:#B80000; color:#ffffff; padding:10px 18px; text-decoration:none; border-radius:6px; font-weight:bold;'>Apri le convenzioni e rispondi</a></p>";
+        $inviate = 0;
+        foreach ($destinatari as $a) {
+            if ($this->mailer->invia($a, 'Messaggio della scuola sulla convenzione: ' . $scuola, $corpo)) {
+                ++$inviate;
+            }
+        }
+
+        return $inviate;
+    }
+
     /** Alla scuola: l'ufficio ha preso in carico la convenzione firmata. */
     public function presaInCarico(string $email, string $scuola, string $tokenPagina, string $protocolloIngresso = ''): bool
     {

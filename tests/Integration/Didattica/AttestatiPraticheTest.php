@@ -31,10 +31,10 @@ final class AttestatiPraticheTest extends DidatticaBase
         $this->db->esegui("UPDATE didattica_moduli SET attivo = 1 WHERE chiave IN ('attestato_frequenza', 'attestato_esame')");
         $this->freq = $this->db->riga("SELECT * FROM didattica_moduli WHERE chiave = 'attestato_frequenza'");
         $this->esame = $this->db->riga("SELECT * FROM didattica_moduli WHERE chiave = 'attestato_esame'");
-        $this->uffAtt = (int) $this->db->valore("SELECT id FROM didattica_uffici WHERE chiave = 'attestati'");
+        $this->uffAtt = (int) $this->db->valore("SELECT id FROM uffici WHERE chiave = 'attestati'");
         $this->operatore('Gianna Manager', 'manager@x.it', 'pratiche', $this->uffAtt);
         $this->db->esegui("INSERT INTO personale_ateneo (id, nome, cognome, email, ruolo, docente, attivo) VALUES ('a.verdi', 'Anna', 'Verdi', 'ANNA.VERDI@x.it', 'PA', 1, 1), ('g.neri', 'Giulia', 'Neri', 'giulia.neri@x.it', 'PO', 1, 1), ('m.gialli', 'Marco', 'Gialli', 'marco.gialli@x.it', 'PO', 1, 1)");
-        $this->db->esegui("INSERT INTO impostazioni_sistema (id, conv_direttore_nome, conv_direttore_email) VALUES (1, 'Mario Bianchi', 'direttore@x.it')");
+        $this->impostaDirettore('Mario Bianchi', 'direttore@x.it');
     }
 
     private function pratiche(): ServizioPratiche
@@ -79,7 +79,7 @@ final class AttestatiPraticheTest extends DidatticaBase
 
     public function testModuliEUfficioPreparati(): void
     {
-        $this->assertSame(['attestati', 'Ufficio attestati', 0, ''], array_values($this->db->riga("SELECT chiave, nome, smista, tipo FROM didattica_uffici WHERE chiave = 'attestati'")));
+        $this->assertSame(['attestati', 'Ufficio attestati', 0, ''], array_values($this->db->riga("SELECT chiave, nome, smista, tipo FROM uffici WHERE chiave = 'attestati'")));
         $iter = $this->servizio(ServizioIter::class);
         foreach ([$this->freq, $this->esame] as $m) {
             $def = $iter->definizione($m);

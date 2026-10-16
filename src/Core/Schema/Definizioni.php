@@ -169,6 +169,34 @@ final class Definizioni
             creata_il DATETIME DEFAULT CURRENT_TIMESTAMP, aggiornata_il DATETIME DEFAULT NULL, scaricata_il DATETIME DEFAULT NULL,
             UNIQUE KEY uq_token (token), INDEX idx_scuola (scuola_codice)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        // v71: uffici responsabili di una risorsa (tutte le persone dell'ufficio ricevono le richieste e, se abilitato, le approvano)
+        'risorse_uffici' => "CREATE TABLE IF NOT EXISTS risorse_uffici (
+            id INT AUTO_INCREMENT PRIMARY KEY, risorsa_id INT NOT NULL, ufficio_id INT NOT NULL, riceve_notifiche TINYINT(1) NOT NULL DEFAULT 1, puo_approvare TINYINT(1) NOT NULL DEFAULT 1,
+            creato_il DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY uq_risorsa_ufficio (risorsa_id, ufficio_id), INDEX idx_ufficio (ufficio_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        // v71: uffici del Dipartimento e di Ateneo in un solo posto (organigramma): le persone si scelgono dall'anagrafe di Ateneo e un ufficio
+        // si richiama da pratiche, tutorato, prenotazioni, convenzioni. Sostituisce didattica_uffici + ufficio_didattica + uffici_ateneo +
+        // uffici_ateneo_persone (che restano com'erano, senza più essere usate: i dati sono copiati dalla migrazione, con gli stessi id per il Dipartimento).
+        // op_id = numero stabile della persona come operatore della Didattica (è quello di pratiche.assegnata_a: uguale per tutte le sue appartenenze, mai cambiato).
+        // chiave = nome stabile usato dai moduli pronti («direzione», «protocollo», «referente_cdl»…); tipo/consiglio_id/smista/segue_corsi = ruolo nel flusso delle pratiche
+        'uffici' => "CREATE TABLE IF NOT EXISTS uffici (
+            id INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(150) NOT NULL DEFAULT '', descrizione VARCHAR(500) DEFAULT '', chiave VARCHAR(30) DEFAULT NULL,
+            ambito VARCHAR(12) NOT NULL DEFAULT 'dipartimento', smista TINYINT(1) NOT NULL DEFAULT 0, segue_corsi TINYINT(1) NOT NULL DEFAULT 0, ordine INT NOT NULL DEFAULT 0,
+            tipo VARCHAR(20) NOT NULL DEFAULT '', consiglio_id INT DEFAULT NULL, attivo TINYINT(1) NOT NULL DEFAULT 1, creato_il DATETIME DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_ambito (ambito, ordine), INDEX idx_chiave (chiave)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        'uffici_persone' => "CREATE TABLE IF NOT EXISTS uffici_persone (
+            id INT AUTO_INCREMENT PRIMARY KEY, ufficio_id INT NOT NULL, persona_id VARCHAR(80) DEFAULT NULL, email VARCHAR(150) NOT NULL DEFAULT '', nominativo VARCHAR(200) NOT NULL DEFAULT '',
+            struttura VARCHAR(255) DEFAULT '', ruolo VARCHAR(100) DEFAULT '', compiti VARCHAR(100) NOT NULL DEFAULT '', corsi TEXT DEFAULT NULL,
+            op_id INT DEFAULT NULL, creato_il DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_ufficio_email (ufficio_id, email), INDEX idx_email (email), INDEX idx_op (op_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        // v70: messaggi tra l'ufficio e la scuola sulla convenzione online (promemoria «carica il PDF», avvisi liberi, risposte della scuola)
+        'convenzioni_messaggi' => "CREATE TABLE IF NOT EXISTS convenzioni_messaggi (
+            id INT AUTO_INCREMENT PRIMARY KEY, compilazione_id INT NOT NULL, da VARCHAR(10) NOT NULL DEFAULT 'ufficio', tipo VARCHAR(20) NOT NULL DEFAULT 'messaggio',
+            testo TEXT DEFAULT NULL, autore VARCHAR(150) DEFAULT '', creato_il DATETIME DEFAULT CURRENT_TIMESTAMP, letto_il DATETIME DEFAULT NULL,
+            INDEX idx_compilazione (compilazione_id, creato_il)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         // v37: uffici dell'Ufficio didattico, definiti dal pannello (manager che smista, referenti dei corsi, carriere…):
         // il personale si assegna a un ufficio e l'iter dei moduli elenca gli uffici che ricevono la pratica
         'didattica_uffici' => "CREATE TABLE IF NOT EXISTS didattica_uffici (
@@ -757,6 +785,15 @@ final class Definizioni
             'conv_direttore_nome'  => "ADD COLUMN conv_direttore_nome VARCHAR(150) NOT NULL DEFAULT ''",
             'conv_direttore_email' => "ADD COLUMN conv_direttore_email VARCHAR(150) NOT NULL DEFAULT ''",
             'conv_direttore_cf'    => "ADD COLUMN conv_direttore_cf VARCHAR(16) NOT NULL DEFAULT ''",
+            // v71: «Direttore assente»: finché è attivo firme, link e cruscotto passano al vice direttore dell'organigramma (Uffici → Direzione)
+            'direttore_assente'       => "ADD COLUMN direttore_assente TINYINT(1) NOT NULL DEFAULT 0",
+            'direttore_assente_fino'  => "ADD COLUMN direttore_assente_fino DATE DEFAULT NULL",
+            'direttore_assente_da'    => "ADD COLUMN direttore_assente_da VARCHAR(150) NOT NULL DEFAULT ''",
+            'direttore_assente_il'    => "ADD COLUMN direttore_assente_il DATETIME DEFAULT NULL",
+            // v72: promemoria al Direttore e agli uffici sospesi (si riattivano con lo stesso interruttore: il cron rimanda quanto è ancora dovuto)
+            'promemoria_sospesi'      => "ADD COLUMN promemoria_sospesi TINYINT(1) NOT NULL DEFAULT 0",
+            'promemoria_sospesi_da'   => "ADD COLUMN promemoria_sospesi_da VARCHAR(150) NOT NULL DEFAULT ''",
+            'promemoria_sospesi_il'   => "ADD COLUMN promemoria_sospesi_il DATETIME DEFAULT NULL",
         ],
         // v19: voce di menu nascondibile (usata da admin/menu.php, mancava dallo schema; nuove aree: voce creata nascosta)
         'menu_voci' => [

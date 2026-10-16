@@ -25,9 +25,8 @@ final class PagamentiTest extends TutoratoBase
     protected function tabelle(): array
     {
         return parent::tabelle() + [
-            'uffici_ateneo' => "CREATE TABLE uffici_ateneo (id INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(150) NOT NULL DEFAULT '', descrizione VARCHAR(500) DEFAULT '', attivo TINYINT(1) NOT NULL DEFAULT 1, creato_il DATETIME DEFAULT CURRENT_TIMESTAMP)",
-            'uffici_ateneo_persone' => "CREATE TABLE uffici_ateneo_persone (id INT AUTO_INCREMENT PRIMARY KEY, ufficio_id INT NOT NULL, persona_id VARCHAR(80) NULL, email VARCHAR(150) NOT NULL DEFAULT '',
-                nominativo VARCHAR(200) NOT NULL DEFAULT '', struttura VARCHAR(255) DEFAULT '', creato_il DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY uq (ufficio_id, email))",
+            'uffici' => "CREATE TABLE uffici (id INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(150) NOT NULL DEFAULT '', descrizione VARCHAR(500) DEFAULT '', chiave VARCHAR(30) NULL, ambito VARCHAR(12) NOT NULL DEFAULT 'dipartimento', smista TINYINT(1) NOT NULL DEFAULT 0, segue_corsi TINYINT(1) NOT NULL DEFAULT 0, ordine INT NOT NULL DEFAULT 0, tipo VARCHAR(20) NOT NULL DEFAULT '', consiglio_id INT NULL, attivo TINYINT(1) NOT NULL DEFAULT 1, creato_il DATETIME DEFAULT CURRENT_TIMESTAMP)",
+            'uffici_persone' => "CREATE TABLE uffici_persone (id INT AUTO_INCREMENT PRIMARY KEY, ufficio_id INT NOT NULL, persona_id VARCHAR(80) NULL, email VARCHAR(150) NOT NULL DEFAULT '', nominativo VARCHAR(200) NOT NULL DEFAULT '', struttura VARCHAR(255) DEFAULT '', ruolo VARCHAR(100) DEFAULT '', compiti VARCHAR(100) NOT NULL DEFAULT '', corsi TEXT NULL, op_id INT NULL, creato_il DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY uq (ufficio_id, email))",
         ];
     }
 
@@ -76,7 +75,7 @@ final class PagamentiTest extends TutoratoBase
     {
         $s = $this->servizio(ServizioUfficiAteneo::class);
         [$id] = $s->salva(0, 'Ufficio pagamenti tutorato', '');
-        $s->aggiungiAMano($id, 'Rossana Zicarelli', 'ufficio@x.it');
+        $this->db->esegui("INSERT INTO uffici_persone (ufficio_id, email, nominativo) VALUES (?, 'ufficio@x.it', 'Rossana Zicarelli')", [$id]);
         $this->db->esegui('UPDATE tutorato_bandi SET ufficio_ateneo_id = ? WHERE id = 1', [$id]);
 
         return $id;

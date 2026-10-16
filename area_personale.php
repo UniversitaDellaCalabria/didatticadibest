@@ -424,6 +424,22 @@ require_once 'header.php';
     <?php endif; ?>
 
     <?php
+    // «Direttore assente»: lo attivano Direttore, vice, segreteria di direzione e amministratori
+    $dir_sv = \App\Core\App::per($conn)->get(\App\Uffici\Direzione::class);
+    if ($dir_sv->puoImpostareAssenza($user_info)): $dir_ass = $dir_sv->assenza(); ?>
+        <a href="direttore_assente.php" class="card border-0 shadow-sm mb-4 text-decoration-none" style="border-radius: 12px; border-left: 5px solid <?php echo $dir_ass['attiva'] ? '#f59e0b' : '#15803d'; ?> !important;">
+            <div class="card-body d-flex align-items-center gap-3 flex-wrap">
+                <i class="fa fa-user-clock fs-3" style="color:#b45309;" aria-hidden="true"></i>
+                <div class="flex-grow-1">
+                    <div class="fw-bold text-dark">Direttore assente</div>
+                    <div class="small text-secondary"><?php echo $dir_ass['attiva'] ? '<strong>Attivo</strong>: firme e avvisi vanno al vice direttore' . ($dir_ass['fino'] ? ' fino al ' . htmlspecialchars(date('d/m/Y', strtotime($dir_ass['fino']))) : '') : 'Spento: firme e avvisi vanno al Direttore'; ?> · passa tutto al vice quando il Direttore è assente</div>
+                </div>
+                <span class="btn btn-sm fw-bold text-white" style="background:#b45309;">Apri</span>
+            </div>
+        </a>
+    <?php endif; ?>
+
+    <?php
     // Risorse di cui l'utente è responsabile (scelto dall'admin dall'anagrafe): richieste da approvare e prenotazioni in arrivo
     $mie_ris = \App\Core\App::per($conn)->get(\App\Risorse\ServizioResponsabiliRisorse::class)->risorseDi($user_info);
     if ($mie_ris): $n_da_appr_r = array_sum(array_column($mie_ris, 'da_approvare')); $n_fut_r = array_sum(array_column($mie_ris, 'future')); ?>

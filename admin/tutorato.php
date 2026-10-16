@@ -614,7 +614,7 @@ $vista_validare = ($_GET['vista'] ?? '') === 'validare';
             <div class="col-md-6"><label class="form-label small fw-bold mb-0" for="bUff">Ufficio di Ateneo che paga i tutor di questo bando</label>
                 <select class="form-select form-select-sm" id="bUff" name="ufficio_ateneo_id"><option value="0">Nessuno (da indicare prima di passare le pratiche)</option>
                     <?php foreach ($uffici_ateneo_b as $ua): ?><option value="<?php echo (int)$ua['id']; ?>"<?php echo (int)($b['ufficio_ateneo_id'] ?? 0) === (int)$ua['id'] ? ' selected' : ''; ?>><?php echo $h($ua['nome']); ?></option><?php endforeach; ?></select>
-                <?php if (!$uffici_ateneo_b): ?><div class="form-text text-danger">Nessun ufficio: l'amministratore lo crea in Gestione del portale › Uffici di Ateneo.</div><?php endif; ?></div>
+                <?php if (!$uffici_ateneo_b): ?><div class="form-text text-danger">Nessun ufficio: l'amministratore lo crea in Gestione del portale › Uffici e persone (Uffici di Ateneo).</div><?php endif; ?></div>
             <div class="col-12"><button type="submit" name="salva_decreti" value="1" class="btn btn-sm btn-primary fw-bold"><i class="fa fa-save me-1" aria-hidden="true"></i>Salva decreti e ufficio</button></div>
         </form></div></details>
     <div class="card border-0 shadow-sm"><div class="table-responsive"><table class="table table-sm align-middle small mb-0">

@@ -30,6 +30,8 @@ function prova(bool $esito, string $nome, string $dettaglio = ''): void {
     global $OK, $KO;
     if ($esito) { $OK++; echo "  \e[32mOK\e[0m  $nome\n"; } else { $KO++; echo "  \e[31mKO\e[0m  $nome" . ($dettaglio !== '' ? "  → $dettaglio" : '') . "\n"; }
 }
+/** Dopo un INSERT diretto in uffici_persone: la persona diventa operatore (op_id = id, come fa il portale). */
+function op_fix(callable $q): void { $q("UPDATE uffici_persone SET op_id = id WHERE op_id IS NULL AND ufficio_id IN (SELECT id FROM uffici WHERE ambito = 'dipartimento' AND COALESCE(chiave, '') NOT IN ('direzione', 'segreteria_direzione'))"); }
 function sezione(string $t): void { echo "\n== $t\n"; }
 
 // ---------------------------------------------------------------------------
@@ -832,7 +834,7 @@ $o_multi = null; foreach (operatori_ufficio($conn) as $o) if ($o['persona_id'] =
 prova($o_multi && $o_multi['_uffici'] === [$uff['internazionalizzazione'], $uff['carriere']], "operatore in più uffici: principale per primo, senza doppioni né uffici inesistenti");
 prova(in_array((int)$o_multi['id'], array_map('intval', array_column(\App\Core\App::per($conn)->get(\App\Didattica\ServizioFlussoConvalide::class)->personeUfficio($uff['carriere']), 'id')), true), "l'operatore con due uffici compare anche nel secondo");
 aggiungi_operatore_ufficio($conn, 'int.prova', '', ['pratiche'], $uff['internazionalizzazione']);
-$q("INSERT INTO didattica_uffici (nome, smista, segue_corsi, ordine) VALUES ('Tirocini', 0, 0, 9)");
+$q("INSERT INTO uffici (nome, smista, segue_corsi, ordine) VALUES ('Tirocini', 0, 0, 9)");
 $id_tir = (int)$conn->insert_id;
 prova(ufficio_didattica_id($conn, $id_tir) === null && ufficio_didattica_id($conn, 'carriere') === $uff['carriere'], "ufficio nuovo letto dopo l'aggiornamento; chiavi dei modelli riconosciute");
 uffici_didattica($conn, true);
@@ -1441,13 +1443,14 @@ prova(frasi_piano($rr, 'Chiede inoltre') === ["Chiede inoltre che l'insegnamento
 // Ufficio del corso: dai corsi del consiglio, altrimenti dal nome del consiglio
 $cons_cv = consigli_didattica($conn); $c_bio = 0;
 foreach ($cons_cv as $c) if (str_contains($c['nome'], 'Laurea in Biologia')) $c_bio = (int)$c['id'];
-$u_bio = (int)db_valore($conn, "SELECT id FROM didattica_uffici WHERE consiglio_id = ?", [$c_bio]);
+$u_bio = (int)db_valore($conn, "SELECT id FROM uffici WHERE consiglio_id = ?", [$c_bio]);
 prova($c_bio && ufficio_del_corso($conn, 'Corso di laurea in Biologia') === $u_bio && ufficio_del_corso($conn, 'Corso di laurea in Bio') === null, "ufficio del corso dal nome del consiglio (senza corsi indicati)");
 $conn->query("UPDATE didattica_consigli SET corsi = '[\"Corso di laurea in Chimica\"]' WHERE id = $c_bio");
 prova(ufficio_del_corso($conn, 'corso di laurea in chimica') === $u_bio && ufficio_del_corso($conn, 'Corso di laurea in Biologia') === null, "con i corsi indicati nel consiglio valgono quelli");
 $conn->query("UPDATE didattica_consigli SET corsi = NULL WHERE id = $c_bio");
 // Pratica: domanda in PDF/A, protocollo, ufficio del corso
-$q("INSERT INTO ufficio_didattica (email, nominativo, compiti, ufficio_id, corsi) VALUES ('prot@unical.it', 'Protocollo Pia', 'pratiche', $u_prot, NULL), ('ref.bio@unical.it', 'Referente Bea', 'pratiche', $u_bio, '[\"Corso di laurea in Biologia\"]')");
+$q("INSERT INTO uffici_persone (email, nominativo, compiti, ufficio_id, corsi) VALUES ('prot@unical.it', 'Protocollo Pia', 'pratiche', $u_prot, NULL), ('ref.bio@unical.it', 'Referente Bea', 'pratiche', $u_bio, '[\"Corso di laurea in Biologia\"]')");
+op_fix($q);
 $q("INSERT INTO utenti (id, nome, cognome, email, codice_fiscale, matricola_studente, ruolo_id) VALUES (9301, 'Giulia', 'Verdi', 'giulia.v@studenti.unical.it', 'VRDGLI02A41D086K', '245678', 5)");
 $ris_cv = array_map(function ($r) { if ($r['etichetta'] === 'Corso di studio') $r['valore'] = 'Corso di laurea in Biologia'; if ($r['etichetta'] === 'Luogo di nascita') $r['valore'] = 'Cosenza'; return $r; }, $ris_cv);
 $EMAIL = []; $_SERVER['REMOTE_ADDR'] = '10.1.2.3'; $_SESSION['auth_meta'] = ['metodo' => 'spid', 'livello' => 2];
@@ -1464,7 +1467,7 @@ prova($e_b === null && str_contains($m_b, 'bollo') && $p_b['protocollo'] === '01
 $EMAIL = [];
 [$e_pr, $m_pr] = registra_protocollo_pratica($conn, $id_cv, '', '', 1, 'Protocollo Pia', true);
 $p_cv = pratica($conn, $id_cv);
-$o_bea = (int)db_valore($conn, "SELECT id FROM ufficio_didattica WHERE email = 'ref.bio@unical.it'");
+$o_bea = (int)db_valore($conn, "SELECT op_id FROM uffici_persone WHERE email = 'ref.bio@unical.it'");
 prova($e_pr === null && $p_cv['protocollo'] === '0123456' && (int)$p_cv['cdl_id'] === $u_bio && (int)$p_cv['ufficio_id'] === $u_bio && (int)$p_cv['passo'] === 2 && (int)$p_cv['assegnata_a'] === $o_bea && $p_cv['stato'] === 'in_lavorazione', "dopo il protocollo la pratica passa da sola all'ufficio del corso (alla sola persona che lo segue)", $m_pr);
 prova($p_cv['bollo_il'] !== null && (int)db_valore($conn, "SELECT COUNT(*) FROM pratiche_eventi WHERE pratica_id = ? AND testo LIKE 'Domanda protocollata%'", [$id_cv]) === 1, "bollo spuntato dopo: numero e data restano, protocollo registrato una volta");
 prova(registra_protocollo_pratica($conn, $id_cv, '0123457', date('Y-m-d'), 1)[1] === 'Dati del protocollo aggiornati.' && (int)pratica($conn, $id_cv)['ufficio_id'] === $u_bio, "pratica già trasmessa: si corregge solo il protocollo");
@@ -1475,9 +1478,10 @@ prova(!empty($dec_cv['righe'][0]['piano']) && $dec_cv['righe'][0]['elimina'] ===
 prova(frasi_piano_decisioni($dec_cv) === ["Lo/La studente/ssa chiede che l'insegnamento «Zoologia generale» sia inserito nel piano di studi come insegnamento a scelta, eliminando dal piano l'insegnamento «Botanica»."], "nel verbale la frase usa l'insegnamento convalidato");
 salva_decisioni_seduta($conn, $id_cv, '', $dec_cv, null);
 // Segreteria studenti: solo pratiche esaminate in seduta
-$q("INSERT INTO didattica_uffici (nome, tipo) VALUES ('Segreteria studenti di prova', 'segreteria')");
-$u_seg = (int)db_valore($conn, "SELECT MAX(id) FROM didattica_uffici WHERE tipo = 'segreteria'");
-$q("INSERT INTO ufficio_didattica (email, nominativo, compiti, ufficio_id) VALUES ('seg.stud@unical.it', 'Segreteria Sergio', 'pratiche', $u_seg)");
+$q("INSERT INTO uffici (nome, tipo) VALUES ('Segreteria studenti di prova', 'segreteria')");
+$u_seg = (int)db_valore($conn, "SELECT MAX(id) FROM uffici WHERE tipo = 'segreteria'");
+$q("INSERT INTO uffici_persone (email, nominativo, compiti, ufficio_id) VALUES ('seg.stud@unical.it', 'Segreteria Sergio', 'pratiche', $u_seg)");
+op_fix($q);
 prova(invia_pratiche_segreteria($conn, [$id_cv], $u_prot, 1)[0] === 0, "si invia solo a un ufficio di segreteria studenti");
 [$n_s, $esc_s] = invia_pratiche_segreteria($conn, [$id_cv], $u_seg, 1);
 prova($n_s === 0 && count($esc_s) === 1 && str_contains($esc_s[0], 'seduta'), "pratica non ancora esaminata in seduta: non si invia");
@@ -1549,12 +1553,13 @@ $EMAIL = [];
 $conn->query("UPDATE pratiche_firme SET richiesta_il = NOW() - INTERVAL 5 DAY WHERE pratica_id = $id_t2 AND stato = 'attesa'");
 prova($fp->solleciti() === 1 && $fp->solleciti() === 0 && str_contains($EMAIL[0]['oggetto'] ?? '', 'Promemoria') && ($EMAIL[0]['a'] ?? '') === 'paolo.neri@unical.it', "promemoria al relatore dopo 3 giorni, una sola volta per periodo");
 // Direttore: documento dell'ufficio da firmare
-$q("INSERT INTO ufficio_didattica (email, nominativo, compiti, ufficio_id, corsi) VALUES ('seg.cert@unical.it', 'Segreteria Sara', 'pratiche', $u_prot, NULL)");
+$q("INSERT INTO uffici_persone (email, nominativo, compiti, ufficio_id, corsi) VALUES ('seg.cert@unical.it', 'Segreteria Sara', 'pratiche', $u_prot, NULL)");
+op_fix($q);
 $m_d = ['iter_json' => json_encode([$u_prot, ['t' => 'direttore', 'gg' => 4]])];
 $q("INSERT INTO didattica_moduli (id, titolo, categoria, tipo, campi_json, destinatari, attivo, ordine, iter_json, giorni_promemoria, domanda_json, in_verbale) VALUES (821, 'Certificato di prova', 'Certificati', 'online', '[]', 'studenti', 1, 2, '" . $conn->real_escape_string($m_d['iter_json']) . "', 7, '{\"pdf\":1,\"bollo\":0}', 0)");
 $id_d = crea_pratica($conn, modulo_didattica($conn, 821), $stud_t, []);
 prova(str_contains((string)$fp->avvia($id_d, 2), 'Indica prima il Direttore'), "senza il Direttore impostato la firma non parte e dice cosa fare");
-\App\Core\App::per($conn)->get(\App\Sistema\ImpostazioniSistemaRepository::class)->salvaDirettoreConvenzioni('Prof. Direttore', 'direttore@unical.it', '');
+$q("INSERT INTO uffici_persone (ufficio_id, email, nominativo, ruolo) SELECT id, 'direttore@unical.it', 'Prof. Direttore', 'Direttore' FROM uffici WHERE chiave = 'direzione'");
 prova(str_contains((string)$fp->avvia($id_d, 1), 'non è una firma'), "un passo che non è una firma non si può mandare alla firma");
 $dir_pr_rel = \App\Core\App::per($conn)->get(\App\Didattica\AllegatiPratiche::class)->cartella(); $cartella_pr = RADICE_SITO . '/' . $dir_pr_rel; @mkdir($cartella_pr, 0755, true);
 file_put_contents($cartella_pr . 'certificato_prova.pdf', $pdf_dom);

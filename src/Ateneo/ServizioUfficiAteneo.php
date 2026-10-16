@@ -7,7 +7,7 @@ namespace App\Ateneo;
 use App\Anagrafi\ServizioPersone;
 
 /**
- * Uffici di Ateneo: li crea l'amministratore e associa le persone scelte dall'anagrafe di Ateneo (o con nome ed email scritti a mano).
+ * Uffici di Ateneo (tabella uffici, ambito «ateneo»): li crea l'amministratore da Gestione del portale → Uffici e associa le persone scelte dall'anagrafe di Ateneo (mai a mano).
  * Le persone entrano nel portale con le credenziali Unical e vedono le pratiche che gli uffici ricevono (es. pagamenti del tutorato):
  * si riconoscono dall'email, come gli operatori dell'Ufficio didattico. Una persona può far parte di più uffici.
  */
@@ -84,21 +84,6 @@ final class ServizioUfficiAteneo
         $ok = $this->uffici->aggiungiPersona($ufficioId, $personaId, $email, trim($p['cognome'] . ' ' . $p['nome']), mb_substr(trim((string) ($p['struttura'] ?? '')), 0, 255));
 
         return $ok ? null : 'La persona fa già parte di questo ufficio.';
-    }
-
-    /** Aggiunge una persona scrivendo nome ed email (non in anagrafe). Ritorna l'errore o null. */
-    public function aggiungiAMano(int $ufficioId, string $nominativo, string $email): ?string
-    {
-        $email = strtolower(trim($email));
-        $nominativo = mb_substr(trim($nominativo), 0, 200);
-        if (!$this->uffici->perId($ufficioId)) {
-            return 'Ufficio non trovato.';
-        }
-        if ($nominativo === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            return 'Scrivi nome ed email della persona.';
-        }
-
-        return $this->uffici->aggiungiPersona($ufficioId, null, $email, $nominativo, '') ? null : 'La persona fa già parte di questo ufficio.';
     }
 
     public function togliPersona(int $id): void

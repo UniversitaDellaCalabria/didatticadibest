@@ -6,7 +6,7 @@ namespace App\Fsl;
 
 use App\Core\Sito;
 use App\Infrastructure\Storage\Upload;
-use App\Sistema\ImpostazioniSistemaRepository;
+use App\Uffici\Direzione;
 use App\Tutorato\FirmaRemota;
 use App\Tutorato\VerificaPdfFirmato;
 
@@ -22,7 +22,7 @@ final class ServizioFirmaDirettore
 
     public function __construct(
         private ConvenzioneCompilataRepository $compilate,
-        private ImpostazioniSistemaRepository $impostazioni,
+        private Direzione $direzione,
         private NotificheConvenzioni $notifiche,
         private FirmaRemota $firmaRemota,
         private VerificaPdfFirmato $verifica,
@@ -34,29 +34,12 @@ final class ServizioFirmaDirettore
     /** @return array{nome: string, email: string, cf: string} */
     public function direttore(): array
     {
-        return $this->impostazioni->direttoreConvenzioni();
+        return $this->direzione->chiFirma();
     }
 
     public function configurato(): bool
     {
         return filter_var($this->direttore()['email'], FILTER_VALIDATE_EMAIL) !== false;
-    }
-
-    /** Salva il Direttore che firma le convenzioni. Ritorna il messaggio di errore, null se salvato. */
-    public function salvaDirettore(string $nome, string $email, string $cf): ?string
-    {
-        $nome = mb_substr(trim($nome), 0, 150);
-        $email = strtolower(trim($email));
-        $cf = strtoupper((string) preg_replace('/\s+/', '', $cf));
-        if ($nome === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            return 'Indica nome ed email del Direttore: a questa email arriva il link per firmare.';
-        }
-        if ($cf !== '' && !preg_match('/^[A-Z0-9]{16}$/', $cf)) {
-            return 'Il codice fiscale ha 16 caratteri (lascialo vuoto se non vuoi controllare il certificato di firma).';
-        }
-        $this->impostazioni->salvaDirettoreConvenzioni($nome, $email, $cf);
-
-        return null;
     }
 
     public function firmaRemotaDisponibile(): bool
@@ -80,7 +63,7 @@ final class ServizioFirmaDirettore
             return 'Prima prendi in carico la convenzione, poi puoi mandarla al Direttore.';
         }
         if (!$this->configurato()) {
-            return 'Indica prima il Direttore del Dipartimento (nome ed email, in Sistema e registri): il link di firma arriva a quell\'indirizzo.';
+            return 'Indica prima il Direttore del Dipartimento in Gestione del portale → Uffici → Direzione: il link di firma arriva alla sua email.';
         }
         $token = bin2hex(random_bytes(20));
         $this->compilate->daFirmare($id, $token);
@@ -92,20 +75,13 @@ final class ServizioFirmaDirettore
     }
 
     /**
-     * La persona collegata è il Direttore indicato (stessa email o stesso codice fiscale).
+     * La persona collegata è chi firma ora: il Direttore o, con «Direttore assente» attivo, il vice (stessa email o stesso codice fiscale).
      *
      * @param array<string, mixed>|null $utente
      */
     public function puoFirmare(?array $utente): bool
     {
-        if (!$utente || empty($utente['id'])) {
-            return false;
-        }
-        $d = $this->direttore();
-        $email = strtolower(trim((string) ($utente['email'] ?? '')));
-        $cf = strtoupper(trim((string) ($utente['codice_fiscale'] ?? '')));
-
-        return ($email !== '' && $email === strtolower($d['email'])) || ($cf !== '' && $d['cf'] !== '' && $cf === strtoupper($d['cf']));
+        return $this->direzione->puoFirmare($utente);
     }
 
     /** Percorso del PDF della scuola da firmare (solo dentro la cartella delle firmate), null se non c'è. */

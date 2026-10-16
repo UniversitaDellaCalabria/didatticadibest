@@ -30,6 +30,12 @@ require_once 'header.php';
             <div class="text-secondary small">Le cose che aspettano la tua firma o che si sono fermate, in tutti i moduli del portale · aggiornato alle <?php echo date('H:i'); ?></div></div>
         <span class="ms-auto badge rounded-pill text-bg-<?php echo $tot ? 'warning' : 'success'; ?> fs-6"><?php echo $tot ? $tot . ' da guardare' : 'Tutto in ordine'; ?></span>
     </div>
+    <?php $dz_c = \App\Core\App::per($conn)->get(\App\Uffici\Direzione::class); $ass_c = $dz_c->assenza(); $firma_c = $dz_c->chiFirma(); ?>
+    <div class="alert alert-<?php echo $ass_c['attiva'] ? 'warning' : 'light border'; ?> small d-flex flex-wrap gap-2 align-items-center py-2">
+        <i class="fa fa-user-clock" aria-hidden="true"></i>
+        <span><?php echo $ass_c['attiva'] ? '<strong>Direttore assente</strong>: firme, link e avvisi vanno a ' . $h($firma_c['nome'] ?: 'il vice direttore') . ($ass_c['fino'] ? ' fino al ' . $h(date('d/m/Y', strtotime($ass_c['fino']))) : '') . '.' : 'Firme e avvisi vanno a <strong>' . $h($firma_c['nome'] ?: '(Direttore non indicato)') . '</strong>.'; ?></span>
+        <?php if ($dz_c->puoImpostareAssenza($user_info ?? null)): ?><a class="ms-auto fw-bold" href="direttore_assente.php"><?php echo $ass_c['attiva'] ? 'Il Direttore è tornato' : 'Direttore assente?'; ?></a><?php endif; ?>
+    </div>
     <div class="row g-3">
     <?php foreach ($gruppi as $g): ?>
         <div class="col-lg-6"><div class="card cd-gruppo h-100" id="g-<?php echo $h($g['chiave']); ?>" style="border-left: 5px solid <?php echo $h($g['colore']); ?> !important;"><div class="card-body">

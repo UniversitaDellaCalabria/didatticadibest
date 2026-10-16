@@ -78,7 +78,7 @@ final class Costanti
     /** Tipi di passo dell'iter di un modulo. */
     public const TIPI_PASSO = ['ufficio' => 'Un ufficio', 'persona' => 'Firma di una persona indicata nel modulo (es. il relatore)', 'direttore' => 'Firma del Direttore', 'conferma' => 'Conferma dei docenti indicati nel modulo (attestati)'];
 
-    /** Uffici con un tipo (didattica_uffici.tipo). */
+    /** Uffici con un tipo (uffici.tipo). */
     public const TIPI_UFFICIO = [
         ''           => 'Ufficio didattico',
         'protocollo' => 'Protocollo (riceve le domande da protocollare)',

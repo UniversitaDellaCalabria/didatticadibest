@@ -6,9 +6,10 @@ namespace App\Risorse;
 
 use App\Anagrafi\ServizioPersone;
 use App\Anagrafi\Testi;
+use App\Uffici\UfficiRepository;
 
 /**
- * Chi si occupa di una risorsa: l'admin sceglie i responsabili dall'anagrafe di Ateneo (una o più persone). Ricevono le email delle richieste,
+ * Chi si occupa di una risorsa: l'admin sceglie i responsabili dall'anagrafe di Ateneo (una o più persone) o un intero ufficio (Gestione del portale → Uffici). Ricevono le email delle richieste,
  * vedono solo le loro risorse dall'Area personale e, se abilitati, approvano, rifiutano e annullano le prenotazioni (come in LibreBooking).
  */
 final class ServizioResponsabiliRisorse
@@ -17,7 +18,8 @@ final class ServizioResponsabiliRisorse
         private ResponsabileRisorsaRepository $responsabili,
         private RisorsaRepository $risorse,
         private ServizioPersone $persone,
-        private ServizioRisorse $servizio
+        private ServizioRisorse $servizio,
+        private UfficiRepository $uffici
     ) {
     }
 
@@ -58,6 +60,41 @@ final class ServizioResponsabiliRisorse
     public function imposta(int $id, bool $notifiche, bool $approva): void
     {
         $this->responsabili->imposta($id, $notifiche, $approva);
+    }
+
+    /** @return list<array<string, mixed>> gli uffici responsabili della risorsa */
+    public function elencoUffici(int $risorsaId): array
+    {
+        return $this->responsabili->uffici($risorsaId);
+    }
+
+    /** Aggiunge un ufficio (tutte le sue persone) tra i responsabili. Ritorna l'errore, null se aggiunto. */
+    public function aggiungiUfficio(int $risorsaId, int $ufficioId): ?string
+    {
+        if (!$this->risorse->perId($risorsaId)) {
+            return 'Risorsa non trovata.';
+        }
+        if (!$this->uffici->perId($ufficioId)) {
+            return 'Ufficio non trovato: gli uffici si creano in Gestione del portale → Uffici e persone.';
+        }
+
+        return $this->responsabili->aggiungiUfficio($risorsaId, $ufficioId, true, true) ? null : 'Questo ufficio è già tra i responsabili.';
+    }
+
+    public function impostaUfficio(int $id, bool $notifiche, bool $approva): void
+    {
+        $this->responsabili->impostaUfficio($id, $notifiche, $approva);
+    }
+
+    /** @return array<string, mixed>|null */
+    public function ufficioPerId(int $id): ?array
+    {
+        return $this->responsabili->ufficioPerId($id);
+    }
+
+    public function togliUfficio(int $id): void
+    {
+        $this->responsabili->togliUfficio($id);
     }
 
     /** @return array<string, mixed>|null */

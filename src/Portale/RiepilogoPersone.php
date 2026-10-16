@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Portale;
 
+use App\Uffici\Direzione;
 use App\Core\Database;
 use App\Core\Orologio;
 use App\Core\Sito;
@@ -28,7 +29,9 @@ final class RiepilogoPersone
         private Mailer $mailer,
         private Sito $sito,
         private Orologio $orologio,
-        private FileEnv $env
+        private FileEnv $env,
+        private Direzione $direzione,
+        private SospensionePromemoria $sospensione
     ) {
     }
 
@@ -132,14 +135,19 @@ final class RiepilogoPersone
     {
         $adesso = $this->orologio->adesso();
         $settimana = $adesso->format('o-W');
-        $dir = mb_strtolower(trim((string) $this->db->valore('SELECT conv_direttore_email FROM impostazioni_sistema WHERE id = 1')));
+        $dir = mb_strtolower(trim((string) ($this->direzione->inCarica()['email'] ?? '')));
         $candidati = $this->daFare->candidati();
         if ($dir !== '' && filter_var($dir, FILTER_VALIDATE_EMAIL)) {
             $candidati[] = $dir;
         }
         $inviati = 0;
         $saltati = 0;
+        // Promemoria sospesi: niente a Direttore, vice e uffici (e senza segnare la settimana: alla riattivazione partono)
+        $esclusi = $this->sospensione->attiva() ? array_merge($this->sospensione->esclusi(), [$dir]) : [];
         foreach (array_unique($candidati) as $email) {
+            if ($esclusi && in_array($email, $esclusi, true)) {
+                continue;
+            }
             $riga = $this->riga($email);
             if ($riga['settimana'] === $settimana) {
                 continue; // già guardato (e mandato, se c'era qualcosa) questa settimana
