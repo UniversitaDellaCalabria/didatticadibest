@@ -53,6 +53,9 @@ require_once 'header.php';
             <div><h1 class="fw-bold h3 mb-0"><?php echo $h($p['modulo_titolo']); ?></h1><div class="small text-secondary font-monospace"><?php echo $h($p['codice']); ?> · inviata il <?php echo date('d/m/Y H:i', strtotime($p['creata_il'])); ?><?php echo ($p['protocollo'] ?? '') !== '' ? ' · prot. ' . $h($p['protocollo']) . (!empty($p['protocollo_data']) ? ' del ' . date('d/m/Y', strtotime($p['protocollo_data'])) : '') : ''; ?></div></div>
             <div class="fs-6 d-flex flex-wrap gap-2 align-items-center"><?php echo badge_stato_pratica($p['stato']); ?><?php if (pratica_modificabile($p)): ?><a href="modulo.php?id=<?php echo (int)$p['modulo_id']; ?>&amp;pratica=<?php echo (int)$p['id']; ?>" class="btn btn-sm btn-outline-primary fw-bold"><i class="fa fa-pen me-1" aria-hidden="true"></i>Modifica la richiesta</a><?php endif; ?></div>
         </div>
+        <?php $link_sond = \App\Core\App::per($conn)->get(\App\Didattica\SondaggioPratica::class)->link($p); if ($link_sond !== ''): ?>
+        <div class="alert alert-light border d-flex flex-wrap justify-content-between align-items-center gap-2"><span><i class="fa fa-comment-dots me-1 text-primary" aria-hidden="true"></i>La pratica è conclusa. Vuoi dirci com'è andata? Due domande, <strong>facoltative</strong>.</span><a class="btn btn-sm btn-primary fw-bold" href="<?php echo $h($link_sond); ?>">Rispondi</a></div>
+        <?php endif; ?>
         <div class="card border-0 shadow-sm mb-3"><div class="card-body">
             <h2 class="h6 fw-bold mb-2">A che punto è la tua pratica</h2>
             <?php echo html_iter_pratica($conn, $p, $m_p); ?>

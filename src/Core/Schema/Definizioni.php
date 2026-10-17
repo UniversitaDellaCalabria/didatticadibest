@@ -208,6 +208,17 @@ final class Definizioni
             op_id INT DEFAULT NULL, creato_il DATETIME DEFAULT CURRENT_TIMESTAMP,
             UNIQUE KEY uq_ufficio_email (ufficio_id, email), INDEX idx_email (email), INDEX idx_op (op_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        // v76: sostituzioni degli operatori: chi sostituisce un operatore assente (dal... al...), così le pratiche non restano ferme: email e «da fare» vanno anche al sostituto
+        'operatori_sostituzioni' => "CREATE TABLE IF NOT EXISTS operatori_sostituzioni (
+            id INT AUTO_INCREMENT PRIMARY KEY, op_id INT NOT NULL, sostituto_op_id INT NOT NULL, dal DATE NOT NULL, al DATE NOT NULL, motivo VARCHAR(200) NOT NULL DEFAULT '',
+            creata_da INT DEFAULT NULL, creata_il DATETIME DEFAULT CURRENT_TIMESTAMP, INDEX idx_op (op_id, dal, al), INDEX idx_sostituto (sostituto_op_id, dal, al)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        // v76: sondaggio facoltativo allo studente a pratica conclusa (due voti da 1 a 5 e un commento): il link personale (token) è nell'email di conclusione e nella pratica
+        'pratiche_sondaggi' => "CREATE TABLE IF NOT EXISTS pratiche_sondaggi (
+            id INT AUTO_INCREMENT PRIMARY KEY, pratica_id INT NOT NULL, token VARCHAR(40) NOT NULL, voto_servizio TINYINT DEFAULT NULL, voto_tempi TINYINT DEFAULT NULL,
+            commento VARCHAR(1000) NOT NULL DEFAULT '', creato_il DATETIME DEFAULT CURRENT_TIMESTAMP, compilato_il DATETIME DEFAULT NULL,
+            UNIQUE KEY uq_pratica (pratica_id), UNIQUE KEY uq_token (token), INDEX idx_compilato (compilato_il)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         // v70: messaggi tra l'ufficio e la scuola sulla convenzione online (promemoria «carica il PDF», avvisi liberi, risposte della scuola)
         'convenzioni_messaggi' => "CREATE TABLE IF NOT EXISTS convenzioni_messaggi (
             id INT AUTO_INCREMENT PRIMARY KEY, compilazione_id INT NOT NULL, da VARCHAR(10) NOT NULL DEFAULT 'ufficio', tipo VARCHAR(20) NOT NULL DEFAULT 'messaggio',

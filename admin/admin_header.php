@@ -431,6 +431,7 @@ $colore_lato = $modulo_corrente === 'portale' ? '#64748b' : $colore_modulo; // l
                         $voce_menu([], 'didattica.php?tab=moduli', 'fa-file-lines', 'Moduli e documenti', $tab_did === 'moduli');
                         $voce_menu([], 'didattica.php?tab=ufficio', 'fa-user-clock', 'Ricevimento', $tab_did === 'ufficio');
                         if (!$is_full_admin) $voce_menu(['uffici.php'], 'uffici.php', 'fa-sitemap', 'Uffici e persone');
+                        $voce_menu(['sostituzioni.php'], 'sostituzioni.php', 'fa-people-arrows', 'Sostituzioni');
                         $voce_menu([], 'didattica.php?tab=statistiche', 'fa-chart-column', 'Statistiche', $tab_did === 'statistiche');
                     }
                     if ($puo_conv_tesi) { $n_ct = 0; try { $n_ct = \App\Core\App::get(\App\ConvenzioniTesi\ServizioConvenzioniTesi::class)->daFare(); } catch (\Throwable $e) { error_log('Menu, convenzioni di tesi: ' . $e->getMessage()); } $voce_menu(['convenzioni_tesi.php'], 'convenzioni_tesi.php', 'fa-handshake', 'Convenzioni di tesi', false, $n_ct); }
@@ -510,6 +511,11 @@ $colore_lato = $modulo_corrente === 'portale' ? '#64748b' : $colore_modulo; // l
                 </<?php echo $link_top ? 'a' : 'span'; ?>>
             <?php endif; ?>
             <div class="ms-auto d-flex align-items-center gap-2 navbar-azioni">
+                <form method="GET" action="cerca.php" class="d-none d-md-flex m-0" role="search">
+                    <input type="hidden" name="p_id" value="<?php echo (int)$filtro_p; ?>">
+                    <input class="form-control form-control-sm" type="search" name="q" maxlength="100" style="width:200px;" placeholder="Cerca ovunque…" aria-label="Cerca ovunque nel pannello" value="<?php echo basename($_SERVER['SCRIPT_NAME'] ?? '') === 'cerca.php' ? htmlspecialchars((string)($_GET['q'] ?? ''), ENT_QUOTES, 'UTF-8') : ''; ?>">
+                </form>
+                <a href="cerca.php?p_id=<?php echo (int)$filtro_p; ?>" class="btn btn-outline-secondary btn-sm d-md-none" title="Cerca ovunque"><i class="fa fa-magnifying-glass" aria-hidden="true"></i></a>
                 <span class="text-muted small d-none d-md-inline-block"><i class="fa fa-user-shield text-danger me-1"></i> <strong><?php echo htmlspecialchars($utente_admin['nome'] ?? ''); ?></strong></span>
                 
                 <a href="messaggi.php?p_id=<?php echo $filtro_p; ?>" class="btn btn-outline-dark btn-sm fw-bold me-2 shadow-sm" style="background-color: #ffffff;">

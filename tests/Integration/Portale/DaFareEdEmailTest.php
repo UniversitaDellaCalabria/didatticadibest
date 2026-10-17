@@ -29,7 +29,7 @@ final class DaFareEdEmailTest extends DatabaseDiProva
 
     /** Tabelle con lo schema vero (colonne aggiunte comprese). */
     private const REALI = ['pratiche', 'pratiche_conferme', 'pratiche_firme', 'didattica_moduli', 'tutorato_incarichi', 'tutorato_registro', 'risorse', 'risorse_responsabili', 'prenotazioni_risorse',
-                           'didattica_sedute', 'didattica_consigli_persone', 'uffici_persone', 'riepilogo_persone', 'valutazioni_fsl', 'partecipanti_prenotazione', 'progetti_dettagli', 'risorse_scadenze', 'convenzioni_tesi'];
+                           'didattica_sedute', 'didattica_consigli_persone', 'uffici_persone', 'riepilogo_persone', 'valutazioni_fsl', 'partecipanti_prenotazione', 'progetti_dettagli', 'risorse_scadenze', 'convenzioni_tesi', 'operatori_sostituzioni'];
 
     protected function tabelle(): array
     {
@@ -61,6 +61,7 @@ final class DaFareEdEmailTest extends DatabaseDiProva
         file_put_contents($this->envFile, "RIEPILOGO_PERSONE=1\n");
         $this->c = new Container();
         $this->c->istanza(Container::class, $this->c);
+        $this->c->istanza(\App\Anagrafi\ClientApiAteneo::class, new \Tests\Doppi\AnagrafiClientApiFinto());
         $this->c->istanza(Database::class, $this->db);
         $this->c->istanza(Mailer::class, $this->mailer);
         $this->c->istanza(Orologio::class, new OrologioFisso('2026-10-14 08:00:00')); // un mercoledì

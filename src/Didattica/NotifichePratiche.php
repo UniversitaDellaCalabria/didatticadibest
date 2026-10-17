@@ -12,7 +12,7 @@ final class NotifichePratiche
 {
     private const COLORE = '#047857';
 
-    public function __construct(private Mailer $mailer, private ServizioUffici $ufficio, private UfficioRepository $uffici, private Sito $sito)
+    public function __construct(private Mailer $mailer, private ServizioUffici $ufficio, private UfficioRepository $uffici, private Sito $sito, private SostituzioniOperatori $sostituzioni, private SondaggioPratica $sondaggio)
     {
     }
 
@@ -41,7 +41,7 @@ final class NotifichePratiche
             $ufficio = $delUff;
         }
         if ($tipo === 'msg_studente' && $inCarico) {
-            $ufficio = [$inCarico['email']];
+            $ufficio = $this->sostituzioni->destinatari($inCarico);
         }
         switch ($tipo) {
             case 'nuova':
@@ -55,7 +55,7 @@ final class NotifichePratiche
             case 'stato':
                 $st = Costanti::STATI_PRATICA[$p['stato']][0] ?? $p['stato'];
                 if (filter_var($p['email'], FILTER_VALIDATE_EMAIL)) {
-                    $this->invia($p['email'], 'Pratica ' . $p['codice'] . ': ' . $st, '<p>Gentile ' . $h($p['nome']) . ',</p><p>la tua pratica è ora: <strong>' . $h($st) . '</strong>.</p>' . $intest . ($testo !== '' ? "<p style='background:#f1f5f9;padding:10px;border-radius:6px;'>" . nl2br($h($testo)) . '</p>' : '') . $bottone($linkS, 'Vedi la pratica'));
+                    $this->invia($p['email'], 'Pratica ' . $p['codice'] . ': ' . $st, '<p>Gentile ' . $h($p['nome']) . ',</p><p>la tua pratica è ora: <strong>' . $h($st) . '</strong>.</p>' . $intest . ($testo !== '' ? "<p style='background:#f1f5f9;padding:10px;border-radius:6px;'>" . nl2br($h($testo)) . '</p>' : '') . $bottone($linkS, 'Vedi la pratica') . $this->invitoSondaggio($p));
                 }
                 break;
             case 'msg_ufficio':
@@ -123,6 +123,25 @@ final class NotifichePratiche
     }
 
     /** Email col colore della Didattica. */
+    /** A pratica conclusa: l'invito (facoltativo) al sondaggio di due domande; vuoto se la pratica non è conclusa o lo studente ha già risposto. @param array<string, mixed> $p */
+    private function invitoSondaggio(array $p): string
+    {
+        $link = $this->sondaggio->link($p);
+
+        return $link === '' ? '' : "<p style='margin-top:22px;color:#475569;font-size:13px;'>Se vuoi, aiutaci a migliorare il servizio: <a href='" . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . "'>due domande, un minuto</a> (facoltativo).</p>";
+    }
+
+    /**
+     * Gli indirizzi di un operatore: il suo e, se è assente, quello di chi lo sostituisce.
+     *
+     * @param array<string, mixed> $operatore
+     * @return list<string>
+     */
+    public function destinatariOperatore(array $operatore): array
+    {
+        return $this->sostituzioni->destinatari($operatore);
+    }
+
     public function invia(string $a, string $oggetto, string $corpo): void
     {
         $this->mailer->invia($a, $oggetto, $corpo, self::COLORE);

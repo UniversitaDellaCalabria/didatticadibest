@@ -6,6 +6,7 @@ namespace App\Portale;
 
 use App\ConvenzioniTesi\Costanti as CostantiTesi;
 use App\Core\Database;
+use App\Didattica\SostituzioniInCorso;
 use App\Uffici\Direzione;
 
 /**
@@ -20,7 +21,7 @@ final class DaFarePersona
     /** Giorni dopo i quali una cosa che aspetta si segnala come ferma. */
     public const GIORNI_FERMA = 7;
 
-    public function __construct(private Database $db, private Direzione $direzione)
+    public function __construct(private Database $db, private Direzione $direzione, private SostituzioniInCorso $sostituzioni)
     {
     }
 
@@ -266,15 +267,18 @@ final class DaFarePersona
         if (!$op) {
             return $this->gruppo('pratiche', 'Pratiche da lavorare', 'fa-inbox', '#047857', 0, [], static fn (array $x): array => []);
         }
+        // Pratiche degli operatori assenti che questa persona sostituisce oggi
+        $assenti = $this->sostituzioni->sostituisce((int) $op['id']);
+        $inPiu = $assenti ? ' OR p.assegnata_a IN (' . implode(',', $assenti) . ')' : '';
         $dove = "p.stato NOT IN ('bozza', 'accolta', 'respinta', 'chiusa', 'integrazione') AND NOT EXISTS (SELECT 1 FROM pratiche_firme f WHERE f.pratica_id = p.id AND f.stato = 'attesa')
             AND NOT EXISTS (SELECT 1 FROM pratiche_conferme c WHERE c.pratica_id = p.id AND c.stato = 'attesa')
-            AND (p.assegnata_a = " . (int) $op['id'] . ($op['ufficio_id'] ? ' OR (p.assegnata_a IS NULL AND p.ufficio_id = ' . (int) $op['ufficio_id'] . ')' : '') . ')';
+            AND (p.assegnata_a = " . (int) $op['id'] . $inPiu . ($op['ufficio_id'] ? ' OR (p.assegnata_a IS NULL AND p.ufficio_id = ' . (int) $op['ufficio_id'] . ')' : '') . ')';
         $n = (int) $this->db->valore("SELECT COUNT(*) FROM pratiche p WHERE $dove");
         $r = $this->db->righe("SELECT p.id, p.codice, p.nome, p.cognome, p.assegnata_a, m.titolo, DATEDIFF(NOW(), COALESCE(p.aggiornata_il, p.creata_il)) AS gg
             FROM pratiche p JOIN didattica_moduli m ON m.id = p.modulo_id WHERE $dove ORDER BY COALESCE(p.aggiornata_il, p.creata_il) LIMIT 15");
 
         return $this->gruppo('pratiche', 'Pratiche da lavorare', 'fa-inbox', '#047857', $n, $r, fn (array $x): array => [
-            'testo' => (string) $x['titolo'] . ' · ' . self::nome($x), 'dettaglio' => 'pratica ' . $x['codice'] . ($x['assegnata_a'] ? ': in carico a te' : ': del tuo ufficio, da prendere in carico'),
+            'testo' => (string) $x['titolo'] . ' · ' . self::nome($x), 'dettaglio' => 'pratica ' . $x['codice'] . ($x['assegnata_a'] ? ((int) $x['assegnata_a'] === (int) $op['id'] ? ': in carico a te' : ': in carico a un collega che stai sostituendo') : ': del tuo ufficio, da prendere in carico'),
             'link' => 'admin/didattica.php?tab=pratiche&id=' . (int) $x['id'], 'giorni' => max(0, (int) $x['gg']),
         ]);
     }

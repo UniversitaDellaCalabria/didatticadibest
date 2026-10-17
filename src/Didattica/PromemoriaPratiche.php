@@ -49,7 +49,7 @@ final class PromemoriaPratiche
             $smistano = array_keys(array_filter($this->uffici->tutti(), fn ($u) => (int) $u['smista'] === 1));
             // Pratica in un ufficio ma senza una persona in carico: ricordano tutte le persone di quell'ufficio (altrimenti chi smista)
             $dellUfficio = $o || empty($p['ufficio_id']) ? [] : array_column(array_filter($this->ufficio->operatori(), fn ($op) => in_array((int) $p['ufficio_id'], $op['_uffici'], true)), 'email');
-            $dest = $o ? [$o['email']] : ($dellUfficio ?: array_column(array_filter($this->ufficio->operatori(), fn ($op) => array_intersect($op['_uffici'], $smistano)), 'email') ?: $this->ufficio->emailUfficio((string) $p['email_ufficio']));
+            $dest = $o ? $this->notifiche->destinatariOperatore($o) : ($dellUfficio ?: array_column(array_filter($this->ufficio->operatori(), fn ($op) => array_intersect($op['_uffici'], $smistano)), 'email') ?: $this->ufficio->emailUfficio((string) $p['email_ufficio']));
             $giorni = (int) floor((time() - strtotime($p['aggiornata_il'] ?: $p['creata_il'])) / 86400);
             foreach ($dest as $e) {
                 $this->notifiche->invia(

@@ -1061,6 +1061,57 @@ var PACCHETTI = [
     ],
     nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
     commit: "Tesi: azienda convenzionata scelta nella pratica con avviso sulla convenzione, dati del Direttore nel testo della convenzione, strumento per provare la firma digitale"
+  },
+  {
+    id: "cerca-sostituzioni-sondaggio",
+    titolo: "Pacchetto 23 · Cerca ovunque, sostituzioni degli operatori, sondaggio a fine pratica",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare",
+    schema: "v76 (due tabelle nuove: operatori_sostituzioni, pratiche_sondaggi)",
+    riassunto: "<strong>1) Cerca ovunque:</strong> una casella «Cerca ovunque…» nella barra in alto del pannello (e la pagina <code>cerca.php</code>) trova con più parole pratiche degli studenti, persone dell'anagrafe, sedute e verbali, aziende con convenzione di tesi, scuole e risorse; ognuno vede solo i gruppi che il suo ruolo può aprire. <strong>2) Sostituzioni degli operatori:</strong> Didattica → Sostituzioni: si indica chi sostituisce un operatore assente (dal… al…). Nel periodo i messaggi degli studenti, i promemoria «pratica ferma» e le integrazioni arrivano anche al sostituto, le pratiche dell'assente compaiono nel suo «Da fare» e in «in carico a me», e la scheda della pratica mostra «sostituito da…». La pratica resta assegnata all'assente: al ritorno non c'è nulla da riassegnare. Ognuno indica la propria assenza; chi smista e gli amministratori la indicano per chiunque. <strong>3) Sondaggio a fine pratica:</strong> a pratica accolta, respinta o chiusa lo studente trova nell'email di conclusione e nella pagina della pratica un invito <em>facoltativo</em> a due domande (soddisfazione, chiarezza e tempi, da 1 a 5, più un commento); le risposte, senza il nome, sono in Didattica → Statistiche.",
+    passi: [["Idea", "Cerca ovunque nel pannello"], ["Idea", "Sostituzioni degli operatori"], ["Idea", "Sondaggio a fine pratica"]],
+    cartelle: [
+      { cartella: "admin/", file: [
+        ["admin/cerca.php", "nuovo", "Idea", "la pagina dei risultati di «Cerca ovunque»"],
+        ["admin/sostituzioni.php", "nuovo", "Idea", "Didattica → Sostituzioni"],
+        ["admin/admin_header.php", "mod", "Idea", "la casella di ricerca nella barra e la voce «Sostituzioni» nel menu Didattica"],
+        ["admin/didattica.php", "mod", "Idea", "«in carico a me» comprende le pratiche dei colleghi sostituiti"],
+        ["admin/didattica_pratiche.php", "mod", "Idea", "«sostituito da…» nella scheda della pratica"],
+        ["admin/didattica_statistiche.php", "mod", "Idea", "il parere degli studenti nelle statistiche"]
+      ]},
+      { cartella: "/ (radice del portale)", file: [
+        ["sondaggio_pratica.php", "nuovo", "Idea", "la pagina pubblica con le due domande"],
+        ["pratiche.php", "mod", "Idea", "l'invito al sondaggio nella pratica conclusa"]
+      ]},
+      { cartella: "inc/", file: [
+        ["inc/sezioni.php", "mod", "Idea", "la pagina Sostituzioni appartiene al modulo Didattica"]
+      ]},
+      { cartella: "src/Portale/", file: [
+        ["src/Portale/RicercaPannello.php", "nuovo", "Idea", "la ricerca (con i permessi) nei sei gruppi"],
+        ["src/Portale/DaFarePersona.php", "mod", "Idea", "le pratiche dei colleghi sostituiti nel «Da fare»"]
+      ]},
+      { cartella: "src/Didattica/", file: [
+        ["src/Didattica/SostituzioniOperatori.php", "nuovo", "Idea", "gestione delle sostituzioni e destinatari delle email"],
+        ["src/Didattica/SostituzioniInCorso.php", "nuovo", "Idea", "le sostituzioni valide oggi"],
+        ["src/Didattica/SondaggioPratica.php", "nuovo", "Idea", "il sondaggio a fine pratica e il riepilogo"],
+        ["src/Didattica/NotifichePratiche.php", "mod", "Idea", "il sostituto in copia; l'invito al sondaggio nell'email di conclusione"],
+        ["src/Didattica/PromemoriaPratiche.php", "mod", "Idea", "i promemoria arrivano anche al sostituto"],
+        ["src/Didattica/ServizioPratiche.php", "mod", "Idea", "le integrazioni arrivano anche al sostituto"],
+        ["src/Didattica/PraticaRepository.php", "mod", "Idea", "elenco «in carico a me» con i sostituiti"]
+      ]},
+      { cartella: "src/Core/Schema/", file: [
+        ["src/Core/Schema/Definizioni.php", "mod", "Idea", "le due tabelle nuove"],
+        ["src/Core/Schema/Migrazioni.php", "mod", "Idea", "versione dello schema: 76"]
+      ]}
+    ],
+    dopo: [
+      "Apri una pagina del pannello: lo schema passa alla v76 (due tabelle nuove).",
+      "<strong>Cerca ovunque:</strong> scrivi un cognome nella casella in alto; devono comparire solo i gruppi che il tuo ruolo può aprire.",
+      "<strong>Sostituzioni:</strong> Didattica → Sostituzioni → indica una assenza di prova (poi eliminala). Gli operatori vedono solo le proprie; chi smista e gli amministratori vedono e indicano tutte.",
+      "<strong>Sondaggio:</strong> porta una pratica a «Accolta» o «Chiusa» e controlla l'email allo studente: in fondo c'è l'invito facoltativo. Le risposte compaiono in Didattica → Statistiche."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Cerca ovunque nel pannello, sostituzioni degli operatori assenti, sondaggio facoltativo a fine pratica"
   }
 ];
 
@@ -1087,12 +1138,12 @@ var PROSSIMI = [
   ["F10b · Tesi: collegare l'azienda convenzionata alla pratica di tesi dello studente", "fatto in locale: vedi Pacchetto 22"],
   ["F10c · Convenzione di tesi: dati del Direttore nel modello Word", "fatto in locale: vedi Pacchetto 22"],
   ["Prova sul server · firma PAdES vera (azienda e Direttore) nelle convenzioni di tesi", "da fare (a cura tua, 20 minuti): strumento strumenti/verifica_firma_pdf.php e guida documentazione/prova_firma_vera_convenzioni_tesi.md pronti"],
-  ["Pacchetti 20-21 · caricamento sul server", "da fare (a cura tua): scp del pacchetto, estrazione, schema v73, aggiunta delle persone nell'«Ufficio convenzioni di tesi», voci di menu (vedi «dopo» dei pacchetti)"],
+  ["Pacchetti 20-23 · caricamento sul server", "da fare (a cura tua): scp del pacchetto, estrazione, schema v76, aggiunta delle persone nell'«Ufficio convenzioni di tesi», voci di menu (vedi «dopo» dei pacchetti)"],
   ["Idea · Tempi per passo delle pratiche (dove si fermano, quanto aspettano)", "da fare: statistica dei giorni medi in ogni passo, per accorgersi dei colli di bottiglia"],
   ["Idea · Valutazione dello studente FSL con attestato delle competenze", "da fare: la struttura ospitante valuta lo studente e l'attestato riporta le competenze"],
-  ["Idea · Cerca ovunque nel pannello", "da fare: un'unica casella per trovare pratiche, persone, scuole, verbali e risorse"],
-  ["Idea · Sostituzioni degli operatori", "da fare: indicare chi sostituisce un operatore assente, così le pratiche non restano ferme"],
-  ["Idea · Sondaggio a fine pratica", "da fare: due domande allo studente a pratica chiusa, per misurare il servizio"],
+  ["Idea · Cerca ovunque nel pannello", "fatto in locale: vedi Pacchetto 23"],
+  ["Idea · Sostituzioni degli operatori", "fatto in locale: vedi Pacchetto 23"],
+  ["Idea · Sondaggio a fine pratica", "fatto in locale: vedi Pacchetto 23"],
   ["E1–E2 · Protocollo Titulus", "in attesa della risposta dell'Ateneo (servono i parametri, §6 del piano)"],
   ["Firma digitale remota (Aruba) in produzione", "in attesa dell'Ateneo: finché non ci sono le variabili ARUBA_* nel .env si carica il PDF firmato a mano"]
 ];

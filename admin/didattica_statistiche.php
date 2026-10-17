@@ -51,3 +51,18 @@ if ($fase === 'azioni') {
             <?php if (!$stat['tempi_passi']): ?><tr><td colspan="5" class="text-center text-muted py-3">Nessun passaggio nel periodo.</td></tr><?php endif; ?>
         </tbody></table></div></div></div>
 
+<?php $sond = \App\Core\App::per($conn)->get(\App\Didattica\SondaggioPratica::class)->riepilogo($s_dal, $s_al); ?>
+    <div class="card border-0 shadow-sm mb-3"><div class="card-body"><h6 class="fw-bold"><i class="fa fa-comment-dots me-1 text-primary" aria-hidden="true"></i>Il parere degli studenti a pratica conclusa</h6>
+        <p class="small text-secondary mb-2">Sondaggio facoltativo di due domande (voti da 1 a 5): il link è nell'email di conclusione e nella pagina della pratica. Le risposte non mostrano il nome dello studente.</p>
+        <?php if (!$sond['risposte']): ?><p class="small text-muted mb-0">Nessuna risposta nel periodo (pratiche concluse: <?php echo (int)$sond['conclusi']; ?>).</p>
+        <?php else: ?>
+            <p class="mb-2"><strong><?php echo (int)$sond['risposte']; ?></strong> risposte su <?php echo (int)$sond['conclusi']; ?> pratiche concluse (<?php echo $sond['conclusi'] ? round($sond['risposte'] * 100 / $sond['conclusi']) : 0; ?>%) ·
+                servizio nel complesso <strong><?php echo $sond['media_servizio']; ?></strong>/5 · chiarezza e tempi <strong><?php echo $sond['media_tempi']; ?></strong>/5</p>
+            <div class="table-responsive"><table class="table table-sm align-middle small mb-2"><thead class="table-light"><tr><th>Modulo</th><th class="text-center">Risposte</th><th class="text-center">Servizio</th><th class="text-center">Chiarezza e tempi</th></tr></thead><tbody>
+                <?php foreach ($sond['per_modulo'] as $nome => $x): ?><tr><td class="fw-bold"><?php echo $h($nome); ?></td><td class="text-center"><?php echo $x['n']; ?></td><td class="text-center"><?php echo $x['servizio']; ?></td><td class="text-center"><?php echo $x['tempi']; ?></td></tr><?php endforeach; ?>
+            </tbody></table></div>
+            <?php foreach ($sond['commenti'] as $c): ?>
+                <blockquote class="small border-start border-3 ps-2 mb-2"><?php echo nl2br($h($c['commento'])); ?><div class="text-secondary"><?php echo $h($c['modulo']); ?> · <?php echo $h($c['data']); ?> · voti <?php echo (int)$c['servizio']; ?>/<?php echo (int)$c['tempi']; ?></div></blockquote>
+            <?php endforeach; ?>
+        <?php endif; ?>
+    </div></div>

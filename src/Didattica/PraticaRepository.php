@@ -255,7 +255,8 @@ final class PraticaRepository
             $where[] = 'p.seduta_id = ' . (int) $seduta;
         }
         if ($carico === 'me') {
-            $where[] = 'p.assegnata_a = ' . (int) ($io['id'] ?? -1);
+            $mie = array_map('intval', array_merge([(int) ($io['id'] ?? -1)], (array) ($io['_sostituisce'] ?? [])));
+            $where[] = 'p.assegnata_a IN (' . implode(',', $mie) . ')';
         } elseif ($carico === 'seguite') {
             $where[] = 'p.id IN (SELECT pratica_id FROM pratiche_operatori WHERE operatore_id = ' . (int) ($io['id'] ?? -1) . ') AND (p.assegnata_a IS NULL OR p.assegnata_a <> ' . (int) ($io['id'] ?? -1) . ')';
         } elseif ($carico === 'smistare') {

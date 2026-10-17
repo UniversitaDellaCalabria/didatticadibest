@@ -21,6 +21,7 @@ $uid = (int)$u_id_curr;
 $ids_post = fn() => array_values(array_filter(array_map('intval', (array)($_POST['ids'] ?? []))));
 $autore_nome = nome_autore_ufficio($conn, $utente_admin);
 $io_operatore = operatore_ufficio($conn, 0, $utente_admin);
+if ($io_operatore) $io_operatore['_sostituisce'] = \App\Core\App::per($conn)->get(\App\Didattica\SostituzioniOperatori::class)->sostituisce((int)$io_operatore['id']); // colleghi assenti che sostituisco oggi
 // Referenti dei consigli (senza gli altri permessi della Didattica): solo le sedute dei loro consigli
 $solo_ref = !$puo_didattica_tutto;
 if ($solo_ref) { $tab = 'sedute'; $autore_nome = trim(($utente_admin['nome'] ?? '') . ' ' . ($utente_admin['cognome'] ?? '')) . ' · Referente del consiglio'; }
