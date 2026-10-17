@@ -989,6 +989,35 @@ var PACCHETTI = [
     ],
     nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
     commit: "Convenzioni di tesi con enti e aziende: iter online con modifiche agli articoli, firma del Direttore, archivio ed elenco pubblico"
+  },
+  {
+    id: "menu-voci-riservate",
+    titolo: "Pacchetto 21 · Menu: tutte le pagine nascoste e voci riservate a un ufficio",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare",
+    schema: "nessuna novità",
+    riassunto: "In <strong>Gestione del portale → Menu</strong>: il pulsante «Aggiungi le pagine nascoste» crea sotto «Pagine del portale (da scegliere)» tutte le pagine utili del portale, nascoste e raggruppate per argomento (senza ripetere quelle già nel menu). In più ogni voce può essere <strong>riservata</strong> alle persone di un ufficio (per esempio la Direzione: Direttore e vice) o ai <strong>responsabili di risorse</strong>, oltre che a tutti, a chi è entrato o a un ruolo. «Cruscotto del Direttore», «Direttore assente» e «Le mie risorse» si riservano da sole. Nel modulo Didattica compare il riquadro «Convenzioni di tesi».",
+    passi: [["F10", "Menu: pagine nascoste e voci per ufficio"]],
+    cartelle: [
+      { cartella: "admin/", file: [
+        ["admin/menu.php", "mod", "F10", "pulsante delle pagine nascoste; visibilità per ufficio e per responsabili di risorse"],
+        ["admin/inizio.php", "mod", "F10", "riquadro «Convenzioni di tesi» nel modulo Didattica"]
+      ]},
+      { cartella: "src/Portale/", file: [
+        ["src/Portale/CatalogoPagineMenu.php", "nuovo", "F10", "il catalogo delle pagine del portale per il menu"],
+        ["src/Portale/AppartenenzeVisitatore.php", "nuovo", "F10", "chi fa parte di un ufficio o è responsabile di risorse"],
+        ["src/Portale/Visitatore.php", "mod", "F10", "conosce l'email di chi guarda; i gruppi riservati restano nascosti se non decide il servizio"],
+        ["src/Portale/ServizioMenu.php", "mod", "F10", "usa le appartenenze per mostrare le voci riservate"],
+        ["src/Portale/MenuRepository.php", "mod", "F10", "visibilità alla creazione di una voce e riserva delle voci già presenti"]
+      ]}
+    ],
+    dopo: [
+      "<strong>Menu:</strong> in Gestione del portale → Menu premi «Aggiungi le pagine nascoste». Per ogni voce che vuoi mostrare: matita → scegli la <em>Posizione</em> e la <em>Visibilità</em> → occhio.",
+      "<strong>Voci per ufficio:</strong> nella Visibilità scegli «Ufficio: Direzione del Dipartimento» (Direttore e vice), «Responsabili di risorse» o un altro ufficio. Gli amministratori vedono sempre tutto; chi non è nell'ufficio non vede la voce (ma le pagine controllano già da sole chi le apre).",
+      "Le voci «Cruscotto del Direttore», «Direttore assente» e «Le mie risorse» che sono già nel menu e ancora per tutti vengono riservate alla Direzione e ai responsabili di risorse."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Menu: tutte le pagine del portale nascoste e voci riservate a un ufficio o ai responsabili di risorse"
   }
 ];
 

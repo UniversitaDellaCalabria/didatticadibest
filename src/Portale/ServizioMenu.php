@@ -12,7 +12,7 @@ final class ServizioMenu
 {
     private const LIVELLI = 3;
 
-    public function __construct(private MenuRepository $menu)
+    public function __construct(private MenuRepository $menu, private ?AppartenenzeVisitatore $appartenenze = null)
     {
     }
 
@@ -35,7 +35,7 @@ final class ServizioMenu
     {
         $out = [];
         foreach ($perGenitore[$genitore] ?? [] as $v) {
-            if (!$visitatore->vede($v->ruoloVisibilita)) {
+            if (!($this->appartenenze !== null ? $this->appartenenze->vede($visitatore, $v->ruoloVisibilita) : $visitatore->vede($v->ruoloVisibilita))) {
                 continue;
             }
             $conSottovoci = $livello < self::LIVELLI && !empty($perGenitore[$v->id]);

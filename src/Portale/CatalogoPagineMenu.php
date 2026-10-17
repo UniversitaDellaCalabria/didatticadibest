@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Portale;
 
+use App\Uffici\UfficiRepository;
+
 /**
  * Il catalogo di tutte le pagine utili del portale (per le persone, non quelle del pannello né quelle che si aprono solo da un link personale), da mettere nel menu del sito.
  * «crea» le aggiunge al menu NASCOSTE, raggruppate per argomento sotto una voce «Pagine del portale (da scegliere)»: il sito non cambia; poi da Menu si spostano
@@ -13,8 +15,23 @@ final class CatalogoPagineMenu
 {
     public const RADICE = 'Pagine del portale (da scegliere)';
 
-    public function __construct(private MenuRepository $menu, private FonteAree $aree)
+    /** Pagine per un gruppo di persone: indirizzo => 'direzione' (ufficio Direzione: Direttore e vice) | 'risorse' (responsabili di risorse). */
+    private const RISERVATE = ['cruscotto_direttore.php' => 'direzione', 'direttore_assente.php' => 'direzione', 'risorse_responsabile.php' => 'risorse'];
+
+    public function __construct(private MenuRepository $menu, private FonteAree $aree, private ?UfficiRepository $uffici = null)
     {
+    }
+
+    /** Il codice di visibilità del gruppo per quella pagina (0 = per tutti, se il gruppo non esiste). */
+    private function visibilitaDi(string $url): int
+    {
+        $g = self::RISERVATE[self::norma($url)] ?? '';
+        if ($g === 'risorse') {
+            return AppartenenzeVisitatore::RESPONSABILI_RISORSE;
+        }
+        $u = $g === 'direzione' && $this->uffici !== null ? $this->uffici->perChiave('direzione') : null;
+
+        return $u ? AppartenenzeVisitatore::codiceUfficio((int) $u['id']) : 0;
     }
 
     /**
@@ -108,8 +125,15 @@ final class CatalogoPagineMenu
             }
             $n = count($this->menu->figli($colonna));
             foreach ($nuove as [$etichetta, $url]) {
-                $this->menu->inserisci($colonna, $etichetta, $url, ++$n, false);
+                $this->menu->inserisci($colonna, $etichetta, $url, ++$n, false, $this->visibilitaDi($url));
                 ++$aggiunte;
+            }
+        }
+
+        // Le voci che c'erano già per queste pagine, ancora per tutti, si riservano a chi le usa davvero
+        foreach (array_keys(self::RISERVATE) as $u) {
+            if ($cod = $this->visibilitaDi($u)) {
+                $this->menu->riservaVociPubbliche($u, $cod);
             }
         }
 

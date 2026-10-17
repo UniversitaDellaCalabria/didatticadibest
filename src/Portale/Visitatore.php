@@ -15,11 +15,12 @@ final class Visitatore
         public readonly bool $collegato,
         public readonly int $ruolo,
         public readonly array $ruoliSecondari,
+        public readonly string $email = '',
     ) {
     }
 
     /**
-     * Dai dati della sessione (utente_id, utente_ruolo_id, utente_ruoli_secondari): li passa il controller.
+     * Dai dati della sessione (utente_id, utente_ruolo_id, utente_ruoli_secondari, utente_email): li passa il controller.
      *
      * @param array<string, mixed> $sessione
      */
@@ -29,6 +30,7 @@ final class Visitatore
             !empty($sessione['utente_id']),
             isset($sessione['utente_ruolo_id']) ? (int) $sessione['utente_ruolo_id'] : self::RUOLO_OSPITE,
             !empty($sessione['utente_ruoli_secondari']) ? explode(',', (string) $sessione['utente_ruoli_secondari']) : [],
+            (string) ($sessione['utente_email'] ?? ''),
         );
     }
 
@@ -38,11 +40,14 @@ final class Visitatore
         return $this->ruolo === 1 || $this->ruolo === 2 || in_array('1', $this->ruoliSecondari) || in_array('2', $this->ruoliSecondari);
     }
 
-    /** Una voce con questa visibilità: 0 tutti, -1 solo chi è entrato, >0 quel ruolo (o un amministratore). */
+    /** Una voce con questa visibilità: 0 tutti, -1 solo chi è entrato, >0 quel ruolo (o un amministratore); gli altri valori negativi sono gruppi di persone (AppartenenzeVisitatore). */
     public function vede(int $ruoloVisibilita): bool
     {
         if ($ruoloVisibilita === self::SOLO_COLLEGATI) {
             return $this->collegato;
+        }
+        if ($ruoloVisibilita < -1) {
+            return false;   // riservata a un ufficio o ai responsabili di risorse: la decide AppartenenzeVisitatore; qui, per sicurezza, resta nascosta
         }
         if ($ruoloVisibilita > 0) {
             return $this->collegato && ($this->ruolo === $ruoloVisibilita || in_array((string) $ruoloVisibilita, $this->ruoliSecondari) || $this->amministratore());

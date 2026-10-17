@@ -32,6 +32,8 @@ if (isset($_POST['ajax_menu_ordine'])) {
 
 if (!function_exists('getVisibilitaBadge')) {
     function getVisibilitaBadge($v_id, $ruoli) {
+        if ($v_id == \App\Portale\AppartenenzeVisitatore::RESPONSABILI_RISORSE) return '<span class="badge bg-dark shadow-sm">🔒 Responsabili di risorse</span>';
+        if (($u_id = \App\Portale\AppartenenzeVisitatore::ufficioDaCodice((int)$v_id)) !== null) return '<span class="badge bg-dark shadow-sm">🔒 Ufficio: ' . htmlspecialchars($GLOBALS['uffici_menu'][$u_id] ?? ('n. ' . $u_id)) . '</span>';
         if ($v_id == 0)  return '<span class="badge bg-success shadow-sm">🌐 Pubblico</span>';
         if ($v_id == -1) return '<span class="badge bg-warning text-dark shadow-sm">🔑 Autenticati SSO</span>';
         foreach ($ruoli as $r) { if ($r['id'] == $v_id) return '<span class="badge bg-dark shadow-sm">🔒 Solo ' . htmlspecialchars($r['nome']) . '</span>'; }
@@ -91,6 +93,21 @@ if (isset($_POST['del_menu'])) {
 // ==============================================================================
 
 $ruoli = get_ruoli($conn);
+// Uffici (Gestione del portale → Uffici): una voce può essere riservata alle persone di un ufficio (per esempio la Direzione) o ai responsabili di risorse
+$uffici_menu = [];
+try { foreach (\App\Core\App::per($conn)->get(\App\Uffici\UfficiRepository::class)->tutti(null, true) as $u_m) $uffici_menu[(int)$u_m['id']] = (string)$u_m['nome']; } catch (\Throwable $e) { error_log('Menu, uffici: ' . $e->getMessage()); }
+function opzioniVisibilita($ruoli, $uffici, int $scelta, bool $breve = false): string {
+    $o = '<option value="0"' . ($scelta === 0 ? ' selected' : '') . '>🌐 ' . ($breve ? 'Tutti' : 'Tutti (Pubblico)') . '</option><option value="-1"' . ($scelta === -1 ? ' selected' : '') . '>🔑 ' . ($breve ? 'Autenticati SSO' : 'Solo Autenticati SSO') . '</option>';
+    foreach ($ruoli as $r) $o .= '<option value="' . (int)$r['id'] . '"' . ($scelta === (int)$r['id'] ? ' selected' : '') . '>🔒 Solo: ' . htmlspecialchars($r['nome']) . '</option>';
+    $o .= '<optgroup label="Persone con un compito"><option value="' . \App\Portale\AppartenenzeVisitatore::RESPONSABILI_RISORSE . '"' . ($scelta === \App\Portale\AppartenenzeVisitatore::RESPONSABILI_RISORSE ? ' selected' : '') . '>🔒 Responsabili di risorse (aule, laboratori, mezzi)</option></optgroup>';
+    if ($uffici) {
+        $o .= '<optgroup label="Persone di un ufficio">';
+        foreach ($uffici as $id => $nome) { $cod = \App\Portale\AppartenenzeVisitatore::codiceUfficio((int)$id); $o .= '<option value="' . $cod . '"' . ($scelta === $cod ? ' selected' : '') . '>🔒 Ufficio: ' . htmlspecialchars($nome) . '</option>'; }
+        $o .= '</optgroup>';
+    }
+
+    return $o;
+}
 
 $aree_lavoro = [];
 $aree_lavoro = \App\Core\App::get(\App\Portale\AreeRepository::class)->titoliESlug();
@@ -176,9 +193,7 @@ $tutti_i_menu = \App\Core\App::get(\App\Portale\MenuRepository::class)->righe();
             <div class="col-md-3">
                 <label class="form-label small fw-bold text-secondary">Visibilità</label>
                 <select name="ruolo_visibilita_id" class="form-select">
-                    <option value="0">🌐 Tutti (Pubblico)</option>
-                    <option value="-1">🔑 Solo Autenticati SSO</option>
-                    <?php foreach ($ruoli as $r): ?><option value="<?= $r['id'] ?>">🔒 Solo: <?= htmlspecialchars($r['nome']) ?></option><?php endforeach; ?>
+                    <?= opzioniVisibilita($ruoli, $uffici_menu, 0) ?>
                 </select>
             </div>
             <div class="col-md-2">
@@ -375,9 +390,7 @@ $tutti_i_menu = \App\Core\App::get(\App\Portale\MenuRepository::class)->righe();
                         <div class="col-md-4">
                             <label class="form-label small fw-bold">Visibilità</label>
                             <select name="ruolo_visibilita_id" class="form-select">
-                                <option value="0" <?= ($em['ruolo_visibilita_id'] == 0) ? 'selected' : '' ?>>🌐 Tutti</option>
-                                <option value="-1" <?= ($em['ruolo_visibilita_id'] == -1) ? 'selected' : '' ?>>🔑 Autenticati SSO</option>
-                                <?php foreach ($ruoli as $r): ?><option value="<?= $r['id'] ?>" <?= ($em['ruolo_visibilita_id'] == $r['id']) ? 'selected' : '' ?>>🔒 Solo: <?= htmlspecialchars($r['nome']) ?></option><?php endforeach; ?>
+                                <?= opzioniVisibilita($ruoli, $uffici_menu, (int)$em['ruolo_visibilita_id'], true) ?>
                             </select>
                         </div>
                         <div class="col-md-4">

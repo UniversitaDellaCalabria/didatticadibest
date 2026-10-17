@@ -100,12 +100,18 @@ final class MenuRepository
         return (int) $this->db->valore('SELECT COALESCE(MAX(ordine), 0) FROM menu_voci WHERE genitore_id = 0');
     }
 
-    public function inserisci(int $genitore, string $etichetta, string $url, int $ordine, bool $visibile = true): int
+    public function inserisci(int $genitore, string $etichetta, string $url, int $ordine, bool $visibile = true, int $ruoloVisibilita = 0): int
     {
         return $this->db->inserisci(
-            'INSERT INTO menu_voci (genitore_id, etichetta, url, ordine, apri_nuova_scheda, ruolo_visibilita_id, visibile) VALUES (?, ?, ?, ?, 0, 0, ?)',
-            [$genitore, $etichetta, $url, $ordine, $visibile ? 1 : 0]
+            'INSERT INTO menu_voci (genitore_id, etichetta, url, ordine, apri_nuova_scheda, ruolo_visibilita_id, visibile) VALUES (?, ?, ?, ?, 0, ?, ?)',
+            [$genitore, $etichetta, $url, $ordine, $ruoloVisibilita, $visibile ? 1 : 0]
         );
+    }
+
+    /** Riserva a un gruppo (vedi AppartenenzeVisitatore) le voci con questo indirizzo che sono ancora per tutti. Ritorna quante. */
+    public function riservaVociPubbliche(string $url, int $ruoloVisibilita): int
+    {
+        return $this->db->esegui('UPDATE menu_voci SET ruolo_visibilita_id = ? WHERE url = ? AND ruolo_visibilita_id = 0', [$ruoloVisibilita, $url]);
     }
 
     /**

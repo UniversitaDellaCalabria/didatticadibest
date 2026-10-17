@@ -48,7 +48,7 @@ final class PortaleUnitTest extends TestCase
         $gestore = Visitatore::daSessione(['utente_id' => 2, 'utente_ruolo_id' => 5, 'utente_ruoli_secondari' => '2']);
         self::assertTrue($gestore->amministratore());
         self::assertTrue($gestore->vede(7), "un amministratore vede le voci riservate a un ruolo");
-        self::assertTrue($gestore->vede(-2), 'visibilità negative diverse da -1: sempre visibili, come prima');
+        self::assertFalse($gestore->vede(-2), 'i gruppi di persone (uffici, responsabili di risorse) li decide AppartenenzeVisitatore: qui restano nascosti per sicurezza');
     }
 
     public function testWidgetHomeNormalizzaIlSalvato(): void
