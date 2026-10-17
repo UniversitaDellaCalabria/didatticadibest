@@ -366,6 +366,57 @@ foreach (['/eventi/admin/convenzioni_tesi.php', '/eventi/admin/convenzioni_tesi.
 }
 
 echo "\n";
+// ─────────────────────────────────────────────────────────────────────
+titolo('11 · Il Direttore nel testo della convenzione');
+$db->query("UPDATE impostazioni_sistema SET tesi_direttore_nome = '', tesi_direttore_nato_a = '', tesi_direttore_nato_il = NULL WHERE id = 1");
+$tok3 = '';
+[, $id3] = $svc->avvia('dir@example.it', 'Test Direttore S.r.l.', \App\ConvenzioniTesi\Costanti::ORIGINE_INVITO, 'collaudo');
+$tok3 = (string) $rep->perId($id3)['token'];
+$azienda->invia('/eventi/convenzione_tesi.php?t=' . $tok3, ['salva_dati' => 1] + array_merge($dati, ['ragione_sociale' => 'Test Direttore S.r.l.']));
+$testo_di = function () use ($azienda, $tok3): string {
+    $tmp = sys_get_temp_dir() . '/ct_dir.docx';
+    file_put_contents($tmp, $azienda->vai('/eventi/convenzione_tesi.php?t=' . $tok3 . '&scarica=word'));
+    $z = new ZipArchive();
+
+    return $z->open($tmp) === true ? preg_replace('/\s+/u', ' ', strip_tags((string) $z->getFromName('word/document.xml'))) : '';
+};
+prova('finché non si indicano i dati il Word ha il testo del modello', str_contains($testo_di(), 'La Russa Mauro Francesco'));
+$p = $admin->vai('/eventi/admin/convenzioni_tesi.php');
+prova('la pagina dell\'ufficio mostra «Il Direttore nel testo della convenzione» da indicare', str_contains($p, 'Il Direttore nel testo della convenzione') && str_contains($p, 'il testo usa ancora il modello'));
+$admin->invia('/eventi/admin/convenzioni_tesi.php', ['salva_direttore_testo' => 1, 'titolo' => 'Prof.', 'nome' => 'Mario Bianchi', 'nato_a' => '', 'nato_il' => '']);
+prova('dati incompleti: non si salvano', (string) q("SELECT tesi_direttore_nome n FROM impostazioni_sistema WHERE id = 1")['n'] === '');
+$admin->invia('/eventi/admin/convenzioni_tesi.php', ['salva_direttore_testo' => 1, 'titolo' => 'Prof.', 'nome' => 'Mario Bianchi', 'nato_a' => 'Cosenza (CS)', 'nato_il' => '1970-02-03']);
+$t = $testo_di();
+prova('salvati: nel Word compaiono i dati del Direttore in carica', str_contains($t, 'Prof. Mario Bianchi, nato a Cosenza (CS) il 03/02/1970') && !str_contains($t, 'La Russa'), substr($t, 0, 60));
+$p = $admin->vai('/eventi/admin/convenzioni_tesi.php');
+prova('la pagina dice che è a posto', str_contains($p, 'badge bg-success">a posto'));
+$db->query("DELETE FROM convenzioni_tesi WHERE id = $id3");
+
+// ─────────────────────────────────────────────────────────────────────
+titolo('12 · Tesi dello studente: la scelta dell\'azienda convenzionata');
+$modulo_tesi = (int) q("SELECT id FROM didattica_moduli WHERE chiave = 'tesi'")['id'];
+$p = $studente->vai('/eventi/modulo.php?id=' . $modulo_tesi);
+prova('il modulo «Richiesta tesi» ha la scelta dell\'azienda con le convenzionate e «Altra azienda»', str_contains($p, 'data-tipo="azienda_tesi"') && str_contains($p, 'Altra azienda o ente (non ancora convenzionato)') && str_contains($p, 'BioLab Calabria S.r.l. – Rende'));
+$prat = (int) q("SELECT id FROM pratiche WHERE modulo_id = $modulo_tesi AND utente_id = 5 ORDER BY id LIMIT 1")['id'];
+if ($prat > 0) {
+    $imposta = function (string $valore, string $nome = '') use ($db, $prat): void {
+        $r = json_decode((string) q("SELECT risposte_json j FROM pratiche WHERE id = $prat")['j'], true) ?: [];
+        $r = array_values(array_filter($r, fn($x) => ($x['tipo'] ?? '') !== 'azienda_tesi' && !str_contains((string) ($x['etichetta'] ?? ''), 'non convenzionata')));
+        $r[] = ['etichetta' => 'Azienda o ente', 'tipo' => 'azienda_tesi', 'valore' => $valore];
+        if ($nome !== '') $r[] = ['etichetta' => "Nome dell'azienda o ente (non convenzionata)", 'tipo' => 'text', 'valore' => $nome];
+        $db->query("UPDATE pratiche SET risposte_json = '" . $db->real_escape_string((string) json_encode($r, JSON_UNESCAPED_UNICODE)) . "' WHERE id = $prat");
+    };
+    $imposta('BioLab Calabria S.r.l. – Rende');
+    $db->query("UPDATE convenzioni_tesi SET stato = 'protocollata', valida_dal = CURDATE(), valida_al = DATE_ADD(CURDATE(), INTERVAL 3 YEAR), protocollo = '4500' WHERE id = $id");
+    $p = $studente->vai('/eventi/pratiche.php?id=' . $prat);
+    prova('lo studente vede «Azienda convenzionata» con la validità', str_contains($p, 'Azienda convenzionata') && str_contains($p, 'convenzione di tesi valida fino al'));
+    $imposta(\App\ConvenzioniTesi\Costanti::ALTRA_AZIENDA, 'Zoo Lab Sila');
+    $p = $studente->vai('/eventi/pratiche.php?id=' . $prat);
+    prova('con «Altra azienda» lo studente è avvisato e trova il link per chiedere la convenzione', str_contains($p, 'Azienda non ancora convenzionata') && str_contains($p, 'richiedi_convenzione_tesi.php') && str_contains($p, 'Zoo Lab Sila'));
+    $p = $admin->vai('/eventi/admin/didattica.php?tab=pratiche&id=' . $prat);
+    prova('anche la scheda dell\'ufficio lo segnala', str_contains($p, 'Azienda non ancora convenzionata'));
+    $imposta('BioLab Calabria S.r.l. – Rende');
+}
 echo "Collaudo: $ok prove riuscite, $ko fallite.\n";
 echo "Per ripulire: DELETE FROM convenzioni_tesi (e php strumenti/locale/scenario_fsl.php nuova per rimettere il Direttore dei dati di prova).\n";
 exit($ko ? 1 : 0);

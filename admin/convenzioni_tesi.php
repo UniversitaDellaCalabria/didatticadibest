@@ -37,6 +37,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         [$err] = $svc->avvia((string)($_POST['email'] ?? ''), (string)($_POST['azienda'] ?? ''), $S::ORIGINE_INVITO, $autore);
         if (!$err) registra_log_audit($conn, "Convenzione di tesi: azienda invitata", ["Email" => (string)($_POST['email'] ?? ''), "Azienda" => (string)($_POST['azienda'] ?? '')]);
         $ok($err ?? "Invito mandato: l'azienda riceve il link per compilare la convenzione.", $err ? 'danger' : 'success');
+    } elseif (isset($_POST['salva_direttore_testo'])) {
+        $errori_d = $svc->salvaDirettoreTesto((string)($_POST['titolo'] ?? ''), (string)($_POST['nome'] ?? ''), (string)($_POST['nato_a'] ?? ''), (string)($_POST['nato_il'] ?? ''));
+        if (!$errori_d) registra_log_audit($conn, "Convenzione di tesi: dati del Direttore nel testo", ["Nome" => (string)($_POST['nome'] ?? '')]);
+        $ok($errori_d ? implode(' ', $errori_d) : "Dati del Direttore salvati: da ora compaiono nel Word e nel PDF delle convenzioni.", $errori_d ? 'danger' : 'success');
     } elseif (isset($_POST['rimanda'])) {
         $err = $svc->rimandaLink($id);
         $ok($err ?? "Link rimandato all'azienda.", $err ? 'danger' : 'success');
@@ -90,6 +94,7 @@ $gruppi = [
 ];
 $n_da_fare = $svc->daFare();
 $dir_firma = $svc->chiFirma();
+$dir_testo = $svc->datiDirettoreTesto();
 $standard = $svc->articoliStandard();
 $oggi = date('Y-m-d');
 $val_dal = $oggi; $val_al = date('Y-m-d', strtotime('+' . $S::DURATA_ANNI . ' years -1 day'));
@@ -156,6 +161,19 @@ echo pn_schede([
                 <?php if ($dir_firma['email'] === ''): ?> <a href="uffici.php?p_id=<?php echo (int)$filtro_p; ?>" class="fw-bold">Indicalo in Uffici → Direzione</a><?php endif; ?></div>
         </div></div>
     </div>
+
+    <details class="border rounded p-2 mb-3 bg-white"<?php echo $dir_testo['stato'] !== 'a_posto' ? ' open' : ''; ?> id="direttoreTesto">
+        <summary class="fw-bold small"><i class="fa fa-user-tie me-1" aria-hidden="true"></i>Il Direttore nel testo della convenzione
+            <?php echo ['mai_indicato' => ' · <span class="badge bg-warning text-dark">il testo usa ancora il modello com\'è</span>', 'a_posto' => ' · <span class="badge bg-success">a posto</span>', 'da_aggiornare' => ' · <span class="badge bg-danger">da aggiornare: il Direttore è cambiato</span>'][$dir_testo['stato']]; ?></summary>
+        <form method="POST" class="row g-2 mt-1"><?php csrf_field(); ?>
+            <div class="col-md-2"><label class="form-label small fw-bold mb-0" for="dtTit">Titolo</label><select class="form-select form-select-sm" id="dtTit" name="titolo"><?php foreach ($S::TITOLI_DIRETTORE as $t_d): ?><option<?php echo $dir_testo['titolo'] === $t_d ? ' selected' : ''; ?>><?php echo $h($t_d); ?></option><?php endforeach; ?></select></div>
+            <div class="col-md-4"><label class="form-label small fw-bold mb-0" for="dtNome">Nome e cognome come nel testo</label><input class="form-control form-control-sm" id="dtNome" name="nome" required maxlength="150" value="<?php echo $h($dir_testo['stato'] === 'da_aggiornare' ? $dir_testo['in_carica'] : ($dir_testo['nome'] ?: $dir_testo['in_carica'])); ?>"></div>
+            <div class="col-md-3"><label class="form-label small fw-bold mb-0" for="dtLuogo">Nato a</label><input class="form-control form-control-sm" id="dtLuogo" name="nato_a" required maxlength="100" placeholder="es. Lachen (CH)" value="<?php echo $h($dir_testo['stato'] === 'da_aggiornare' ? '' : $dir_testo['nato_a']); ?>"></div>
+            <div class="col-md-2"><label class="form-label small fw-bold mb-0" for="dtData">Il</label><input type="date" class="form-control form-control-sm" id="dtData" name="nato_il" required value="<?php echo $h($dir_testo['stato'] === 'da_aggiornare' ? '' : $dir_testo['nato_il']); ?>"></div>
+            <div class="col-md-1 d-flex align-items-end"><button class="btn btn-sm btn-outline-primary w-100" type="submit" name="salva_direttore_testo" value="1">Salva</button></div>
+            <div class="form-text">Nel modello il Direttore è «rappresentato dal Direttore, <em>titolo nome</em>, nato a <em>luogo</em> il <em>data</em>, domiciliato per la carica…». Il Direttore in carica (Gestione del portale → Uffici → Direzione) è <strong><?php echo $h($dir_testo['in_carica'] ?: 'non indicato'); ?></strong>. Finché non salvi questi dati il Word e il PDF usano il testo del modello com'è; se il Direttore cambia, il nuovo nome compare da solo e luogo e data restano puntini finché non li aggiorni qui.</div>
+        </form>
+    </details>
 
     <?php if (!$svc->modelloDisponibile()): ?><div class="alert alert-danger small">Manca il modello Word (<code><?php echo $h($S::MODELLO); ?></code>): le aziende non possono scaricare la convenzione.</div><?php endif; ?>
 

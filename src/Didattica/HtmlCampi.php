@@ -156,7 +156,7 @@ final class HtmlCampi
                 $attr .= ' data-' . $k . '="' . htmlspecialchars((string) json_encode($c[$k], JSON_UNESCAPED_UNICODE), ENT_QUOTES, 'UTF-8') . '"';
             }
         }
-        $breve = in_array($c['tipo'], ['text', 'email', 'tel', 'number', 'date', 'time', 'url', 'codice_fiscale', 'select', 'anno_accademico', 'corso_studio', 'docente', 'insegnamento'], true)
+        $breve = in_array($c['tipo'], ['text', 'email', 'tel', 'number', 'date', 'time', 'url', 'codice_fiscale', 'select', 'anno_accademico', 'corso_studio', 'azienda_tesi', 'docente', 'insegnamento'], true)
               || ($c['tipo'] === 'radio' && count($c['opzioni']) <= 3);
         return '<div class="campo-pratica' . ($griglia ? ($breve ? ' col-md-6' : ' col-12') : '') . '"' . $attr . '>' . $this->interno($c, $valore, $conAnagrafe) . '</div>';
     }
@@ -197,6 +197,17 @@ final class HtmlCampi
                 foreach ($gruppi as $g => $corsi) {
                     $o .= '<optgroup label="' . $h($g) . '">';
                     foreach ($corsi as $n) {
+                        $o .= '<option' . ($n === $testo ? ' selected' : '') . '>' . $h($n) . '</option>';
+                    }
+                    $o .= '</optgroup>';
+                }
+                return '<div class="mb-3">' . $et . '<select class="form-select" id="' . $id . '" name="' . $name . '"' . $req . '>' . $o . '</select>' . $aiuto . '</div>';
+            case 'azienda_tesi':
+                $gruppi = $this->scelte->per('azienda_tesi');
+                $o = '<option value="">-- scegli l\'azienda o l\'ente --</option>';
+                foreach ($gruppi as $g => $aziende) {
+                    $o .= '<optgroup label="' . $h($g) . '">';
+                    foreach ($aziende as $n) {
                         $o .= '<option' . ($n === $testo ? ' selected' : '') . '>' . $h($n) . '</option>';
                     }
                     $o .= '</optgroup>';

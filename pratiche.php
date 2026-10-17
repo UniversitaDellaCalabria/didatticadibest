@@ -65,6 +65,7 @@ require_once 'header.php';
                 <a class="btn btn-success fw-bold" href="allegato_pratica.php?p=<?php echo (int)$p['id']; ?>&amp;e=<?php echo (int)$doc_pronto['id']; ?>"><i class="fa fa-file-pdf me-1" aria-hidden="true"></i>Scarica il PDF</a>
             </div></div>
         <?php endif; ?>
+        <?php echo \App\Core\App::per($conn)->get(\App\ConvenzioniTesi\AziendaDellaPratica::class)->riquadro($risposte, false); ?>
         <?php $svc_conf = \App\Core\App::per($conn)->get(\App\Didattica\ServizioConfermeDocenti::class); $conf_s = $svc_conf->dellaPratica((int)$p['id']); ?>
         <?php if ($conf_s): ?>
             <div class="card border-0 shadow-sm mb-3" style="border-left:5px solid #0056B3 !important;"><div class="card-body">

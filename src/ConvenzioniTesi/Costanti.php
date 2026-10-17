@@ -51,6 +51,12 @@ final class Costanti
         self::PROTOCOLLATA => ['Stipulata', 'success'],
     ];
 
+    /** Titolo del Direttore nel testo della convenzione. */
+    public const TITOLI_DIRETTORE = ['Prof.' => 'Prof.', 'Prof.ssa' => 'Prof.ssa', 'Dott.' => 'Dott.', 'Dott.ssa' => 'Dott.ssa', 'Ing.' => 'Ing.'];
+
+    /** La scelta del campo «Azienda convenzionata» di una pratica di tesi per chi non trova la propria azienda nell'elenco. */
+    public const ALTRA_AZIENDA = 'Altra azienda o ente (non ancora convenzionato)';
+
     /** Forma di rivolgersi al rappresentante dell'azienda nel testo («rappresentato/a dal/la …»). */
     public const TITOLI = ['Dott.' => 'Dott.', 'Dott.ssa' => 'Dott.ssa', 'Prof.' => 'Prof.', 'Prof.ssa' => 'Prof.ssa', 'Ing.' => 'Ing.', 'Avv.' => 'Avv.', 'Sig.' => 'Sig.', 'Sig.ra' => 'Sig.ra'];
 }

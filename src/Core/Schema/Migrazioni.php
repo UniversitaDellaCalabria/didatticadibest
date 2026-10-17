@@ -16,8 +16,8 @@ use Closure;
  */
 final class Migrazioni
 {
-    /** 73: convenzioni di tesi con enti e aziende (tabella convenzioni_tesi e ufficio «convenzioni_tesi»). 72: interruttore per sospendere i promemoria al Direttore e agli uffici. 71: uffici di Dipartimento e di Ateneo in un'unica anagrafe (tabelle uffici e uffici_persone): la migrazione copia i dati delle quattro tabelle di prima. */
-    public const VERSIONE = 73;
+    /** 75: dati del Direttore nel testo della convenzione di tesi (colonne tesi_direttore_* di impostazioni_sistema). 74: nella richiesta di tesi la sede esterna sceglie l'azienda tra le convenzionate (aggiorna il modulo già creato). 73: convenzioni di tesi con enti e aziende (tabella convenzioni_tesi e ufficio «convenzioni_tesi»). 72: interruttore per sospendere i promemoria al Direttore e agli uffici. 71: uffici di Dipartimento e di Ateneo in un'unica anagrafe (tabelle uffici e uffici_persone): la migrazione copia i dati delle quattro tabelle di prima. */
+    public const VERSIONE = 75;
 
     /**
      * @param list<string> $gruppiPersonale gruppi assegnati al login in base al ruolo in Ateneo (GRUPPI_PERSONALE)
@@ -212,11 +212,6 @@ final class Migrazioni
             }
         }
 
-        // Ufficio che prende in carico le convenzioni di tesi con enti e aziende (persone dall'anagrafe, si scelgono da Gestione del portale → Uffici)
-        if ((int) ($this->db->valore("SELECT COUNT(*) FROM uffici WHERE chiave = 'convenzioni_tesi'") ?? 0) === 0) {
-            $this->db->comando("INSERT INTO uffici (nome, descrizione, chiave, ambito, ordine) VALUES ('Ufficio convenzioni di tesi', 'Prende in carico le convenzioni per la tesi con enti e aziende: protocollo in entrata e definitivo, modifiche agli articoli', 'convenzioni_tesi', 'dipartimento', 0)");
-        }
-
         // Uffici di partenza di una installazione nuova (si cambiano dal pannello)
         if ((int) ($this->db->valore("SELECT COUNT(*) n FROM uffici WHERE ambito = 'dipartimento'") ?? 1) === 0) {
             $this->db->comando("INSERT INTO uffici (nome, descrizione, chiave, ambito, smista, segue_corsi, ordine) VALUES
@@ -226,6 +221,13 @@ final class Migrazioni
                 ('Internazionalizzazione', 'Mobilità e attività all’estero', 'internazionalizzazione', 'dipartimento', 0, 0, 4),
                 ('Segreteria didattica', 'Operatori dell’ufficio', 'operatore', 'dipartimento', 0, 0, 5)");
         }
+
+        // Dopo gli uffici di partenza (che si creano solo se il Dipartimento non ne ha ancora): l'ufficio che prende in carico le convenzioni di tesi con enti e aziende
+        // (persone dall'anagrafe, si scelgono da Gestione del portale → Uffici)
+        if ((int) ($this->db->valore("SELECT COUNT(*) FROM uffici WHERE chiave = 'convenzioni_tesi'") ?? 0) === 0) {
+            $this->db->comando("INSERT INTO uffici (nome, descrizione, chiave, ambito, ordine) VALUES ('Ufficio convenzioni di tesi', 'Prende in carico le convenzioni per la tesi con enti e aziende: protocollo in entrata e definitivo, modifiche agli articoli', 'convenzioni_tesi', 'dipartimento', 0)");
+        }
+
         // Direzione del Dipartimento (Direttore e vice) e segreteria di direzione: sempre presenti. Il Direttore delle impostazioni diventa il primo membro.
         if (!$giaFatto) {
             $dir = $this->db->inserisci("INSERT INTO uffici (nome, descrizione, chiave, ambito, ordine) VALUES ('Direzione del Dipartimento', 'Direttore e vice direttore: firmano convenzioni e pratiche', 'direzione', 'dipartimento', 0)");

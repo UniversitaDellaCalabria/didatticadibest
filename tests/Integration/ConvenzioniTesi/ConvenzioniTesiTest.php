@@ -36,7 +36,7 @@ final class ConvenzioniTesiTest extends DatabaseDiProva
     {
         return $this->tabelleUffici() + [
             'utenti' => 'CREATE TABLE utenti (id INT PRIMARY KEY, email VARCHAR(150) NULL, ruolo_id INT DEFAULT 5, codice_fiscale VARCHAR(16) NULL)',
-            'impostazioni_sistema' => 'CREATE TABLE impostazioni_sistema (id INT PRIMARY KEY, ' . self::COLONNE_ASSENZA . ')',
+            'impostazioni_sistema' => 'CREATE TABLE impostazioni_sistema (id INT PRIMARY KEY, ' . self::COLONNE_ASSENZA . ', tesi_direttore_titolo VARCHAR(20) NOT NULL DEFAULT \'Prof.\', tesi_direttore_nome VARCHAR(150) NOT NULL DEFAULT \'\', tesi_direttore_nato_a VARCHAR(100) NOT NULL DEFAULT \'\', tesi_direttore_nato_il DATE NULL)',
             'convenzioni_tesi' => Definizioni::tabelle()['convenzioni_tesi'],
         ];
     }
@@ -148,6 +148,54 @@ final class ConvenzioniTesiTest extends DatabaseDiProva
         $this->assertSame($id, $id2);
         $this->assertCount(2, $this->mailer->inviate);
         $this->assertSame(1, (int) $this->db->valore('SELECT COUNT(*) FROM convenzioni_tesi'));
+    }
+
+    /** Il testo del Word di una convenzione compilata. */
+    private function testoWord(int $id): string
+    {
+        $w = (string) $this->s()->word($this->riga($id));
+        $z = new \ZipArchive();
+        $z->open($w);
+        $xml = (string) $z->getFromName('word/document.xml');
+        $z->close();
+        @unlink($w);
+
+        return trim((string) preg_replace('/\s+/u', ' ', strip_tags(str_replace('</w:p>', "
+", $xml))));
+    }
+
+    public function testIlDirettoreNelTestoDellaConvenzione(): void
+    {
+        $id = $this->compilata();
+        $d = $this->s()->datiDirettoreTesto();
+        $this->assertSame(['mai_indicato', 'Mario Bianchi'], [$d['stato'], $d['in_carica']]);
+        $this->assertStringContainsString('Prof. La Russa Mauro Francesco, nato a Lachen (CH) il 30/09/1977', $this->testoWord($id), 'finché non si indica, il testo del modello com\'è');
+
+        // dati non validi
+        $this->assertCount(3, $this->s()->salvaDirettoreTesto('Prof.', ' ', '', 'non una data'));
+        $this->assertStringContainsString('data di nascita', implode(' ', $this->s()->salvaDirettoreTesto('Prof.', 'Bianchi Mario', 'Cosenza (CS)', '2999-01-01')));
+        $this->assertSame('mai_indicato', $this->s()->datiDirettoreTesto()['stato']);
+
+        // indicati: nel Word e nel PDF
+        $this->assertSame([], $this->s()->salvaDirettoreTesto('Prof.', 'Bianchi Mario', 'Cosenza (CS)', '1970-02-03'));
+        $this->assertSame('a_posto', $this->s()->datiDirettoreTesto()['stato'], 'il Direttore in carica è lo stesso, anche con nome e cognome invertiti');
+        $testo = $this->testoWord($id);
+        $this->assertStringContainsString('rappresentato dal Direttore, Prof. Bianchi Mario, nato a Cosenza (CS) il 03/02/1970, domiciliato per la carica presso la sede', $testo);
+        $this->assertStringNotContainsString('La Russa', $testo);
+        $this->assertStringContainsString('BioLab Calabria S.r.l., con sede legale', $testo, 'la parte dell\'azienda resta');
+        $pdf = (string) preg_replace('/\s+/u', ' ', (new \App\Infrastructure\Pdf\TestoPdf())->estrai((string) $this->s()->pdf($this->riga($id))));
+        $this->assertStringContainsString('nato a Cosenza (CS) il 03/02/1970', $pdf);
+
+        // il Direttore cambia: nel testo va il nuovo nome, luogo e data restano da completare
+        $this->impostaDirettore('Vera Nuova', 'nuova@unical.it');
+        $d = $this->s()->datiDirettoreTesto();
+        $this->assertSame(['da_aggiornare', 'Vera Nuova'], [$d['stato'], $d['in_carica']]);
+        $testo = $this->testoWord($id);
+        $this->assertStringContainsString('rappresentato dal Direttore, Prof. Vera Nuova, nato a …………………… il ……………, domiciliato', $testo);
+        $this->assertStringNotContainsString('Bianchi Mario', $testo);
+        // aggiornati i dati torna a posto
+        $this->s()->salvaDirettoreTesto('Prof.ssa', 'Vera Nuova', 'Roma', '1980-05-06');
+        $this->assertStringContainsString('Prof.ssa Vera Nuova, nato a Roma il 06/05/1980', $this->testoWord($id));
     }
 
     public function testControlloDeiDati(): void

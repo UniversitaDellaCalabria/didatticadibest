@@ -46,6 +46,34 @@ final class ModelliPratiche
     {
     }
 
+    /**
+     * La richiesta di tesi già creata aveva i campi di testo «Azienda o ente» e «Riferimento convenzione» per la sede esterna: diventano la scelta tra le aziende
+     * convenzionate e il nome dell'azienda non convenzionata, nello stesso punto del modulo (i nomi dei campi non cambiano: le bozze e le pratiche già inviate restano a posto).
+     * Si fa una volta sola: dopo, il modulo ha un campo «azienda_tesi». Un modulo cambiato a mano nel frattempo non si tocca.
+     */
+    private function aziendaConvenzionataNellaTesi(): void
+    {
+        $m = $this->db->riga("SELECT id, campi_json FROM didattica_moduli WHERE chiave = 'tesi'");
+        $campi = $m ? json_decode((string) $m['campi_json'], true) : null;
+        if (!is_array($campi) || array_filter($campi, static fn ($c): bool => ($c['tipo'] ?? '') === 'azienda_tesi')) {
+            return;
+        }
+        $a = $r = null;
+        foreach ($campi as $i => $c) {
+            if (($c['tipo'] ?? '') === 'text' && ($c['etichetta'] ?? '') === 'Azienda o ente') {
+                $a = $i;
+            } elseif (($c['tipo'] ?? '') === 'text' && ($c['etichetta'] ?? '') === 'Riferimento convenzione') {
+                $r = $i;
+            }
+        }
+        if ($a === null || $r === null) {
+            return;
+        }
+        $campi[$a] = array_merge($campi[$a], self::CAMPO_AZIENDA_TESI);
+        $campi[$r] = array_merge($campi[$r], self::CAMPO_NOME_AZIENDA_TESI);
+        $this->db->esegui('UPDATE didattica_moduli SET campi_json = ? WHERE id = ?', [json_encode(array_values($campi), JSON_UNESCAPED_UNICODE), (int) $m['id']]);
+    }
+
     /** Crea le pratiche che mancano (si chiama a ogni aggiornamento dello schema: non tocca quelle già presenti). */
     public function prepara(): void
     {
@@ -60,6 +88,7 @@ final class ModelliPratiche
                 $this->$metodo();
             }
         }
+        $this->aziendaConvenzionataNellaTesi();
         // Le pratiche di mobilità passano dall'ufficio «Internazionalizzazione» (già esistente): se in una versione precedente era stato creato un ufficio a parte, si unifica
         $intern = (int) $this->db->valore("SELECT id FROM uffici WHERE chiave = 'internazionalizzazione'");
         $vecchio = (int) $this->db->valore("SELECT id FROM uffici WHERE chiave = 'mobilita'");
@@ -760,6 +789,12 @@ SEDE",
     private const CATEGORIA_LAUREE = 'Lauree';
     private const CATEGORIA_MOBILITA = 'Mobilità internazionale';
 
+    /** I due campi della sede esterna della tesi: l'azienda tra le convenzionate (o «Altra azienda») e, per chi non la trova, il suo nome. */
+    public const CAMPO_AZIENDA_TESI = ['tipo' => 'azienda_tesi', 'etichetta' => 'Azienda o ente', 'obbligatorio' => 1,
+        'aiuto' => 'Scegli l\'azienda tra quelle convenzionate. Se non c\'è scegli «Altra azienda»: serve prima la convenzione, che l\'azienda chiede online da «Convenzione di tesi per enti e aziende» (menu Studenti → Tesi).'];
+    public const CAMPO_NOME_AZIENDA_TESI = ['tipo' => 'text', 'etichetta' => 'Nome dell\'azienda o ente (non convenzionata)', 'obbligatorio' => 1,
+        'cond' => ['campo' => 'Azienda o ente', 'op' => 'uguale', 'valore' => 'Altra azienda o ente (non ancora convenzionato)']];
+
     /** Le tre richieste della pratica «Richiesta Tesi». */
     public const TIPI_TESI = ['Richiesta tesi', 'Richiesta tesi LMCU Conservazione e Restauro dei Beni Culturali', 'Variazione della richiesta di tesi'];
 
@@ -807,8 +842,8 @@ SEDE",
             ['tipo' => 'radio', 'etichetta' => 'Sede del lavoro di tesi', 'obbligatorio' => 1, 'opzioni' => ['Interna', 'Esterna'], 'cond' => $c('uguale', $tesi)],
             ['tipo' => 'text', 'etichetta' => 'Laboratorio DiBEST', 'cond' => $interna, 'aiuto' => 'Il laboratorio DiBEST in cui si svolge il lavoro finale'],
             ['tipo' => 'textarea', 'etichetta' => 'Laboratorio UNICAL', 'cond' => $interna, 'aiuto' => 'Nome del laboratorio e cubo'],
-            ['tipo' => 'text', 'etichetta' => 'Azienda o ente', 'cond' => $esterna],
-            ['tipo' => 'text', 'etichetta' => 'Riferimento convenzione', 'cond' => $esterna],
+            self::CAMPO_AZIENDA_TESI + ['cond' => $esterna],
+            self::CAMPO_NOME_AZIENDA_TESI,
             ['tipo' => 'multicheck', 'etichetta' => 'Cosa varia', 'obbligatorio' => 1, 'opzioni' => ['Progetto formativo', 'Laboratorio', 'Relatore/trice o correlatori/trici'], 'cond' => $c('uguale', $variazione)],
             ['tipo' => 'textarea', 'etichetta' => 'Nuovo progetto formativo', 'obbligatorio' => 1, 'cond' => $cosa('progetto formativo')],
             ['tipo' => 'text', 'etichetta' => 'Nuovo laboratorio', 'obbligatorio' => 1, 'cond' => $cosa('laboratorio')],

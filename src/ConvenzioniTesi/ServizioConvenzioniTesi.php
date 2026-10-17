@@ -146,13 +146,84 @@ final class ServizioConvenzioniTesi
     /** Il Word compilato (file temporaneo da cancellare). @param array<string, mixed> $c */
     public function word(array $c): ?string
     {
-        return $this->pronta($c) || (string) $c['stato'] === Costanti::PROTOCOLLATA ? $this->modello->word($this->dati($c), $this->concordati($c)) : null;
+        return $this->pronta($c) || (string) $c['stato'] === Costanti::PROTOCOLLATA ? $this->modello->word($this->dati($c), $this->concordati($c), $this->direttoreNelTesto()) : null;
     }
 
     /** Il PDF da firmare. @param array<string, mixed> $c */
     public function pdf(array $c): ?string
     {
-        return $this->pronta($c) ? $this->modello->pdf($this->dati($c), $this->concordati($c)) : null;
+        return $this->pronta($c) ? $this->modello->pdf($this->dati($c), $this->concordati($c), $this->direttoreNelTesto()) : null;
+    }
+
+    // ───────────────────────────── Il Direttore nel testo della convenzione ─────────────────────────────
+
+    private static function chiaveNome(string $nome): string
+    {
+        $t = array_filter(explode(' ', mb_strtolower((string) preg_replace('/[^\p{L}\s]/u', ' ', \App\Tutorato\AbbinamentoInsegnamenti::norma($nome)))));
+        sort($t);
+
+        return implode(' ', $t);
+    }
+
+    /**
+     * Come compare il Direttore nel testo della convenzione, e se i dati sono a posto.
+     * stato: «mai_indicato» (si usa il testo del modello com'è), «a_posto» (il Direttore in carica è quello dei dati) o «da_aggiornare» (il Direttore è cambiato: nel testo
+     * va il nuovo nome e restano puntini da completare per luogo e data di nascita).
+     *
+     * @return array{titolo: string, nome: string, nato_a: string, nato_il: string, stato: string, in_carica: string}
+     */
+    public function datiDirettoreTesto(): array
+    {
+        $r = $this->db->riga('SELECT tesi_direttore_titolo, tesi_direttore_nome, tesi_direttore_nato_a, tesi_direttore_nato_il FROM impostazioni_sistema WHERE id = 1') ?: [];
+        $d = $this->direzione->direttore();
+        $inCarica = $d ? trim((string) $d['nominativo']) : '';
+        $nome = trim((string) ($r['tesi_direttore_nome'] ?? ''));
+        $natoA = trim((string) ($r['tesi_direttore_nato_a'] ?? ''));
+        $natoIl = (string) ($r['tesi_direttore_nato_il'] ?? '');
+        $salvato = $nome !== '' && $natoA !== '' && $natoIl !== '';
+        $stato = !$salvato ? 'mai_indicato' : ($inCarica === '' || self::chiaveNome($inCarica) === self::chiaveNome($nome) ? 'a_posto' : 'da_aggiornare');
+
+        return ['titolo' => trim((string) ($r['tesi_direttore_titolo'] ?? '')) ?: 'Prof.', 'nome' => $nome, 'nato_a' => $natoA, 'nato_il' => $natoIl, 'stato' => $stato, 'in_carica' => $inCarica];
+    }
+
+    /** I dati del Direttore da scrivere nel Word e nel PDF; null = il testo del modello com'è (finché non si indicano). @return array{titolo: string, nome: string, nato_a: string, nato_il: string}|null */
+    private function direttoreNelTesto(): ?array
+    {
+        $d = $this->datiDirettoreTesto();
+        if ($d['stato'] === 'mai_indicato') {
+            return null;
+        }
+        if ($d['stato'] === 'da_aggiornare') {
+            return ['titolo' => $d['titolo'], 'nome' => $d['in_carica'], 'nato_a' => '', 'nato_il' => ''];
+        }
+
+        return ['titolo' => $d['titolo'], 'nome' => $d['nome'], 'nato_a' => $d['nato_a'], 'nato_il' => $d['nato_il']];
+    }
+
+    /** Salva il Direttore come si scrive nella convenzione. Ritorna gli errori. @return list<string> */
+    public function salvaDirettoreTesto(string $titolo, string $nome, string $natoA, string $natoIl): array
+    {
+        $nome = mb_substr(trim((string) preg_replace('/\s+/u', ' ', $nome)), 0, 150);
+        $natoA = mb_substr(trim((string) preg_replace('/\s+/u', ' ', $natoA)), 0, 100);
+        $errori = [];
+        if ($nome === '') {
+            $errori[] = 'Scrivi nome e cognome del Direttore come devono comparire nella convenzione.';
+        }
+        if ($natoA === '') {
+            $errori[] = 'Scrivi il luogo di nascita (per esempio Lachen (CH)).';
+        }
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $natoIl) || strtotime($natoIl) === false || $natoIl > $this->oggi()) {
+            $errori[] = 'Controlla la data di nascita.';
+        }
+        if (!isset(Costanti::TITOLI_DIRETTORE[$titolo])) {
+            $titolo = 'Prof.';
+        }
+        if ($errori) {
+            return $errori;
+        }
+        $this->db->esegui('UPDATE impostazioni_sistema SET tesi_direttore_titolo = ?, tesi_direttore_nome = ?, tesi_direttore_nato_a = ?, tesi_direttore_nato_il = ? WHERE id = 1', [$titolo, $nome, $natoA, $natoIl]);
+
+        return [];
     }
 
     /** Anteprima per l'ufficio: anche con modifiche non ancora accettate non si genera nulla, si legge il testo proposto. @return list<string> */

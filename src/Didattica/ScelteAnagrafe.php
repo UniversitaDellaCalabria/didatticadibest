@@ -77,6 +77,12 @@ final class ScelteAnagrafe
                 }
             }
             $out = array_values(array_unique($out));
+        } elseif ($tipo === 'azienda_tesi') {
+            // Le aziende con una convenzione di tesi stipulata e valida oggi, più la scelta per chi non trova la sua
+            foreach ($this->db->righe("SELECT azienda, dati_json FROM convenzioni_tesi WHERE stato = 'protocollata' AND valida_al >= CURDATE() ORDER BY azienda") as $r) {
+                $out['Aziende convenzionate'][] = \App\ConvenzioniTesi\AziendaDellaPratica::etichetta((string) $r['azienda'], (string) $r['dati_json']);
+            }
+            $out['Altro'][] = \App\ConvenzioniTesi\Costanti::ALTRA_AZIENDA;
         } elseif ($tipo === 'docente') {
             foreach (Righe::testo($this->db->righe('SELECT cognome, nome FROM personale_ateneo WHERE docente = 1 AND attivo = 1 ORDER BY cognome, nome')) as $x) {
                 $out[] = trim($x['cognome'] . ' ' . $x['nome']);

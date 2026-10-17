@@ -119,6 +119,9 @@ final class LetturaRisposte
                 if ($v !== '' && $c['tipo'] === 'corso_studio' && $controllaCorsi && ($corsi = array_merge([], ...array_values($this->scelte->per('corso_studio')))) && !in_array($v, $corsi, true)) {
                     $v = '';
                 }
+                if ($v !== '' && $c['tipo'] === 'azienda_tesi' && $controllaCorsi && !in_array($v, array_merge([], ...array_values($this->scelte->per('azienda_tesi'))), true)) {
+                    $v = '';   // un'azienda che non è (più) tra quelle convenzionate: si sceglie «Altra azienda»
+                }
                 if ($c['tipo'] === 'insegnamento_ateneo' && $v !== '') {
                     // Scelto dal catalogo: corso, anno di offerta, CFU e S.S.D. (si riconoscono nel verbale e nelle convalide)
                     $meta = json_decode((string) ($post[$k . '_meta'] ?? ''), true);

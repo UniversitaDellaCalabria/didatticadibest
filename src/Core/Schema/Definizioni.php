@@ -794,6 +794,11 @@ final class Definizioni
             'testo_attestato'       => "ADD COLUMN testo_attestato VARCHAR(300) DEFAULT NULL",
         ],
         'impostazioni_sistema' => [
+            // v75: il Direttore come si scrive nella convenzione di tesi (titolo, nome, luogo e data di nascita): il nome viene dalla Direzione, il resto si indica una volta
+            'tesi_direttore_titolo' => "ADD COLUMN tesi_direttore_titolo VARCHAR(20) NOT NULL DEFAULT 'Prof.'",
+            'tesi_direttore_nome'   => "ADD COLUMN tesi_direttore_nome VARCHAR(150) NOT NULL DEFAULT ''",
+            'tesi_direttore_nato_a' => "ADD COLUMN tesi_direttore_nato_a VARCHAR(100) NOT NULL DEFAULT ''",
+            'tesi_direttore_nato_il' => "ADD COLUMN tesi_direttore_nato_il DATE DEFAULT NULL",
             'email_attestato_oggetto' => "ADD COLUMN email_attestato_oggetto VARCHAR(255) DEFAULT ''",
             'email_attestato_corpo'   => "ADD COLUMN email_attestato_corpo TEXT DEFAULT NULL",
             'email_sondaggio_oggetto' => "ADD COLUMN email_sondaggio_oggetto VARCHAR(255) DEFAULT ''",

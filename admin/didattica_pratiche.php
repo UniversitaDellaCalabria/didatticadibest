@@ -287,6 +287,7 @@ echo pn_prossima($prossima_p[0], $prossima_p[1], $prossima_p[2], $prossima_p[3])
         <?php endif; ?>
     </div></div>
 
+    <?php echo \App\Core\App::per($conn)->get(\App\ConvenzioniTesi\AziendaDellaPratica::class)->riquadro($risposte, true); ?>
     <?php if ($conf_p): ?>
     <div class="card border-0 shadow-sm mb-3" style="border-left:4px solid #0056B3 !important;"><div class="card-body">
         <h6 class="fw-bold mb-2"><i class="fa fa-user-check me-1 text-primary" aria-hidden="true"></i>Conferma dei docenti</h6>

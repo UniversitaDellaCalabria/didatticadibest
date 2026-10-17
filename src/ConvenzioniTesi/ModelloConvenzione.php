@@ -62,10 +62,13 @@ final class ModelloConvenzione
     /**
      * Il Word compilato (percorso di un file temporaneo da cancellare dopo l'uso) o null se il modello manca.
      *
+     * $direttore: come scrivere il Direttore del Dipartimento (titolo, nome, nato_a, nato_il); null = il testo del modello com'è.
+     *
      * @param array<string, mixed> $azienda
      * @param array<int, string> $modifiche
+     * @param array{titolo: string, nome: string, nato_a: string, nato_il: string}|null $direttore
      */
-    public function word(array $azienda, array $modifiche = []): ?string
+    public function word(array $azienda, array $modifiche = [], ?array $direttore = null): ?string
     {
         if (!$this->disponibile()) {
             return null;
@@ -91,6 +94,9 @@ final class ModelloConvenzione
         }
         $xp = $this->xpath($dom);
         $this->compilaAzienda($dom, $xp, $azienda);
+        if ($direttore !== null) {
+            $this->compilaDirettore($dom, $xp, $direttore);
+        }
         foreach ($modifiche as $n => $testo) {
             $this->sostituisciArticolo($dom, $xp, (int) $n, (string) $testo);
         }
@@ -105,10 +111,11 @@ final class ModelloConvenzione
      *
      * @param array<string, mixed> $azienda
      * @param array<int, string> $modifiche
+     * @param array{titolo: string, nome: string, nato_a: string, nato_il: string}|null $direttore
      */
-    public function pdf(array $azienda, array $modifiche = []): ?string
+    public function pdf(array $azienda, array $modifiche = [], ?array $direttore = null): ?string
     {
-        $word = $this->word($azienda, $modifiche);
+        $word = $this->word($azienda, $modifiche, $direttore);
         if ($word === null) {
             return null;
         }
@@ -280,6 +287,24 @@ final class ModelloConvenzione
             } elseif (str_starts_with($t, 'Firma del soggetto ospitante')) {
                 $this->riscrivi($dom, $xp, $p, 'Firma del soggetto ospitante (' . $v('ragione_sociale', '……………………………') . ') ____________________');
             }
+        }
+    }
+
+    /** Il Direttore («rappresentato dal Direttore, Prof. … nato a … il …, domiciliato per la carica…»): i dati non indicati restano puntini da completare a mano. */
+    private function compilaDirettore(DOMDocument $dom, DOMXPath $xp, array $d): void
+    {
+        foreach ($xp->query('//w:body//w:p') as $p) {
+            $t = $this->testo($p);
+            if (!str_contains($t, 'soggetto promotore') || !preg_match('/rappresentato dal Direttore, .+?, domiciliato per la carica/u', $t)) {
+                continue;
+            }
+            $v = static fn (string $k): string => trim((string) ($d[$k] ?? '')) !== '' ? trim((string) $d[$k]) : '……………………';
+            $data = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) ($d['nato_il'] ?? '')) ? date('d/m/Y', (int) strtotime((string) $d['nato_il'])) : '……………';
+            $nuovo = (string) preg_replace('/rappresentato dal Direttore, .+?, domiciliato per la carica/u',
+                'rappresentato dal Direttore, ' . trim($v('titolo') . ' ' . $v('nome')) . ', nato a ' . $v('nato_a') . ' il ' . $data . ', domiciliato per la carica', $t);
+            $this->riscrivi($dom, $xp, $p, $nuovo);
+
+            return;
         }
     }
 

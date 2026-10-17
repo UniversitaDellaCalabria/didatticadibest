@@ -56,6 +56,27 @@ final class ModelloConvenzioneTest extends TestCase
         self::assertStringContainsString('Art. 13', $t);
     }
 
+    public function testIlDirettoreNelTesto(): void
+    {
+        $m = $this->modello();
+        $w = $m->word(self::AZIENDA, [], ['titolo' => 'Prof.ssa', 'nome' => 'Rossi Anna', 'nato_a' => 'Cosenza (CS)', 'nato_il' => '1975-03-09']);
+        $t = $this->testoWord((string) $w);
+        @unlink((string) $w);
+        self::assertStringContainsString('rappresentato dal Direttore, Prof.ssa Rossi Anna, nato a Cosenza (CS) il 09/03/1975, domiciliato per la carica presso la sede dell’Università della Calabria', $t);
+        self::assertStringNotContainsString('La Russa', $t);
+        self::assertStringContainsString('Il Dipartimento di Biologia Ecologia e Scienze della Terra (DIBEST) - con sede in Rende (CS)', $t, 'il resto del paragrafo non cambia');
+        // dati mancanti: puntini
+        $w = $m->word(self::AZIENDA, [], ['titolo' => 'Prof.', 'nome' => 'Rossi Anna', 'nato_a' => '', 'nato_il' => '']);
+        $t = $this->testoWord((string) $w);
+        @unlink((string) $w);
+        self::assertStringContainsString('Prof. Rossi Anna, nato a …………………… il ……………, domiciliato', $t);
+        // senza dati del Direttore il testo del modello resta com'è
+        $w = $m->word(self::AZIENDA);
+        $t = $this->testoWord((string) $w);
+        @unlink((string) $w);
+        self::assertStringContainsString('Prof. La Russa Mauro Francesco, nato a Lachen (CH) il 30/09/1977', $t);
+    }
+
     public function testCampiVuotiRestanoPuntini(): void
     {
         $w = $this->modello()->word(['ragione_sociale' => 'Solo Nome']);

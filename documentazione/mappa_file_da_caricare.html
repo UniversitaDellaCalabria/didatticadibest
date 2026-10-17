@@ -1018,6 +1018,49 @@ var PACCHETTI = [
     ],
     nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
     commit: "Menu: tutte le pagine del portale nascoste e voci riservate a un ufficio o ai responsabili di risorse"
+  },
+  {
+    id: "tesi-azienda-direttore",
+    titolo: "Pacchetto 22 · Tesi: azienda convenzionata nella pratica e Direttore nel testo della convenzione",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare",
+    schema: "v74 e v75 (4 colonne in impostazioni_sistema; il modulo «Richiesta tesi» si aggiorna da solo)",
+    riassunto: "<strong>1) Pratica di tesi:</strong> nella richiesta di tesi con sede esterna lo studente sceglie l'<strong>azienda tra quelle convenzionate</strong> (con il comune) oppure «Altra azienda o ente» (e ne scrive il nome). Nella pratica, allo studente e all'ufficio, compare un riquadro: azienda convenzionata (valida fino al…), convenzione in scadenza prima della fine di una tesi di otto mesi, scaduta, in corso (l'azienda la sta compilando) o <strong>ancora da chiedere</strong> con il link per richiederla. <strong>2) Direttore nel testo:</strong> nome, luogo e data di nascita del Direttore nella convenzione di tesi non sono più scritti nel Word: si indicano una volta in Didattica → Convenzioni di tesi e, se il Direttore cambia, il nuovo nome compare da solo (luogo e data restano puntini finché non si aggiornano). <strong>3)</strong> Strumento e guida per provare la <strong>firma digitale vera</strong>.",
+    passi: [["F10b", "Azienda convenzionata nella pratica di tesi"], ["F10c", "Direttore nel testo della convenzione"]],
+    cartelle: [
+      { cartella: "admin/", file: [
+        ["admin/convenzioni_tesi.php", "mod", "F10c", "riquadro «Il Direttore nel testo della convenzione»"],
+        ["admin/didattica_pratiche.php", "mod", "F10b", "il riquadro dell'azienda nella scheda della pratica"]
+      ]},
+      { cartella: "/ (radice del portale)", file: [
+        ["pratiche.php", "mod", "F10b", "il riquadro dell'azienda nella pratica dello studente"]
+      ]},
+      { cartella: "src/ConvenzioniTesi/", file: [
+        ["src/ConvenzioniTesi/AziendaDellaPratica.php", "nuovo", "F10b", "stato della convenzione dell'azienda scelta nella pratica"],
+        ["src/ConvenzioniTesi/Costanti.php", "mod", "F10b", "scelta «Altra azienda» e titoli del Direttore"],
+        ["src/ConvenzioniTesi/ModelloConvenzione.php", "mod", "F10c", "i dati del Direttore nel Word e nel PDF"],
+        ["src/ConvenzioniTesi/ServizioConvenzioniTesi.php", "mod", "F10c", "dati del Direttore: lettura, controllo e salvataggio"]
+      ]},
+      { cartella: "src/Didattica/", file: [
+        ["src/Didattica/Costanti.php", "mod", "F10b", "nuovo tipo di campo «Azienda convenzionata per la tesi»"],
+        ["src/Didattica/ScelteAnagrafe.php", "mod", "F10b", "l'elenco delle aziende convenzionate valide"],
+        ["src/Didattica/HtmlCampi.php", "mod", "F10b", "il campo nel modulo"],
+        ["src/Didattica/LetturaRisposte.php", "mod", "F10b", "controllo della scelta"],
+        ["src/Didattica/ModelliPratiche.php", "mod", "F10b", "il modulo «Richiesta tesi» (anche quello già creato si aggiorna da solo)"]
+      ]},
+      { cartella: "src/Core/Schema/", file: [
+        ["src/Core/Schema/Definizioni.php", "mod", "F10c", "colonne tesi_direttore_* in impostazioni_sistema"],
+        ["src/Core/Schema/Migrazioni.php", "mod", "F10b F10c", "versione dello schema: 75"]
+      ]}
+    ],
+    dopo: [
+      "Apri una pagina del pannello: lo schema passa alla v75 e il modulo «Richiesta tesi» già creato <strong>si aggiorna da solo</strong> (i vecchi campi di testo «Azienda o ente» e «Riferimento convenzione» diventano la scelta dell'azienda e il nome dell'azienda non convenzionata: le pratiche già inviate non cambiano).",
+      "<strong>Direttore nel testo:</strong> Didattica → Convenzioni di tesi: apri «Il Direttore nel testo della convenzione» e indica titolo, nome, luogo e data di nascita. Finché non lo fai il Word e il PDF usano il testo del modello com'è (Prof. La Russa…).",
+      "<strong>Prova la scelta:</strong> compila una richiesta di tesi di prova con sede «Esterna»: nell'elenco devono comparire le aziende con convenzione valida; scegli «Altra azienda» e controlla l'avviso nella pratica.",
+      "<strong>Firma vera:</strong> segui <code>documentazione/prova_firma_vera_convenzioni_tesi.md</code> (e prima controlla un PDF firmato con <code>php strumenti/verifica_firma_pdf.php file.pdf</code> sul tuo computer)."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Tesi: azienda convenzionata scelta nella pratica con avviso sulla convenzione, dati del Direttore nel testo della convenzione, strumento per provare la firma digitale"
   }
 ];
 
@@ -1041,9 +1084,9 @@ var PROSSIMI = [
   ["F4 · Guide per ruolo («Come si fa»)", "fatto: dieci guide con schermate (compresa quella per le scuole sulla convenzione FSL), anche in PDF (Pacchetto 16)"],
   ["F5 · Assistente IA interno per i verbali (testi e vocali, gratis, dentro il server)", "in stand-by (su decisione dell’utente): si riprende solo se serve; comandi di prova nel piano (F5)"],
   ["F7 · Da fare per te, riepilogo settimanale e Report FSL", "fatto: vedi Pacchetto 18"],
-  ["F10b · Tesi: collegare l'azienda convenzionata alla pratica di tesi dello studente", "da fare: nel modulo «Tesi» lo studente sceglie l'azienda tra quelle convenzionate e il portale avvisa se non c'è una convenzione valida (previsto dal piano, non incluso nel Pacchetto 20)"],
-  ["F10c · Convenzione di tesi: dati del Direttore nel modello Word", "da fare: il nome e i dati di nascita del Direttore sono scritti nel modello (modelli_documenti/convenzione_tesi.docx): renderli dinamici dalla Direzione, così se cambia il Direttore non si rifà il modello"],
-  ["Prova sul server · firma PAdES vera (azienda e Direttore) nelle convenzioni di tesi", "da fare: in locale la firma si simula; provare una convenzione intera sul server con firme vere prima di usarla con un'azienda"],
+  ["F10b · Tesi: collegare l'azienda convenzionata alla pratica di tesi dello studente", "fatto in locale: vedi Pacchetto 22"],
+  ["F10c · Convenzione di tesi: dati del Direttore nel modello Word", "fatto in locale: vedi Pacchetto 22"],
+  ["Prova sul server · firma PAdES vera (azienda e Direttore) nelle convenzioni di tesi", "da fare (a cura tua, 20 minuti): strumento strumenti/verifica_firma_pdf.php e guida documentazione/prova_firma_vera_convenzioni_tesi.md pronti"],
   ["Pacchetti 20-21 · caricamento sul server", "da fare (a cura tua): scp del pacchetto, estrazione, schema v73, aggiunta delle persone nell'«Ufficio convenzioni di tesi», voci di menu (vedi «dopo» dei pacchetti)"],
   ["Idea · Tempi per passo delle pratiche (dove si fermano, quanto aspettano)", "da fare: statistica dei giorni medi in ogni passo, per accorgersi dei colli di bottiglia"],
   ["Idea · Valutazione dello studente FSL con attestato delle competenze", "da fare: la struttura ospitante valuta lo studente e l'attestato riporta le competenze"],

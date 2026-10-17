@@ -24,7 +24,7 @@ final class Costanti
         'select' => 'Tendina', 'radio' => 'Scelta singola', 'multicheck' => 'Scelta multipla (caselle)', 'checkbox' => 'Casella (sì/no)', 'dichiarazione' => 'Dichiarazione da accettare',
         'file' => 'Allegato (PDF o immagine)',
         'corso_studio' => 'Corso di studio (anagrafe)', 'insegnamento' => 'Insegnamento del Dipartimento (anagrafe)', 'insegnamento_ateneo' => 'Insegnamento di Ateneo (tipo, corso, a.a. di offerta)',
-        'docente' => 'Docente (anagrafe)', 'anno_accademico' => 'Anno accademico', 'tabella' => 'Tabella a righe (es. esami)',
+        'docente' => 'Docente (anagrafe)', 'anno_accademico' => 'Anno accademico', 'azienda_tesi' => 'Azienda convenzionata per la tesi', 'tabella' => 'Tabella a righe (es. esami)',
         'titolo' => 'Titolo di sezione (solo testo)', 'info' => 'Testo informativo (solo testo)',
     ];
 
@@ -32,7 +32,7 @@ final class Costanti
     public const GRUPPI_TIPI_CAMPO = [
         'Campi di base' => ['text', 'textarea', 'email', 'tel', 'number', 'date', 'time', 'url', 'codice_fiscale', 'file'],
         'Scelte' => ['select', 'radio', 'multicheck', 'checkbox', 'dichiarazione'],
-        'Dalle anagrafi' => ['corso_studio', 'insegnamento', 'insegnamento_ateneo', 'docente', 'anno_accademico'],
+        'Dalle anagrafi' => ['corso_studio', 'insegnamento', 'insegnamento_ateneo', 'docente', 'anno_accademico', 'azienda_tesi'],
         'Tabelle' => ['tabella'],
         'Impaginazione' => ['titolo', 'info'],
     ];
