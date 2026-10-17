@@ -925,11 +925,66 @@ var PACCHETTI = [
     ],
     nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
     commit: "Uffici di Dipartimento e di Ateneo in un'unica anagrafe con persone solo dall'anagrafe, Direzione con «Direttore assente», uffici richiamabili da risorse e convenzioni, promemoria e messaggi alle scuole sulla convenzione"
+  },
+  {
+    id: "convenzioni-tesi",
+    titolo: "Pacchetto 20 · Convenzioni di tesi con enti e aziende",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare",
+    schema: "v73 (nuova tabella convenzioni_tesi e Ufficio convenzioni di tesi)",
+    riassunto: "L'iter per stipulare le <strong>convenzioni per svolgere la tesi presso enti e aziende</strong>, nel modulo Didattica. L'azienda lavora da un <strong>link personale, senza registrarsi</strong>: inserisce i dati e il rappresentante legale, può <strong>proporre modifiche agli articoli</strong> (il Dipartimento le accetta, le rifiuta o risponde con un altro testo prima della firma), scarica la convenzione compilata in <strong>PDF e Word</strong> dal modello del Dipartimento, la firma in PAdES e la ricarica. L'ufficio protocolla in entrata (il Direttore riceve da solo il link; con «Direttore assente» il vice), il Direttore firma, l'ufficio registra il protocollo in uscita e la validità (5 anni): <strong>stipulata, in archivio e nell'elenco pubblico</strong> delle aziende convenzionate. Si possono inserire anche le convenzioni già in essere, con promemoria alle aziende ferme e avviso di scadenza 60 giorni prima (con rinnovo in un clic). Le aziende possono anche chiedere la convenzione da sole da una pagina pubblica.",
+    passi: [["F10", "Convenzioni di tesi con enti e aziende"]],
+    cartelle: [
+      { cartella: "/ (radice del portale)", file: [
+        ["convenzione_tesi.php", "nuovo", "F10", "la pagina dell'azienda (link personale): dati, modifiche agli articoli, scarica e ricarica"],
+        ["richiedi_convenzione_tesi.php", "nuovo", "F10", "pagina pubblica per chiedere la convenzione (domanda anti-robot, link per email)"],
+        ["firma_convenzione_tesi.php", "nuovo", "F10", "la pagina di firma del Direttore (o del vice)"],
+        ["aziende_convenzionate_tesi.php", "nuovo", "F10", "elenco pubblico delle aziende convenzionate"],
+        ["cron_background.php", "mod", "F10", "promemoria alle aziende ferme e avvisi di scadenza"]
+      ]},
+      { cartella: "admin/", file: [
+        ["admin/convenzioni_tesi.php", "nuovo", "F10", "il pannello: iter guidato, archivio, invito, convenzioni già in essere"],
+        ["admin/admin_header.php", "mod", "F10", "voce «Convenzioni di tesi» nel menu Didattica e permesso per l'ufficio"],
+        ["admin/inizio.php", "mod", "F10", "le convenzioni di tesi da seguire nella scrivania"]
+      ]},
+      { cartella: "inc/", file: [
+        ["inc/sezioni.php", "mod", "F10", "la pagina appartiene al modulo Didattica"]
+      ]},
+      { cartella: "modelli_documenti/", file: [
+        ["modelli_documenti/convenzione_tesi.docx", "nuovo", "F10", "il modello Word dell'accordo per la tesi (13 articoli): da qui si compilano Word e PDF. Se cambia il testo si sostituisce questo file"]
+      ]},
+      { cartella: "src/ConvenzioniTesi/", file: [
+        ["src/ConvenzioniTesi/Costanti.php", "nuovo", "F10", "stati, cartelle, durata"],
+        ["src/ConvenzioniTesi/ModelloConvenzione.php", "nuovo", "F10", "compila Word e PDF dal modello, con gli articoli concordati"],
+        ["src/ConvenzioniTesi/ConvenzioneTesiRepository.php", "nuovo", "F10", "lettura e scrittura dei dati"],
+        ["src/ConvenzioniTesi/NotificheConvenzioniTesi.php", "nuovo", "F10", "le email all'azienda, all'ufficio e al Direttore"],
+        ["src/ConvenzioniTesi/ServizioConvenzioniTesi.php", "nuovo", "F10", "le regole dell'iter, dell'archivio e dei promemoria"]
+      ]},
+      { cartella: "src/Portale/", file: [
+        ["src/Portale/CruscottoDirettore.php", "mod", "F10", "le convenzioni di tesi da firmare nel cruscotto"],
+        ["src/Portale/DaFarePersona.php", "mod", "F10", "«Da fare per te» per il Direttore e per l'ufficio delle convenzioni di tesi"],
+        ["src/Portale/OrganizzazioneProposta.php", "mod", "F10", "nel menu proposto: Studenti → Tesi (elenco aziende e richiesta)"]
+      ]},
+      { cartella: "src/Core/Schema/", file: [
+        ["src/Core/Schema/Definizioni.php", "mod", "F10", "tabella convenzioni_tesi"],
+        ["src/Core/Schema/Migrazioni.php", "mod", "F10", "versione 73 e ufficio «Ufficio convenzioni di tesi»"]
+      ]}
+    ],
+    dopo: [
+      "Apri una pagina del pannello: lo schema passa alla v73 (<code>cache/schema_v73.ok</code>), crea la tabella e l'ufficio <strong>«Ufficio convenzioni di tesi»</strong>.",
+      "<strong>Admin → Gestione del portale → Uffici e persone</strong>: nell'ufficio «Ufficio convenzioni di tesi» aggiungi (dall'anagrafe di Ateneo) chi protocolla e segue le convenzioni: ricevono gli avvisi e vedono «Convenzioni di tesi» nel modulo Didattica. Controlla che nella Direzione ci siano Direttore e vice.",
+      "<strong>Menu del sito:</strong> aggiungi (o ripeti «Organizzazione proposta») le voci <strong>Studenti → Tesi → Aziende convenzionate per la tesi</strong> (<code>aziende_convenzionate_tesi.php</code>) e <strong>Convenzione di tesi per enti e aziende</strong> (<code>richiedi_convenzione_tesi.php</code>). Il secondo indirizzo si può anche dare direttamente alle aziende.",
+      "<strong>Prova:</strong> da Didattica → Convenzioni di tesi invita un'azienda (anche con la tua email), compila la convenzione dal link, prova a cambiare un articolo e a rispondere dal pannello; poi scarica il PDF.",
+      "<strong>Firma:</strong> la firma PAdES dell'azienda e del Direttore non si può provare in locale: provala sul server almeno una volta con una firma vera prima di usarla con un'azienda.",
+      "<strong>Controlla il testo:</strong> il PDF e il Word escono dal modello <code>convenzione_tesi.docx</code> (il Direttore compare con i dati scritti nel modello: se cambia, aggiorna il modello)."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Convenzioni di tesi con enti e aziende: iter online con modifiche agli articoli, firma del Direttore, archivio ed elenco pubblico"
   }
 ];
 
 var PROSSIMI = [
-  ["★ PRIORITÀ 1 · da fare per primo · F10 · Convenzioni di tesi con enti e aziende esterne", "da fare: iter come le convenzioni FSL. L'ufficio manda il link all'azienda; l'azienda accede con SPID/CIE, compila i campi, scarica la convenzione precompilata (Word / PDF/A), la firma in PAdES e la ricarica; l'operatore la prende in carico, la protocolla e registra il numero; passa al Direttore per la firma; l'ufficio scarica il firmato, lo protocolla e carica il file protocollato: convenzione stipulata. Con un archivio (anche delle convenzioni già in essere). In attesa del format della convenzione (da mettere in materiali/). Dettagli nel piano (F10)"],
+  ["F10 · Convenzioni di tesi con enti e aziende esterne", "fatto in locale: vedi Pacchetto 20 (link all'azienda senza registrazione, modifiche agli articoli, firma del Direttore, archivio ed elenco pubblico)"],
   ["F8 · Uffici di Dipartimento e di Ateneo in un'unica anagrafe, Direttore e vice, «Direttore assente»", "fatto in locale: vedi Pacchetto 19 (restano da decidere la pagina pubblica «Organigramma» e un selettore unico per gli eventi)"],
   ["FSL · Promemoria e messaggi alle scuole sulla convenzione", "fatto in locale: vedi Pacchetto 19"],
   ["D1 · Tutorato: pagamenti", "fatto: vedi Pacchetto 2"],

@@ -64,6 +64,10 @@ try {
         if ($sm['n'] > 0) $cose[] = ['didattica', $sm['n'], $sm['n'] === 1 ? 'Pratica da assegnare' : 'Pratiche da assegnare',
             'Didattica · ' . ($sm['giorni'] >= 3 ? 'la più vecchia aspetta da ' . $sm['giorni'] . ' giorni' : 'arrivate da poco'), 'didattica.php?tab=pratiche&carico=smistare', $sm['giorni'] >= 7];
     });
+    if ($puo_conv_tesi) $sicuro('convenzioni di tesi', function () use (&$cose, $conn) {
+        $n_ct = \App\Core\App::per($conn)->get(\App\ConvenzioniTesi\ServizioConvenzioniTesi::class)->daFare();
+        if ($n_ct > 0) $cose[] = ['didattica', $n_ct, $n_ct === 1 ? 'Convenzione di tesi da seguire' : 'Convenzioni di tesi da seguire', 'Didattica · modifiche agli articoli, protocollo in entrata e in uscita', 'convenzioni_tesi.php', false];
+    });
     if ($puo_didattica) $sicuro('verbali', function () use (&$cose, $cdf, $puo_didattica_tutto, $consigli_referente) {
         $vf = $cdf->verbaliInFirma($puo_didattica_tutto ? null : $consigli_referente);
         if ($vf > 0) $cose[] = ['didattica', $vf, $vf === 1 ? 'Verbale in attesa di firma' : 'Verbali in attesa di firma', 'Didattica · sedute dei consigli', 'didattica.php?tab=sedute', false];

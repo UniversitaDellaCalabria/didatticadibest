@@ -143,6 +143,8 @@ $puo_didattica_tutto = $is_full_admin || ha_modulo($conn, $uid_rbac, 'didattica'
 // Referenti dei consigli dei corsi di studio: solo le sedute dei loro consigli
 $consigli_referente  = $puo_didattica_tutto ? [] : consigli_referente($conn, $utente_admin);
 $puo_didattica       = $puo_didattica_tutto || (bool)$consigli_referente;
+// Convenzioni di tesi con enti e aziende: chi lavora in Didattica e le persone dell'ufficio «Ufficio convenzioni di tesi» (Gestione del portale → Uffici)
+$puo_conv_tesi        = $puo_didattica_tutto || \App\Core\App::per($conn)->get(\App\ConvenzioniTesi\ServizioConvenzioniTesi::class)->utenteDellUfficio($utente_admin);
 $puo_tutorato        = $is_full_admin || ha_modulo($conn, $uid_rbac, 'didattica') || utente_operatore_ufficio($conn, $utente_admin, 'bandi');
 
 $can_manage_eventi = $can_manage_iscritti = $can_manage_sondaggi = $can_manage_form = $can_manage_settings = $is_full_admin;
@@ -174,9 +176,9 @@ if (!$is_full_admin && $page_cfg) {
 
 // Abilitati senza aree (solo una parte della FSL o il modulo Didattica): la loro pagina di partenza è quella
 if (!$is_full_admin && !$pagine_disponibili && in_array(basename($_SERVER['PHP_SELF']), ['index.php', 'inizio.php', 'dashboard.php', 'aree.php'], true)
-    && ($puo_fsl_convenzioni || $puo_fsl_scuole || $puo_didattica)) {
+    && ($puo_fsl_convenzioni || $puo_fsl_scuole || $puo_didattica || $puo_conv_tesi)) {
     while (ob_get_level() > 0) ob_end_clean();
-    header('Location: ' . ($puo_fsl_convenzioni ? 'fsl.php' : ($puo_fsl_scuole ? 'scuole.php' : 'didattica.php')));
+    header('Location: ' . ($puo_fsl_convenzioni ? 'fsl.php' : ($puo_fsl_scuole ? 'scuole.php' : ($puo_didattica ? 'didattica.php' : 'convenzioni_tesi.php'))));
     exit;
 }
 
@@ -188,7 +190,7 @@ if (!$is_full_admin && !$pagine_disponibili && in_array(basename($_SERVER['PHP_S
 $moduli_utente = [];
 foreach ($pagine_disponibili as $p_m) $moduli_utente[modulo_di_area($p_m)] = true;
 if ($puo_fsl_convenzioni) $moduli_utente['fsl'] = true;
-if ($puo_didattica) $moduli_utente['didattica'] = true;
+if ($puo_didattica || $puo_conv_tesi) $moduli_utente['didattica'] = true;
 if ($is_full_admin || $puo_fsl_scuole) $moduli_utente['portale'] = true;
 $moduli_utente = array_values(array_filter(array_keys(MODULI_PORTALE), fn($k) => isset($moduli_utente[$k])));
 $pagina_corrente = basename($_SERVER['PHP_SELF']);
@@ -413,7 +415,7 @@ $colore_lato = $modulo_corrente === 'portale' ? '#64748b' : $colore_modulo; // l
                     $voce_menu(['fsl.php', 'convenzione_file.php'], 'fsl.php', 'fa-briefcase', $puo_fsl ? 'Formazione Scuola Lavoro' : 'Convenzioni FSL', false, $n_conv_firmate); ?>
                 <?php endif; ?>
 
-                <?php if ($modulo_corrente === 'didattica' && $puo_didattica): ?>
+                <?php if ($modulo_corrente === 'didattica' && ($puo_didattica || $puo_conv_tesi)): ?>
                     <?php $tab_did = $current_page === 'didattica.php' ? (in_array($_GET['tab'] ?? '', ['sedute', 'moduli', 'ufficio', 'statistiche'], true) ? $_GET['tab'] : 'pratiche') : '';
                     if (!$puo_didattica_tutto) $tab_did = $current_page === 'didattica.php' ? 'sedute' : '';
                     // Numeri accanto alle voci: se non si riescono a contare (file non ancora caricato) il menu resta senza numeri
@@ -424,13 +426,14 @@ $colore_lato = $modulo_corrente === 'portale' ? '#64748b' : $colore_modulo; // l
                         $n_verbali_firma = $cdf_menu->verbaliInFirma($puo_didattica_tutto ? null : $consigli_referente);
                     } catch (\Throwable $e) { error_log('Menu, cose da fare: ' . $e->getMessage()); }
                     if ($puo_didattica_tutto) $voce_menu([], 'didattica.php?tab=pratiche', 'fa-inbox', 'Pratiche degli studenti', $tab_did === 'pratiche', \App\Core\App::get(\App\Portale\CoseDaFare::class)->praticheDaSmistare()['n']);
-                    $voce_menu([], 'didattica.php?tab=sedute', 'fa-gavel', $puo_didattica_tutto ? 'Sedute e verbali' : 'Sedute del consiglio', $tab_did === 'sedute', \App\Core\App::get(\App\Portale\CoseDaFare::class)->verbaliInFirma($puo_didattica_tutto ? null : $consigli_referente));
+                    if ($puo_didattica) $voce_menu([], 'didattica.php?tab=sedute', 'fa-gavel', $puo_didattica_tutto ? 'Sedute e verbali' : 'Sedute del consiglio', $tab_did === 'sedute', \App\Core\App::get(\App\Portale\CoseDaFare::class)->verbaliInFirma($puo_didattica_tutto ? null : $consigli_referente));
                     if ($puo_didattica_tutto) {
                         $voce_menu([], 'didattica.php?tab=moduli', 'fa-file-lines', 'Moduli e documenti', $tab_did === 'moduli');
                         $voce_menu([], 'didattica.php?tab=ufficio', 'fa-user-clock', 'Ricevimento', $tab_did === 'ufficio');
                         if (!$is_full_admin) $voce_menu(['uffici.php'], 'uffici.php', 'fa-sitemap', 'Uffici e persone');
                         $voce_menu([], 'didattica.php?tab=statistiche', 'fa-chart-column', 'Statistiche', $tab_did === 'statistiche');
                     }
+                    if ($puo_conv_tesi) { $n_ct = 0; try { $n_ct = \App\Core\App::get(\App\ConvenzioniTesi\ServizioConvenzioniTesi::class)->daFare(); } catch (\Throwable $e) { error_log('Menu, convenzioni di tesi: ' . $e->getMessage()); } $voce_menu(['convenzioni_tesi.php'], 'convenzioni_tesi.php', 'fa-handshake', 'Convenzioni di tesi', false, $n_ct); }
                     if ($puo_tutorato) { $n_tut_val = 0; try { $n_tut_val = \App\Core\App::get(\App\Portale\CoseDaFare::class)->tutoratoDaValidare(); } catch (\Throwable $e) { error_log('Menu, tutorato: ' . $e->getMessage()); } $voce_menu(['tutorato.php'], 'tutorato.php', 'fa-user-graduate', 'Tutorato · lettere di incarico', false, $n_tut_val); } ?>
                 <?php endif; ?>
 

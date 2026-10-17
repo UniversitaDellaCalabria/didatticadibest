@@ -51,7 +51,7 @@ final class CruscottoDirettore
     {
         $out = [];
         foreach ([
-            'firme' => 'firmeDelDirettore', 'convenzioni_firma' => 'convenzioniDaFirmare', 'pratiche' => 'praticheFerme', 'conferme' => 'confermeFerme', 'verbali' => 'verbaliInFirma',
+            'firme' => 'firmeDelDirettore', 'convenzioni_firma' => 'convenzioniDaFirmare', 'tesi_firma' => 'convenzioniTesiDaFirmare', 'pratiche' => 'praticheFerme', 'conferme' => 'confermeFerme', 'verbali' => 'verbaliInFirma',
             'convenzioni' => 'convenzioniInScadenza', 'tutorato' => 'tutoratoFermo', 'risorse' => 'scadenzeRisorse', 'prenotazioni' => 'prenotazioniFerme',
         ] as $metodo) {
             try {
@@ -116,6 +116,16 @@ final class CruscottoDirettore
         return $this->gruppo('convenzioni_firma', 'Convenzioni FSL da firmare', 'fa-file-signature', '#0f766e', count($r), $r, fn (array $x): array => [
             'testo' => (string) $x['scuola'], 'dettaglio' => 'convenzione con le scuole (Formazione Scuola Lavoro)', 'link' => 'admin/fsl.php', 'giorni' => max(0, (int) $x['gg']),
         ], 'Nessuna convenzione aspetta la firma.', 'admin/fsl.php');
+    }
+
+    /** Convenzioni di tesi con enti e aziende arrivate al passo della firma del Direttore: il link porta direttamente alla firma. */
+    private function convenzioniTesiDaFirmare(): array
+    {
+        $r = $this->db->righe("SELECT azienda, token_direttore, DATEDIFF(NOW(), COALESCE(da_firmare_il, aggiornata_il)) AS gg FROM convenzioni_tesi WHERE stato = 'da_firmare' AND token_direttore IS NOT NULL ORDER BY da_firmare_il LIMIT 20");
+
+        return $this->gruppo('tesi_firma', 'Convenzioni di tesi da firmare', 'fa-file-signature', '#0f766e', count($r), $r, fn (array $x): array => [
+            'testo' => (string) $x['azienda'], 'dettaglio' => 'convenzione per la tesi con un ente o un\'azienda', 'link' => 'firma_convenzione_tesi.php?t=' . urlencode((string) $x['token_direttore']), 'giorni' => max(0, (int) $x['gg']),
+        ], 'Nessuna convenzione di tesi aspetta la firma.');
     }
 
     /** Pratiche aperte ferme da più dei giorni del loro modulo (promemoria). */

@@ -169,6 +169,23 @@ final class Definizioni
             creata_il DATETIME DEFAULT CURRENT_TIMESTAMP, aggiornata_il DATETIME DEFAULT NULL, scaricata_il DATETIME DEFAULT NULL,
             UNIQUE KEY uq_token (token), INDEX idx_scuola (scuola_codice)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        // v73: convenzioni per la tesi con enti e aziende esterne. L'azienda compila dal link personale (token), scarica la convenzione, la firma in PAdES e la ricarica;
+        // l'ufficio protocolla in entrata, il Direttore firma (token_direttore), l'ufficio protocolla in uscita e la convenzione va in archivio e nell'elenco pubblico.
+        // modifiche_json: articoli che l'azienda vuole cambiare {numero: {testo, stato (proposta|accettata|rifiutata), risposta}}; concordate si applicano al Word e al PDF.
+        'convenzioni_tesi' => "CREATE TABLE IF NOT EXISTS convenzioni_tesi (
+            id INT AUTO_INCREMENT PRIMARY KEY, token VARCHAR(40) NOT NULL, token_direttore VARCHAR(40) DEFAULT NULL, stato VARCHAR(20) NOT NULL DEFAULT 'invitata',
+            origine VARCHAR(10) NOT NULL DEFAULT 'invito', azienda VARCHAR(200) NOT NULL DEFAULT '', email VARCHAR(255) NOT NULL DEFAULT '', dati_json MEDIUMTEXT DEFAULT NULL,
+            modifiche_json MEDIUMTEXT DEFAULT NULL, nota_azienda VARCHAR(1000) NOT NULL DEFAULT '', consenso_elenco TINYINT(1) NOT NULL DEFAULT 0,
+            file_firmato VARCHAR(255) DEFAULT NULL, firmatario VARCHAR(255) NOT NULL DEFAULT '', firmata_il DATETIME DEFAULT NULL,
+            protocollo_ingresso VARCHAR(80) NOT NULL DEFAULT '', protocollo_ingresso_data DATE DEFAULT NULL, in_carico_il DATETIME DEFAULT NULL, in_carico_da VARCHAR(255) NOT NULL DEFAULT '',
+            nota_ufficio VARCHAR(500) NOT NULL DEFAULT '', da_firmare_il DATETIME DEFAULT NULL, file_definitivo VARCHAR(255) DEFAULT NULL,
+            firmata_direttore_il DATETIME DEFAULT NULL, firmatario_direttore VARCHAR(255) NOT NULL DEFAULT '',
+            protocollo VARCHAR(100) NOT NULL DEFAULT '', protocollo_data DATE DEFAULT NULL, file_protocollato VARCHAR(255) DEFAULT NULL,
+            valida_dal DATE DEFAULT NULL, valida_al DATE DEFAULT NULL, protocollata_il DATETIME DEFAULT NULL, invitata_da VARCHAR(150) NOT NULL DEFAULT '',
+            avviso_scadenza TINYINT(1) NOT NULL DEFAULT 0, promemoria_il DATETIME DEFAULT NULL,
+            creata_il DATETIME DEFAULT CURRENT_TIMESTAMP, aggiornata_il DATETIME DEFAULT NULL,
+            UNIQUE KEY uq_token (token), INDEX idx_stato (stato), INDEX idx_validita (valida_al)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         // v71: uffici responsabili di una risorsa (tutte le persone dell'ufficio ricevono le richieste e, se abilitato, le approvano)
         'risorse_uffici' => "CREATE TABLE IF NOT EXISTS risorse_uffici (
             id INT AUTO_INCREMENT PRIMARY KEY, risorsa_id INT NOT NULL, ufficio_id INT NOT NULL, riceve_notifiche TINYINT(1) NOT NULL DEFAULT 1, puo_approvare TINYINT(1) NOT NULL DEFAULT 1,

@@ -146,6 +146,8 @@ figcaption { font-size: .85rem; color: var(--tenue); margin-top: 6px; max-width:
 <tr><td>Cruscotto del Direttore</td><td>Area riservata (o solo link diretto)</td><td><code>cruscotto_direttore.php</code></td><td>Solo ruolo scelto</td><td>Documenti da firmare e cose ferme</td></tr>
 <tr><td>Le mie risorse</td><td>Area riservata</td><td><code>risorse_responsabile.php</code></td><td>Chi è entrato</td><td>Per i responsabili di aule/auto (compare anche come card in Area personale)</td></tr>
 <tr><td>Verbali (con password)</td><td>Solo se serve, dopo il parere del DPO</td><td><code>verbali.php</code></td><td>Tutti</td><td>Accesso pubblico con password ai verbali dei consigli</td></tr>
+<tr><td>Aziende convenzionate per la tesi</td><td>Studenti → Tesi</td><td><code>aziende_convenzionate_tesi.php</code></td><td>Tutti</td><td>Elenco pubblico delle aziende dove si può fare la tesi</td></tr>
+<tr><td>Convenzione di tesi per enti e aziende</td><td>Studenti → Tesi</td><td><code>richiedi_convenzione_tesi.php</code></td><td>Tutti</td><td>L'azienda chiede da sola la convenzione e riceve il link per compilarla</td></tr>
 <tr><td>Privacy · Crediti</td><td>Piè di pagina / Link utili</td><td><code>privacy.php</code> · <code>crediti.php</code></td><td>Tutti</td><td>Informativa GDPR e credits</td></tr>
 </tbody></table></div>
 <div class="nota">Le <strong>aree</strong> (OpenLab, FSL, Aule e laboratori, o una nuova) hanno un indirizzo <code>nome-area.php</code> creato da solo: non c'è un file per area, le serve <code>area.php</code> tramite <code>.htaccess</code>. Per aggiungerne una: Gestione → <em>Aree di tutti i moduli</em> → <em>Nuova area</em>.</div>
@@ -248,6 +250,8 @@ figcaption { font-size: .85rem; color: var(--tenue); margin-top: 6px; max-width:
 <tr><td>Firma verbale</td><td><code>firma_verbale.php</code></td><td>Segretario, coordinatore</td><td>Firma del verbale di seduta</td></tr>
 <tr><td>Lettera di incarico</td><td><code>incarico.php</code> · <code>firma_incarico.php</code></td><td>Tutor, docente, Direttore</td><td>Accettazione con SPID/CIE e firma della lettera</td></tr>
 <tr><td>Firma convenzione</td><td><code>firma_convenzione.php</code></td><td>Direttore</td><td>Firma la convenzione FSL già firmata dalla scuola</td></tr>
+<tr><td>Convenzione di tesi (azienda)</td><td><code>convenzione_tesi.php</code></td><td>Ente o azienda</td><td>Dati, modifiche agli articoli, scarica il PDF/Word, firma in PAdES e ricarica</td></tr>
+<tr><td>Firma convenzione di tesi</td><td><code>firma_convenzione_tesi.php</code></td><td>Direttore (o vice)</td><td>Firma della convenzione già firmata dall'azienda</td></tr>
 <tr><td>Giustifica assenza</td><td><code>giustifica.php</code></td><td>Componente di un consiglio</td><td>Giustifica l'assenza dalla seduta</td></tr>
 <tr><td>Valutazione struttura (FSL)</td><td><code>valutazione_fsl.php</code></td><td>Docente della scuola</td><td>8 aspetti da 1 a 5 e commenti a fine attività</td></tr>
 <tr><td>Riepilogo settimanale</td><td><code>riepilogo_persone.php</code></td><td>Chiunque lo riceva</td><td>Smette (o riprende) di ricevere l'email «Da fare per te»</td></tr>
@@ -317,6 +321,15 @@ figcaption { font-size: .85rem; color: var(--tenue); margin-top: 6px; max-width:
 <div class="coppia"><figure><img src="schermate/map_adm_did_ufficio.png" alt=""></figure><figure><img src="schermate/map_adm_did_statistiche.png" alt=""></figure></div></div>
 <div class="pagina" style="--c:#047857"><h4>Tutorato</h4><div class="meta"><code>admin/tutorato.php</code></div>
 <p>Bando con decreti, import dei vincitori dal Word, lettere di incarico (Word/PDF), iter: email → accettazione con SPID/CIE → firma del docente e del Direttore → registro delle attività → dichiarazione di fine attività → pagamenti. Solleciti automatici delle firme ferme.</p><figure><img src="schermate/map_adm_tutorato.png" alt=""></figure></div>
+
+<div class="pagina" style="--c:#047857"><h4>Convenzioni di tesi con enti e aziende</h4><div class="meta"><code>admin/convenzioni_tesi.php</code> · <code>convenzione_tesi.php</code> · <code>richiedi_convenzione_tesi.php</code> · <code>firma_convenzione_tesi.php</code> · <code>aziende_convenzionate_tesi.php</code></div>
+<p>L'accordo che permette agli studenti di fare la tesi presso un ente o un'azienda. <strong>L'azienda non si registra</strong>: lavora da un link personale ricevuto per email (o lo chiede da sola da una pagina pubblica). Inserisce i dati e il rappresentante legale, può <strong>proporre modifiche agli articoli</strong> (l'ufficio le accetta, le rifiuta o risponde con un altro testo prima della firma), scarica la convenzione compilata in PDF e Word, la firma in PAdES e la ricarica. L'ufficio protocolla in entrata (il Direttore riceve da solo il link; con «Direttore assente» il vice), il Direttore firma, l'ufficio registra il protocollo in uscita e la validità (5 anni): <strong>stipulata, in archivio e nell'elenco pubblico</strong>. Nell'archivio si inseriscono anche le convenzioni già in essere, con avviso di scadenza e rinnovo.</p>
+<div class="coppia"><figure><img src="schermate/tesi_1_pannello_da_seguire.png" alt=""><figcaption>Il pannello «Da seguire»: sei passi, chi li fa, e le convenzioni che aspettano l'ufficio (qui una con modifiche agli articoli da valutare).</figcaption></figure>
+<figure><img src="schermate/tesi_2_azienda_modulo.png" alt=""><figcaption>La pagina dell'azienda (senza accesso): dati, articoli con «Proponi una modifica», risposte del Dipartimento.</figcaption></figure>
+<figure><img src="schermate/tesi_3_archivio.png" alt=""><figcaption>Archivio: ricerca, convenzioni già in essere, scadenze e rinnovo.</figcaption></figure>
+<figure><img src="schermate/tesi_4_elenco_pubblico.png" alt=""><figcaption>L'elenco pubblico delle aziende convenzionate (solo valide e con il consenso dell'azienda).</figcaption></figure>
+<figure><img src="schermate/tesi_5_richiesta_pubblica.png" alt=""><figcaption>La pagina pubblica dove un'azienda chiede la convenzione (domanda anti-robot, link per email).</figcaption></figure>
+<figure><img src="schermate/tesi_6_direttore_firma.png" alt=""><figcaption>La firma del Direttore dal link ricevuto.</figcaption></figure></div></div>
 
 <h3 id="p-por" style="color:#334155">Modulo Gestione del portale</h3>
 <div class="pagina" style="--c:#334155"><h4>Anagrafi</h4><div class="meta"><code>admin/anagrafe_personale.php</code> · <code>anagrafe_docenti.php</code> · <code>anagrafe_pta.php</code> · <code>anagrafe_insegnamenti.php</code> · <code>cerca_personale.php</code></div>

@@ -139,6 +139,12 @@ if (date('N') >= 1) {
 echo \App\Core\App::get(\App\Portale\RiepilogoPersone::class)->cron();
 
 // =========================================================================
+// TASK 1k: CONVENZIONI DI TESI CON ENTI E AZIENDE: promemoria alle aziende ferme (ogni 7 giorni, fino a 120 giorni dall'invito) e avviso di scadenza
+// (60 giorni prima) all'azienda e all'ufficio, una volta sola
+// =========================================================================
+echo \App\Core\App::get(\App\ConvenzioniTesi\ServizioConvenzioniTesi::class)->cron();
+
+// =========================================================================
 // TASK 1h: CONTROLLO AUTOMATICO DEL PORTALE, una volta al giorno dalle 3 di notte
 // (pagine, file riservati, spazio su disco, backup, email): avviso agli amministratori solo se qualcosa non va
 // =========================================================================

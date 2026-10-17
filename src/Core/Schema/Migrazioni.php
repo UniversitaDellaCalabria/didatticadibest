@@ -16,8 +16,8 @@ use Closure;
  */
 final class Migrazioni
 {
-    /** 72: interruttore per sospendere i promemoria al Direttore e agli uffici. 71: uffici di Dipartimento e di Ateneo in un'unica anagrafe (tabelle uffici e uffici_persone): la migrazione copia i dati delle quattro tabelle di prima. */
-    public const VERSIONE = 72;
+    /** 73: convenzioni di tesi con enti e aziende (tabella convenzioni_tesi e ufficio «convenzioni_tesi»). 72: interruttore per sospendere i promemoria al Direttore e agli uffici. 71: uffici di Dipartimento e di Ateneo in un'unica anagrafe (tabelle uffici e uffici_persone): la migrazione copia i dati delle quattro tabelle di prima. */
+    public const VERSIONE = 73;
 
     /**
      * @param list<string> $gruppiPersonale gruppi assegnati al login in base al ruolo in Ateneo (GRUPPI_PERSONALE)
@@ -210,6 +210,11 @@ final class Migrazioni
                 }
                 $this->db->comando('UPDATE tutorato_bandi SET ufficio_ateneo_id = CASE ufficio_ateneo_id' . $casi . ' ELSE ufficio_ateneo_id END WHERE ufficio_ateneo_id IN (' . implode(',', array_keys($mappa)) . ')');
             }
+        }
+
+        // Ufficio che prende in carico le convenzioni di tesi con enti e aziende (persone dall'anagrafe, si scelgono da Gestione del portale → Uffici)
+        if ((int) ($this->db->valore("SELECT COUNT(*) FROM uffici WHERE chiave = 'convenzioni_tesi'") ?? 0) === 0) {
+            $this->db->comando("INSERT INTO uffici (nome, descrizione, chiave, ambito, ordine) VALUES ('Ufficio convenzioni di tesi', 'Prende in carico le convenzioni per la tesi con enti e aziende: protocollo in entrata e definitivo, modifiche agli articoli', 'convenzioni_tesi', 'dipartimento', 0)");
         }
 
         // Uffici di partenza di una installazione nuova (si cambiano dal pannello)

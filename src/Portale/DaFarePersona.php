@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Portale;
 
+use App\ConvenzioniTesi\Costanti as CostantiTesi;
 use App\Core\Database;
+use App\Uffici\Direzione;
 
 /**
  * «Da fare per te»: tutte le cose che aspettano UNA persona (docente, responsabile, operatore, segretario…) nei vari moduli del portale, in un solo elenco per
@@ -18,7 +20,7 @@ final class DaFarePersona
     /** Giorni dopo i quali una cosa che aspetta si segnala come ferma. */
     public const GIORNI_FERMA = 7;
 
-    public function __construct(private Database $db)
+    public function __construct(private Database $db, private Direzione $direzione)
     {
     }
 
@@ -35,7 +37,7 @@ final class DaFarePersona
             return [];
         }
         $out = [];
-        foreach (['conferme', 'firme', 'verbali', 'tutoratoLettere', 'tutoratoRegistri', 'valutazioni', 'elenchi', 'risorse', 'pratiche'] as $metodo) {
+        foreach (['conferme', 'firme', 'convenzioniTesiFirma', 'convenzioniTesiUfficio', 'verbali', 'tutoratoLettere', 'tutoratoRegistri', 'valutazioni', 'elenchi', 'risorse', 'pratiche'] as $metodo) {
             try {
                 $g = $this->$metodo($email);
                 if ($g['n'] > 0) {
@@ -129,6 +131,31 @@ final class DaFarePersona
         return $this->gruppo('firme', 'Documenti da firmare', 'fa-signature', '#7c3aed', $n, $r, fn (array $x): array => [
             'testo' => (string) $x['titolo'] . ' · ' . self::nome($x), 'dettaglio' => 'pratica ' . $x['codice'] . ': firma digitale PAdES',
             'link' => 'firma_pratica.php?t=' . urlencode((string) $x['token']), 'giorni' => max(0, (int) $x['gg']),
+        ]);
+    }
+
+    /** Convenzioni di tesi che aspettano la firma di chi firma ora (il Direttore o, con «Direttore assente», il vice). */
+    private function convenzioniTesiFirma(string $email): array
+    {
+        $chi = mb_strtolower(trim($this->direzione->chiFirma()['email']));
+        $r = $chi !== '' && $chi === $email
+            ? $this->db->righe("SELECT token_direttore, azienda, DATEDIFF(NOW(), da_firmare_il) AS gg FROM convenzioni_tesi WHERE stato = 'da_firmare' AND token_direttore IS NOT NULL ORDER BY da_firmare_il LIMIT 15") : [];
+
+        return $this->gruppo('tesi_firma', 'Convenzioni di tesi da firmare', 'fa-file-signature', '#0f766e', count($r), $r, static fn (array $x): array => [
+            'testo' => (string) $x['azienda'], 'dettaglio' => 'convenzione per la tesi: firma digitale PAdES', 'link' => 'firma_convenzione_tesi.php?t=' . urlencode((string) $x['token_direttore']), 'giorni' => max(0, (int) $x['gg']),
+        ]);
+    }
+
+    /** Convenzioni di tesi che aspettano l'ufficio (modifiche da valutare, protocollo in entrata e in uscita), per le persone dell'ufficio convenzioni di tesi. */
+    private function convenzioniTesiUfficio(string $email): array
+    {
+        $membro = (int) $this->db->valore("SELECT COUNT(*) FROM uffici_persone p JOIN uffici u ON u.id = p.ufficio_id WHERE u.chiave = 'convenzioni_tesi' AND LOWER(p.email) = ?", [$email]) > 0;
+        $stati = "'" . implode("','", CostantiTesi::DA_FARE_UFFICIO) . "'";
+        $r = $membro ? $this->db->righe("SELECT azienda, email, stato, DATEDIFF(NOW(), COALESCE(aggiornata_il, creata_il)) AS gg FROM convenzioni_tesi WHERE stato IN ($stati) ORDER BY COALESCE(aggiornata_il, creata_il) LIMIT 15") : [];
+        $cosa = [CostantiTesi::MODIFICHE => 'modifiche agli articoli da valutare', CostantiTesi::CARICATA => 'firmata dall\'azienda: da protocollare in entrata', CostantiTesi::IN_CARICO => 'da mandare al Direttore', CostantiTesi::FIRMATA => 'firmata dal Direttore: da protocollare in uscita'];
+
+        return $this->gruppo('tesi_ufficio', 'Convenzioni di tesi da seguire', 'fa-handshake', '#047857', count($r), $r, static fn (array $x): array => [
+            'testo' => (string) ($x['azienda'] ?: $x['email']), 'dettaglio' => $cosa[$x['stato']] ?? (string) $x['stato'], 'link' => 'admin/convenzioni_tesi.php', 'giorni' => max(0, (int) $x['gg']),
         ]);
     }
 

@@ -29,7 +29,7 @@ final class DaFareEdEmailTest extends DatabaseDiProva
 
     /** Tabelle con lo schema vero (colonne aggiunte comprese). */
     private const REALI = ['pratiche', 'pratiche_conferme', 'pratiche_firme', 'didattica_moduli', 'tutorato_incarichi', 'tutorato_registro', 'risorse', 'risorse_responsabili', 'prenotazioni_risorse',
-                           'didattica_sedute', 'didattica_consigli_persone', 'uffici_persone', 'riepilogo_persone', 'valutazioni_fsl', 'partecipanti_prenotazione', 'progetti_dettagli', 'risorse_scadenze'];
+                           'didattica_sedute', 'didattica_consigli_persone', 'uffici_persone', 'riepilogo_persone', 'valutazioni_fsl', 'partecipanti_prenotazione', 'progetti_dettagli', 'risorse_scadenze', 'convenzioni_tesi'];
 
     protected function tabelle(): array
     {
@@ -154,6 +154,7 @@ final class DaFareEdEmailTest extends DatabaseDiProva
         $this->db->esegui("INSERT INTO didattica_sedute (consiglio_id, organo, data, verbale_stato, verbale_token) VALUES (1, 'Consiglio di Biologia', '2026-10-01', 'segretario', 'vt1')");
         // pratiche dell'operatore
         $op = $this->db->inserisci("INSERT INTO uffici_persone (email, nominativo, ufficio_id) VALUES ('op@x.it', 'Gianna', 7)");
+        $this->db->esegui('UPDATE uffici_persone SET op_id = id WHERE id = ?', [$op]);   // numero stabile della persona come operatore
         $p1 = $this->pratica('in_lavorazione');
         $this->db->esegui('UPDATE pratiche SET assegnata_a = ? WHERE id = ?', [$op, $p1]);
         $p2 = $this->pratica('inviata');
