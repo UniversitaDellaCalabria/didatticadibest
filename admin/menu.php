@@ -10,6 +10,15 @@ if (!$is_full_admin) {
 
 function admin_redirect($url) { echo "<script>window.location.replace('$url');</script>"; exit; }
 
+// Tutte le pagine utili del portale, aggiunte al menu NASCOSTE (il sito non cambia): poi si spostano e si mostrano a mano
+if (isset($_POST['crea_catalogo_pagine'])) {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    [$aggiunte_cat, $presenti_cat] = \App\Core\App::per($conn)->get(\App\Portale\CatalogoPagineMenu::class)->crea();
+    registra_log_audit($conn, "Menu: pagine del portale aggiunte nascoste", ["Aggiunte" => $aggiunte_cat, "Già nel menu" => $presenti_cat]);
+    flash_set($aggiunte_cat ? "Aggiunte $aggiunte_cat pagine, nascoste, sotto «" . \App\Portale\CatalogoPagineMenu::RADICE . "» ($presenti_cat erano già nel menu). Il sito non è cambiato: spostale dove vuoi e mostrale." : "Non ci sono pagine nuove da aggiungere: tutte quelle del catalogo sono già nel menu.", $aggiunte_cat ? 'success' : 'info');
+    admin_redirect("menu.php?p_id=$filtro_p");
+}
+
 // AJAX: salva ordine stesso livello
 if (isset($_POST['ajax_menu_ordine'])) {
     header('Content-Type: application/json');
@@ -122,6 +131,13 @@ $tutti_i_menu = \App\Core\App::get(\App\Portale\MenuRepository::class)->righe();
     <div><h1 class="pn-titolo"><i class="fa fa-link me-2" aria-hidden="true"></i>Menu di navigazione</h1><p class="pn-aiuto">Le voci del menu del sito pubblico: l&#39;ordine, i nomi e dove portano.</p></div>
     <span class="badge bg-secondary"><?= count($tutti_i_menu) ?> voci totali</span>
 </div>
+
+<!-- TUTTE LE PAGINE DEL PORTALE, NASCOSTE -->
+<div class="card shadow-sm border-0 mb-4" style="border-left:4px solid #047857 !important;"><div class="card-body">
+    <h2 class="h6 fw-bold mb-1"><i class="fa fa-list-check me-1 text-success" aria-hidden="true"></i>Aggiungi al menu tutte le pagine del portale (nascoste)</h2>
+    <p class="small text-secondary mb-2">Crea sotto <strong>«<?php echo htmlspecialchars(\App\Portale\CatalogoPagineMenu::RADICE); ?>»</strong>, raggruppate per argomento, tutte le pagine utili per le persone: agenda e ambiti, aree e archivi, aule e ricevimento, modulistica e pratiche, tesi e aziende convenzionate, area riservata, guide, verifica attestati, privacy. Sono <strong>nascoste</strong>: il sito non cambia. Poi, per ogni voce che ti serve, premi la matita e scegli la <em>Posizione</em> (dove metterla), quindi l'occhio per mostrarla. Le pagine che sono già nel menu non si ripetono: puoi rilanciare quando nascono pagine nuove.</p>
+    <form method="POST"><?php csrf_field(); ?><button type="submit" name="crea_catalogo_pagine" value="1" class="btn btn-sm btn-success fw-bold"><i class="fa fa-eye-slash me-1" aria-hidden="true"></i>Aggiungi le pagine nascoste</button></form>
+</div></div>
 
 <!-- FORM AGGIUNGI NUOVA VOCE -->
 <div class="card shadow-sm border-0 mb-4">

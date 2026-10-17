@@ -16,11 +16,12 @@ $funzioni_modulo = [
     'fsl'          => $puo_fsl_convenzioni ? [[$puo_fsl ? 'Pannello della Formazione Scuola Lavoro' : 'Convenzioni FSL', 'Per tutte le aree FSL: convenzioni con le scuole, verifica delle iscrizioni, riepilogo per anno e valutazioni', 'fa-briefcase', 'fsl.php']] : [],
     'calendari'    => [],
     // Referenti dei consigli: solo le sedute; Tutorato a chi ha il compito «Bandi» (o gestisce tutta la Didattica)
-    'didattica'    => $puo_didattica ? array_values(array_filter([
+    'didattica'    => ($puo_didattica || $puo_conv_tesi) ? array_values(array_filter([
         $puo_didattica_tutto ? ['Pratiche degli studenti', 'Moduli online, pratiche con stato, istruttoria e messaggi', 'fa-inbox', 'didattica.php?tab=pratiche'] : null,
-        ['Sedute e verbali', 'Consigli dei corsi di studio, presenze, convalide e piani di studio, verbale in Word ed Excel', 'fa-gavel', 'didattica.php?tab=sedute'],
+        $puo_didattica ? ['Sedute e verbali', 'Consigli dei corsi di studio, presenze, convalide e piani di studio, verbale in Word ed Excel', 'fa-gavel', 'didattica.php?tab=sedute'] : null,
         $puo_didattica_tutto ? ['Moduli e documenti', 'Modulistica: documenti da scaricare e moduli online guidati', 'fa-file-lines', 'didattica.php?tab=moduli'] : null,
         $puo_didattica_tutto ? ['Ricevimento', 'Sportello a appuntamenti dell’Ufficio didattico', 'fa-user-clock', 'didattica.php?tab=ufficio'] : null,
+        $puo_conv_tesi ? ['Convenzioni di tesi', 'Convenzioni con enti e aziende per svolgere la tesi: modifiche agli articoli, protocollo in entrata e in uscita, firma del Direttore, archivio ed elenco pubblico', 'fa-handshake', 'convenzioni_tesi.php'] : null,
         $puo_tutorato ? ['Tutorato · lettere di incarico', 'Bandi e lettere dei vincitori: conferma con SPID/CIE, firme PAdES del docente e del direttore, protocollo', 'fa-user-graduate', 'tutorato.php'] : null,
     ])) : [],
     'portale'      => array_values(array_filter([
