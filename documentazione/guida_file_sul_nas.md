@@ -177,3 +177,10 @@ archivio/
 6. Nell'archivio puoi filtrare per consiglio o per altro organo. Gli altri organi (commissione, riesame, studenti) li vede solo l'Ufficio didattico.
 
 Limiti: file fino a 30 MB, percorso (cartelle + nome) non oltre 230 caratteri circa; vengono ignorati i file che non sono PDF e le cartelle di sistema del NAS (`@eaDir`, `#recycle`).
+
+### Collegamento automatico (consigliato)
+Se le cartelle sono fatte come «Corso / Organo / anno» (per esempio `VERBALI_GEOLOGIA/CONSIGLIO_CORSO_DI_STUDIO/2019/…`, `VERBALI_GEOLOGIA/COMMISSIONE_DIDATTICA/2019/…`), nella sezione «Organi per corso di studi e cartelle sul NAS» compare il riquadro **«Collegamento automatico: il portale propone»**: per ogni cartella dice se diventa il consiglio già nel portale (abbinato per nome) o un organo nuovo, con tipo e corso di studi. Se la proposta è giusta, **«Collega tutto come proposto»**. Non legge ancora i PDF: li leggi tu con «Scansiona ora» (o ogni ora in automatico).
+
+**Allegati.** I PDF dentro sottocartelle di un organo che non sono un anno (le cartelle dei verbali con molti allegati, per esempio `…/2020/Verbale 2 allegati/`) e quelli con un nome che comincia per «Allegato» **non vengono importati come verbali**: la scansione li conta e li elenca nell'avviso azzurro. Se una di quelle cartelle è in realtà un organo, collegala con la sua cartella.
+
+**Pausa.** Con «Sospendi la scansione automatica» il portale non legge più nulla da solo ogni ora (resta «Scansiona ora»): utile mentre sistemi le cartelle. Con «Riattiva» riparte.

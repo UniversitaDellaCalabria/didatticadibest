@@ -143,7 +143,7 @@ if ($fase === 'azioni') {
         echo json_encode(['risultati' => $ris_i], JSON_UNESCAPED_UNICODE); exit;
     }
     // ── Archivio verbali: organi, cartelle sul NAS e scansione (solo Ufficio didattico) ──
-    if (array_intersect(array_keys($_POST), ['scansiona_archivio', 'salva_organo', 'elimina_organo', 'crea_organi_standard', 'cartella_consiglio', 'collega_cartella'])) {
+    if (array_intersect(array_keys($_POST), ['scansiona_archivio', 'pausa_scansione', 'collega_automatico', 'salva_organo', 'elimina_organo', 'crea_organi_standard', 'cartella_consiglio', 'collega_cartella'])) {
         if (!$puo_didattica_tutto) nega_accesso();
         $app_o = \App\Core\App::per($conn);
         $org_s = $app_o->get(\App\Didattica\OrganiArchivio::class);
@@ -160,6 +160,14 @@ if ($fase === 'azioni') {
             $r = $scan_s->eseguiERicorda(60);
             registra_log_audit($conn, "Archivio verbali: scansione della cartella", ["Nuovi" => $r['nuovi'], "Aggiornati" => $r['aggiornati'], "Tolti" => $r['rimossi']]);
             flash_set('Scansione fatta: ' . $riassunto($r) . '.' . ($r['errori'] ? ' Ci sono ' . count($r['errori']) . ' problemi (sotto).' : ''), $r['errori'] ? 'warning' : 'success');
+        } elseif (isset($_POST['pausa_scansione'])) {
+            $scan_s->pausa((string)$_POST['pausa_scansione'] === '1');
+            registra_log_audit($conn, (string)$_POST['pausa_scansione'] === '1' ? "Archivio verbali: scansione automatica sospesa" : "Archivio verbali: scansione automatica riattivata", []);
+            flash_set((string)$_POST['pausa_scansione'] === '1' ? 'Scansione automatica sospesa: i PDF si leggono solo con «Scansiona ora».' : 'Scansione automatica riattivata (ogni ora).', 'success');
+        } elseif (isset($_POST['collega_automatico'])) {
+            $r_a = $app_o->get(\App\Didattica\ProposteCartelle::class)->applica();
+            registra_log_audit($conn, "Archivio verbali: cartelle collegate in automatico", ["Collegate" => $r_a['collegate']]);
+            flash_set('Collegate ' . $r_a['collegate'] . ' cartelle agli organi.' . ($r_a['problemi'] ? ' Problemi: ' . implode(' · ', $r_a['problemi']) : ' Ora controlla qui sotto, poi premi «Scansiona ora» quando vuoi leggere i PDF.'), $r_a['problemi'] ? 'warning' : 'success');
         } elseif (isset($_POST['salva_organo'])) {
             [$tp_o, $tn_o] = \App\Didattica\OrganiArchivio::risolviTipo((string)($_POST['tipo'] ?? 'altro'), (string)($_POST['tipo_nuovo'] ?? ''));
             $err = $org_s->salva((int)($_POST['id'] ?? 0), (string)($_POST['nome'] ?? ''), $tp_o, (string)($_POST['corso'] ?? ''), (string)($_POST['cartella'] ?? ''), $tn_o);

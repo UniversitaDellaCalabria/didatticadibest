@@ -121,16 +121,16 @@ final class ScansioneArchivioTest extends DidatticaBase
         $this->assertSame(1, $this->scan->esegui()['aggiornati']);
 
         // spostato in un'altra cartella: lo stesso verbale, con i dati corretti, cambia solo il percorso
-        @mkdir($this->radice . 'Biologia/Archivio vecchio', 0755, true);
-        rename($this->radice . 'Biologia/2019/Verbale_08_2019-03-12.pdf', $this->radice . 'Biologia/Archivio vecchio/Verbale_08_2019-03-12.pdf');
+        @mkdir($this->radice . 'Biologia/2018', 0755, true);
+        rename($this->radice . 'Biologia/2019/Verbale_08_2019-03-12.pdf', $this->radice . 'Biologia/2018/Verbale_08_2019-03-12.pdf');
         $r = $this->scan->esegui();
         $this->assertSame([1, 0, 0], [$r['spostati'], $r['nuovi'], $r['rimossi']]);
         $riga = $this->db->riga('SELECT * FROM didattica_sedute WHERE id = ?', [$id]);
         $this->assertSame('77', $riga['numero_verbale']);
-        $this->assertStringContainsString('Archivio vecchio', (string) $riga['verbale_pdf']);
+        $this->assertStringContainsString('Biologia/2018/', (string) $riga['verbale_pdf']);
 
         // cancellato dal NAS: sparisce dall'archivio
-        unlink($this->radice . 'Biologia/Archivio vecchio/Verbale_08_2019-03-12.pdf');
+        unlink($this->radice . 'Biologia/2018/Verbale_08_2019-03-12.pdf');
         $this->assertSame(1, $this->scan->esegui()['rimossi']);
         $this->assertCount(1, $this->verbali());
     }

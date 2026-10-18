@@ -96,6 +96,34 @@ final class ScansioneArchivio
         return $best;
     }
 
+    /** Un anno o un anno accademico scritto come nome di cartella («2019», «2019-2020», «A.A. 2019/20»). */
+    public static function eAnno(string $segmento): bool
+    {
+        return (bool) preg_match('#^(?:a\.?\s?a\.?\s*)?(?:19|20)\d{2}(?:\s*[-_/]\s*(?:19|20)?\d{2})?$#iu', $segmento);
+    }
+
+    /**
+     * Il PDF è un allegato (non un verbale)? Lo è se il nome comincia per «allegat…» o se sta in una sottocartella dell'organo che non è un anno
+     * (le cartelle dei verbali con molti allegati): quei file non si importano come verbali.
+     *
+     * @param array<string, mixed> $organo la cartella collegata (chiave «cartella»)
+     */
+    public static function eAllegato(string $rel, array $organo): bool
+    {
+        if (str_starts_with(mb_strtolower(basename($rel)), 'allegat')) {
+            return true;
+        }
+        $dir = trim(dirname($rel) === '.' ? '' : dirname($rel), '/');
+        $sotto = mb_strlen($dir) > mb_strlen((string) $organo['cartella']) ? trim(mb_substr($dir, mb_strlen((string) $organo['cartella'])), '/') : '';
+        foreach ($sotto === '' ? [] : explode('/', $sotto) as $seg) {
+            if (!self::eAnno($seg)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /** La cartella senza le sottocartelle dell'anno («Biologia/Commissione didattica/2019» → «Biologia/Commissione didattica»). */
     public static function senzaAnni(string $dir): string
     {
@@ -159,11 +187,11 @@ final class ScansioneArchivio
     /**
      * Una scansione: nuovi PDF, PDF cambiati o spostati, PDF spariti.
      *
-     * @return array{trovati: int, nuovi: int, aggiornati: int, spostati: int, doppi: int, rimossi: int, restanti: int, non_collegati: array<string, int>, errori: list<string>, avvisi: list<string>}
+     * @return array{trovati: int, nuovi: int, aggiornati: int, spostati: int, doppi: int, rimossi: int, restanti: int, non_collegati: array<string, int>, allegati: array<string, int>, errori: list<string>, avvisi: list<string>}
      */
     public function esegui(int $max = self::MAX_PER_VOLTA): array
     {
-        $r = ['trovati' => 0, 'nuovi' => 0, 'aggiornati' => 0, 'spostati' => 0, 'doppi' => 0, 'rimossi' => 0, 'restanti' => 0, 'non_collegati' => [], 'errori' => [], 'avvisi' => []];
+        $r = ['trovati' => 0, 'nuovi' => 0, 'aggiornati' => 0, 'spostati' => 0, 'doppi' => 0, 'rimossi' => 0, 'restanti' => 0, 'non_collegati' => [], 'allegati' => [], 'errori' => [], 'avvisi' => []];
         if (!$this->prepara()) {
             $r['errori'][] = 'La cartella ' . $this->cartella . 'archivio/ non esiste e non riesco a crearla (permessi? NAS non montato?).';
 
@@ -197,6 +225,11 @@ final class ScansioneArchivio
             if (!$riga && !$m) {
                 $c = self::senzaAnni($dir);
                 $r['non_collegati'][$c] = ($r['non_collegati'][$c] ?? 0) + 1;
+                continue;
+            }
+            if (!$riga && $m && self::eAllegato($f['rel'], $m)) {
+                $c = self::senzaAnni($dir);
+                $r['allegati'][$c] = ($r['allegati'][$c] ?? 0) + 1;
                 continue;
             }
             if ($f['dim'] <= 0) {
@@ -289,6 +322,7 @@ final class ScansioneArchivio
             }
         }
         $r['non_collegati'] = $this->riordina($r['non_collegati']);
+        $r['allegati'] = $this->riordina($r['allegati']);
 
         return $r;
     }
@@ -296,6 +330,30 @@ final class ScansioneArchivio
     private function fileEsito(): string
     {
         return $this->sito->radice() . '/cache/archivio_scansione.json';
+    }
+
+    private function filePausa(): string
+    {
+        return $this->sito->radice() . '/cache/archivio_scansione_pausa';
+    }
+
+    /** La scansione automatica (ogni ora) è sospesa? «Scansiona ora» funziona comunque. */
+    public function inPausa(): bool
+    {
+        return is_file($this->filePausa());
+    }
+
+    public function pausa(bool $si): void
+    {
+        $dir = dirname($this->filePausa());
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0755, true);
+        }
+        if ($si) {
+            @file_put_contents($this->filePausa(), date('Y-m-d H:i:s'));
+        } else {
+            @unlink($this->filePausa());
+        }
     }
 
     /** L'esito dell'ultima scansione (automatica o a mano): ['quando' => data e ora, 'esito' => risultato di esegui()], null se non è mai stata fatta. @return array<string, mixed>|null */
@@ -321,6 +379,9 @@ final class ScansioneArchivio
     /** Per il cron (ogni 15 minuti): scansiona al massimo una volta all'ora, o subito di nuovo se la volta prima non ha finito. Ritorna una riga di resoconto ('' se non c'è nulla da dire). */
     public function cron(): string
     {
+        if ($this->inPausa()) {
+            return '';
+        }
         $u = $this->ultimoEsito();
         if ($u && strtotime((string) ($u['quando'] ?? '')) > time() - 3600 && (int) ($u['esito']['restanti'] ?? 0) === 0) {
             return '';

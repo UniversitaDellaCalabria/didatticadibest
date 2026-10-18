@@ -82,6 +82,8 @@ if ($pubs && !($pubs['verbale_stato'] === 'firmato' || $pubs['origine'] === 'imp
     $non_coll = $scan_a->nonCollegate();
     $ultima = $scan_a->ultimoEsito();
     $mappe_a = $scan_a->mappe();
+    $proposte_a = \App\Core\App::per($conn)->get(\App\Didattica\ProposteCartelle::class)->proponi();
+    $pausa_a = $scan_a->inPausa();
     $organi_tutti = $srv_organi->tutti();
     $tipi_org = $srv_organi->tipiDisponibili();
     // campo «Tipo»: scelta tra i tipi (predefiniti e già scritti a mano) oppure «Nuovo tipo…» con il nome da scrivere
@@ -112,10 +114,25 @@ if ($pubs && !($pubs['verbale_stato'] === 'firmato' || $pubs['origine'] === 'imp
             </div>
             <form method="POST" class="d-flex flex-wrap gap-2 align-items-center mb-3"><?php csrf_field(); ?>
                 <button class="btn btn-sm btn-primary fw-bold" name="scansiona_archivio" value="1"><i class="fa fa-rotate me-1" aria-hidden="true"></i>Scansiona ora</button>
+                <button class="btn btn-sm btn-outline-secondary" name="pausa_scansione" value="<?php echo $pausa_a ? '0' : '1'; ?>" title="La scansione automatica legge i PDF nuovi ogni ora"><i class="fa fa-<?php echo $pausa_a ? 'play' : 'pause'; ?> me-1" aria-hidden="true"></i><?php echo $pausa_a ? 'Riattiva la scansione automatica' : 'Sospendi la scansione automatica'; ?></button>
+                <?php if ($pausa_a): ?><span class="badge text-bg-warning">scansione automatica sospesa</span><?php endif; ?>
                 <span class="small text-secondary"><?php echo $ultima ? 'Ultima scansione: ' . date('d/m/Y H:i', strtotime((string)$ultima['quando'])) . ' — ' . (int)$e_ult['trovati'] . ' PDF trovati, ' . (int)$e_ult['nuovi'] . ' nuovi, ' . (int)$e_ult['rimossi'] . ' tolti' . ((int)$e_ult['restanti'] ? ', ' . (int)$e_ult['restanti'] . ' ancora da leggere' : '') . '.' : 'Non è ancora stata fatta una scansione.'; ?></span>
             </form>
             <?php foreach (array_slice((array)($e_ult['errori'] ?? []), 0, 8) as $er): ?><div class="alert alert-danger small py-1 mb-1"><?php echo $h($er); ?></div><?php endforeach; ?>
+            <?php if (!empty($e_ult['allegati'])): ?><div class="alert alert-info small py-2 mb-2"><i class="fa fa-paperclip me-1" aria-hidden="true"></i><strong><?php echo array_sum($e_ult['allegati']); ?> PDF non importati come verbali</strong>: sono in sottocartelle dentro un organo (cartelle di allegati?) o hanno un nome che comincia per «Allegato». Cartelle: <?php echo $h(implode(' · ', array_map(fn($c, $n) => "$c ($n)", array_keys($e_ult['allegati']), $e_ult['allegati']))); ?>. Se una di queste è in realtà un organo, collegala (sotto) con la sua cartella.</div><?php endif; ?>
             <?php foreach (array_slice((array)($e_ult['avvisi'] ?? []), 0, 5) as $er): ?><div class="alert alert-warning small py-1 mb-1"><?php echo $h($er); ?></div><?php endforeach; ?>
+
+            <?php if ($proposte_a): ?>
+                <div class="border border-primary rounded p-3 mb-3">
+                    <h3 class="h6 fw-bold"><i class="fa fa-wand-magic-sparkles me-1 text-primary" aria-hidden="true"></i>Collegamento automatico: il portale propone</h3>
+                    <p class="small text-secondary mb-2">Dalla struttura delle cartelle (<em>Corso / Organo / anno</em>) il portale abbina il consiglio al consiglio già nel portale e crea gli altri organi dello stesso corso. Controlla la proposta: se è giusta, un solo clic.</p>
+                    <div class="table-responsive"><table class="table table-sm small align-middle mb-2"><thead class="table-light"><tr><th>Cartella sul NAS</th><th>PDF</th><th>Diventa</th><th>Corso di studi</th></tr></thead><tbody>
+                    <?php foreach ($proposte_a as $p_a): ?><tr><td><i class="fa fa-folder me-1" aria-hidden="true"></i><?php echo $h($p_a['cartella']); ?></td><td><?php echo (int)$p_a['n_pdf']; ?></td>
+                        <td><?php echo $p_a['azione'] === 'consiglio' ? '<span class="badge text-bg-primary">Consiglio già nel portale</span> ' : '<span class="badge text-bg-success">Organo nuovo</span> '; ?><?php echo $h(mb_strimwidth($p_a['nome'], 0, 90, '…')); ?></td><td><?php echo $h(mb_strimwidth($p_a['corso'], 0, 70, '…')); ?></td></tr><?php endforeach; ?>
+                    </tbody></table></div>
+                    <form method="POST" class="m-0"><?php csrf_field(); ?><button class="btn btn-primary fw-bold" name="collega_automatico" value="1" data-confirm="Collegare tutte le cartelle come proposto?"><i class="fa fa-link me-1" aria-hidden="true"></i>Collega tutto come proposto</button> <span class="small text-secondary ms-2">Non legge ancora i PDF: quello lo fai tu con «Scansiona ora».</span></form>
+                </div>
+            <?php endif; ?>
 
             <?php if ($non_coll): ?>
                 <h3 class="h6 fw-bold mt-3"><i class="fa fa-circle-question me-1 text-warning" aria-hidden="true"></i>Cartelle da collegare <span class="fw-normal text-secondary">(trovate sul NAS, non ancora assegnate a un organo)</span></h3>
