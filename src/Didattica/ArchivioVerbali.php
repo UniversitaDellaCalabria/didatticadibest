@@ -20,7 +20,7 @@ final class ArchivioVerbali
     private const MESI = ['gennaio' => 1, 'febbraio' => 2, 'marzo' => 3, 'aprile' => 4, 'maggio' => 5, 'giugno' => 6, 'luglio' => 7, 'agosto' => 8, 'settembre' => 9, 'ottobre' => 10, 'novembre' => 11, 'dicembre' => 12,
         'gen' => 1, 'feb' => 2, 'mar' => 3, 'apr' => 4, 'mag' => 5, 'giu' => 6, 'lug' => 7, 'ago' => 8, 'set' => 9, 'sett' => 9, 'ott' => 10, 'nov' => 11, 'dic' => 12];
 
-    public function __construct(private SedutaRepository $sedute, private ConsiglioRepository $consigli, private Sito $sito, private TestoPdf $testo, private string $cartella = Costanti::DIR_VERBALI)
+    public function __construct(private SedutaRepository $sedute, private ConsiglioRepository $consigli, private OrganiArchivio $organi, private Sito $sito, private TestoPdf $testo, private string $cartella = Costanti::DIR_VERBALI)
     {
     }
 
@@ -105,7 +105,7 @@ final class ArchivioVerbali
      *
      * @return array{esito: string, id?: int, completo?: bool, messaggio: string, nome: string}
      */
-    public function importa(string $tmp, string $nomeOriginale, string $percorso, ?int $consiglioId, string $organo, string $annoForzato = ''): array
+    public function importa(string $tmp, string $nomeOriginale, string $percorso, ?int $consiglioId, string $organo, string $annoForzato = '', ?int $organoId = null): array
     {
         $nome = $nomeOriginale !== '' ? $nomeOriginale : basename($percorso);
         $err = fn (string $m) => ['esito' => 'errore', 'messaggio' => $m, 'nome' => $nome];
@@ -130,8 +130,13 @@ final class ArchivioVerbali
         $aa = $annoForzato !== '' ? $annoForzato : ($g['anno_accademico'] ?? ($data ? self::annoAccademico($data) : ''));
         if ($consiglioId && ($c = $this->consigli->perId($consiglioId))) {
             $organo = (string) $c['nome'];
+            $organoId = null;
+        } elseif ($organoId && ($o = $this->organi->perId($organoId))) {
+            $organo = (string) $o['nome'];
+            $consiglioId = null;
         } else {
             $consiglioId = null;
+            $organoId = null;
             $organo = mb_substr(trim($organo), 0, 500);
         }
         $dir = $this->sito->radice() . '/' . $this->cartella;
@@ -146,7 +151,7 @@ final class ArchivioVerbali
             return $err('salvataggio non riuscito');
         }
         $id = $this->sedute->inserisciImportato([
-            'organo' => $organo, 'anno_accademico' => $aa, 'data' => $data, 'consiglio_id' => $consiglioId, 'numero_verbale' => (string) $numero,
+            'organo' => $organo, 'anno_accademico' => $aa, 'data' => $data, 'consiglio_id' => $consiglioId, 'organo_id' => $organoId, 'numero_verbale' => (string) $numero,
             'verbale_pdf' => $this->cartella . $file, 'nome_originale' => mb_substr($nome, 0, 255), 'file_hash' => $hash, 'testo_ricerca' => $testo,
         ]);
 
@@ -158,6 +163,9 @@ final class ArchivioVerbali
     {
         if (($seduta['origine'] ?? '') !== 'importato') {
             return 'Si può sostituire solo il PDF di un verbale importato.';
+        }
+        if ((int) ($seduta['da_cartella'] ?? 0) === 1) {
+            return 'Questo verbale viene dalla cartella dell\'archivio sul NAS: sostituisci il file lì (il portale lo rilegge da solo).';
         }
         $pdf = (string) @file_get_contents($tmp);
         if (!str_starts_with(ltrim(substr($pdf, 0, 16)), '%PDF') || strlen($pdf) > self::MAX_BYTE) {
@@ -185,12 +193,18 @@ final class ArchivioVerbali
     /** Dati (organo/consiglio, data, anno accademico, numero, o.d.g. sintetico) di un verbale importato, ripuliti. Ritorna l'errore, null se va bene. */
     public function salvaDati(int $id, array $post, array $consigli): ?string
     {
-        $cons = (int) ($post['consiglio_id'] ?? 0);
+        $scelta = (string) ($post['consiglio_id'] ?? '0');
+        $orgId = preg_match('/^o(\d+)$/', $scelta, $mo) ? (int) $mo[1] : 0;
+        $cons = $orgId ? 0 : (int) $scelta;
         $organo = mb_substr(trim((string) ($post['organo'] ?? '')), 0, 500);
         if ($cons && isset($consigli[$cons])) {
             $organo = (string) $consigli[$cons]['nome'];
+            $orgId = 0;
+        } elseif ($orgId && ($o = $this->organi->perId($orgId))) {
+            $organo = (string) $o['nome'];
         } else {
             $cons = 0;
+            $orgId = 0;
         }
         $data = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) ($post['data'] ?? '')) ? (string) $post['data'] : null;
         $aa = preg_match('#^\d{4}/\d{4}$#', (string) ($post['anno_accademico'] ?? '')) ? (string) $post['anno_accademico'] : ($data ? self::annoAccademico($data) : '');
@@ -198,24 +212,26 @@ final class ArchivioVerbali
             return "Scegli il consiglio o scrivi l'organo.";
         }
         $this->sedute->aggiornaImportato($id, [
-            'organo' => $organo, 'anno_accademico' => $aa, 'data' => $data, 'consiglio_id' => $cons ?: null,
+            'organo' => $organo, 'anno_accademico' => $aa, 'data' => $data, 'consiglio_id' => $cons ?: null, 'organo_id' => $orgId ?: null,
             'numero_verbale' => mb_substr(trim((string) ($post['numero_verbale'] ?? '')), 0, 10), 'odg' => mb_substr(trim((string) ($post['odg'] ?? '')), 0, 5000),
         ]);
 
         return null;
     }
 
-    /** Toglie un verbale importato dall'archivio (anche il file). */
-    public function elimina(array $seduta): void
+    /** Toglie un verbale importato dall'archivio (anche il file). Quelli letti dalla cartella sul NAS non si tolgono da qui: false. */
+    public function elimina(array $seduta): bool
     {
-        if (($seduta['origine'] ?? '') !== 'importato') {
-            return;
+        if (($seduta['origine'] ?? '') !== 'importato' || (int) ($seduta['da_cartella'] ?? 0) === 1) {
+            return false;
         }
         $f = $this->percorsoFile($seduta);
         $this->sedute->eliminaImportato((int) $seduta['id']);
         if ($f) {
             @unlink($f);
         }
+
+        return true;
     }
 
     /** Percorso reale del PDF (solo dentro la cartella dei verbali). */

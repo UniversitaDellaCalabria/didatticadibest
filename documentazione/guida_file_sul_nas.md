@@ -129,3 +129,32 @@ Ma se nel frattempo sono arrivati file nuovi, prima copiali dal NAS: `sudo rsync
 ## 8. Dati personali
 
 I file con dati degli studenti (pratiche, tesi) restano comunque in una rete dell'Ateneo, quindi la sede cambia ma non esce dall'Ateneo. Se il NAS è condiviso con altri, mantieni l'utente `portale` limitato a questa cartella e non dare accesso ad altri utenti. Aggiorna, se serve, l'elenco delle sedi di conservazione dell'informativa privacy.
+
+
+## 9. Archivio verbali sul NAS: i verbali vecchi si copiano e il portale li legge da soli
+
+Funziona **già ora** (anche senza spostare le altre cartelle sul NAS) e funziona meglio con il NAS: la cartella dei verbali vecchi è `uploads/verbali/archivio/`. Se hai fatto il punto 4 per `verbali`, quella cartella sta sul NAS in `portale_didattica/verbali/archivio/`.
+
+**Come si organizza.** Una cartella per corso di studi; dentro, le cartelle per organo (facoltative) e per anno. Per esempio:
+
+```
+archivio/
+  Biologia/                          ← verbali del Consiglio di corso di studi (con le cartelle degli anni: 2017, 2018, …)
+    2017/ … 2025/
+    Commissione didattica/2019/ …
+    Gruppo di riesame/2020/ …
+    Riunioni con gli studenti/2021/ …
+  Chimica/ …
+```
+
+1. **Copia** le tue cartelle dei verbali (quelle con gli anni 2017…2025) dentro `archivio/`, una per corso. Su Windows basta il copia-incolla nella cartella di rete del NAS.
+2. In **Didattica → Sedute e verbali → Archivio verbali → «Organi e cartelle sul NAS»**:
+   - le cartelle trovate compaiono sotto «Cartelle trovate sul NAS da collegare»: per ognuna scegli a quale organo appartiene (il consiglio già esistente, oppure «Un organo nuovo») e premi **Collega**;
+   - per un corso crei in un colpo i tre organi (commissione didattica, gruppo di riesame, riunioni con gli studenti) con **«Crea i tre organi»**; poi metti i PDF nelle loro cartelle;
+   - puoi creare altri organi a mano (nome, tipo, corso, cartella).
+3. Il portale **legge i PDF da solo ogni ora**; con **«Scansiona ora»** lo fai subito. I PDF non vengono copiati: restano sul NAS.
+4. Data, numero del verbale e anno accademico si ricavano dal nome del file e dalla cartella (per esempio `Verbale_08_2019-03-12.pdf`, `2024-2025/…`) o dal testo del PDF. Quelli incompleti compaiono in «Da completare» e si correggono con la matita.
+5. **Quando cambi qualcosa sul NAS:** un file sostituito si rilegge; un file spostato in un'altra cartella tiene i dati già corretti; un file cancellato sparisce dall'archivio alla scansione successiva (il portale non cancella mai i file del NAS). Se il NAS è spento o non montato il portale non toglie nulla.
+6. Nell'archivio puoi filtrare per consiglio o per altro organo. Gli altri organi (commissione, riesame, studenti) li vede solo l'Ufficio didattico.
+
+Limiti: file fino a 30 MB, percorso (cartelle + nome) non oltre 230 caratteri circa; vengono ignorati i file che non sono PDF e le cartelle di sistema del NAS (`@eaDir`, `#recycle`).

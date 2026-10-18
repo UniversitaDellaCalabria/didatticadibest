@@ -219,6 +219,12 @@ final class Definizioni
             commento VARCHAR(1000) NOT NULL DEFAULT '', creato_il DATETIME DEFAULT CURRENT_TIMESTAMP, compilato_il DATETIME DEFAULT NULL,
             UNIQUE KEY uq_pratica (pratica_id), UNIQUE KEY uq_token (token), INDEX idx_compilato (compilato_il)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        // v77: organi di un corso di studi oltre al consiglio (commissione didattica, gruppo di riesame, riunioni con gli studenti…): hanno solo l'archivio dei verbali,
+        // cartella = percorso dentro uploads/verbali/archivio/ (sul NAS) da cui il portale legge i PDF in automatico
+        'archivio_organi' => "CREATE TABLE IF NOT EXISTS archivio_organi (
+            id INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(300) NOT NULL DEFAULT '', tipo VARCHAR(20) NOT NULL DEFAULT 'altro', corso VARCHAR(300) NOT NULL DEFAULT '',
+            cartella VARCHAR(300) NOT NULL DEFAULT '', attivo TINYINT(1) NOT NULL DEFAULT 1, creato_il DATETIME DEFAULT CURRENT_TIMESTAMP, INDEX idx_cartella (cartella)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         // v70: messaggi tra l'ufficio e la scuola sulla convenzione online (promemoria «carica il PDF», avvisi liberi, risposte della scuola)
         'convenzioni_messaggi' => "CREATE TABLE IF NOT EXISTS convenzioni_messaggi (
             id INT AUTO_INCREMENT PRIMARY KEY, compilazione_id INT NOT NULL, da VARCHAR(10) NOT NULL DEFAULT 'ufficio', tipo VARCHAR(20) NOT NULL DEFAULT 'messaggio',
@@ -511,6 +517,10 @@ final class Definizioni
             'marche_il'            => "ADD COLUMN marche_il DATETIME DEFAULT NULL",
             'marche_da'            => "ADD COLUMN marche_da VARCHAR(200) DEFAULT ''",
         ],
+        'didattica_consigli' => [
+            // v77: cartella dei verbali del consiglio dentro uploads/verbali/archivio/ (per esempio «Biologia»): i PDF lì dentro si leggono in automatico
+            'cartella_archivio' => "ADD COLUMN cartella_archivio VARCHAR(300) NOT NULL DEFAULT ''",
+        ],
         'didattica_uffici' => [
             // v42: tipo dell'ufficio nel flusso delle pratiche (protocollo, ufficio di un corso di studio, segreteria studenti)
             // e consiglio dei corsi seguiti (le pratiche di quei corsi arrivano a quell'ufficio dopo il protocollo)
@@ -545,6 +555,10 @@ final class Definizioni
             'verbale_pubblico_pdf'  => "ADD COLUMN verbale_pubblico_pdf VARCHAR(255) DEFAULT NULL",
             'pubblicato_il'         => "ADD COLUMN pubblicato_il DATETIME DEFAULT NULL",
             'pubblicato_da'         => "ADD COLUMN pubblicato_da VARCHAR(150) NOT NULL DEFAULT ''",
+            // v77: verbali letti dalla cartella dell'archivio sul NAS (il file non si copia: si legge dov'è) e organi diversi dal consiglio
+            'organo_id'             => "ADD COLUMN organo_id INT DEFAULT NULL, ADD INDEX idx_organo_id (organo_id)",
+            'da_cartella'           => "ADD COLUMN da_cartella TINYINT(1) NOT NULL DEFAULT 0",
+            'cartella_firma'        => "ADD COLUMN cartella_firma VARCHAR(40) NOT NULL DEFAULT ''",
         ],
         'tutorato_bandi' => [
             // v53: ufficio di Ateneo che paga i tutor di questo bando e i tre decreti in PDF (bando, commissione, approvazione atti)

@@ -121,8 +121,10 @@ if ($fase === 'azioni') {
     if (isset($_POST['importa_verbali'])) {
         while (ob_get_level() > 0) ob_end_clean();
         header('Content-Type: application/json; charset=utf-8');
-        $cons_i = (int)($_POST['consiglio_id'] ?? 0);
-        if ($cons_i ? !$puo_consiglio($cons_i) : !$puo_didattica_tutto) { http_response_code(403); echo json_encode(['errore' => 'Scegli un consiglio che puoi gestire.']); exit; }
+        $cons_raw = (string)($_POST['consiglio_id'] ?? '0'); // «12» = consiglio, «o5» = altro organo
+        $org_i = preg_match('/^o(\d+)$/', $cons_raw, $mo_i) ? (int)$mo_i[1] : 0;
+        $cons_i = $org_i ? 0 : (int)$cons_raw;
+        if ($org_i ? !$puo_didattica_tutto : ($cons_i ? !$puo_consiglio($cons_i) : !$puo_didattica_tutto)) { http_response_code(403); echo json_encode(['errore' => 'Scegli un consiglio che puoi gestire.']); exit; }
         @set_time_limit(180);
         $arch = \App\Core\App::per($conn)->get(\App\Didattica\ArchivioVerbali::class);
         $f_i = $_FILES['file'] ?? ['name' => [], 'tmp_name' => [], 'error' => []];
@@ -134,16 +136,66 @@ if ($fase === 'azioni') {
                 $ris_i[] = ['esito' => 'errore', 'nome' => (string)$nome_i, 'messaggio' => in_array($f_i['error'][$k] ?? 0, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true) ? 'troppo grande per il server' : 'caricamento non riuscito'];
                 continue;
             }
-            $ris_i[] = $arch->importa((string)$f_i['tmp_name'][$k], (string)$nome_i, $percorsi_i[$k] ?? (string)$nome_i, $cons_i ?: null, (string)($_POST['organo'] ?? ''), $aa_i);
+            $ris_i[] = $arch->importa((string)$f_i['tmp_name'][$k], (string)$nome_i, $percorsi_i[$k] ?? (string)$nome_i, $cons_i ?: null, (string)($_POST['organo'] ?? ''), $aa_i, $org_i ?: null);
         }
         $n_ok = count(array_filter($ris_i, fn($r) => $r['esito'] === 'ok'));
-        if ($n_ok) registra_log_audit($conn, "Archivio verbali: verbali importati", ["Verbali" => $n_ok, "Consiglio" => $cons_i]);
+        if ($n_ok) registra_log_audit($conn, "Archivio verbali: verbali importati", ["Verbali" => $n_ok, "Consiglio" => $cons_i, "Organo" => $org_i]);
         echo json_encode(['risultati' => $ris_i], JSON_UNESCAPED_UNICODE); exit;
+    }
+    // ── Archivio verbali: organi, cartelle sul NAS e scansione (solo Ufficio didattico) ──
+    if (array_intersect(array_keys($_POST), ['scansiona_archivio', 'salva_organo', 'elimina_organo', 'crea_organi_standard', 'cartella_consiglio', 'collega_cartella'])) {
+        if (!$puo_didattica_tutto) nega_accesso();
+        $app_o = \App\Core\App::per($conn);
+        $org_s = $app_o->get(\App\Didattica\OrganiArchivio::class);
+        $scan_s = $app_o->get(\App\Didattica\ScansioneArchivio::class);
+        $url_a = "$base&tab=sedute&archivio=1";
+        $riassunto = function (array $r): string {
+            $t = $r['nuovi'] . ' nuovi, ' . $r['aggiornati'] . ' aggiornati, ' . $r['spostati'] . ' spostati, ' . $r['rimossi'] . ' tolti';
+            if ($r['doppi']) $t .= ', ' . $r['doppi'] . ' già presenti';
+            if ($r['restanti']) $t .= '. Ne restano ' . $r['restanti'] . ' da leggere: premi di nuovo «Scansiona ora» (o aspetta, il portale continua da solo)';
+            return $t;
+        };
+        if (isset($_POST['scansiona_archivio'])) {
+            @set_time_limit(280);
+            $r = $scan_s->eseguiERicorda(60);
+            registra_log_audit($conn, "Archivio verbali: scansione della cartella", ["Nuovi" => $r['nuovi'], "Aggiornati" => $r['aggiornati'], "Tolti" => $r['rimossi']]);
+            flash_set('Scansione fatta: ' . $riassunto($r) . '.' . ($r['errori'] ? ' Ci sono ' . count($r['errori']) . ' problemi (sotto).' : ''), $r['errori'] ? 'warning' : 'success');
+        } elseif (isset($_POST['salva_organo'])) {
+            $err = $org_s->salva((int)($_POST['id'] ?? 0), (string)($_POST['nome'] ?? ''), (string)($_POST['tipo'] ?? 'altro'), (string)($_POST['corso'] ?? ''), (string)($_POST['cartella'] ?? ''));
+            if (!$err) registra_log_audit($conn, "Archivio verbali: organo salvato", ["Organo" => trim((string)$_POST['nome']), "Cartella" => \App\Didattica\OrganiArchivio::cartella((string)($_POST['cartella'] ?? ''))]);
+            flash_set($err ?? 'Organo salvato.', $err ? 'danger' : 'success');
+        } elseif (isset($_POST['elimina_organo'])) {
+            $err = $org_s->elimina((int)$_POST['elimina_organo']);
+            if (!$err) registra_log_audit($conn, "Archivio verbali: organo eliminato", ["Organo" => (int)$_POST['elimina_organo']]);
+            flash_set($err ?? 'Organo eliminato.', $err ? 'warning' : 'success');
+        } elseif (isset($_POST['crea_organi_standard'])) {
+            $n = $org_s->creaStandard((string)($_POST['corso'] ?? ''), (string)($_POST['cartella_corso'] ?? ''));
+            if ($n) registra_log_audit($conn, "Archivio verbali: organi standard creati", ["Corso" => trim((string)$_POST['corso']), "Organi" => $n]);
+            flash_set($n ? "Creati $n organi (commissione didattica, gruppo di riesame, riunioni con gli studenti): controlla le cartelle qui sotto." : 'Scrivi il corso di studi (o gli organi di quel corso ci sono già).', $n ? 'success' : 'warning');
+        } elseif (isset($_POST['cartella_consiglio'])) {
+            $err = $org_s->cartellaConsiglio((int)$_POST['cartella_consiglio'], (string)($_POST['cartella'] ?? ''));
+            if (!$err) registra_log_audit($conn, "Archivio verbali: cartella di un consiglio", ["Consiglio" => (int)$_POST['cartella_consiglio'], "Cartella" => (string)($_POST['cartella'] ?? '')]);
+            flash_set($err ?? 'Cartella del consiglio salvata. Premi «Scansiona ora» per leggere i PDF.', $err ? 'danger' : 'success');
+        } elseif (isset($_POST['collega_cartella'])) {
+            $cart = \App\Didattica\OrganiArchivio::cartella((string)($_POST['cartella'] ?? ''));
+            $sc = (string)($_POST['scelta'] ?? 'nuovo');
+            if ($cart === '') $err = 'Cartella non valida.';
+            elseif (preg_match('/^c(\d+)$/', $sc, $mc)) $err = $org_s->cartellaConsiglio((int)$mc[1], $cart);
+            elseif (preg_match('/^o(\d+)$/', $sc, $mo2) && ($og = $org_s->perId((int)$mo2[1]))) $err = $org_s->salva((int)$og['id'], (string)$og['nome'], (string)$og['tipo'], (string)$og['corso'], $cart);
+            else $err = $org_s->salva(0, (string)($_POST['nome'] ?? '') !== '' ? (string)$_POST['nome'] : basename($cart), (string)($_POST['tipo'] ?? 'altro'), (string)($_POST['corso'] ?? ''), $cart);
+            if (!$err) {
+                $r = $scan_s->eseguiERicorda(60);
+                registra_log_audit($conn, "Archivio verbali: cartella collegata", ["Cartella" => $cart, "Nuovi" => $r['nuovi']]);
+                flash_set('Cartella collegata: ' . $riassunto($r) . '.', 'success');
+            } else flash_set($err, 'danger');
+        }
+        admin_redirect($url_a);
     }
     if (isset($_POST['salva_verbale_importato'])) {
         $id = (int)($_POST['id'] ?? 0);
         $imp = seduta_didattica($conn, $id);
-        $cons_n = (int)($_POST['consiglio_id'] ?? 0);
+        $cons_raw = (string)($_POST['consiglio_id'] ?? '0');
+        $cons_n = preg_match('/^o\d+$/', $cons_raw) ? 0 : (int)$cons_raw;
         if (!$imp || $imp['origine'] !== 'importato' || !($imp['consiglio_id'] ? $puo_seduta($imp) : $puo_didattica_tutto) || ($cons_n ? !$puo_consiglio($cons_n) : !$puo_didattica_tutto)) nega_accesso();
         $arch = \App\Core\App::per($conn)->get(\App\Didattica\ArchivioVerbali::class);
         $err = $arch->salvaDati($id, $_POST, $consigli);
@@ -157,7 +209,10 @@ if ($fase === 'azioni') {
         $id = (int)$_POST['elimina_verbale_importato'];
         $imp = seduta_didattica($conn, $id);
         if (!$imp || $imp['origine'] !== 'importato' || !($imp['consiglio_id'] ? $puo_seduta($imp) : $puo_didattica_tutto)) nega_accesso();
-        \App\Core\App::per($conn)->get(\App\Didattica\ArchivioVerbali::class)->elimina($imp);
+        if (!\App\Core\App::per($conn)->get(\App\Didattica\ArchivioVerbali::class)->elimina($imp)) {
+            flash_set("Questo verbale viene dalla cartella dell'archivio sul NAS: per toglierlo elimina il file dalla cartella, sparisce da solo alla prossima scansione.", 'warning');
+            admin_redirect("$base&tab=sedute&archivio=1");
+        }
         registra_log_audit($conn, "Archivio verbali: verbale importato eliminato", ["Seduta" => $id]);
         flash_set("Verbale tolto dall'archivio.", 'warning');
         admin_redirect("$base&tab=sedute&archivio=1");

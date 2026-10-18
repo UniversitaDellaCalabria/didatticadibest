@@ -1112,6 +1112,42 @@ var PACCHETTI = [
     ],
     nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
     commit: "Cerca ovunque nel pannello, sostituzioni degli operatori assenti, sondaggio facoltativo a fine pratica"
+  },
+  {
+    id: "archivio-organi-nas",
+    titolo: "Pacchetto 24 · Archivio verbali: altri organi e cartella sul NAS letta in automatico",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare",
+    schema: "v77 (tabella archivio_organi e alcune colonne nuove)",
+    riassunto: "L'archivio verbali non è più solo dei consigli di corso di studi. <strong>1) Altri organi:</strong> da Didattica → Sedute e verbali → Archivio verbali → «Organi e cartelle sul NAS» si creano gli organi di ogni corso (commissione didattica, gruppo di riesame – Assicurazione della Qualità, riunioni con gli studenti, o altri a mano), anche i tre standard in un colpo. I PDF si possono caricare dal browser scegliendo il consiglio o l'organo, e si filtra l'archivio per organo. <strong>2) Cartella sul NAS:</strong> i verbali vecchi, già divisi per corso e per anno, si copiano e incollano in <code>uploads/verbali/archivio/</code> (sul NAS): il portale li legge da solo ogni ora (o con «Scansiona ora») senza copiarli, ricava data, numero e anno accademico, assegna a ogni cartella il suo organo, rilegge i file cambiati, segue quelli spostati e toglie dall'archivio quelli cancellati (mai se il NAS non risponde, e il portale non cancella mai i file del NAS). Le cartelle senza organo compaiono nell'elenco «da collegare».",
+    passi: [["Archivio", "Organi diversi dal consiglio di corso di studi"], ["Archivio", "Lettura automatica della cartella sul NAS"]],
+    cartelle: [
+      { cartella: "admin/", file: [
+        ["admin/didattica_archivio.php", "mod", "Archivio", "sezione «Organi e cartelle sul NAS», scelta dell'organo, filtro, badge NAS"],
+        ["admin/didattica_sedute.php", "mod", "Archivio", "azioni: scansione, organi, cartelle; importazione per organo"]
+      ]},
+      { cartella: "/ (radice del portale)", file: [
+        ["cron_background.php", "mod", "Archivio", "scansione della cartella ogni ora"]
+      ]},
+      { cartella: "src/Didattica/", file: [
+        ["src/Didattica/OrganiArchivio.php", "nuovo", "Archivio", "gli organi e le loro cartelle"],
+        ["src/Didattica/ScansioneArchivio.php", "nuovo", "Archivio", "lettura della cartella, file nuovi, cambiati, spostati, tolti"],
+        ["src/Didattica/ArchivioVerbali.php", "mod", "Archivio", "importazione per organo; i file del NAS non si cancellano dal portale"],
+        ["src/Didattica/SedutaRepository.php", "mod", "Archivio", "filtro per organo e verbali letti dalla cartella"]
+      ]},
+      { cartella: "src/Core/Schema/", file: [
+        ["src/Core/Schema/Definizioni.php", "mod", "Archivio", "tabella archivio_organi e colonne nuove"],
+        ["src/Core/Schema/Migrazioni.php", "mod", "Archivio", "versione dello schema: 77"]
+      ]}
+    ],
+    dopo: [
+      "Apri una pagina del pannello: lo schema passa alla v77.",
+      "Sul server la cartella <code>/opt/lampp/htdocs/didattica/uploads/verbali/archivio/</code> si crea da sola al primo uso (con il NAS: <code>portale_didattica/verbali/archivio/</code>, vedi la guida <code>documentazione/guida_file_sul_nas.md</code>, punto 9).",
+      "Copia dentro <code>archivio/</code> una cartella per corso (con le sottocartelle degli anni), poi in Didattica → Sedute e verbali → Archivio verbali → «Organi e cartelle sul NAS» collega ogni cartella al suo organo e premi «Scansiona ora».",
+      "Per ogni corso usa «Crea i tre organi» e metti i PDF di commissione, riesame e studenti nelle loro cartelle."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Archivio verbali: altri organi (commissione didattica, riesame, studenti) e cartella sul NAS letta in automatico"
   }
 ];
 
@@ -1138,7 +1174,7 @@ var PROSSIMI = [
   ["F10b · Tesi: collegare l'azienda convenzionata alla pratica di tesi dello studente", "fatto in locale: vedi Pacchetto 22"],
   ["F10c · Convenzione di tesi: dati del Direttore nel modello Word", "fatto in locale: vedi Pacchetto 22"],
   ["Prova sul server · firma PAdES vera (azienda e Direttore) nelle convenzioni di tesi", "da fare (a cura tua, 20 minuti): strumento strumenti/verifica_firma_pdf.php e guida documentazione/prova_firma_vera_convenzioni_tesi.md pronti"],
-  ["Pacchetti 20-23 · caricamento sul server", "da fare (a cura tua): scp del pacchetto, estrazione, schema v76, aggiunta delle persone nell'«Ufficio convenzioni di tesi», voci di menu (vedi «dopo» dei pacchetti)"],
+  ["Pacchetto 24 · caricamento sul server (include i precedenti)", "da fare (a cura tua): scp del pacchetto, estrazione, schema v77, aggiunta delle persone nell'«Ufficio convenzioni di tesi», voci di menu (vedi «dopo» dei pacchetti)"],
   ["F12 · File del portale sul NAS (verbali, convenzioni, pratiche degli studenti)", "da fare (19/10 mattina, a cura tua con la guida): documentazione/guida_file_sul_nas.md; poi un piccolo pacchetto di codice (controllo NAS in Sistema, backup)"],
   ["Idea · Tempi per passo delle pratiche (dove si fermano, quanto aspettano)", "da fare: statistica dei giorni medi in ogni passo, per accorgersi dei colli di bottiglia"],
   ["Idea · Valutazione dello studente FSL con attestato delle competenze", "da fare: la struttura ospitante valuta lo studente e l'attestato riporta le competenze"],

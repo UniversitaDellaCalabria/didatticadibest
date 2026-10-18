@@ -5,6 +5,8 @@
 if (!defined('DIDATTICA_PANNELLO')) { http_response_code(403); exit('Accesso negato.'); }
 
 $rep_sed = \App\Core\App::per($conn)->get(\App\Didattica\SedutaRepository::class);
+$srv_organi = \App\Core\App::per($conn)->get(\App\Didattica\OrganiArchivio::class);
+$organi_arch = $puo_didattica_tutto ? array_values(array_filter($srv_organi->tutti(), fn($o) => (int)$o['attivo'] === 1)) : []; // altri organi (commissioni, riesame…): solo l'Ufficio didattico
 $imp_id = (int)($_GET['imp'] ?? 0);
 $imp = $imp_id ? seduta_didattica($conn, $imp_id) : null;
 if ($imp && ($imp['origine'] !== 'importato' || !($imp['consiglio_id'] ? $puo_seduta($imp) : $puo_didattica_tutto))) $imp = null;
@@ -45,9 +47,10 @@ if ($pubs && !($pubs['verbale_stato'] === 'firmato' || $pubs['origine'] === 'imp
                 <select class="form-select" id="iCons" name="consiglio_id">
                     <?php if ($puo_didattica_tutto): ?><option value="0">— nessuno (scrivo l'organo qui sotto) —</option><?php endif; ?>
                     <?php foreach ($consigli_vis as $k => $c): ?><option value="<?php echo $k; ?>"<?php echo (int)$imp['consiglio_id'] === $k ? ' selected' : ''; ?>><?php echo $h(mb_strimwidth($c['nome'], 0, 150, '…')); ?></option><?php endforeach; ?>
+                    <?php if ($organi_arch): ?><optgroup label="Altri organi (commissioni, riesame, studenti…)"><?php foreach ($organi_arch as $o_s): ?><option value="o<?php echo (int)$o_s['id']; ?>"<?php echo (int)$imp['organo_id'] === (int)$o_s['id'] ? ' selected' : ''; ?>><?php echo $h(mb_strimwidth($o_s['nome'], 0, 150, '…')); ?></option><?php endforeach; ?></optgroup><?php endif; ?>
                 </select></div>
             <div class="col-md-4"><label class="form-label small fw-bold" for="iNum">Verbale n.</label><input class="form-control" id="iNum" name="numero_verbale" maxlength="10" value="<?php echo $h($imp['numero_verbale']); ?>"></div>
-            <div class="col-12"><label class="form-label small fw-bold" for="iOrg">Organo (solo se non scegli un consiglio)</label><input class="form-control" id="iOrg" name="organo" maxlength="500" value="<?php echo $h($imp['consiglio_id'] ? '' : $imp['organo']); ?>"></div>
+            <div class="col-12"><label class="form-label small fw-bold" for="iOrg">Organo (solo se non scegli un consiglio)</label><input class="form-control" id="iOrg" name="organo" maxlength="500" value="<?php echo $h($imp['consiglio_id'] || $imp['organo_id'] ? '' : $imp['organo']); ?>"></div>
             <div class="col-md-4"><label class="form-label small fw-bold" for="iData">Data della seduta</label><input type="date" class="form-control" id="iData" name="data" value="<?php echo $h($imp['data']); ?>"></div>
             <div class="col-md-4"><label class="form-label small fw-bold" for="iAa">Anno accademico</label><select class="form-select" id="iAa" name="anno_accademico"><option value="">— dalla data —</option><?php foreach (array_unique(array_merge(anni_accademici_scelta(), $imp['anno_accademico'] !== '' ? [$imp['anno_accademico']] : [])) as $a): ?><option<?php echo $a === $imp['anno_accademico'] ? ' selected' : ''; ?>><?php echo $h($a); ?></option><?php endforeach; ?></select></div>
             <div class="col-md-4"><label class="form-label small fw-bold" for="iPdf">Sostituisci il PDF (facoltativo)</label><input type="file" class="form-control" id="iPdf" name="verbale_pdf" accept=".pdf,application/pdf"></div>
@@ -57,7 +60,7 @@ if ($pubs && !($pubs['verbale_stato'] === 'firmato' || $pubs['origine'] === 'imp
         <div class="mt-3 d-flex gap-2"><button type="submit" name="salva_verbale_importato" value="1" class="btn btn-primary fw-bold"><i class="fa fa-save me-1" aria-hidden="true"></i>Salva</button><a class="btn btn-outline-secondary" href="<?php echo $h($url_arch); ?>">Annulla</a></div>
     </div></form>
 <?php else:
-    $filtri = ['consiglio' => (int)($_GET['cons'] ?? 0), 'anno_accademico' => (string)($_GET['aa'] ?? ''), 'q' => mb_substr(trim((string)($_GET['q'] ?? '')), 0, 100), 'tipo' => in_array($_GET['tipo'] ?? '', ['portale', 'importato', 'firmato', 'incompleto'], true) ? $_GET['tipo'] : ''];
+    $filtri = ['consiglio' => (int)($_GET['cons'] ?? 0), 'anno_accademico' => (string)($_GET['aa'] ?? ''), 'q' => mb_substr(trim((string)($_GET['q'] ?? '')), 0, 100), 'tipo' => in_array($_GET['tipo'] ?? '', ['portale', 'importato', 'firmato', 'incompleto'], true) ? $_GET['tipo'] : '', 'organo_id' => $puo_didattica_tutto ? (int)($_GET['organo'] ?? 0) : 0];
     if ($filtri['consiglio'] && !isset($consigli_vis[$filtri['consiglio']])) $filtri['consiglio'] = 0;
     $verbali = $rep_sed->archivio($filtri, $solo_ref ? $consigli_referente : null);
     $anni = $rep_sed->anniAccademici();
@@ -70,15 +73,98 @@ if ($pubs && !($pubs['verbale_stato'] === 'firmato' || $pubs['origine'] === 'imp
     </div>
     <p class="small text-secondary mb-3">Tutti i verbali in un posto solo: quelli scritti nel portale e quelli vecchi caricati in PDF. <?php echo $solo_ref ? 'Vedi i verbali dei tuoi consigli.' : "Chi gestisce un consiglio vede i verbali del proprio consiglio, l'Ufficio didattico tutti."; ?></p>
 
+<?php if ($puo_didattica_tutto):
+    $scan_a = \App\Core\App::per($conn)->get(\App\Didattica\ScansioneArchivio::class);
+    $non_coll = $scan_a->nonCollegate();
+    $ultima = $scan_a->ultimoEsito();
+    $organi_tutti = $srv_organi->tutti();
+    $corsi_noti = [];
+    foreach ($consigli as $c_n) { foreach ((array)json_decode((string)($c_n['corsi'] ?? ''), true) as $x_n) { if (is_string($x_n) && $x_n !== '') $corsi_noti[$x_n] = $x_n; } }
+    foreach ($organi_tutti as $o_n) { if ($o_n['corso'] !== '') $corsi_noti[$o_n['corso']] = $o_n['corso']; }
+    $tipi_org = array_map(fn($t) => $t[0], \App\Didattica\OrganiArchivio::TIPI);
+    $e_ult = $ultima['esito'] ?? null;
+?>
+    <details class="card border-0 shadow-sm mb-3" id="organi"<?php echo !empty($_GET['organi']) || $non_coll || !$organi_tutti ? ' open' : ''; ?>>
+        <summary class="card-header bg-white fw-bold small" style="cursor:pointer;"><i class="fa fa-folder-tree me-1 text-primary" aria-hidden="true"></i>Organi e cartelle sul NAS (lettura automatica dei PDF)<?php echo $non_coll ? ' <span class="badge text-bg-warning">' . count($non_coll) . ' cartelle da collegare</span>' : ''; ?></summary>
+        <div class="card-body">
+            <p class="small text-secondary mb-2">Copia le cartelle dei verbali sul NAS dentro <code><?php echo $h(\App\Didattica\Costanti::DIR_VERBALI); ?>archivio/</code> (per esempio <code>Biologia/2019/Verbale_08_2019-03-12.pdf</code> oppure <code>Biologia/Commissione didattica/2020/…</code>). Il portale le legge <strong>da solo ogni ora</strong>, senza copiare i file: li apre dove sono. Ogni cartella appartiene a un organo: se un PDF sta in una sottocartella con un organo suo, vale quello.</p>
+            <form method="POST" class="d-flex flex-wrap gap-2 align-items-center mb-3"><?php csrf_field(); ?>
+                <button class="btn btn-sm btn-primary fw-bold" name="scansiona_archivio" value="1"><i class="fa fa-rotate me-1" aria-hidden="true"></i>Scansiona ora</button>
+                <span class="small text-secondary"><?php echo $ultima ? 'Ultima scansione: ' . date('d/m/Y H:i', strtotime((string)$ultima['quando'])) . ' — ' . (int)$e_ult['trovati'] . ' PDF trovati, ' . (int)$e_ult['nuovi'] . ' nuovi, ' . (int)$e_ult['rimossi'] . ' tolti' . ((int)$e_ult['restanti'] ? ', ' . (int)$e_ult['restanti'] . ' ancora da leggere' : '') . '.' : 'Non è ancora stata fatta una scansione.'; ?></span>
+            </form>
+            <?php foreach (array_slice((array)($e_ult['errori'] ?? []), 0, 8) as $er): ?><div class="alert alert-danger small py-1 mb-1"><?php echo $h($er); ?></div><?php endforeach; ?>
+            <?php foreach (array_slice((array)($e_ult['avvisi'] ?? []), 0, 5) as $er): ?><div class="alert alert-warning small py-1 mb-1"><?php echo $h($er); ?></div><?php endforeach; ?>
+
+            <?php if ($non_coll): ?>
+                <h3 class="h6 fw-bold mt-3"><i class="fa fa-circle-question me-1 text-warning" aria-hidden="true"></i>Cartelle trovate sul NAS da collegare a un organo</h3>
+                <?php foreach ($non_coll as $cart_n => $n_pdf): ?>
+                    <form method="POST" class="row g-2 align-items-end border rounded p-2 mb-2 bg-light"><?php csrf_field(); ?>
+                        <input type="hidden" name="cartella" value="<?php echo $h($cart_n); ?>">
+                        <div class="col-lg-3"><div class="small fw-bold"><i class="fa fa-folder me-1" aria-hidden="true"></i><?php echo $cart_n === '' ? '(file sparsi nella cartella principale)' : $h($cart_n); ?></div><div class="small text-secondary"><?php echo (int)$n_pdf; ?> PDF</div></div>
+                        <?php if ($cart_n === ''): ?><div class="col small text-secondary">Metti i PDF dentro una cartella (per corso e organo): quelli sparsi nella cartella principale non si possono assegnare.</div>
+                        <?php else: ?>
+                        <div class="col-lg-3"><label class="form-label small mb-0">Appartiene a</label>
+                            <select class="form-select form-select-sm" name="scelta" aria-label="Organo di <?php echo $h($cart_n); ?>">
+                                <option value="nuovo">Un organo nuovo…</option>
+                                <?php foreach ($consigli as $c_n): if ((string)($c_n['cartella_archivio'] ?? '') !== '') continue; ?><option value="c<?php echo (int)$c_n['id']; ?>">Consiglio: <?php echo $h(mb_strimwidth($c_n['nome'], 0, 70, '…')); ?></option><?php endforeach; ?>
+                                <?php foreach ($organi_tutti as $o_n): if ($o_n['cartella'] !== '') continue; ?><option value="o<?php echo (int)$o_n['id']; ?>"><?php echo $h(mb_strimwidth($o_n['nome'], 0, 70, '…')); ?></option><?php endforeach; ?>
+                            </select></div>
+                        <div class="col-lg-3"><label class="form-label small mb-0">Se nuovo: nome</label><input class="form-control form-control-sm" name="nome" maxlength="300" value="<?php echo $h(basename($cart_n)); ?>"></div>
+                        <div class="col-lg-2"><label class="form-label small mb-0">Tipo</label><select class="form-select form-select-sm" name="tipo"><?php foreach ($tipi_org as $k_t => $n_t): ?><option value="<?php echo $h($k_t); ?>"><?php echo $h($n_t); ?></option><?php endforeach; ?></select></div>
+                        <input type="hidden" name="corso" value="">
+                        <div class="col-lg-1"><button class="btn btn-sm btn-primary fw-bold w-100" name="collega_cartella" value="1">Collega</button></div>
+                        <?php endif; ?>
+                    </form>
+                <?php endforeach; ?>
+            <?php endif; ?>
+
+            <h3 class="h6 fw-bold mt-3">Consigli (verbali anche scritti nel portale)</h3>
+            <?php foreach ($consigli as $c_n): ?>
+                <form method="POST" class="row g-2 align-items-center mb-1"><?php csrf_field(); ?>
+                    <div class="col-lg-6 small"><?php echo $h(mb_strimwidth($c_n['nome'], 0, 120, '…')); ?></div>
+                    <div class="col-lg-5"><input class="form-control form-control-sm" name="cartella" maxlength="300" value="<?php echo $h($c_n['cartella_archivio'] ?? ''); ?>" placeholder="cartella sul NAS, per esempio Biologia" aria-label="Cartella del consiglio"></div>
+                    <div class="col-lg-1"><button class="btn btn-sm btn-outline-primary w-100" name="cartella_consiglio" value="<?php echo (int)$c_n['id']; ?>">Salva</button></div>
+                </form>
+            <?php endforeach; ?>
+            <?php if (!$consigli): ?><div class="small text-secondary">Nessun consiglio.</div><?php endif; ?>
+
+            <h3 class="h6 fw-bold mt-3">Altri organi (commissione didattica, gruppo di riesame, riunioni con gli studenti…)</h3>
+            <datalist id="dlCorsi"><?php foreach ($corsi_noti as $c_k): ?><option value="<?php echo $h($c_k); ?>"><?php endforeach; ?></datalist>
+            <?php foreach (array_merge($organi_tutti, [['id' => 0, 'nome' => '', 'tipo' => 'commissione', 'corso' => '', 'cartella' => '', 'n_verbali' => 0]]) as $o_n): $nuovo_o = !(int)$o_n['id']; ?>
+                <form method="POST" class="row g-2 align-items-end <?php echo $nuovo_o ? 'border rounded p-2 bg-light mt-2' : 'mb-2'; ?>"><?php csrf_field(); ?><input type="hidden" name="id" value="<?php echo (int)$o_n['id']; ?>">
+                    <div class="col-lg-3"><label class="form-label small mb-0"><?php echo $nuovo_o ? 'Nuovo organo: nome' : 'Nome'; ?></label><input class="form-control form-control-sm" name="nome" maxlength="300" required value="<?php echo $h($o_n['nome']); ?>"></div>
+                    <div class="col-lg-2"><label class="form-label small mb-0">Tipo</label><select class="form-select form-select-sm" name="tipo"><?php foreach ($tipi_org as $k_t => $n_t): ?><option value="<?php echo $h($k_t); ?>"<?php echo $o_n['tipo'] === $k_t ? ' selected' : ''; ?>><?php echo $h($n_t); ?></option><?php endforeach; ?></select></div>
+                    <div class="col-lg-2"><label class="form-label small mb-0">Corso di studi</label><input class="form-control form-control-sm" name="corso" list="dlCorsi" maxlength="300" value="<?php echo $h($o_n['corso']); ?>"></div>
+                    <div class="col-lg-3"><label class="form-label small mb-0">Cartella sul NAS</label><input class="form-control form-control-sm" name="cartella" maxlength="300" value="<?php echo $h($o_n['cartella']); ?>" placeholder="Biologia/Commissione didattica"></div>
+                    <div class="col-lg-2 d-flex gap-1">
+                        <button class="btn btn-sm btn-primary fw-bold flex-fill" name="salva_organo" value="1"><?php echo $nuovo_o ? 'Aggiungi' : 'Salva'; ?></button>
+                        <?php if (!$nuovo_o): ?><a class="btn btn-sm btn-outline-secondary" href="<?php echo $h($url_arch); ?>&amp;organo=<?php echo (int)$o_n['id']; ?>" title="Vedi i verbali di questo organo"><?php echo (int)$o_n['n_verbali']; ?></a>
+                        <button class="btn btn-sm btn-outline-danger" name="elimina_organo" value="<?php echo (int)$o_n['id']; ?>" data-confirm="Eliminare questo organo?" title="Elimina"><i class="fa fa-trash" aria-hidden="true"></i><span class="visually-hidden">Elimina</span></button><?php endif; ?>
+                    </div>
+                </form>
+            <?php endforeach; ?>
+
+            <form method="POST" class="row g-2 align-items-end border rounded p-2 bg-light mt-3"><?php csrf_field(); ?>
+                <div class="col-12 small fw-bold">Crea in un colpo i tre organi di un corso di studi</div>
+                <div class="col-lg-5"><label class="form-label small mb-0">Corso di studi</label><input class="form-control form-control-sm" name="corso" list="dlCorsi" maxlength="300" required placeholder="Corso di laurea in Biologia"></div>
+                <div class="col-lg-4"><label class="form-label small mb-0">Cartella del corso sul NAS</label><input class="form-control form-control-sm" name="cartella_corso" maxlength="300" placeholder="Biologia (le tre cartelle ci vanno dentro)"></div>
+                <div class="col-lg-3"><button class="btn btn-sm btn-outline-primary fw-bold w-100" name="crea_organi_standard" value="1">Crea i tre organi</button></div>
+                <div class="col-12 small text-secondary">Commissione didattica, Gruppo di riesame – Assicurazione della Qualità e Riunione con gli studenti, con le cartelle «Corso/Commissione didattica», «Corso/Gruppo di riesame» e «Corso/Riunioni con gli studenti».</div>
+            </form>
+        </div>
+    </details>
+<?php endif; ?>
+
     <details class="card border-0 shadow-sm mb-3" id="importa"<?php echo !empty($_GET['importa']) || !$verbali ? ' open' : ''; ?>>
         <summary class="card-header bg-white fw-bold small" style="cursor:pointer;"><i class="fa fa-file-import me-1 text-primary" aria-hidden="true"></i>Aggiungi verbali vecchi (PDF)</summary>
         <form class="card-body" id="fImporta" onsubmit="return false;">
             <?php csrf_field(); ?>
             <div class="row g-2">
-                <div class="col-md-7"><label class="form-label small fw-bold" for="mCons">Consiglio dei verbali <?php echo $solo_ref ? '<span class="text-danger">*</span>' : ''; ?></label>
+                <div class="col-md-7"><label class="form-label small fw-bold" for="mCons">Consiglio o organo dei verbali <?php echo $solo_ref ? '<span class="text-danger">*</span>' : ''; ?></label>
                     <select class="form-select" id="mCons" name="consiglio_id">
                         <?php if (!$solo_ref): ?><option value="0">— nessuno (scrivo l'organo qui sotto) —</option><?php endif; ?>
                         <?php foreach ($consigli_vis as $k => $c): ?><option value="<?php echo $k; ?>"<?php echo $filtri['consiglio'] === $k ? ' selected' : ''; ?>><?php echo $h(mb_strimwidth($c['nome'], 0, 150, '…')); ?></option><?php endforeach; ?>
+                        <?php if ($organi_arch): ?><optgroup label="Altri organi (commissioni, riesame, studenti…)"><?php foreach ($organi_arch as $o_s): ?><option value="o<?php echo (int)$o_s['id']; ?>"<?php echo $filtri['organo_id'] === (int)$o_s['id'] ? ' selected' : ''; ?>><?php echo $h(mb_strimwidth($o_s['nome'], 0, 150, '…')); ?></option><?php endforeach; ?></optgroup><?php endif; ?>
                     </select></div>
                 <div class="col-md-5"><label class="form-label small fw-bold" for="mAa">Anno accademico</label>
                     <select class="form-select" id="mAa" name="anno_accademico"><option value="">— lo ricavo da cartella, nome file o data —</option><?php foreach (anni_accademici_scelta() as $a): ?><option><?php echo $h($a); ?></option><?php endforeach; ?></select></div>
@@ -100,6 +186,7 @@ if ($pubs && !($pubs['verbale_stato'] === 'firmato' || $pubs['origine'] === 'imp
         <input type="hidden" name="p_id" value="<?php echo (int)$filtro_p; ?>"><input type="hidden" name="tab" value="sedute"><input type="hidden" name="archivio" value="1">
         <div style="min-width:240px;flex:1;"><label class="form-label small fw-bold mb-0" for="fQ">Cerca</label><input class="form-control form-control-sm" id="fQ" name="q" value="<?php echo $h($filtri['q']); ?>" placeholder="una parola nel verbale, il numero…"></div>
         <div><label class="form-label small fw-bold mb-0" for="fC">Consiglio</label><select class="form-select form-select-sm" id="fC" name="cons" style="max-width:260px;"><option value="0">Tutti</option><?php foreach ($consigli_vis as $k => $c): ?><option value="<?php echo $k; ?>"<?php echo $filtri['consiglio'] === $k ? ' selected' : ''; ?>><?php echo $h(mb_strimwidth($c['nome'], 0, 60, '…')); ?></option><?php endforeach; ?></select></div>
+        <?php if ($organi_arch): ?><div><label class="form-label small fw-bold mb-0" for="fO">Altro organo</label><select class="form-select form-select-sm" id="fO" name="organo" style="max-width:260px;"><option value="0">Nessuno</option><?php foreach ($organi_arch as $o_s): ?><option value="<?php echo (int)$o_s['id']; ?>"<?php echo $filtri['organo_id'] === (int)$o_s['id'] ? ' selected' : ''; ?>><?php echo $h(mb_strimwidth($o_s['nome'], 0, 60, '…')); ?></option><?php endforeach; ?></select></div><?php endif; ?>
         <div><label class="form-label small fw-bold mb-0" for="fA">Anno accademico</label><select class="form-select form-select-sm" id="fA" name="aa"><option value="">Tutti</option><?php foreach ($anni as $a): ?><option<?php echo $filtri['anno_accademico'] === $a ? ' selected' : ''; ?>><?php echo $h($a); ?></option><?php endforeach; ?></select></div>
         <div><label class="form-label small fw-bold mb-0" for="fT">Mostra</label><select class="form-select form-select-sm" id="fT" name="tipo"><?php foreach (['' => 'Tutti', 'portale' => 'Scritti nel portale', 'importato' => 'Importati (PDF)', 'firmato' => 'Firmati', 'incompleto' => 'Da completare'] as $k => $n): ?><option value="<?php echo $k; ?>"<?php echo $filtri['tipo'] === $k ? ' selected' : ''; ?>><?php echo $h($n); ?></option><?php endforeach; ?></select></div>
         <button class="btn btn-sm btn-primary fw-bold" type="submit"><i class="fa fa-magnifying-glass me-1" aria-hidden="true"></i>Filtra</button>
@@ -117,7 +204,7 @@ if ($pubs && !($pubs['verbale_stato'] === 'firmato' || $pubs['origine'] === 'imp
                     <td><?php echo $x['organo'] !== '' ? $h(mb_strimwidth($x['organo'], 0, 130, '…')) : '<span class="text-danger">senza organo</span>'; ?><?php echo $imp_x && $x['nome_originale'] ? '<div class="text-secondary" style="font-size:.72rem;">' . $h($x['nome_originale']) . '</div>' : ''; ?></td>
                     <td><?php echo $h($x['numero_verbale']); ?></td>
                     <td><?php echo $h($x['anno_accademico']); ?></td>
-                    <td><?php if ($imp_x): ?><span class="badge text-bg-light border"><i class="fa fa-file-pdf me-1" aria-hidden="true"></i>importato</span>
+                    <td><?php if ($imp_x): ?><span class="badge text-bg-light border"><i class="fa fa-file-pdf me-1" aria-hidden="true"></i>importato</span><?php if ((int)$x['da_cartella']): ?> <span class="badge text-bg-info" title="Letto dalla cartella dell'archivio sul NAS"><i class="fa fa-hard-drive me-1" aria-hidden="true"></i>NAS</span><?php endif; ?>
                         <?php else: ?><span class="badge text-bg-light border"><i class="fa fa-gavel me-1" aria-hidden="true"></i>portale</span> <?php if ($vs_x && $x['verbale_stato'] !== ''): ?><span class="badge" style="background:<?php echo $vs_x[1]; ?>;"><?php echo $h($x['verbale_stato'] === 'firmato' ? 'firmato' : 'in firma'); ?></span><?php endif; ?><?php endif; ?>
                         <?php if ((int)$x['pubblicabile']): ?><span class="badge text-bg-success" title="Visibile nella pagina pubblica con password"><i class="fa fa-earth-europe me-1" aria-hidden="true"></i>pubblico</span><?php endif; ?></td>
                     <td class="text-end text-nowrap">
@@ -125,7 +212,7 @@ if ($pubs && !($pubs['verbale_stato'] === 'firmato' || $pubs['origine'] === 'imp
                         <?php if ($puo_didattica_tutto && ($x['verbale_stato'] === 'firmato' || $imp_x) && $x['verbale_pdf']): ?><a class="btn btn-sm btn-outline-<?php echo (int)$x['pubblicabile'] ? 'success' : 'secondary'; ?> py-0" href="<?php echo $h($url_arch); ?>&amp;pub=<?php echo (int)$x['id']; ?>" title="Pagina pubblica dei verbali"><i class="fa fa-earth-europe" aria-hidden="true"></i><span class="visually-hidden">Pagina pubblica dei verbali</span></a><?php endif; ?>
                         <?php if ($imp_x): ?>
                             <a class="btn btn-sm btn-outline-secondary py-0" href="<?php echo $h($url_arch); ?>&amp;imp=<?php echo (int)$x['id']; ?>" title="Modifica i dati"><i class="fa fa-pen" aria-hidden="true"></i><span class="visually-hidden">Modifica i dati</span></a>
-                            <form method="POST" class="d-inline"><?php csrf_field(); ?><button type="submit" name="elimina_verbale_importato" value="<?php echo (int)$x['id']; ?>" class="btn btn-sm btn-outline-danger py-0" data-confirm="Togliere questo verbale dall'archivio? Il PDF viene cancellato." title="Elimina"><i class="fa fa-trash" aria-hidden="true"></i><span class="visually-hidden">Elimina</span></button></form>
+                            <?php if (!(int)$x['da_cartella']): ?><form method="POST" class="d-inline"><?php csrf_field(); ?><button type="submit" name="elimina_verbale_importato" value="<?php echo (int)$x['id']; ?>" class="btn btn-sm btn-outline-danger py-0" data-confirm="Togliere questo verbale dall'archivio? Il PDF viene cancellato." title="Elimina"><i class="fa fa-trash" aria-hidden="true"></i><span class="visually-hidden">Elimina</span></button></form><?php endif; ?>
                         <?php else: ?>
                             <a class="btn btn-sm btn-outline-secondary py-0" href="<?php echo $base; ?>&amp;tab=sedute&amp;id=<?php echo (int)$x['id']; ?>" title="Apri la seduta"><i class="fa fa-folder-open" aria-hidden="true"></i><span class="visually-hidden">Apri la seduta</span></a>
                         <?php endif; ?>

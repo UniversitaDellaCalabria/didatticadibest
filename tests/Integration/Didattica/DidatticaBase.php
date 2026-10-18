@@ -163,9 +163,11 @@ abstract class DidatticaBase extends DatabaseDiProva
                   `attivo` tinyint(1) NOT NULL DEFAULT 1,
                   `ordine` int(11) NOT NULL DEFAULT 0,
                   `creato_il` datetime DEFAULT current_timestamp(),
+                  `cartella_archivio` varchar(300) NOT NULL DEFAULT '',
                   PRIMARY KEY (`id`)
                 )
                 SQL,
+            'archivio_organi' => \App\Core\Schema\Definizioni::tabelle()['archivio_organi'],
             'didattica_consigli_persone' => <<<'SQL'
                 CREATE TABLE `didattica_consigli_persone` (
                   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -212,6 +214,9 @@ abstract class DidatticaBase extends DatabaseDiProva
                   `testo_ricerca` mediumtext DEFAULT NULL,
                   `file_hash` varchar(40) DEFAULT NULL,
                   `nome_originale` varchar(255) NOT NULL DEFAULT '',
+                  `organo_id` int(11) DEFAULT NULL,
+                  `da_cartella` tinyint(1) NOT NULL DEFAULT 0,
+                  `cartella_firma` varchar(40) NOT NULL DEFAULT '',
                   PRIMARY KEY (`id`)
                 )
                 SQL,

@@ -61,6 +61,10 @@ final class SedutaRepository
             $dove[] = 's.consiglio_id = ?';
             $par[] = (int) $f['consiglio'];
         }
+        if (!empty($f['organo_id'])) {
+            $dove[] = 's.organo_id = ?';
+            $par[] = (int) $f['organo_id'];
+        }
         if (!empty($f['anno_accademico'])) {
             $dove[] = 's.anno_accademico = ?';
             $par[] = (string) $f['anno_accademico'];
@@ -84,7 +88,7 @@ final class SedutaRepository
         }
 
         return Righe::testo($this->db->righe(
-            'SELECT s.id, s.organo, s.data, s.anno_accademico, s.numero_verbale, s.origine, s.verbale_stato, s.verbale_pdf, s.nome_originale, s.consiglio_id, s.odg, s.pubblicabile, s.verbale_pubblico_pdf
+            'SELECT s.id, s.organo, s.organo_id, s.da_cartella, s.data, s.anno_accademico, s.numero_verbale, s.origine, s.verbale_stato, s.verbale_pdf, s.nome_originale, s.consiglio_id, s.odg, s.pubblicabile, s.verbale_pubblico_pdf
              FROM didattica_sedute s WHERE ' . implode(' AND ', $dove) . ' ORDER BY s.data IS NULL DESC, s.data DESC, s.id DESC LIMIT ' . (int) $limite,
             $par
         ));
@@ -128,18 +132,55 @@ final class SedutaRepository
     public function inserisciImportato(array $f): int
     {
         return $this->db->inserisci(
-            "INSERT INTO didattica_sedute (organo, anno_accademico, data, odg, consiglio_id, numero_verbale, origine, verbale_pdf, nome_originale, file_hash, testo_ricerca)
-             VALUES (?, ?, ?, ?, ?, ?, 'importato', ?, ?, ?, ?)",
-            [$f['organo'], $f['anno_accademico'], $f['data'], $f['odg'] ?? '', $f['consiglio_id'], $f['numero_verbale'], $f['verbale_pdf'], $f['nome_originale'], $f['file_hash'], $f['testo_ricerca']]
+            "INSERT INTO didattica_sedute (organo, anno_accademico, data, odg, consiglio_id, organo_id, numero_verbale, origine, verbale_pdf, nome_originale, file_hash, testo_ricerca, da_cartella, cartella_firma)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 'importato', ?, ?, ?, ?, ?, ?)",
+            [$f['organo'], $f['anno_accademico'], $f['data'], $f['odg'] ?? '', $f['consiglio_id'], $f['organo_id'] ?? null, $f['numero_verbale'], $f['verbale_pdf'], $f['nome_originale'], $f['file_hash'], $f['testo_ricerca'], (int) ($f['da_cartella'] ?? 0), (string) ($f['cartella_firma'] ?? '')]
         );
+    }
+
+    /**
+     * I verbali letti dalla cartella dell'archivio, per percorso del file.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public function daCartella(): array
+    {
+        $out = [];
+        foreach ($this->db->righe('SELECT id, organo, consiglio_id, organo_id, verbale_pdf, cartella_firma, file_hash FROM didattica_sedute WHERE da_cartella = 1') as $r) {
+            $out[(string) $r['verbale_pdf']] = $r;
+        }
+
+        return $out;
+    }
+
+    public function testoRicerca(int $id): ?string
+    {
+        $t = $this->db->valore('SELECT testo_ricerca FROM didattica_sedute WHERE id = ?', [$id]);
+
+        return $t === null ? null : (string) $t;
+    }
+
+    /** Il file di un verbale letto dalla cartella è stato cambiato o spostato: nuovi dati del file (e dell'organo, se cambia). @param array<string, mixed> $f */
+    public function aggiornaDaCartella(int $id, array $f): void
+    {
+        $this->db->esegui(
+            'UPDATE didattica_sedute SET verbale_pdf = ?, nome_originale = ?, file_hash = ?, testo_ricerca = ?, cartella_firma = ?, organo = ?, consiglio_id = ?, organo_id = ? WHERE id = ? AND da_cartella = 1',
+            [$f['verbale_pdf'], $f['nome_originale'], $f['file_hash'], $f['testo_ricerca'], $f['cartella_firma'], $f['organo'], $f['consiglio_id'], $f['organo_id'], $id]
+        );
+    }
+
+    /** Toglie dall'archivio i verbali della cartella i cui file non ci sono più. @param list<int> $ids */
+    public function eliminaDaCartella(array $ids): int
+    {
+        return $ids ? $this->db->esegui('DELETE FROM didattica_sedute WHERE da_cartella = 1 AND id IN (' . implode(',', array_map('intval', $ids)) . ')') : 0;
     }
 
     /** @param array<string, mixed> $f organo, anno_accademico, data, odg, consiglio_id, numero_verbale */
     public function aggiornaImportato(int $id, array $f): void
     {
         $this->db->esegui(
-            "UPDATE didattica_sedute SET organo = ?, anno_accademico = ?, data = ?, odg = ?, consiglio_id = ?, numero_verbale = ? WHERE id = ? AND origine = 'importato'",
-            [$f['organo'], $f['anno_accademico'], $f['data'], $f['odg'], $f['consiglio_id'], $f['numero_verbale'], $id]
+            "UPDATE didattica_sedute SET organo = ?, anno_accademico = ?, data = ?, odg = ?, consiglio_id = ?, organo_id = ?, numero_verbale = ? WHERE id = ? AND origine = 'importato'",
+            [$f['organo'], $f['anno_accademico'], $f['data'], $f['odg'], $f['consiglio_id'], $f['organo_id'] ?? null, $f['numero_verbale'], $id]
         );
     }
 

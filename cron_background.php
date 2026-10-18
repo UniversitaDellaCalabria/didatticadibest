@@ -151,6 +151,15 @@ echo \App\Core\App::get(\App\ConvenzioniTesi\ServizioConvenzioniTesi::class)->cr
 echo $cron->controlloPortale();
 
 // =========================================================================
+// TASK 1l: ARCHIVIO VERBALI dalla cartella sul NAS (uploads/verbali/archivio/): nuovi PDF letti, cambiati riletti, tolti quelli spariti; al massimo una volta all'ora
+// =========================================================================
+try {
+    echo \App\Core\App::get(\App\Didattica\ScansioneArchivio::class)->cron();
+} catch (\Throwable $e) {
+    error_log('Cron, archivio verbali: ' . $e->getMessage());
+}
+
+// =========================================================================
 // TASK 1f: ANAGRAFE DEL PERSONALE E CORSI DI STUDIO (API del portale di Ateneo), una volta a settimana
 // =========================================================================
 echo $cron->anagrafeAteneo();
