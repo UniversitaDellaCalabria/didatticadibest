@@ -89,16 +89,17 @@ echo '<meta name="robots" content="noindex, nofollow, noarchive">';
         .vp-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; align-items: start; }
         @media (max-width: 767px) { .vp-grid { grid-template-columns: 1fr; } }
         .vp-card { background: #fff; border-radius: .6rem; box-shadow: 0 1px 6px rgba(0,0,0,.09); overflow: hidden; }
-        .vp-card > header { padding: .9rem 1.1rem .7rem; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
-        .vp-card h3 { font-size: 1.15rem; font-weight: 700; margin: 0; flex: 1 1 auto; }
-        .vp-ultimo { font-size: .78rem; color: #5c6f82; width: 100%; }
-        .vp-aa > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: .6rem; padding: .75rem 1.1rem; font-size: 1.2rem; font-weight: 700; color: #17324d; border-bottom: 1px solid #eef1f4; }
+        .vp-card > header { padding: 1rem 1.2rem .9rem; background: #8e0f1f; border-bottom: 5px solid #5a0a14; color: #fff; display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+        .vp-card h3 { font-size: 1.55rem; line-height: 1.2; font-weight: 800; margin: 0; flex: 1 1 auto; color: #fff; }
+        .vp-card header .badge { background: rgba(255,255,255,.18) !important; color: #fff !important; border: 1px solid rgba(255,255,255,.45) !important; font-size: .8rem; }
+        .vp-ultimo { font-size: .8rem; color: rgba(255,255,255,.85); width: 100%; }
+        .vp-aa > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: .55rem; padding: .55rem 1.2rem; font-size: 1rem; font-weight: 600; color: #3d4852; background: #f7f8fa; border-bottom: 1px solid #e3e7ec; }
         .vp-aa > summary::-webkit-details-marker { display: none; }
-        .vp-aa > summary .vp-freccia { transition: transform .15s; color: #0066cc; font-size: .95rem; }
+        .vp-aa > summary .vp-freccia { transition: transform .15s; color: #8e0f1f; font-size: .8rem; }
         .vp-aa[open] > summary .vp-freccia { transform: rotate(90deg); }
-        .vp-aa > summary:hover { background: #f3f7fb; }
-        .vp-aa > summary .badge { font-size: .8rem; font-weight: 600; }
-        .vp-lista a { display: flex; align-items: center; gap: .6rem; padding: .55rem 1.1rem .55rem 1.6rem; border-bottom: 1px solid #f0f2f5; text-decoration: none; }
+        .vp-aa > summary:hover { background: #eef1f5; }
+        .vp-aa > summary .badge { font-size: .75rem; font-weight: 600; }
+        .vp-lista a { display: flex; align-items: center; gap: .6rem; padding: .6rem 1.2rem .6rem 1.8rem; border-bottom: 1px solid #f0f2f5; text-decoration: none; }
         .vp-lista a:hover { background: #f8fafc; }
         .vp-lista .vp-nome { flex: 1 1 auto; }
         .vp-lista .vp-scarica { font-size: .85rem; white-space: nowrap; }
@@ -121,7 +122,7 @@ echo '<meta name="robots" content="noindex, nofollow, noarchive">';
                 <article class="vp-card" aria-label="<?php echo $h($nome_organo); ?>">
                     <header>
                         <h3><?php echo $h($nome_organo); ?></h3>
-                        <span class="badge text-bg-light border fw-normal"><?php echo $n_org; ?> verbali</span>
+                        <span class="badge fw-normal"><?php echo $n_org; ?> verbali</span>
                         <?php if ($ultimo): ?><span class="vp-ultimo">Ultimo verbale: <?php echo date('d/m/Y', strtotime($ultimo)); ?></span><?php endif; ?>
                     </header>
                     <?php foreach ($anni as $anno => $lista): ?>
