@@ -181,9 +181,14 @@ if ($fase === 'azioni') {
             $cart = \App\Didattica\OrganiArchivio::cartella((string)($_POST['cartella'] ?? ''));
             $sc = (string)($_POST['scelta'] ?? 'nuovo');
             if ($cart === '') $err = 'Cartella non valida.';
+            elseif ($sc === '') $err = 'Scegli di quale organo sono i verbali di questa cartella (o «Un organo nuovo»).';
             elseif (preg_match('/^c(\d+)$/', $sc, $mc)) $err = $org_s->cartellaConsiglio((int)$mc[1], $cart);
             elseif (preg_match('/^o(\d+)$/', $sc, $mo2) && ($og = $org_s->perId((int)$mo2[1]))) $err = $org_s->salva((int)$og['id'], (string)$og['nome'], (string)$og['tipo'], (string)$og['corso'], $cart, (string)$og['tipo_nome']);
-            else { [$tp_o, $tn_o] = \App\Didattica\OrganiArchivio::risolviTipo((string)($_POST['tipo'] ?? 'altro'), (string)($_POST['tipo_nuovo'] ?? '')); $err = $org_s->salva(0, (string)($_POST['nome'] ?? '') !== '' ? (string)$_POST['nome'] : basename($cart), $tp_o, (string)($_POST['corso'] ?? ''), $cart, $tn_o); }
+            else { [$tp_o, $tn_o] = \App\Didattica\OrganiArchivio::risolviTipo((string)($_POST['tipo'] ?? 'altro'), (string)($_POST['tipo_nuovo'] ?? '')); $corso_in = trim((string)($_POST['corso'] ?? ''));
+                if ($corso_in === '' && ($mp = \App\Didattica\ScansioneArchivio::trova($scan_s->mappe(), dirname($cart) === '.' ? '' : dirname($cart)))) { // il corso è quello della cartella principale
+                    $corso_in = $mp['organo_id'] ? (string)($org_s->perId((int)$mp['organo_id'])['corso'] ?? '') : (string)$mp['nome'];
+                }
+                $err = $org_s->salva(0, (string)($_POST['nome'] ?? '') !== '' ? (string)$_POST['nome'] : basename($cart), $tp_o, $corso_in, $cart, $tn_o); }
             if (!$err) {
                 $r = $scan_s->eseguiERicorda(60);
                 registra_log_audit($conn, "Archivio verbali: cartella collegata", ["Cartella" => $cart, "Nuovi" => $r['nuovi']]);

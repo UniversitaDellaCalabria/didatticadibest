@@ -101,15 +101,15 @@ $db->query('DELETE FROM archivio_organi');
 $db->query("UPDATE didattica_consigli SET cartella_archivio = ''");
 @unlink('cache/archivio_scansione.json');
 
-titolo('Cartelle da collegare');
+titolo('non ancora assegnate a un organo');
 pdf('Biologia/2019/Verbale_08_2019-03-12.pdf');
 pdf('Biologia/Commissione didattica/2020/Verbale_2_2020-05-05.pdf');
 pdf('Biologia/Gruppo di riesame/2021-2022/Riesame_2022-01-20.pdf');
 pdf('Biologia/Riunioni con gli studenti/Incontro_2021-04-01.pdf');
 pdf('Chimica/2021/Verbale_1_2021-02-02.pdf');
 $h = $admin->vai($P);
-prova('la pagina dell\'archivio si apre con la sezione Organi', $admin->codice === 200 && str_contains($h, 'Organi e cartelle sul NAS'), 'HTTP ' . $admin->codice);
-prova('segnala le cartelle trovate da collegare', str_contains($h, 'Cartelle trovate sul NAS da collegare') && str_contains($h, 'Chimica') && str_contains($h, 'Biologia/Commissione didattica'));
+prova('la pagina dell\'archivio si apre con la sezione Organi', $admin->codice === 200 && str_contains($h, 'Organi per corso di studi'), 'HTTP ' . $admin->codice);
+prova('segnala le cartelle trovate da collegare', str_contains($h, 'non ancora assegnate a un organo') && str_contains($h, 'Chimica') && str_contains($h, 'Biologia/Commissione didattica'));
 prova('il portale non ha ancora importato nulla', (int) q('SELECT COUNT(*) n FROM didattica_sedute WHERE da_cartella = 1')['n'] === 0);
 
 titolo('Organi di un corso');
@@ -130,7 +130,7 @@ prova('importati i 4 PDF collegati (non Chimica)', $n === 4, "importati: $n");
 prova('ogni PDF ha il suo organo', (int) q("SELECT COUNT(*) n FROM didattica_sedute WHERE da_cartella = 1 AND organo LIKE 'Commissione didattica%'")['n'] === 1
     && (int) q("SELECT COUNT(*) n FROM didattica_sedute WHERE da_cartella = 1 AND consiglio_id = " . (int) $cons['id'])['n'] === 1
     && (int) q("SELECT COUNT(*) n FROM didattica_sedute WHERE da_cartella = 1 AND organo LIKE 'Riunione con gli studenti%'")['n'] === 1);
-prova('Chimica resta da collegare', str_contains($h, 'Chimica') && str_contains($h, 'Cartelle trovate sul NAS da collegare'));
+prova('Chimica resta da collegare', str_contains($h, 'Chimica') && str_contains($h, 'non ancora assegnate a un organo'));
 $id_comm = (int) q("SELECT id FROM archivio_organi WHERE tipo = 'commissione'")['id'];
 $hf = $admin->vai($P . '&organo=' . $id_comm);
 prova('filtro per organo', str_contains($hf, 'Verbale_2_2020-05-05.pdf') && !str_contains($hf, 'Incontro_2021-04-01.pdf'));
@@ -146,7 +146,7 @@ prova('dal web non si raggiunge direttamente', !str_starts_with($h, '%PDF'));
 titolo('Collegare una cartella nuova');
 $admin->invia($P, ['collega_cartella' => 1, 'cartella' => 'Chimica', 'scelta' => 'nuovo', 'nome' => 'Consiglio di corso di studi in Chimica', 'tipo' => 'altro']);
 $h = $admin->vai($P);
-prova('creato l\'organo e letto il PDF', (int) q("SELECT COUNT(*) n FROM didattica_sedute WHERE da_cartella = 1 AND organo = 'Consiglio di corso di studi in Chimica'")['n'] === 1 && !str_contains($h, 'Cartelle trovate sul NAS da collegare'));
+prova('creato l\'organo e letto il PDF', (int) q("SELECT COUNT(*) n FROM didattica_sedute WHERE da_cartella = 1 AND organo = 'Consiglio di corso di studi in Chimica'")['n'] === 1 && !str_contains($h, 'non ancora assegnate a un organo'));
 
 titolo('Modifiche sul NAS');
 unlink('uploads/verbali/archivio/Chimica/2021/Verbale_1_2021-02-02.pdf');
@@ -157,7 +157,7 @@ prova('dal portale non si cancella un file del NAS', is_file('uploads/verbali/ar
 
 titolo('Permessi');
 $hr = $referente->vai($P);
-prova('chi non gestisce la Didattica non vede gli organi e le cartelle', !str_contains($hr, 'Organi e cartelle sul NAS'));
+prova('chi non gestisce la Didattica non vede gli organi e le cartelle', !str_contains($hr, 'Organi per corso di studi'));
 $referente->invia($P, ['scansiona_archivio' => 1]);
 prova('e non può avviare la scansione', $referente->codice === 403 || (int) q("SELECT COUNT(*) n FROM didattica_sedute WHERE da_cartella = 1")['n'] === 4);
 

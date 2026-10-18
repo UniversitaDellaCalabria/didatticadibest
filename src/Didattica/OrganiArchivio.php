@@ -17,6 +17,7 @@ final class OrganiArchivio
     public const TIPI = [
         'consiglio'   => ['Consiglio di corso di studi', 'Consiglio'],
         'commissione' => ['Commissione didattica', 'Commissione didattica'],
+        'paritetica'  => ['Commissione paritetica', 'Commissione paritetica'],
         'riesame'     => ['Gruppo di riesame – Assicurazione della Qualità', 'Gruppo di riesame'],
         'studenti'    => ['Riunione con gli studenti', 'Riunioni con gli studenti'],
         'altro'       => ['Altro organo', ''],
@@ -24,6 +25,30 @@ final class OrganiArchivio
 
     public function __construct(private Database $db)
     {
+    }
+
+    /** Il tipo che somiglia di più al nome di una cartella («COMMISSIONE_DIDATTICA» → commissione, «Gruppo di riesame» → riesame…). */
+    public static function indovinaTipo(string $nomeCartella): string
+    {
+        $n = mb_strtolower(str_replace(['_', '-', '.'], ' ', $nomeCartella));
+        return match (true) {
+            str_contains($n, 'paritetica') => 'paritetica',
+            str_contains($n, 'riesame') || str_contains($n, 'assicurazione') || (bool) preg_match('/\\baq\\b/u', $n) => 'riesame',
+            str_contains($n, 'welcome') || str_contains($n, 'student') || str_contains($n, 'incontr') => 'studenti',
+            str_contains($n, 'commission') => 'commissione',
+            str_contains($n, 'consiglio') || (bool) preg_match('/\\bc[dl]s\\b|\\bcdl\\b/u', $n) => 'consiglio',
+            default => 'altro',
+        };
+    }
+
+    /** Il nome proposto per un organo nuovo: «Commissione didattica – Corso di Biologia» (o il nome della cartella, bello da leggere). */
+    public static function nomeSuggerito(string $nomeCartella, string $tipo, string $corso): string
+    {
+        $bello = trim(preg_replace('/\\s+/u', ' ', str_replace(['_', '-'], ' ', $nomeCartella)) ?? '');
+        $bello = mb_strtoupper(mb_substr($bello, 0, 1)) . mb_strtolower(mb_substr($bello, 1));
+        $base = isset(self::TIPI[$tipo]) && $tipo !== 'altro' ? self::TIPI[$tipo][0] : $bello;
+
+        return $corso !== '' ? $base . ' – ' . $corso : $base;
     }
 
     /** La cartella come si scrive nel database: barre dritte, niente «..», niente barre ai bordi. */

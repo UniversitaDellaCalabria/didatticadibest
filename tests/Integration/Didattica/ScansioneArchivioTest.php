@@ -200,7 +200,7 @@ final class ScansioneArchivioTest extends DidatticaBase
         $o = $this->servizio(OrganiArchivio::class);
         $tipi = $o->tipiDisponibili();
         $this->assertSame('Consiglio di corso di studi', $tipi['consiglio'], 'il consiglio è tra i tipi predefiniti');
-        $this->assertSame(['consiglio', 'commissione', 'riesame', 'studenti', 'altro'], array_keys($tipi));
+        $this->assertSame(['consiglio', 'commissione', 'paritetica', 'riesame', 'studenti', 'altro'], array_keys($tipi));
 
         $this->assertSame(['riesame', ''], OrganiArchivio::risolviTipo('riesame'));
         $this->assertSame(['altro', 'Comitato di indirizzo'], OrganiArchivio::risolviTipo('@nuovo', ' Comitato di indirizzo '));
@@ -218,6 +218,45 @@ final class ScansioneArchivioTest extends DidatticaBase
         $this->assertNull($o->salva((int) $org['id'], $org['nome'], 'consiglio', 'Biologia', 'Biologia/Comitato', 'avanzo'));
         $this->assertSame('', $o->perId((int) $org['id'])['tipo_nome']);
         $this->assertArrayNotHasKey('x:Comitato di indirizzo', $o->tipiDisponibili());
+    }
+    public function testCorsoDiStudiEFiltroNellArchivio(): void
+    {
+        $this->servizio(OrganiArchivio::class)->creaStandard('Biologia', 'Biologia');
+        $this->pdf('Biologia/2019/Verbale_1_2019-01-10.pdf');
+        $this->pdf('Biologia/Commissione didattica/2020/Verbale_2_2020-02-11.pdf');
+        $this->pdf('Chimica/2021/Verbale_3_2021-02-02.pdf');
+        $this->db->esegui("INSERT INTO archivio_organi (nome, tipo, corso, cartella) VALUES ('Commissione didattica – Chimica', 'commissione', 'Chimica', 'Chimica/Commissione didattica')");
+        $this->pdf('Chimica/Commissione didattica/2021/Verbale_4_2021-03-03.pdf');
+        $this->db->esegui("UPDATE didattica_consigli SET nome = 'Biologia', cartella_archivio = 'Biologia' WHERE id = ?", [$this->cons]);
+        $this->scan->esegui();
+        $arch = $this->servizio(SedutaRepository::class);
+
+        // «Biologia» è il nome del consiglio e il corso degli altri organi: stesso gruppo
+        $righe = $arch->archivio(['corso' => 'Biologia'], null);
+        $this->assertSame(['Verbale_1_2019-01-10.pdf', 'Verbale_2_2020-02-11.pdf'], array_column($righe, 'nome_originale') === [] ? [] : $this->ordinati(array_column($righe, 'nome_originale')));
+        $this->assertSame(['Biologia'], array_values(array_unique(array_column($righe, 'corso'))), 'il corso compare su ogni verbale');
+        $this->assertCount(1, $arch->archivio(['corso' => 'Chimica'], null), 'la Chimica ha solo la commissione: la sua cartella principale non è collegata');
+        $this->assertCount(3, $arch->archivio([], null));
+    }
+
+    /** @param list<string> $v @return list<string> */
+    private function ordinati(array $v): array
+    {
+        sort($v);
+
+        return $v;
+    }
+
+    public function testIndovinaIlTipoDallaCartella(): void
+    {
+        $this->assertSame('commissione', OrganiArchivio::indovinaTipo('COMMISSIONE_DIDATTICA'));
+        $this->assertSame('paritetica', OrganiArchivio::indovinaTipo('Commissione paritetica'));
+        $this->assertSame('riesame', OrganiArchivio::indovinaTipo('Gruppo di Riesame AQ'));
+        $this->assertSame('studenti', OrganiArchivio::indovinaTipo('WELCOME_DAY'));
+        $this->assertSame('consiglio', OrganiArchivio::indovinaTipo('Consiglio di CdS'));
+        $this->assertSame('altro', OrganiArchivio::indovinaTipo('VERBALI_GEOLOGIA'));
+        $this->assertSame('Commissione didattica – Biologia', OrganiArchivio::nomeSuggerito('COMMISSIONE_DIDATTICA', 'commissione', 'Biologia'));
+        $this->assertSame('Verbali geologia', OrganiArchivio::nomeSuggerito('VERBALI_GEOLOGIA', 'altro', ''));
     }
     public function testArchivioNonEliminaIFileDelNas(): void
     {

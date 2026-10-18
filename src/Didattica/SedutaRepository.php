@@ -61,6 +61,11 @@ final class SedutaRepository
             $dove[] = 's.consiglio_id = ?';
             $par[] = (int) $f['consiglio'];
         }
+        if (!empty($f['corso'])) {
+            $dove[] = '(ao.corso = ? OR dc.nome = ?)';
+            $par[] = (string) $f['corso'];
+            $par[] = (string) $f['corso'];
+        }
         if (!empty($f['organo_id'])) {
             $dove[] = 's.organo_id = ?';
             $par[] = (int) $f['organo_id'];
@@ -88,8 +93,8 @@ final class SedutaRepository
         }
 
         return Righe::testo($this->db->righe(
-            'SELECT s.id, s.organo, s.organo_id, s.da_cartella, s.data, s.anno_accademico, s.numero_verbale, s.origine, s.verbale_stato, s.verbale_pdf, s.nome_originale, s.consiglio_id, s.odg, s.pubblicabile, s.verbale_pubblico_pdf
-             FROM didattica_sedute s WHERE ' . implode(' AND ', $dove) . ' ORDER BY s.data IS NULL DESC, s.data DESC, s.id DESC LIMIT ' . (int) $limite,
+            'SELECT s.id, s.organo, s.organo_id, s.da_cartella, s.data, s.anno_accademico, s.numero_verbale, s.origine, s.verbale_stato, s.verbale_pdf, s.nome_originale, s.consiglio_id, s.odg, s.pubblicabile, s.verbale_pubblico_pdf, COALESCE(NULLIF(ao.corso, \'\'), dc.nome, \'\') AS corso
+             FROM didattica_sedute s LEFT JOIN archivio_organi ao ON ao.id = s.organo_id LEFT JOIN didattica_consigli dc ON dc.id = s.consiglio_id WHERE ' . implode(' AND ', $dove) . ' ORDER BY s.data IS NULL DESC, s.data DESC, s.id DESC LIMIT ' . (int) $limite,
             $par
         ));
     }

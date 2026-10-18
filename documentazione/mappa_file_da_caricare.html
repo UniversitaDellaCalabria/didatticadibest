@@ -1173,11 +1173,11 @@ var PACCHETTI = [
   },
   {
     id: "tipi-organo",
-    titolo: "Pacchetto 26 · Archivio verbali: tipi di organo, anche nuovi scritti da te",
+    titolo: "Pacchetto 26 · Archivio verbali: organi raggruppati per corso di studi e tipi di organo",
     stato: "pronto",
     statoTesto: "Pronto da caricare",
     schema: "v78 (una colonna nuova in archivio_organi)",
-    riassunto: "Nel campo «Tipo» degli organi dell'archivio verbali c'è ora anche <strong>Consiglio di corso di studi</strong> (insieme a commissione didattica, gruppo di riesame, riunione con gli studenti e altro organo) e, scegliendo <strong>«➕ Nuovo tipo…»</strong>, si scrive un tipo nuovo (per esempio «Comitato di indirizzo»): da quel momento compare nell'elenco dei tipi per tutti gli altri organi.",
+    riassunto: "<strong>Organi per corso di studi:</strong> nella sezione «Organi per corso di studi e cartelle sul NAS» ogni corso è una scheda con il suo consiglio (cartella principale) e gli altri organi (commissione, riesame, welcome day…, di solito sottocartelle); in «Cartelle da collegare» il portale propone da solo nome e tipo dalla cartella e il corso di quella principale, e nell'elenco dei verbali si vede il corso di ogni verbale e si filtra per <em>Corso di studi</em>. <strong>Tipi:</strong> nel campo «Tipo» degli organi c'è ora anche <strong>Consiglio di corso di studi</strong> e <strong>Commissione paritetica</strong> (insieme a commissione didattica, gruppo di riesame, riunione con gli studenti e altro organo) e, scegliendo <strong>«➕ Nuovo tipo…»</strong>, si scrive un tipo nuovo (per esempio «Comitato di indirizzo»): da quel momento compare nell'elenco dei tipi per tutti gli altri organi.",
     passi: [["Archivio", "Tipi di organo"]],
     cartelle: [
       { cartella: "admin/", file: [
@@ -1185,7 +1185,8 @@ var PACCHETTI = [
         ["admin/didattica_sedute.php", "mod", "Archivio", "salvataggio del tipo scritto a mano"]
       ]},
       { cartella: "src/Didattica/", file: [
-        ["src/Didattica/OrganiArchivio.php", "mod", "Archivio", "tipi predefiniti e tipi scritti a mano"]
+        ["src/Didattica/OrganiArchivio.php", "mod", "Archivio", "tipi predefiniti e tipi scritti a mano; tipo e nome proposti dalla cartella"],
+        ["src/Didattica/SedutaRepository.php", "mod", "Archivio", "corso di studi di ogni verbale e filtro per corso"]
       ]},
       { cartella: "src/Core/Schema/", file: [
         ["src/Core/Schema/Definizioni.php", "mod", "Archivio", "colonna tipo_nome"],
