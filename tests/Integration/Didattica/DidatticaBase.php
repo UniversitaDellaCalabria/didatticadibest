@@ -221,6 +221,7 @@ abstract class DidatticaBase extends DatabaseDiProva
                   `organo_id` int(11) DEFAULT NULL,
                   `da_cartella` tinyint(1) NOT NULL DEFAULT 0,
                   `cartella_firma` varchar(40) NOT NULL DEFAULT '',
+                  `allegati_json` text DEFAULT NULL,
                   PRIMARY KEY (`id`)
                 )
                 SQL,

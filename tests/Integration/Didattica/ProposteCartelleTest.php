@@ -45,8 +45,13 @@ final class ProposteCartelleTest extends DidatticaBase
                 $this->pdf("$c/$o/2019/Verbale_1_2019-01-10.pdf", "$c$o");
             }
         }
-        // un verbale con la cartella degli allegati
-        $this->pdf('VERBALI_GEOLOGIA/CONSIGLIO_CORSO_DI_STUDIO/2020/Verbale_2 allegati/Allegato_1.pdf', 'allegato geologia');
+        // un verbale con la sua cartella di allegati (PDF, Excel…), come nel 2025 del Consiglio di Geologia
+        $cv = 'VERBALI_GEOLOGIA/CONSIGLIO_CORSO_DI_STUDIO/2025/Verb. CCL_02-10-2025/';
+        $this->pdf($cv . 'Verb. CCL_02-10-2025.pdf', 'verbale 2025');
+        $this->pdf($cv . 'ALLEGATO_BOZZA Rapporto.pdf', 'allegato pdf');
+        file_put_contents($this->radice . $cv . 'ALLEGATO_OFA sett 2025.xlsx', 'xlsx');
+        // e un PDF qualunque nella cartella dell'anno (RRC…): resta un verbale da completare
+        $this->pdf('VERBALI_GEOLOGIA/CONSIGLIO_CORSO_DI_STUDIO/2019/RRC_L-34.pdf', 'rapporto');
     }
 
     protected function tearDown(): void
@@ -101,7 +106,7 @@ final class ProposteCartelleTest extends DidatticaBase
         $cons = $this->proposta($p, 'VERBALI_GEOLOGIA/CONSIGLIO_CORSO_DI_STUDIO');
         $this->assertSame('consiglio', $cons['azione']);
         $this->assertStringContainsString('Scienze Geologiche', $cons['nome']);
-        $this->assertSame(2, $cons['n_pdf'], 'comprende il verbale con gli allegati');
+        $this->assertSame(4, $cons['n_pdf'], '1 verbale del 2019, il RRC, il verbale 2025 e il suo allegato PDF');
 
         $com = $this->proposta($p, 'VERBALI_GEOLOGIA/COMMISSIONE_DIDATTICA');
         $this->assertSame(['nuovo', 'commissione'], [$com['azione'], $com['tipo']]);
@@ -120,26 +125,52 @@ final class ProposteCartelleTest extends DidatticaBase
         $this->assertSame(15, (int) $this->db->valore('SELECT COUNT(*) FROM archivio_organi'));
 
         $r = $this->scan->esegui(100);
-        $this->assertSame(['VERBALI_GEOLOGIA/CONSIGLIO_CORSO_DI_STUDIO/2020/Verbale_2 allegati' => 1], $r['allegati'], 'il PDF nella cartella degli allegati non è un verbale');
+        $this->assertSame([[], []], [$r['allegati'], $r['senza_verbale']]);
         $per = $this->db->righe('SELECT organo, COUNT(*) n FROM didattica_sedute WHERE da_cartella = 1 GROUP BY organo');
-        $this->assertSame(20, array_sum(array_column($per, 'n')), 'un verbale per organo di ogni corso; gli allegati non diventano verbali');
+        $this->assertSame(22, array_sum(array_column($per, 'n')), '20 verbali del 2019 + il RRC + il verbale 2025; gli allegati non diventano verbali');
+        $v = $this->db->riga("SELECT * FROM didattica_sedute WHERE nome_originale = 'Verb. CCL_02-10-2025.pdf'");
+        $this->assertSame(['2025-10-02', '2025/2026'], [$v['data'], $v['anno_accademico']]);
+        $all = json_decode((string) $v['allegati_json'], true);
+        $this->assertSame(['ALLEGATO_BOZZA Rapporto.pdf', 'ALLEGATO_OFA sett 2025.xlsx'], array_column($all, 'n'), 'gli allegati del verbale, anche Excel');
+        $this->assertStringStartsWith($this->cartellaVerbali . 'archivio/VERBALI_GEOLOGIA/', $all[0]['p']);
+        $this->assertSame(1, (int) $this->db->valore("SELECT COUNT(*) FROM didattica_sedute WHERE nome_originale = 'RRC_L-34.pdf'"));
+        // un allegato nuovo nella cartella del verbale: la scansione successiva lo aggiunge
+        file_put_contents($this->radice . 'VERBALI_GEOLOGIA/CONSIGLIO_CORSO_DI_STUDIO/2025/Verb. CCL_02-10-2025/ALLEGATO_Tirocini.xlsx', 'x');
+        $r = $this->scan->esegui(100);
+        $this->assertSame(1, $r['allegati_aggiornati']);
+        $this->assertCount(3, json_decode((string) $this->db->valore("SELECT allegati_json FROM didattica_sedute WHERE nome_originale = 'Verb. CCL_02-10-2025.pdf'"), true));
         // il verbale di Geologia: i dati del consiglio, non di un organo nuovo
-        $this->assertSame(1, (int) $this->db->valore("SELECT COUNT(*) FROM didattica_sedute s JOIN didattica_consigli c ON c.id = s.consiglio_id WHERE c.nome LIKE '%Scienze Geologiche%' AND s.da_cartella = 1"));
+        $this->assertSame(3, (int) $this->db->valore("SELECT COUNT(*) FROM didattica_sedute s JOIN didattica_consigli c ON c.id = s.consiglio_id WHERE c.nome LIKE '%Scienze Geologiche%' AND s.da_cartella = 1"), 'verbale 2019, RRC e verbale 2025');
     }
 
-    public function testAllegatiNonSonoVerbali(): void
+    public function testRegoleDelleCartelleDeiVerbali(): void
     {
-        $o = ['cartella' => 'Biologia'];
-        $this->assertFalse(ScansioneArchivio::eAllegato('Biologia/2019/Verbale_1.pdf', $o));
-        $this->assertFalse(ScansioneArchivio::eAllegato('Biologia/Verbale_1.pdf', $o));
-        $this->assertFalse(ScansioneArchivio::eAllegato('Biologia/2019-2020/Verbale_1.pdf', $o));
-        $this->assertTrue(ScansioneArchivio::eAllegato('Biologia/2019/Allegato_1_verbale.pdf', $o), 'nome che comincia per Allegato');
-        $this->assertTrue(ScansioneArchivio::eAllegato('Biologia/2019/Verbale 3 allegati/doc.pdf', $o), 'cartella degli allegati');
-        $this->assertTrue(ScansioneArchivio::eAllegato('Biologia/Commissione/2019/v.pdf', $o), 'sottocartella non anno: se è un organo si collega a parte');
+        $this->assertNull(ScansioneArchivio::cartellaVerbale('Biologia/2019/Verbale_1.pdf', 'Biologia'));
+        $this->assertNull(ScansioneArchivio::cartellaVerbale('Biologia/Verbale_1.pdf', 'Biologia'));
+        $this->assertNull(ScansioneArchivio::cartellaVerbale('Biologia/2019-2020/Verbale_1.pdf', 'Biologia'));
+        $this->assertSame('Biologia/2025/Verb. CCL_02-10-2025', ScansioneArchivio::cartellaVerbale('Biologia/2025/Verb. CCL_02-10-2025/Verb. CCL_02-10-2025.pdf', 'Biologia'));
+        $this->assertSame('Biologia/2025/Verb. CCL_02-10-2025', ScansioneArchivio::cartellaVerbale('Biologia/2025/Verb. CCL_02-10-2025/Altri/doc.pdf', 'Biologia'), 'le sottocartelle sono ancora allegati dello stesso verbale');
+        $this->assertSame('Biologia/Verbale 3', ScansioneArchivio::cartellaVerbale('Biologia/Verbale 3/v.pdf', 'Biologia'), 'cartella del verbale subito sotto l\'organo');
+
+        $this->assertSame('Verb. CCL_02-10-2025.pdf', ScansioneArchivio::scegliVerbale(['ALLEGATO_a.pdf', 'Verb. CCL_02-10-2025.pdf'], 'Verb. CCL_02-10-2025'));
+        $this->assertSame('02_verbale_x.pdf', ScansioneArchivio::scegliVerbale(['ALLEGATO_a.pdf', 'tabella.pdf', '02_verbale_x.pdf'], 'Cartella'), 'quello che si chiama verbale');
+        $this->assertSame('solo.pdf', ScansioneArchivio::scegliVerbale(['solo.pdf', 'Allegato 1.pdf'], 'Qualcosa'));
+        $this->assertNull(ScansioneArchivio::scegliVerbale(['ALLEGATO_a.pdf', 'allegato_b.pdf'], 'Cartella'), 'solo allegati: nessun verbale');
         $this->assertTrue(ScansioneArchivio::eAnno('A.A. 2019/20'));
         $this->assertFalse(ScansioneArchivio::eAnno('Verbale 2019'));
     }
 
+    public function testCartellaSenzaVerbaleEAllegatoSciolto(): void
+    {
+        $this->servizio(ProposteCartelle::class)->applica();
+        $base = 'VERBALI_MOTORIE/CONSIGLIO_CORSO_DI_STUDIO/2021/';
+        $this->pdf($base . 'Solo allegati/ALLEGATO_1.pdf', 'a');
+        $this->pdf($base . 'ALLEGATO_sciolto.pdf', 'b');
+        $r = $this->scan->esegui(100);
+        $this->assertSame(['VERBALI_MOTORIE/CONSIGLIO_CORSO_DI_STUDIO/2021/Solo allegati'], $r['senza_verbale']);
+        $this->assertSame(['VERBALI_MOTORIE/CONSIGLIO_CORSO_DI_STUDIO' => 1], $r['allegati']);
+        $this->assertSame(0, (int) $this->db->valore("SELECT COUNT(*) FROM didattica_sedute WHERE nome_originale LIKE 'ALLEGATO%'"));
+    }
     public function testPausaDellaScansioneAutomatica(): void
     {
         $this->servizio(ProposteCartelle::class)->applica();

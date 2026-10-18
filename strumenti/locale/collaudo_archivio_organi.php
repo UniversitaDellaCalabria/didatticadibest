@@ -155,6 +155,22 @@ prova('un PDF tolto dal NAS sparisce dall\'archivio', (int) q("SELECT COUNT(*) n
 $admin->invia($P, ['elimina_verbale_importato' => $id_v]);
 prova('dal portale non si cancella un file del NAS', is_file('uploads/verbali/archivio/Biologia/Commissione didattica/2020/Verbale_2_2020-05-05.pdf') && (int) q("SELECT COUNT(*) n FROM didattica_sedute WHERE id = $id_v")['n'] === 1);
 
+titolo('Verbale con gli allegati');
+pdf('Biologia/Commissione didattica/2021/Verb. 05-03-2021/Verb. 05-03-2021.pdf', 'verbale con allegati');
+pdf('Biologia/Commissione didattica/2021/Verb. 05-03-2021/ALLEGATO_relazione.pdf', 'allegato pdf');
+file_put_contents('uploads/verbali/archivio/Biologia/Commissione didattica/2021/Verb. 05-03-2021/ALLEGATO_dati.xlsx', 'PK-finto');
+$admin->invia($P, ['scansiona_archivio' => 1]);
+$riga_v = q("SELECT id, data, allegati_json FROM didattica_sedute WHERE nome_originale = 'Verb. 05-03-2021.pdf'");
+prova('il verbale della cartella è uno solo, con la data del nome', !empty($riga_v['id']) && $riga_v['data'] === '2021-03-05');
+$all_v = json_decode((string) ($riga_v['allegati_json'] ?? ''), true) ?: [];
+prova('gli allegati (PDF ed Excel) sono agganciati', array_column($all_v, 'n') === ['ALLEGATO_dati.xlsx', 'ALLEGATO_relazione.pdf'], json_encode(array_column($all_v, 'n')));
+prova('l\'allegato PDF non è un verbale a sé', (int) q("SELECT COUNT(*) n FROM didattica_sedute WHERE nome_originale = 'ALLEGATO_relazione.pdf'")['n'] === 0);
+$hl = $admin->vai($P . '&organo=' . $id_comm);
+prova('l\'elenco mostra «2 allegati»', str_contains($hl, '2 allegati') && str_contains($hl, 'ALLEGATO_dati.xlsx'));
+$x = $admin->vai('/eventi/admin/didattica.php?p_id=1&tab=sedute&id=' . (int) $riga_v['id'] . '&esporta=allegato_verbale&n=0');
+prova('l\'allegato Excel si scarica', $admin->codice === 200 && str_contains($admin->tipo, 'spreadsheetml') && $x === 'PK-finto', 'HTTP ' . $admin->codice . ' ' . $admin->tipo);
+$admin->vai('/eventi/admin/didattica.php?p_id=1&tab=sedute&id=' . (int) $riga_v['id'] . '&esporta=allegato_verbale&n=9');
+prova('un allegato inesistente non si scarica', $admin->codice !== 200);
 titolo('Permessi');
 $hr = $referente->vai($P);
 prova('chi non gestisce la Didattica non vede gli organi e le cartelle', !str_contains($hr, 'Organi per corso di studi'));

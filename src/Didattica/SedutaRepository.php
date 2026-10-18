@@ -93,7 +93,7 @@ final class SedutaRepository
         }
 
         return Righe::testo($this->db->righe(
-            'SELECT s.id, s.organo, s.organo_id, s.da_cartella, s.data, s.anno_accademico, s.numero_verbale, s.origine, s.verbale_stato, s.verbale_pdf, s.nome_originale, s.consiglio_id, s.odg, s.pubblicabile, s.verbale_pubblico_pdf, COALESCE(NULLIF(ao.corso, \'\'), dc.nome, \'\') AS corso
+            'SELECT s.id, s.organo, s.organo_id, s.da_cartella, s.allegati_json, s.data, s.anno_accademico, s.numero_verbale, s.origine, s.verbale_stato, s.verbale_pdf, s.nome_originale, s.consiglio_id, s.odg, s.pubblicabile, s.verbale_pubblico_pdf, COALESCE(NULLIF(ao.corso, \'\'), dc.nome, \'\') AS corso
              FROM didattica_sedute s LEFT JOIN archivio_organi ao ON ao.id = s.organo_id LEFT JOIN didattica_consigli dc ON dc.id = s.consiglio_id WHERE ' . implode(' AND ', $dove) . ' ORDER BY s.data IS NULL DESC, s.data DESC, s.id DESC LIMIT ' . (int) $limite,
             $par
         ));
@@ -137,9 +137,9 @@ final class SedutaRepository
     public function inserisciImportato(array $f): int
     {
         return $this->db->inserisci(
-            "INSERT INTO didattica_sedute (organo, anno_accademico, data, odg, consiglio_id, organo_id, numero_verbale, origine, verbale_pdf, nome_originale, file_hash, testo_ricerca, da_cartella, cartella_firma)
-             VALUES (?, ?, ?, ?, ?, ?, ?, 'importato', ?, ?, ?, ?, ?, ?)",
-            [$f['organo'], $f['anno_accademico'], $f['data'], $f['odg'] ?? '', $f['consiglio_id'], $f['organo_id'] ?? null, $f['numero_verbale'], $f['verbale_pdf'], $f['nome_originale'], $f['file_hash'], $f['testo_ricerca'], (int) ($f['da_cartella'] ?? 0), (string) ($f['cartella_firma'] ?? '')]
+            "INSERT INTO didattica_sedute (organo, anno_accademico, data, odg, consiglio_id, organo_id, numero_verbale, origine, verbale_pdf, nome_originale, file_hash, testo_ricerca, da_cartella, cartella_firma, allegati_json)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 'importato', ?, ?, ?, ?, ?, ?, ?)",
+            [$f['organo'], $f['anno_accademico'], $f['data'], $f['odg'] ?? '', $f['consiglio_id'], $f['organo_id'] ?? null, $f['numero_verbale'], $f['verbale_pdf'], $f['nome_originale'], $f['file_hash'], $f['testo_ricerca'], (int) ($f['da_cartella'] ?? 0), (string) ($f['cartella_firma'] ?? ''), $f['allegati_json'] ?? null]
         );
     }
 
@@ -151,11 +151,16 @@ final class SedutaRepository
     public function daCartella(): array
     {
         $out = [];
-        foreach ($this->db->righe('SELECT id, organo, consiglio_id, organo_id, verbale_pdf, cartella_firma, file_hash FROM didattica_sedute WHERE da_cartella = 1') as $r) {
+        foreach ($this->db->righe('SELECT id, organo, consiglio_id, organo_id, verbale_pdf, cartella_firma, file_hash, allegati_json FROM didattica_sedute WHERE da_cartella = 1') as $r) {
             $out[(string) $r['verbale_pdf']] = $r;
         }
 
         return $out;
+    }
+
+    public function aggiornaAllegati(int $id, ?string $json): void
+    {
+        $this->db->esegui('UPDATE didattica_sedute SET allegati_json = ? WHERE id = ? AND da_cartella = 1', [$json, $id]);
     }
 
     public function testoRicerca(int $id): ?string

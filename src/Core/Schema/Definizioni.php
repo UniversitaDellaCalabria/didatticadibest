@@ -563,6 +563,8 @@ final class Definizioni
             'organo_id'             => "ADD COLUMN organo_id INT DEFAULT NULL, ADD INDEX idx_organo_id (organo_id)",
             'da_cartella'           => "ADD COLUMN da_cartella TINYINT(1) NOT NULL DEFAULT 0",
             'cartella_firma'        => "ADD COLUMN cartella_firma VARCHAR(40) NOT NULL DEFAULT ''",
+            // v79: allegati del verbale (file nella cartella del verbale: Excel, Word, PDF…), elenco JSON [{p: percorso, n: nome, d: dimensione}]
+            'allegati_json'         => "ADD COLUMN allegati_json TEXT DEFAULT NULL",
         ],
         'tutorato_bandi' => [
             // v53: ufficio di Ateneo che paga i tutor di questo bando e i tre decreti in PDF (bando, commissione, approvazione atti)

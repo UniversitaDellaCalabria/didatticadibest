@@ -103,25 +103,51 @@ final class ScansioneArchivio
     }
 
     /**
-     * Il PDF è un allegato (non un verbale)? Lo è se il nome comincia per «allegat…» o se sta in una sottocartella dell'organo che non è un anno
-     * (le cartelle dei verbali con molti allegati): quei file non si importano come verbali.
-     *
-     * @param array<string, mixed> $organo la cartella collegata (chiave «cartella»)
+     * La cartella di un verbale con i suoi allegati («Organo/2025/Verb. CCL_02-10-2025»): la prima sottocartella che non è un anno sotto la cartella dell'organo.
+     * Null se il PDF sta direttamente nella cartella dell'organo o in quella di un anno.
      */
-    public static function eAllegato(string $rel, array $organo): bool
+    public static function cartellaVerbale(string $rel, string $cartellaOrgano): ?string
     {
-        if (str_starts_with(mb_strtolower(basename($rel)), 'allegat')) {
-            return true;
-        }
         $dir = trim(dirname($rel) === '.' ? '' : dirname($rel), '/');
-        $sotto = mb_strlen($dir) > mb_strlen((string) $organo['cartella']) ? trim(mb_substr($dir, mb_strlen((string) $organo['cartella'])), '/') : '';
+        $sotto = mb_strlen($dir) > mb_strlen($cartellaOrgano) ? trim(mb_substr($dir, mb_strlen($cartellaOrgano)), '/') : '';
+        $percorso = [];
         foreach ($sotto === '' ? [] : explode('/', $sotto) as $seg) {
+            $percorso[] = $seg;
             if (!self::eAnno($seg)) {
-                return true;
+                return trim($cartellaOrgano . '/' . implode('/', $percorso), '/');
             }
         }
 
-        return false;
+        return null;
+    }
+
+    /**
+     * Il PDF del verbale tra i file di una cartella di verbale: il nome uguale a quello della cartella, poi uno che comincia per «verb» o contiene «verbale»,
+     * altrimenti l'unico (o il primo per nome) che non comincia per «allegato». Null se ci sono solo allegati.
+     *
+     * @param list<string> $nomi i PDF direttamente nella cartella
+     */
+    public static function scegliVerbale(array $nomi, string $nomeCartella): ?string
+    {
+        $cand = array_values(array_filter($nomi, static fn (string $n): bool => !str_starts_with(mb_strtolower($n), 'allegat')));
+        if (!$cand) {
+            return null;
+        }
+        usort($cand, 'strnatcasecmp');
+        $base = mb_strtolower($nomeCartella);
+        foreach ($cand as $n) {
+            if (mb_strtolower((string) pathinfo($n, PATHINFO_FILENAME)) === $base) {
+                return $n;
+            }
+        }
+        foreach ($cand as $n) {
+            $l = mb_strtolower($n);
+            if (str_starts_with($l, 'verb') || str_contains($l, 'verbale')) {
+                return $n;
+            }
+        }
+
+        return $cand[0];
     }
 
     /** La cartella senza le sottocartelle dell'anno («Biologia/Commissione didattica/2019» → «Biologia/Commissione didattica»). */
@@ -187,11 +213,11 @@ final class ScansioneArchivio
     /**
      * Una scansione: nuovi PDF, PDF cambiati o spostati, PDF spariti.
      *
-     * @return array{trovati: int, nuovi: int, aggiornati: int, spostati: int, doppi: int, rimossi: int, restanti: int, non_collegati: array<string, int>, allegati: array<string, int>, errori: list<string>, avvisi: list<string>}
+     * @return array{trovati: int, nuovi: int, aggiornati: int, spostati: int, doppi: int, rimossi: int, restanti: int, non_collegati: array<string, int>, allegati: array<string, int>, allegati_aggiornati: int, senza_verbale: list<string>, errori: list<string>, avvisi: list<string>}
      */
     public function esegui(int $max = self::MAX_PER_VOLTA): array
     {
-        $r = ['trovati' => 0, 'nuovi' => 0, 'aggiornati' => 0, 'spostati' => 0, 'doppi' => 0, 'rimossi' => 0, 'restanti' => 0, 'non_collegati' => [], 'allegati' => [], 'errori' => [], 'avvisi' => []];
+        $r = ['trovati' => 0, 'nuovi' => 0, 'aggiornati' => 0, 'spostati' => 0, 'doppi' => 0, 'rimossi' => 0, 'restanti' => 0, 'non_collegati' => [], 'allegati' => [], 'allegati_aggiornati' => 0, 'senza_verbale' => [], 'errori' => [], 'avvisi' => []];
         if (!$this->prepara()) {
             $r['errori'][] = 'La cartella ' . $this->cartella . 'archivio/ non esiste e non riesco a crearla (permessi? NAS non montato?).';
 
@@ -202,6 +228,13 @@ final class ScansioneArchivio
         $r['trovati'] = count($file);
         $esistenti = $this->sedute->daCartella();
         $chiave = fn (string $rel): string => $this->cartella . 'archivio/' . $rel;
+        $perCartella = [];
+        foreach ($file as $f) {
+            $d = dirname($f['rel']);
+            $perCartella[$d === '.' ? '' : $d][] = basename($f['rel']);
+        }
+        $principali = [];
+        $nonPiuVerbali = [];
         $presenti = [];
         foreach ($file as $f) {
             $presenti[$chiave($f['rel'])] = true;
@@ -219,17 +252,41 @@ final class ScansioneArchivio
             $m = self::trova($mappe, $dir);
             $firma = $f['dim'] . '-' . $f['mtime'];
             $riga = $esistenti[$k] ?? null;
+            // cartella di un verbale con gli allegati: il PDF del verbale è uno solo, il resto (anche Excel e Word) sono i suoi allegati
+            $cv = $m ? self::cartellaVerbale($f['rel'], (string) $m['cartella']) : null;
+            $allegatiJson = null;
+            if ($cv !== null) {
+                $principali[$cv] ??= self::scegliVerbale($perCartella[$cv] ?? [], basename($cv));
+                if ($principali[$cv] === null) {
+                    $r['senza_verbale'][$cv] = $cv;
+                } elseif (basename($f['rel']) === $principali[$cv] && dirname($f['rel']) === $cv) {
+                    $allegatiJson = $this->allegatiDi($cv, $f['rel']);
+                }
+                if ($allegatiJson === null) {
+                    if ($riga) {
+                        $nonPiuVerbali[] = (int) $riga['id'];
+                    }
+                    continue;
+                }
+            } elseif ($m && str_starts_with(mb_strtolower(basename($f['rel'])), 'allegat')) {
+                $c = self::senzaAnni($dir);
+                $r['allegati'][$c] = ($r['allegati'][$c] ?? 0) + 1;
+                if ($riga) {
+                    $nonPiuVerbali[] = (int) $riga['id'];
+                }
+                continue;
+            }
+            if ($riga && $cv !== null && (string) $riga['allegati_json'] !== (string) $allegatiJson) {
+                $this->sedute->aggiornaAllegati((int) $riga['id'], $allegatiJson);
+                $r['allegati_aggiornati']++;
+                $riga['allegati_json'] = $allegatiJson;
+            }
             if ($riga && (string) $riga['cartella_firma'] === $firma) {
                 continue;
             }
             if (!$riga && !$m) {
                 $c = self::senzaAnni($dir);
                 $r['non_collegati'][$c] = ($r['non_collegati'][$c] ?? 0) + 1;
-                continue;
-            }
-            if (!$riga && $m && self::eAllegato($f['rel'], $m)) {
-                $c = self::senzaAnni($dir);
-                $r['allegati'][$c] = ($r['allegati'][$c] ?? 0) + 1;
                 continue;
             }
             if ($f['dim'] <= 0) {
@@ -299,11 +356,14 @@ final class ScansioneArchivio
             $numero = $g['numero'] ?? ArchivioVerbali::numeroDa(mb_substr($testo, 0, 3000));
             $this->sedute->inserisciImportato([
                 'organo' => $m['nome'], 'anno_accademico' => $g['anno_accademico'] ?? ($data ? ArchivioVerbali::annoAccademico($data) : ''), 'data' => $data,
-                'consiglio_id' => $m['consiglio_id'], 'organo_id' => $m['organo_id'], 'numero_verbale' => (string) $numero, 'verbale_pdf' => $k,
+                'consiglio_id' => $m['consiglio_id'], 'organo_id' => $m['organo_id'], 'allegati_json' => $allegatiJson, 'numero_verbale' => (string) $numero, 'verbale_pdf' => $k,
                 'nome_originale' => mb_substr(basename($f['rel']), 0, 255), 'file_hash' => $hash, 'testo_ricerca' => $testo, 'da_cartella' => 1, 'cartella_firma' => $firma,
             ]);
             $r['nuovi']++;
         }
+
+        // PDF che prima erano verbali e adesso risultano allegati (cartella del verbale con i suoi allegati): non sono più verbali
+        $r['rimossi'] += $this->sedute->eliminaDaCartella($nonPiuVerbali);
 
         // verbali i cui file non ci sono più: si tolgono solo se la cartella è davvero raggiungibile (un NAS non montato sembra una cartella vuota)
         $spariti = [];
@@ -323,6 +383,7 @@ final class ScansioneArchivio
         }
         $r['non_collegati'] = $this->riordina($r['non_collegati']);
         $r['allegati'] = $this->riordina($r['allegati']);
+        $r['senza_verbale'] = array_values($r['senza_verbale']);
 
         return $r;
     }
@@ -403,6 +464,38 @@ final class ScansioneArchivio
         ksort($a, SORT_NATURAL | SORT_FLAG_CASE);
 
         return $a;
+    }
+
+    /**
+     * Gli allegati di un verbale: tutti i file della sua cartella (anche nelle sottocartelle) tranne il PDF del verbale.
+     *
+     * @return string|null JSON [{p: percorso, n: nome, d: dimensione}], null se non ce ne sono
+     */
+    private function allegatiDi(string $cartellaVerbale, string $principaleRel): string
+    {
+        $base = $this->radice() . $cartellaVerbale;
+        $out = [];
+        try {
+            $it = new \RecursiveIteratorIterator(new \RecursiveCallbackFilterIterator(
+                new \RecursiveDirectoryIterator($base, \FilesystemIterator::SKIP_DOTS),
+                static fn (\SplFileInfo $f): bool => !preg_match('/^[.@#]|^~\\$/u', $f->getFilename()) && !$f->isLink()
+            ));
+            foreach ($it as $f) {
+                if (!$f->isFile()) {
+                    continue;
+                }
+                $rel = str_replace('\\', '/', substr($f->getPathname(), strlen($this->radice())));
+                if ($rel === $principaleRel) {
+                    continue;
+                }
+                $out[] = ['p' => $this->cartella . 'archivio/' . $rel, 'n' => substr($rel, strlen($cartellaVerbale) + 1), 'd' => (int) $f->getSize()];
+            }
+        } catch (\Throwable) {
+            return '';
+        }
+        usort($out, static fn (array $a, array $b): int => strnatcasecmp($a['n'], $b['n']));
+
+        return $out ? (string) json_encode(array_slice($out, 0, 100), JSON_UNESCAPED_UNICODE) : '';
     }
 
     private function leggi(string $pdf): string

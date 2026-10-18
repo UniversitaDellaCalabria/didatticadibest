@@ -69,6 +69,21 @@ if (($_GET['esporta'] ?? '') === 'verbale_pdf' && $tab === 'sedute') {
     header('Content-Disposition: attachment; filename="Verbale_' . ($seduta_exp['data'] ? date('d_m_Y', strtotime($seduta_exp['data'])) : 'seduta') . ($seduta_exp['verbale_stato'] === 'firmato' ? '_firmato' : '') . '.pdf"');
     readfile($f); exit;
 }
+// ── Allegato di un verbale letto dalla cartella dell'archivio (PDF, Excel, Word…) ──
+if (($_GET['esporta'] ?? '') === 'allegato_verbale' && $tab === 'sedute') {
+    $seduta_all = seduta_didattica($conn, (int)($_GET['id'] ?? 0));
+    if (!$seduta_all || !$puo_seduta($seduta_all)) nega_accesso();
+    $lista_all = json_decode((string)($seduta_all['allegati_json'] ?? ''), true) ?: [];
+    $voce_all = $lista_all[(int)($_GET['n'] ?? -1)] ?? null;
+    $f_all = $voce_all ? \App\Core\App::per($conn)->get(\App\Didattica\ArchivioVerbali::class)->percorsoAllegato((string)$voce_all['p']) : null;
+    if (!$f_all) nega_accesso();
+    $tipi_all = ['pdf' => 'application/pdf', 'xls' => 'application/vnd.ms-excel', 'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'doc' => 'application/msword', 'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'odt' => 'application/vnd.oasis.opendocument.text', 'ods' => 'application/vnd.oasis.opendocument.spreadsheet', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'zip' => 'application/zip', 'txt' => 'text/plain', 'csv' => 'text/csv'];
+    $ext_all = strtolower(pathinfo($f_all, PATHINFO_EXTENSION));
+    while (ob_get_level() > 0) ob_end_clean();
+    header('Content-Type: ' . ($tipi_all[$ext_all] ?? 'application/octet-stream')); header('X-Content-Type-Options: nosniff'); header('Content-Length: ' . filesize($f_all));
+    header('Content-Disposition: attachment; filename="' . str_replace(['"', "\r", "\n", '/', '\\\\'], '_', basename($f_all)) . '"');
+    readfile($f_all); exit;
+}
 // ── Esportazioni (Excel e Word): scartano la pagina già prodotta dall'intestazione ──
 if (isset($_GET['esporta']) && in_array($_GET['esporta'], ['xlsx', 'docx'], true)) {
     $seduta_exp = $tab === 'sedute' ? seduta_didattica($conn, (int)($_GET['id'] ?? 0)) : null;

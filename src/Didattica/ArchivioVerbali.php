@@ -234,6 +234,15 @@ final class ArchivioVerbali
         return true;
     }
 
+    /** Percorso reale di un allegato di un verbale letto dalla cartella (solo dentro la cartella dei verbali), null se non è valido. */
+    public function percorsoAllegato(string $relativo): ?string
+    {
+        $base = realpath($this->sito->radice() . '/' . $this->cartella);
+        $p = $relativo !== '' ? realpath($this->sito->radice() . '/' . $relativo) : false;
+
+        return ($base && $p && strpos($p, $base . DIRECTORY_SEPARATOR) === 0 && is_file($p)) ? $p : null;
+    }
+
     /** Percorso reale del PDF (solo dentro la cartella dei verbali). */
     public function percorsoFile(array $s): ?string
     {
