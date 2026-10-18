@@ -260,12 +260,30 @@ if ($pubs && !($pubs['verbale_stato'] === 'firmato' || $pubs['origine'] === 'imp
     </form>
     <?php if ($n_incompleti): ?><div class="alert alert-warning small py-2"><i class="fa fa-circle-exclamation me-1" aria-hidden="true"></i><?php echo $n_incompleti; ?> verbali senza data o senza organo: aprili con la matita e completa i dati.</div><?php endif; ?>
 
+    <?php if ($puo_didattica_tutto && $verbali): ?>
+    <form method="POST" id="fBulk" class="card border-0 shadow-sm mb-2"><div class="card-body py-2">
+        <?php csrf_field(); ?><input type="hidden" name="torna" value="<?php echo $h((string)($_SERVER['QUERY_STRING'] ?? '')); ?>">
+        <div class="d-flex flex-wrap gap-2 align-items-center small">
+            <strong><i class="fa fa-earth-europe me-1 text-primary" aria-hidden="true"></i>Pagina pubblica dei verbali, più verbali insieme</strong>
+            <label class="ms-2 mb-0"><input type="checkbox" id="bTutti"> seleziona tutti</label>
+            <button type="button" class="btn btn-sm btn-outline-secondary py-0" id="bNonPub">solo quelli non ancora pubblici</button>
+            <span class="text-secondary" id="bConta">0 selezionati</span>
+        </div>
+        <div class="d-flex flex-wrap gap-2 align-items-center mt-2">
+            <label class="small mb-0"><input type="checkbox" name="conferma_blocco" value="1"> Ho verificato che questi verbali non contengono dati personali degli studenti (nomi, matricole, esiti): si pubblica il PDF così com'è. Per quelli che li contengono usa la pubblicazione singola con gli omissis.</label>
+            <button class="btn btn-sm btn-primary fw-bold" name="pubblica_blocco" value="1" data-confirm="Pubblicare i verbali selezionati?"><i class="fa fa-earth-europe me-1" aria-hidden="true"></i>Pubblica i selezionati</button>
+            <button class="btn btn-sm btn-outline-danger" name="ritira_blocco" value="1" data-confirm="Ritirare i verbali selezionati dalla pagina pubblica?">Ritira i selezionati</button>
+        </div>
+        <div class="small text-secondary mt-1">Si possono pubblicare i verbali firmati o importati di un <strong>consiglio</strong> (gli altri organi non hanno la pagina pubblica). Li vede chi ha un accesso con password per quel consiglio.</div>
+    </div></form>
+    <?php endif; ?>
     <div class="card border-0 shadow-sm"><div class="table-responsive">
         <table class="table table-sm table-hover align-middle small mb-0">
-            <thead class="table-light"><tr><th style="width:105px;">Data</th><th>Organo</th><th style="width:60px;">N.</th><th style="width:105px;">A.a.</th><th style="width:200px;">Tipo</th><th style="width:160px;"></th></tr></thead>
+            <thead class="table-light"><tr><?php if ($puo_didattica_tutto): ?><th style="width:28px;"></th><?php endif; ?><th style="width:105px;">Data</th><th>Organo</th><th style="width:60px;">N.</th><th style="width:105px;">A.a.</th><th style="width:200px;">Tipo</th><th style="width:160px;"></th></tr></thead>
             <tbody>
             <?php foreach ($verbali as $x): $imp_x = $x['origine'] === 'importato'; $inc = !$x['data'] || $x['organo'] === ''; $vs_x = STATI_VERBALE[$x['verbale_stato'] ?? ''] ?? null; ?>
                 <tr<?php echo $inc ? ' class="table-warning"' : ''; ?>>
+                    <?php if ($puo_didattica_tutto): ?><td><?php if (($x['verbale_stato'] === 'firmato' || $imp_x) && $x['verbale_pdf'] && (int)$x['consiglio_id']): ?><input type="checkbox" class="chkB" name="ids[]" value="<?php echo (int)$x['id']; ?>" form="fBulk" data-pub="<?php echo (int)$x['pubblicabile']; ?>" aria-label="Seleziona questo verbale"><?php endif; ?></td><?php endif; ?>
                     <td class="fw-bold"><?php echo $x['data'] ? date('d/m/Y', strtotime($x['data'])) : '<span class="text-danger">senza data</span>'; ?></td>
                     <td><?php echo $x['organo'] !== '' ? $h(mb_strimwidth($x['organo'], 0, 130, '…')) : '<span class="text-danger">senza organo</span>'; ?><?php echo $x['corso'] !== '' && $x['corso'] !== $x['organo'] ? '<div class="text-secondary" style="font-size:.72rem;"><i class="fa fa-graduation-cap me-1" aria-hidden="true"></i>' . $h(mb_strimwidth($x['corso'], 0, 100, '…')) . '</div>' : ''; ?>
                         <?php $all_x = (string)($x['allegati_json'] ?? '') !== '' ? (json_decode((string)$x['allegati_json'], true) ?: []) : []; if ($all_x): ?>
@@ -289,12 +307,22 @@ if ($pubs && !($pubs['verbale_stato'] === 'firmato' || $pubs['origine'] === 'imp
                     </td>
                 </tr>
             <?php endforeach; ?>
-            <?php if (!$verbali): ?><tr><td colspan="6" class="text-center text-secondary py-4"><i class="fa fa-box-archive fa-2x d-block mb-2" aria-hidden="true"></i>Nessun verbale<?php echo array_filter($filtri) ? ' con questi filtri' : ' in archivio: aggiungi i PDF vecchi qui sopra'; ?>.</td></tr><?php endif; ?>
+            <?php if (!$verbali): ?><tr><td colspan="7" class="text-center text-secondary py-4"><i class="fa fa-box-archive fa-2x d-block mb-2" aria-hidden="true"></i>Nessun verbale<?php echo array_filter($filtri) ? ' con questi filtri' : ' in archivio: aggiungi i PDF vecchi qui sopra'; ?>.</td></tr><?php endif; ?>
             </tbody>
         </table>
     </div></div>
 
     <script>
+    (function () {
+        var tutti = document.getElementById('bTutti'), conta = document.getElementById('bConta'), nonpub = document.getElementById('bNonPub');
+        if (tutti) {
+            var caselle = function () { return Array.prototype.slice.call(document.querySelectorAll('.chkB')); };
+            var aggiorna = function () { var n = caselle().filter(function (c) { return c.checked; }).length; conta.textContent = n + ' selezionat' + (n === 1 ? 'o' : 'i'); };
+            tutti.addEventListener('change', function () { caselle().forEach(function (c) { c.checked = tutti.checked; }); aggiorna(); });
+            nonpub.addEventListener('click', function () { caselle().forEach(function (c) { c.checked = c.getAttribute('data-pub') === '0'; }); aggiorna(); });
+            caselle().forEach(function (c) { c.addEventListener('change', aggiorna); });
+        }
+    })();
     (function () {
         var f = document.getElementById('fImporta'); if (!f) return;
         var URL_ARCH = <?php echo json_encode($url_arch); ?>;

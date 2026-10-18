@@ -232,7 +232,7 @@ if ($fase === 'azioni') {
         admin_redirect("$base&tab=sedute&archivio=1");
     }
     // ── Pagina pubblica dei verbali: accessi con password e pubblicazione dei singoli verbali (solo Ufficio didattico) ──
-    if (array_intersect(array_keys($_POST), ['crea_accesso_verbali', 'salva_accesso_verbali', 'nuova_password_verbali', 'stato_accesso_verbali', 'elimina_accesso_verbali', 'pubblica_verbale', 'ritira_verbale'])) {
+    if (array_intersect(array_keys($_POST), ['crea_accesso_verbali', 'salva_accesso_verbali', 'nuova_password_verbali', 'stato_accesso_verbali', 'elimina_accesso_verbali', 'pubblica_verbale', 'ritira_verbale', 'pubblica_blocco', 'ritira_blocco'])) {
         if (!$puo_didattica_tutto) nega_accesso();
         $pubb = \App\Core\App::per($conn)->get(\App\Didattica\ServizioVerbaliPubblici::class);
         $rep_acc = \App\Core\App::per($conn)->get(\App\Didattica\AccessoVerbaliRepository::class);
@@ -270,6 +270,26 @@ if ($fase === 'azioni') {
             registra_log_audit($conn, "Verbali pubblici: accesso eliminato", ["Accesso" => (int)$_POST['elimina_accesso_verbali']]);
             flash_set("Accesso eliminato.", 'warning');
             admin_redirect($url_acc);
+        }
+        // pubblicazione o ritiro di più verbali insieme (versione originale, con la conferma sui dati personali)
+        if (isset($_POST['pubblica_blocco']) || isset($_POST['ritira_blocco'])) {
+            parse_str((string)($_POST['torna'] ?? ''), $q_torna);
+            $url_torna = "$base&tab=sedute&archivio=1" . ($q_torna ? '&' . http_build_query(array_diff_key($q_torna, array_flip(['p_id', 'tab', 'archivio', 'r']))) : '');
+            $ids_b = array_slice(array_values(array_unique(array_filter(array_map('intval', (array)($_POST['ids'] ?? []))))), 0, 500);
+            $ritira_b = isset($_POST['ritira_blocco']);
+            if (!$ids_b) { flash_set('Seleziona almeno un verbale.', 'warning'); admin_redirect($url_torna); }
+            if (!$ritira_b && empty($_POST['conferma_blocco'])) { flash_set('Per pubblicare conferma di aver verificato che i verbali non contengono dati personali degli studenti.', 'danger'); admin_redirect($url_torna); }
+            $n_ok = 0; $n_ko = 0; $primo_err = '';
+            foreach ($ids_b as $id_b) {
+                $sb = seduta_didattica($conn, $id_b);
+                if (!$sb) continue;
+                if ($ritira_b) { if ((int)$sb['pubblicabile']) { $pubb->ritira($sb); $n_ok++; } continue; }
+                $e_b = $pubb->pubblica($sb, 'integrale', true, null, $autore_nome);
+                if ($e_b === null) $n_ok++; else { $n_ko++; $primo_err = $primo_err ?: $e_b; }
+            }
+            registra_log_audit($conn, $ritira_b ? "Verbali pubblici: verbali ritirati in blocco" : "Verbali pubblici: verbali pubblicati in blocco", ["Verbali" => $n_ok, "Non riusciti" => $n_ko]);
+            flash_set(($ritira_b ? "Ritirati dalla pagina pubblica: $n_ok verbali." : "Pubblicati nella pagina dei verbali: $n_ok.") . ($n_ko ? " Non riusciti: $n_ko ($primo_err)" : ''), $n_ko ? 'warning' : 'success');
+            admin_redirect($url_torna);
         }
         if (isset($_POST['pubblica_verbale']) || isset($_POST['ritira_verbale'])) {
             $id = (int)($_POST['pubblica_verbale'] ?? $_POST['ritira_verbale']);
