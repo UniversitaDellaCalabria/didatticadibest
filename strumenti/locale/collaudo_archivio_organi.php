@@ -200,7 +200,7 @@ $ext = new Persona($BASE);
 $ext->invia('/eventi/verbali.php', ['accedi' => 1, 'password' => 'PasswordProva-2026!']);
 $pg = $ext->vai('/eventi/verbali.php');
 prova('con la password si entra', str_contains($pg, 'Verbali dei consigli e degli organi') && str_contains($pg, 'Prova esterni'), 'HTTP ' . $ext->codice);
-prova('i verbali sono per organo: il consiglio e la commissione del suo corso', str_contains($pg, '>Consiglio <') && str_contains($pg, 'Commissione didattica <') && count($ids_p) >= 3, count($ids_p) . ' verbali');
+prova('i verbali sono per organo: il consiglio e la commissione del suo corso', str_contains($pg, '<h3>Consiglio</h3>') && str_contains($pg, '<h3>Commissione didattica</h3>') && count($ids_p) >= 3, count($ids_p) . ' verbali');
 prova('ci sono i filtri a tendina per organo e anno accademico', str_contains($pg, 'name="organo"') && str_contains($pg, 'name="aa"'));
 prova('i verbali pubblicati sono tutti elencati', substr_count($pg, 'verbali.php?d=') === count($ids_p), substr_count($pg, 'verbali.php?d=') . ' link');
 $pf = $ext->vai('/eventi/verbali.php?organo=' . urlencode('Commissione didattica'));
@@ -212,21 +212,25 @@ prova('un verbale si scarica', $ext->codice === 200 && str_starts_with($dl, '%PD
 $altri = new Persona($BASE);
 $altri->vai('/eventi/verbali.php?d=' . ($md[1] ?? 0));
 prova('senza password non si scarica nulla', $altri->codice === 404 || !str_starts_with($altri->vai('/eventi/verbali.php?d=' . ($md[1] ?? 0)), '%PDF'));
-$db->query('DELETE FROM verbali_accessi_log');
-$db->query('DELETE FROM verbali_accessi');
-$db->query('UPDATE didattica_sedute SET pubblicabile = 0');
+if (!getenv('COLLAUDO_TIENI')) { // COLLAUDO_TIENI=1 lascia i dati per guardare la pagina pubblica nel browser
+    $db->query('DELETE FROM verbali_accessi_log');
+    $db->query('DELETE FROM verbali_accessi');
+    $db->query('UPDATE didattica_sedute SET pubblicabile = 0');
+}
 titolo('Permessi');
 $hr = $referente->vai($P);
 prova('chi non gestisce la Didattica non vede gli organi e le cartelle', !str_contains($hr, 'Organi per corso di studi'));
 $referente->invia($P, ['scansiona_archivio' => 1]);
 prova('e non può avviare la scansione', $referente->codice === 403 || (int) q("SELECT COUNT(*) n FROM didattica_sedute WHERE da_cartella = 1")['n'] === 4);
 
-// pulizia finale
-pulisci('uploads/verbali/archivio');
-$db->query('DELETE FROM didattica_sedute WHERE da_cartella = 1');
-$db->query('DELETE FROM archivio_organi');
-$db->query("UPDATE didattica_consigli SET cartella_archivio = ''");
-@unlink('cache/archivio_scansione.json');
+// pulizia finale (con COLLAUDO_TIENI=1 si lasciano file e dati)
+if (!getenv('COLLAUDO_TIENI')) {
+    pulisci('uploads/verbali/archivio');
+    $db->query('DELETE FROM didattica_sedute WHERE da_cartella = 1');
+    $db->query('DELETE FROM archivio_organi');
+    $db->query("UPDATE didattica_consigli SET cartella_archivio = ''");
+    @unlink('cache/archivio_scansione.json');
+}
 
 echo "\n$ok OK, $ko KO\n";
 exit($ko ? 1 : 0);
