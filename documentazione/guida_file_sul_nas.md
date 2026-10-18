@@ -1,0 +1,131 @@
+# File del portale sul NAS (verbali, convenzioni, pratiche degli studenti)
+
+Guida passo per passo, da seguire con calma (circa 2 ore, la prima volta). Non cambia il codice del portale: le cartelle dei file caricati (`uploads/…`) restano dove sono per il portale, ma **dietro ci sono le cartelle del NAS** (collegamento simbolico). Il database resta sul server.
+
+## 0. Cosa cambia e cosa no
+
+| | Prima | Dopo |
+|---|---|---|
+| Verbali, convenzioni, allegati delle pratiche, lettere di incarico… | su disco del server, `uploads/…` | **sul NAS**, il portale li vede come prima |
+| Database (utenti, pratiche, testi) | server | server (non va sul NAS) |
+| Backup notturno | database + file → NAS | database → NAS; i file **sono già** sul NAS |
+
+**Vantaggio:** 8 TB invece del disco del server, file lontani dal sito, snapshot e RAID del NAS.
+**Rischi da conoscere (e come li copriamo):**
+1. **NAS spento o rete interrotta** → il portale non apre/salva i file finché non torna. Le altre pagine funzionano. Montiamo con `nofail` e controlliamo la raggiungibilità (punto 7).
+2. **I file hanno una sola copia** (prima c'era anche la copia del backup). Il NAS deve avere RAID e **snapshot giornalieri**, e meglio una copia fuori dal NAS (disco esterno o altro NAS) almeno ogni settimana.
+3. **Più lento** del disco locale: per PDF e allegati non si nota.
+
+## 1. Cosa mi serve sapere prima (scrivilo qui sotto)
+
+- Marca e modello del NAS (Synology, QNAP, altro): ______
+- IP o nome del NAS nella rete del server: ______
+- Il NAS è già montato sul server per il backup? Sul server: `mount | grep -i -E "cifs|nfs"` e `grep BACKUP_NAS_PATH /opt/lampp/htdocs/didattica/.env` → percorso: ______
+- Utente con cui gira Apache di XAMPP: sul server `ps -eo user,comm | grep -E "httpd|apache" | sort -u` (di solito `daemon`): ______
+
+## 2. Sul NAS: cartella condivisa e utente (esempio Synology; su QNAP i nomi dei menu cambiano poco)
+
+1. **Pannello di controllo → Cartella condivisa → Crea.** Nome: `portale_didattica`. Non attivare «Nascondi nei risultati di ricerca» se non serve; **attiva il Cestino**; **non cifrare** (o, se cifri, il volume deve montarsi da solo all'avvio).
+2. **Pannello di controllo → Utente → Crea.** Nome: `portale`. Password lunga (20+ caratteri, la salvi nel gestore di password). Nessun gruppo di amministratori. Assegna **lettura/scrittura solo** alla cartella `portale_didattica`, nessun accesso alle altre cartelle, nessuna applicazione (disattiva File Station, DSM, ecc.).
+3. **Servizi file → SMB:** abilita SMB; protocollo minimo **SMB2** (meglio SMB3).
+4. Dentro `portale_didattica` crea queste sottocartelle (File Station → Crea cartella):
+   `verbali`, `convenzioni`, `convenzioni_tesi`, `convenzioni_compilate`, `modelli_convenzione`, `pratiche`, `incarichi`, `autorizzazioni`, `modulistica`, `personale`, `allegati_prenotazioni`.
+5. **Snapshot:** *Snapshot Replication* (o equivalente) → programma uno snapshot **ogni giorno** della cartella con conservazione di 30 giorni. Così anche un file cancellato per errore si recupera.
+6. **Sicurezza di rete:** il NAS non deve essere raggiungibile da Internet (niente port forwarding). Se hai un firewall sul NAS, consenti SMB (porta 445) solo dall'IP del server.
+7. Controlla che il volume sia in **RAID** (Gestione archiviazione → stato «Integro») e che esista una copia periodica altrove.
+
+## 3. Sul server: montare la cartella
+
+Tutto da utente con `sudo`. Sostituisci `IP_DEL_NAS`.
+
+```bash
+sudo apt install -y cifs-utils
+sudo mkdir -p /mnt/nas_portale
+```
+
+File con le credenziali (leggibile solo da root):
+
+```bash
+sudo nano /root/.nas_portale
+```
+Contenuto (due righe):
+```
+username=portale
+password=LA_PASSWORD_DELL_UTENTE_PORTALE
+```
+```bash
+sudo chmod 600 /root/.nas_portale
+```
+
+Prima del montaggio fisso, **prova a mano** (usa lo stesso utente di Apache; con `daemon` trovi uid/gid con `id daemon`):
+
+```bash
+sudo mount -t cifs //IP_DEL_NAS/portale_didattica /mnt/nas_portale \
+  -o credentials=/root/.nas_portale,uid=$(id -u daemon),gid=$(id -g daemon),file_mode=0640,dir_mode=0750,vers=3.0
+ls /mnt/nas_portale
+sudo -u daemon touch /mnt/nas_portale/verbali/prova.txt && sudo -u daemon rm /mnt/nas_portale/verbali/prova.txt && echo "SCRITTURA OK"
+```
+
+Se dice `SCRITTURA OK`, rendi il montaggio permanente:
+
+```bash
+sudo umount /mnt/nas_portale
+echo "//IP_DEL_NAS/portale_didattica /mnt/nas_portale cifs credentials=/root/.nas_portale,uid=$(id -u daemon),gid=$(id -g daemon),file_mode=0640,dir_mode=0750,vers=3.0,_netdev,nofail,x-systemd.automount,x-systemd.idle-timeout=0 0 0" | sudo tee -a /etc/fstab
+sudo systemctl daemon-reload
+sudo mount -a
+df -h /mnt/nas_portale
+```
+
+`nofail` fa partire comunque il server se il NAS è spento; `x-systemd.automount` lo rimonta appena torna.
+
+## 4. Spostare i file esistenti (orario tranquillo, es. sera)
+
+Cartella del portale: `/opt/lampp/htdocs/didattica`. Fai prima un backup manuale (`Sistema → Backup → Esegui ora`) e **aspetta che finisca**.
+
+Per **ogni** cartella della lista (esempio con `verbali`; ripeti cambiando il nome):
+
+```bash
+cd /opt/lampp/htdocs/didattica/uploads
+# 1) copia sul NAS (conserva date e permessi non servono: li decide il montaggio)
+sudo rsync -rt --info=progress2 verbali/ /mnt/nas_portale/verbali/
+# 2) controllo: non deve elencare differenze
+sudo rsync -rcn --itemize-changes verbali/ /mnt/nas_portale/verbali/
+# 3) metti da parte la cartella vecchia e collega quella del NAS
+sudo mv verbali verbali.vecchia
+sudo ln -s /mnt/nas_portale/verbali verbali
+ls -la verbali | head
+```
+
+Se `uploads/<cartella>` non esiste ancora (cartella mai usata), salta rsync e fai solo `ln -s`.
+Le cartelle `.htaccess` di protezione (se c'erano in `verbali.vecchia`) copiale nella cartella del NAS: `sudo cp -a verbali.vecchia/.htaccess /mnt/nas_portale/verbali/` (il comando rsync sopra le copia già).
+
+> Non spostare mai `uploads/.htaccess` (quello della radice): resta nel server.
+
+## 5. Provare che funziona (prima di cancellare qualunque cosa)
+
+1. Pannello → apri un **verbale** esistente e scarica il PDF.
+2. Apri una **pratica di uno studente con allegato** e scaricalo.
+3. Carica un file nuovo (allegato a una pratica di prova) e scaricalo. Sul NAS (File Station) lo ritrovi in `portale_didattica/pratiche/`.
+4. Una convenzione di tesi o FSL: scarica il Word/PDF.
+5. Se qualcosa non va: `sudo tail -n 30 /opt/lampp/logs/error_log`. Errori «Permission denied» → controlla uid/gid del punto 3.
+
+Per **2 settimane** tieni le cartelle `*.vecchia`. Poi, dopo aver verificato che gli snapshot del NAS funzionano, le cancelli: `sudo rm -rf uploads/*.vecchia`.
+
+## 6. Tornare indietro (se serve)
+
+```bash
+cd /opt/lampp/htdocs/didattica/uploads
+sudo rm verbali            # è solo il collegamento
+sudo mv verbali.vecchia verbali
+```
+Ma se nel frattempo sono arrivati file nuovi, prima copiali dal NAS: `sudo rsync -rt /mnt/nas_portale/verbali/ verbali.vecchia/`.
+
+## 7. Cose che faccio io nel portale (codice, nella sessione dopo)
+
+- In **Sistema** una riga «File sul NAS: raggiungibile / non raggiungibile» (scrive e cancella un file di prova).
+- Il backup notturno non scarica più i file dal NAS (non segue i collegamenti): l'archivio contiene database e codice; i file hanno gli snapshot del NAS. Il report settimanale segnala se il NAS non risponde.
+- Messaggio chiaro agli utenti se un file non si apre perché il NAS è fuori linea (invece di una pagina vuota).
+
+## 8. Dati personali
+
+I file con dati degli studenti (pratiche, tesi) restano comunque in una rete dell'Ateneo, quindi la sede cambia ma non esce dall'Ateneo. Se il NAS è condiviso con altri, mantieni l'utente `portale` limitato a questa cartella e non dare accesso ad altri utenti. Aggiorna, se serve, l'elenco delle sedi di conservazione dell'informativa privacy.
