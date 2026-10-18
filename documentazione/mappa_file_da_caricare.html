@@ -1170,6 +1170,35 @@ var PACCHETTI = [
     ],
     nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code> (tranne lo script indicato), <code>materiali/…</code> e <code>documentazione/…</code>.",
     commit: "File sul NAS: controllo delle cartelle collegate in Sistema e script per spostare i file riservati"
+  },
+  {
+    id: "tipi-organo",
+    titolo: "Pacchetto 26 · Archivio verbali: tipi di organo, anche nuovi scritti da te",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare",
+    schema: "v78 (una colonna nuova in archivio_organi)",
+    riassunto: "Nel campo «Tipo» degli organi dell'archivio verbali c'è ora anche <strong>Consiglio di corso di studi</strong> (insieme a commissione didattica, gruppo di riesame, riunione con gli studenti e altro organo) e, scegliendo <strong>«➕ Nuovo tipo…»</strong>, si scrive un tipo nuovo (per esempio «Comitato di indirizzo»): da quel momento compare nell'elenco dei tipi per tutti gli altri organi.",
+    passi: [["Archivio", "Tipi di organo"]],
+    cartelle: [
+      { cartella: "admin/", file: [
+        ["admin/didattica_archivio.php", "mod", "Archivio", "il campo Tipo con la scelta del tipo nuovo"],
+        ["admin/didattica_sedute.php", "mod", "Archivio", "salvataggio del tipo scritto a mano"]
+      ]},
+      { cartella: "src/Didattica/", file: [
+        ["src/Didattica/OrganiArchivio.php", "mod", "Archivio", "tipi predefiniti e tipi scritti a mano"]
+      ]},
+      { cartella: "src/Core/Schema/", file: [
+        ["src/Core/Schema/Definizioni.php", "mod", "Archivio", "colonna tipo_nome"],
+        ["src/Core/Schema/Migrazioni.php", "mod", "Archivio", "versione dello schema: 78"]
+      ]}
+    ],
+    dopo: [
+      "Apri una pagina del pannello: lo schema passa alla v78.",
+      "Archivio verbali → «Organi e cartelle sul NAS»: nel campo Tipo trovi «Consiglio di corso di studi» e «➕ Nuovo tipo…».",
+      "Per collegare la cartella al consiglio che c'è già nel portale non serve il tipo: scegli il consiglio nel campo «Appartiene a»."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Archivio verbali: tipo «Consiglio di corso di studi» e tipi di organo nuovi scritti da admin"
   }
 ];
 
@@ -1196,7 +1225,7 @@ var PROSSIMI = [
   ["F10b · Tesi: collegare l'azienda convenzionata alla pratica di tesi dello studente", "fatto in locale: vedi Pacchetto 22"],
   ["F10c · Convenzione di tesi: dati del Direttore nel modello Word", "fatto in locale: vedi Pacchetto 22"],
   ["Prova sul server · firma PAdES vera (azienda e Direttore) nelle convenzioni di tesi", "da fare (a cura tua, 20 minuti): strumento strumenti/verifica_firma_pdf.php e guida documentazione/prova_firma_vera_convenzioni_tesi.md pronti"],
-  ["Pacchetti 24-25 · caricamento sul server (include i precedenti)", "da fare (a cura tua): scp del pacchetto, estrazione, schema v77, aggiunta delle persone nell'«Ufficio convenzioni di tesi», voci di menu (vedi «dopo» dei pacchetti)"],
+  ["Pacchetti 24-26 · caricamento sul server (include i precedenti)", "da fare (a cura tua): scp del pacchetto, estrazione, schema v78, aggiunta delle persone nell'«Ufficio convenzioni di tesi», voci di menu (vedi «dopo» dei pacchetti)"],
   ["F12 · File del portale sul NAS (verbali, convenzioni, pratiche degli studenti)", "fatto in locale: vedi Pacchetto 25 (script, controllo in Sistema, guida); lo spostamento sul server è a cura tua"],
   ["Idea · Tempi per passo delle pratiche (dove si fermano, quanto aspettano)", "da fare: statistica dei giorni medi in ogni passo, per accorgersi dei colli di bottiglia"],
   ["Idea · Valutazione dello studente FSL con attestato delle competenze", "da fare: la struttura ospitante valuta lo studente e l'attestato riporta le competenze"],

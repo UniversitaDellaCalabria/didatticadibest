@@ -121,6 +121,7 @@ $cons = q('SELECT id, nome FROM didattica_consigli ORDER BY id LIMIT 1');
 $admin->invia($P, ['cartella_consiglio' => $cons['id'], 'cartella' => 'Biologia']);
 prova('cartella del consiglio salvata', q('SELECT cartella_archivio c FROM didattica_consigli WHERE id = ' . (int) $cons['id'])['c'] === 'Biologia');
 
+prova('il campo Tipo ha il Consiglio di corso di studi e la scelta di un tipo nuovo', str_contains($h, 'Consiglio di corso di studi') && str_contains($h, 'Nuovo tipo'));
 titolo('Scansione');
 $admin->invia($P, ['scansiona_archivio' => 1]);
 $h = $admin->vai($P);

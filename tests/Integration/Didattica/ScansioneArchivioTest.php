@@ -195,6 +195,30 @@ final class ScansioneArchivioTest extends DidatticaBase
         $this->assertStringContainsString('ha dei verbali', (string) $o->elimina($id));
     }
 
+    public function testTipiDiOrganoPredefinitiEScrittiAMano(): void
+    {
+        $o = $this->servizio(OrganiArchivio::class);
+        $tipi = $o->tipiDisponibili();
+        $this->assertSame('Consiglio di corso di studi', $tipi['consiglio'], 'il consiglio è tra i tipi predefiniti');
+        $this->assertSame(['consiglio', 'commissione', 'riesame', 'studenti', 'altro'], array_keys($tipi));
+
+        $this->assertSame(['riesame', ''], OrganiArchivio::risolviTipo('riesame'));
+        $this->assertSame(['altro', 'Comitato di indirizzo'], OrganiArchivio::risolviTipo('@nuovo', ' Comitato di indirizzo '));
+        $this->assertSame(['altro', 'Comitato di indirizzo'], OrganiArchivio::risolviTipo('x:Comitato di indirizzo'));
+        $this->assertSame(['altro', ''], OrganiArchivio::risolviTipo('inesistente'));
+
+        [$t, $n] = OrganiArchivio::risolviTipo('@nuovo', 'Comitato di indirizzo');
+        $this->assertNull($o->salva(0, 'Comitato di indirizzo – Biologia', $t, 'Biologia', 'Biologia/Comitato', $n));
+        $this->assertArrayHasKey('x:Comitato di indirizzo', $o->tipiDisponibili(), 'il tipo nuovo compare nelle scelte');
+        $org = $o->tutti()[0];
+        $this->assertSame('x:Comitato di indirizzo', OrganiArchivio::valoreScelta($org));
+        $this->assertSame('consiglio', OrganiArchivio::valoreScelta(['tipo' => 'consiglio']));
+
+        // un organo con un tipo predefinito non tiene il nome scritto a mano
+        $this->assertNull($o->salva((int) $org['id'], $org['nome'], 'consiglio', 'Biologia', 'Biologia/Comitato', 'avanzo'));
+        $this->assertSame('', $o->perId((int) $org['id'])['tipo_nome']);
+        $this->assertArrayNotHasKey('x:Comitato di indirizzo', $o->tipiDisponibili());
+    }
     public function testArchivioNonEliminaIFileDelNas(): void
     {
         $this->pdf('Biologia/2019/v.pdf');

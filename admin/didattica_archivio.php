@@ -81,7 +81,13 @@ if ($pubs && !($pubs['verbale_stato'] === 'firmato' || $pubs['origine'] === 'imp
     $corsi_noti = [];
     foreach ($consigli as $c_n) { foreach ((array)json_decode((string)($c_n['corsi'] ?? ''), true) as $x_n) { if (is_string($x_n) && $x_n !== '') $corsi_noti[$x_n] = $x_n; } }
     foreach ($organi_tutti as $o_n) { if ($o_n['corso'] !== '') $corsi_noti[$o_n['corso']] = $o_n['corso']; }
-    $tipi_org = array_map(fn($t) => $t[0], \App\Didattica\OrganiArchivio::TIPI);
+    $tipi_org = $srv_organi->tipiDisponibili();
+    // campo «Tipo»: scelta tra i tipi (predefiniti e già scritti a mano) oppure «Nuovo tipo…» con il nome da scrivere
+    $campo_tipo = function (string $attuale) use ($tipi_org, $h): string {
+        $o = '<select class="form-select form-select-sm" name="tipo" aria-label="Tipo di organo" onchange="this.nextElementSibling.style.display = this.value === \'@nuovo\' ? \'\' : \'none\';">';
+        foreach ($tipi_org as $k_t => $n_t) $o .= '<option value="' . $h($k_t) . '"' . ($attuale === (string)$k_t ? ' selected' : '') . '>' . $h($n_t) . '</option>';
+        return $o . '<option value="@nuovo">➕ Nuovo tipo…</option></select><input class="form-control form-control-sm mt-1" name="tipo_nuovo" maxlength="100" placeholder="Nome del nuovo tipo" style="display:none;">';
+    };
     $e_ult = $ultima['esito'] ?? null;
 ?>
     <details class="card border-0 shadow-sm mb-3" id="organi"<?php echo !empty($_GET['organi']) || $non_coll || !$organi_tutti ? ' open' : ''; ?>>
@@ -110,7 +116,7 @@ if ($pubs && !($pubs['verbale_stato'] === 'firmato' || $pubs['origine'] === 'imp
                                 <?php foreach ($organi_tutti as $o_n): if ($o_n['cartella'] !== '') continue; ?><option value="o<?php echo (int)$o_n['id']; ?>"><?php echo $h(mb_strimwidth($o_n['nome'], 0, 70, '…')); ?></option><?php endforeach; ?>
                             </select></div>
                         <div class="col-lg-3"><label class="form-label small mb-0">Se nuovo: nome</label><input class="form-control form-control-sm" name="nome" maxlength="300" value="<?php echo $h(basename($cart_n)); ?>"></div>
-                        <div class="col-lg-2"><label class="form-label small mb-0">Tipo</label><select class="form-select form-select-sm" name="tipo"><?php foreach ($tipi_org as $k_t => $n_t): ?><option value="<?php echo $h($k_t); ?>"><?php echo $h($n_t); ?></option><?php endforeach; ?></select></div>
+                        <div class="col-lg-2"><label class="form-label small mb-0">Tipo</label><?php echo $campo_tipo('consiglio'); ?></div>
                         <input type="hidden" name="corso" value="">
                         <div class="col-lg-1"><button class="btn btn-sm btn-primary fw-bold w-100" name="collega_cartella" value="1">Collega</button></div>
                         <?php endif; ?>
@@ -133,7 +139,7 @@ if ($pubs && !($pubs['verbale_stato'] === 'firmato' || $pubs['origine'] === 'imp
             <?php foreach (array_merge($organi_tutti, [['id' => 0, 'nome' => '', 'tipo' => 'commissione', 'corso' => '', 'cartella' => '', 'n_verbali' => 0]]) as $o_n): $nuovo_o = !(int)$o_n['id']; ?>
                 <form method="POST" class="row g-2 align-items-end <?php echo $nuovo_o ? 'border rounded p-2 bg-light mt-2' : 'mb-2'; ?>"><?php csrf_field(); ?><input type="hidden" name="id" value="<?php echo (int)$o_n['id']; ?>">
                     <div class="col-lg-3"><label class="form-label small mb-0"><?php echo $nuovo_o ? 'Nuovo organo: nome' : 'Nome'; ?></label><input class="form-control form-control-sm" name="nome" maxlength="300" required value="<?php echo $h($o_n['nome']); ?>"></div>
-                    <div class="col-lg-2"><label class="form-label small mb-0">Tipo</label><select class="form-select form-select-sm" name="tipo"><?php foreach ($tipi_org as $k_t => $n_t): ?><option value="<?php echo $h($k_t); ?>"<?php echo $o_n['tipo'] === $k_t ? ' selected' : ''; ?>><?php echo $h($n_t); ?></option><?php endforeach; ?></select></div>
+                    <div class="col-lg-2"><label class="form-label small mb-0">Tipo</label><?php echo $campo_tipo(\App\Didattica\OrganiArchivio::valoreScelta($o_n)); ?></div>
                     <div class="col-lg-2"><label class="form-label small mb-0">Corso di studi</label><input class="form-control form-control-sm" name="corso" list="dlCorsi" maxlength="300" value="<?php echo $h($o_n['corso']); ?>"></div>
                     <div class="col-lg-3"><label class="form-label small mb-0">Cartella sul NAS</label><input class="form-control form-control-sm" name="cartella" maxlength="300" value="<?php echo $h($o_n['cartella']); ?>" placeholder="Biologia/Commissione didattica"></div>
                     <div class="col-lg-2 d-flex gap-1">

@@ -161,7 +161,8 @@ if ($fase === 'azioni') {
             registra_log_audit($conn, "Archivio verbali: scansione della cartella", ["Nuovi" => $r['nuovi'], "Aggiornati" => $r['aggiornati'], "Tolti" => $r['rimossi']]);
             flash_set('Scansione fatta: ' . $riassunto($r) . '.' . ($r['errori'] ? ' Ci sono ' . count($r['errori']) . ' problemi (sotto).' : ''), $r['errori'] ? 'warning' : 'success');
         } elseif (isset($_POST['salva_organo'])) {
-            $err = $org_s->salva((int)($_POST['id'] ?? 0), (string)($_POST['nome'] ?? ''), (string)($_POST['tipo'] ?? 'altro'), (string)($_POST['corso'] ?? ''), (string)($_POST['cartella'] ?? ''));
+            [$tp_o, $tn_o] = \App\Didattica\OrganiArchivio::risolviTipo((string)($_POST['tipo'] ?? 'altro'), (string)($_POST['tipo_nuovo'] ?? ''));
+            $err = $org_s->salva((int)($_POST['id'] ?? 0), (string)($_POST['nome'] ?? ''), $tp_o, (string)($_POST['corso'] ?? ''), (string)($_POST['cartella'] ?? ''), $tn_o);
             if (!$err) registra_log_audit($conn, "Archivio verbali: organo salvato", ["Organo" => trim((string)$_POST['nome']), "Cartella" => \App\Didattica\OrganiArchivio::cartella((string)($_POST['cartella'] ?? ''))]);
             flash_set($err ?? 'Organo salvato.', $err ? 'danger' : 'success');
         } elseif (isset($_POST['elimina_organo'])) {
@@ -181,8 +182,8 @@ if ($fase === 'azioni') {
             $sc = (string)($_POST['scelta'] ?? 'nuovo');
             if ($cart === '') $err = 'Cartella non valida.';
             elseif (preg_match('/^c(\d+)$/', $sc, $mc)) $err = $org_s->cartellaConsiglio((int)$mc[1], $cart);
-            elseif (preg_match('/^o(\d+)$/', $sc, $mo2) && ($og = $org_s->perId((int)$mo2[1]))) $err = $org_s->salva((int)$og['id'], (string)$og['nome'], (string)$og['tipo'], (string)$og['corso'], $cart);
-            else $err = $org_s->salva(0, (string)($_POST['nome'] ?? '') !== '' ? (string)$_POST['nome'] : basename($cart), (string)($_POST['tipo'] ?? 'altro'), (string)($_POST['corso'] ?? ''), $cart);
+            elseif (preg_match('/^o(\d+)$/', $sc, $mo2) && ($og = $org_s->perId((int)$mo2[1]))) $err = $org_s->salva((int)$og['id'], (string)$og['nome'], (string)$og['tipo'], (string)$og['corso'], $cart, (string)$og['tipo_nome']);
+            else { [$tp_o, $tn_o] = \App\Didattica\OrganiArchivio::risolviTipo((string)($_POST['tipo'] ?? 'altro'), (string)($_POST['tipo_nuovo'] ?? '')); $err = $org_s->salva(0, (string)($_POST['nome'] ?? '') !== '' ? (string)$_POST['nome'] : basename($cart), $tp_o, (string)($_POST['corso'] ?? ''), $cart, $tn_o); }
             if (!$err) {
                 $r = $scan_s->eseguiERicorda(60);
                 registra_log_audit($conn, "Archivio verbali: cartella collegata", ["Cartella" => $cart, "Nuovi" => $r['nuovi']]);

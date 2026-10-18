@@ -15,6 +15,7 @@ final class OrganiArchivio
 {
     /** tipo => [nome predefinito, cartella predefinita] */
     public const TIPI = [
+        'consiglio'   => ['Consiglio di corso di studi', 'Consiglio'],
         'commissione' => ['Commissione didattica', 'Commissione didattica'],
         'riesame'     => ['Gruppo di riesame – Assicurazione della Qualità', 'Gruppo di riesame'],
         'studenti'    => ['Riunione con gli studenti', 'Riunioni con gli studenti'],
@@ -54,8 +55,9 @@ final class OrganiArchivio
     }
 
     /** Crea (id = 0) o aggiorna un organo. Ritorna il messaggio d'errore, null se va bene. */
-    public function salva(int $id, string $nome, string $tipo, string $corso, string $cartella): ?string
+    public function salva(int $id, string $nome, string $tipo, string $corso, string $cartella, string $tipoNome = ''): ?string
     {
+        $tipoNome = mb_substr(trim($tipoNome), 0, 100);
         $nome = mb_substr(trim($nome), 0, 300);
         $corso = mb_substr(trim($corso), 0, 300);
         $cartella = self::cartella($cartella);
@@ -65,17 +67,69 @@ final class OrganiArchivio
         if (!isset(self::TIPI[$tipo])) {
             $tipo = 'altro';
         }
+        if ($tipo !== 'altro') {
+            $tipoNome = '';
+        }
         if ($cartella !== '' && ($altro = $this->proprietarioCartella($cartella, $id))) {
             return 'La cartella «' . $cartella . '» è già di «' . $altro . '».';
         }
         if ($id) {
-            $this->db->esegui('UPDATE archivio_organi SET nome = ?, tipo = ?, corso = ?, cartella = ? WHERE id = ?', [$nome, $tipo, $corso, $cartella, $id]);
+            $this->db->esegui('UPDATE archivio_organi SET nome = ?, tipo = ?, tipo_nome = ?, corso = ?, cartella = ? WHERE id = ?', [$nome, $tipo, $tipoNome, $corso, $cartella, $id]);
             $this->db->esegui('UPDATE didattica_sedute SET organo = ? WHERE organo_id = ?', [$nome, $id]);
         } else {
-            $this->db->inserisci('INSERT INTO archivio_organi (nome, tipo, corso, cartella) VALUES (?, ?, ?, ?)', [$nome, $tipo, $corso, $cartella]);
+            $this->db->inserisci('INSERT INTO archivio_organi (nome, tipo, tipo_nome, corso, cartella) VALUES (?, ?, ?, ?, ?)', [$nome, $tipo, $tipoNome, $corso, $cartella]);
         }
 
         return null;
+    }
+
+    /**
+     * Le scelte del campo «Tipo»: i tipi predefiniti e quelli scritti a mano e già usati. Il valore è la chiave del tipo predefinito oppure «x:Nome».
+     *
+     * @return array<string, string> valore => etichetta
+     */
+    public function tipiDisponibili(): array
+    {
+        $out = [];
+        foreach (self::TIPI as $k => $t) {
+            $out[$k] = $t[0];
+        }
+        foreach ($this->db->righe("SELECT DISTINCT tipo_nome FROM archivio_organi WHERE tipo = 'altro' AND tipo_nome <> '' ORDER BY tipo_nome") as $r) {
+            $out['x:' . $r['tipo_nome']] = (string) $r['tipo_nome'];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Dalla scelta nel modulo («consiglio», «x:Nome» o «@nuovo» con il nome scritto a parte) al tipo da salvare.
+     *
+     * @return array{0: string, 1: string} [chiave del tipo, nome scritto a mano o '']
+     */
+    public static function risolviTipo(string $scelta, string $nuovo = ''): array
+    {
+        if (isset(self::TIPI[$scelta])) {
+            return [$scelta, ''];
+        }
+        if ($scelta === '@nuovo') {
+            return ['altro', mb_substr(trim($nuovo), 0, 100)];
+        }
+        if (str_starts_with($scelta, 'x:')) {
+            return ['altro', mb_substr(trim(substr($scelta, 2)), 0, 100)];
+        }
+
+        return ['altro', ''];
+    }
+
+    /** Il valore da selezionare nel campo «Tipo» per un organo. @param array<string, mixed> $o */
+    public static function valoreScelta(array $o): string
+    {
+        $tipo = (string) ($o['tipo'] ?? 'altro');
+        if ($tipo === 'altro' && (string) ($o['tipo_nome'] ?? '') !== '') {
+            return 'x:' . $o['tipo_nome'];
+        }
+
+        return isset(self::TIPI[$tipo]) ? $tipo : 'altro';
     }
 
     /** Il nome dell'organo o del consiglio che ha già quella cartella (maiuscole ignorate), null se è libera. */

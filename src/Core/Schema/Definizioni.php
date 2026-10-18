@@ -222,7 +222,7 @@ final class Definizioni
         // v77: organi di un corso di studi oltre al consiglio (commissione didattica, gruppo di riesame, riunioni con gli studenti…): hanno solo l'archivio dei verbali,
         // cartella = percorso dentro uploads/verbali/archivio/ (sul NAS) da cui il portale legge i PDF in automatico
         'archivio_organi' => "CREATE TABLE IF NOT EXISTS archivio_organi (
-            id INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(300) NOT NULL DEFAULT '', tipo VARCHAR(20) NOT NULL DEFAULT 'altro', corso VARCHAR(300) NOT NULL DEFAULT '',
+            id INT AUTO_INCREMENT PRIMARY KEY, nome VARCHAR(300) NOT NULL DEFAULT '', tipo VARCHAR(20) NOT NULL DEFAULT 'altro', tipo_nome VARCHAR(100) NOT NULL DEFAULT '', corso VARCHAR(300) NOT NULL DEFAULT '',
             cartella VARCHAR(300) NOT NULL DEFAULT '', attivo TINYINT(1) NOT NULL DEFAULT 1, creato_il DATETIME DEFAULT CURRENT_TIMESTAMP, INDEX idx_cartella (cartella)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         // v70: messaggi tra l'ufficio e la scuola sulla convenzione online (promemoria «carica il PDF», avvisi liberi, risposte della scuola)
@@ -516,6 +516,10 @@ final class Definizioni
             // v63: marche da bollo caricate in Esse3 dalla segreteria (passo «attesa del pagamento»): quando lo studente è stato avvisato e da chi
             'marche_il'            => "ADD COLUMN marche_il DATETIME DEFAULT NULL",
             'marche_da'            => "ADD COLUMN marche_da VARCHAR(200) DEFAULT ''",
+        ],
+        'archivio_organi' => [
+            // v78: tipo scritto a mano da chi gestisce (oltre a quelli predefiniti)
+            'tipo_nome' => "ADD COLUMN tipo_nome VARCHAR(100) NOT NULL DEFAULT ''",
         ],
         'didattica_consigli' => [
             // v77: cartella dei verbali del consiglio dentro uploads/verbali/archivio/ (per esempio «Biologia»): i PDF lì dentro si leggono in automatico
