@@ -186,6 +186,35 @@ $n_pub = (int) q('SELECT COUNT(*) n FROM didattica_sedute WHERE pubblicabile = 1
 prova('con la conferma pubblica tutti i selezionati del consiglio', $n_pub === count($ids_c) && $n_pub > 0, "pubblici: $n_pub su " . count($ids_c));
 $admin->invia($P, ['ritira_blocco' => 1, 'ids' => $ids_c]);
 prova('il ritiro in blocco li toglie dalla pagina pubblica', (int) q('SELECT COUNT(*) n FROM didattica_sedute WHERE pubblicabile = 1')['n'] === 0);
+titolo('Pagina pubblica: organi e filtri');
+$db->query('DELETE FROM verbali_accessi_log');
+$db->query('DELETE FROM verbali_accessi');
+// la commissione appartiene al corso del consiglio (stesso nome) e il suo nome ripete il corso
+$admin->invia($P, ['salva_organo' => 1, 'id' => $id_comm, 'nome' => 'Commissione didattica – ' . $cons['nome'], 'tipo' => 'commissione', 'corso' => $cons['nome'], 'cartella' => 'Biologia/Commissione didattica']);
+$ids_p = [];
+$rs = $db->query('SELECT id FROM didattica_sedute WHERE da_cartella = 1 AND (consiglio_id = ' . (int) $cons['id'] . ' OR organo_id = ' . $id_comm . ')');
+while ($rs && ($rw = $rs->fetch_assoc())) { $ids_p[] = (int) $rw['id']; }
+$admin->invia($P, ['pubblica_blocco' => 1, 'conferma_blocco' => 1, 'ids' => $ids_p]);
+$admin->invia('/eventi/admin/didattica.php?p_id=1&tab=sedute&accessi=1', ['crea_accesso_verbali' => 1, 'etichetta' => 'Prova esterni', 'password' => 'PasswordProva-2026!', 'consigli_ids' => [(int) $cons['id']]]);
+$ext = new Persona($BASE);
+$ext->invia('/eventi/verbali.php', ['accedi' => 1, 'password' => 'PasswordProva-2026!']);
+$pg = $ext->vai('/eventi/verbali.php');
+prova('con la password si entra', str_contains($pg, 'Verbali dei consigli e degli organi') && str_contains($pg, 'Prova esterni'), 'HTTP ' . $ext->codice);
+prova('i verbali sono per organo: il consiglio e la commissione del suo corso', str_contains($pg, '>Consiglio <') && str_contains($pg, 'Commissione didattica <') && count($ids_p) >= 3, count($ids_p) . ' verbali');
+prova('ci sono i filtri a tendina per organo e anno accademico', str_contains($pg, 'name="organo"') && str_contains($pg, 'name="aa"'));
+prova('i verbali pubblicati sono tutti elencati', substr_count($pg, 'verbali.php?d=') === count($ids_p), substr_count($pg, 'verbali.php?d=') . ' link');
+$pf = $ext->vai('/eventi/verbali.php?organo=' . urlencode('Commissione didattica'));
+$n_comm = (int) q('SELECT COUNT(*) n FROM didattica_sedute WHERE da_cartella = 1 AND organo_id = ' . $id_comm)['n'];
+prova('filtrando per organo restano solo i suoi verbali', substr_count($pf, 'verbali.php?d=') === $n_comm && $n_comm > 0, substr_count($pf, 'verbali.php?d=') . ' link, attesi ' . $n_comm);
+preg_match('#verbali\.php\?d=(\d+)#', $pg, $md);
+$dl = $ext->vai('/eventi/verbali.php?d=' . ($md[1] ?? 0));
+prova('un verbale si scarica', $ext->codice === 200 && str_starts_with($dl, '%PDF'), 'HTTP ' . $ext->codice);
+$altri = new Persona($BASE);
+$altri->vai('/eventi/verbali.php?d=' . ($md[1] ?? 0));
+prova('senza password non si scarica nulla', $altri->codice === 404 || !str_starts_with($altri->vai('/eventi/verbali.php?d=' . ($md[1] ?? 0)), '%PDF'));
+$db->query('DELETE FROM verbali_accessi_log');
+$db->query('DELETE FROM verbali_accessi');
+$db->query('UPDATE didattica_sedute SET pubblicabile = 0');
 titolo('Permessi');
 $hr = $referente->vai($P);
 prova('chi non gestisce la Didattica non vede gli organi e le cartelle', !str_contains($hr, 'Organi per corso di studi'));

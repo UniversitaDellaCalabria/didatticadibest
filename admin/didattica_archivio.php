@@ -274,7 +274,7 @@ if ($pubs && !($pubs['verbale_stato'] === 'firmato' || $pubs['origine'] === 'imp
             <button class="btn btn-sm btn-primary fw-bold" name="pubblica_blocco" value="1" data-confirm="Pubblicare i verbali selezionati?"><i class="fa fa-earth-europe me-1" aria-hidden="true"></i>Pubblica i selezionati</button>
             <button class="btn btn-sm btn-outline-danger" name="ritira_blocco" value="1" data-confirm="Ritirare i verbali selezionati dalla pagina pubblica?">Ritira i selezionati</button>
         </div>
-        <div class="small text-secondary mt-1">Si possono pubblicare i verbali firmati o importati di un <strong>consiglio</strong> (gli altri organi non hanno la pagina pubblica). Li vede chi ha un accesso con password per quel consiglio.</div>
+        <div class="small text-secondary mt-1">Si pubblicano i verbali firmati o importati di un <strong>consiglio</strong> e degli altri organi del suo corso di studi (commissione, riesame…, quando il «corso di studi» dell'organo è il nome del consiglio). Li vede chi ha un accesso con password per quel consiglio, organizzati per organo.</div>
     </div></form>
     <?php endif; ?>
     <div class="card border-0 shadow-sm"><div class="table-responsive">
@@ -283,7 +283,7 @@ if ($pubs && !($pubs['verbale_stato'] === 'firmato' || $pubs['origine'] === 'imp
             <tbody>
             <?php foreach ($verbali as $x): $imp_x = $x['origine'] === 'importato'; $inc = !$x['data'] || $x['organo'] === ''; $vs_x = STATI_VERBALE[$x['verbale_stato'] ?? ''] ?? null; ?>
                 <tr<?php echo $inc ? ' class="table-warning"' : ''; ?>>
-                    <?php if ($puo_didattica_tutto): ?><td><?php if (($x['verbale_stato'] === 'firmato' || $imp_x) && $x['verbale_pdf'] && (int)$x['consiglio_id']): ?><input type="checkbox" class="chkB" name="ids[]" value="<?php echo (int)$x['id']; ?>" form="fBulk" data-pub="<?php echo (int)$x['pubblicabile']; ?>" aria-label="Seleziona questo verbale"><?php endif; ?></td><?php endif; ?>
+                    <?php if ($puo_didattica_tutto): ?><td><?php if (($x['verbale_stato'] === 'firmato' || $imp_x) && $x['verbale_pdf'] && ((int)$x['consiglio_id'] || (int)$x['corso_consiglio_id'])): ?><input type="checkbox" class="chkB" name="ids[]" value="<?php echo (int)$x['id']; ?>" form="fBulk" data-pub="<?php echo (int)$x['pubblicabile']; ?>" aria-label="Seleziona questo verbale"><?php endif; ?></td><?php endif; ?>
                     <td class="fw-bold"><?php echo $x['data'] ? date('d/m/Y', strtotime($x['data'])) : '<span class="text-danger">senza data</span>'; ?></td>
                     <td><?php echo $x['organo'] !== '' ? $h(mb_strimwidth($x['organo'], 0, 130, '…')) : '<span class="text-danger">senza organo</span>'; ?><?php echo $x['corso'] !== '' && $x['corso'] !== $x['organo'] ? '<div class="text-secondary" style="font-size:.72rem;"><i class="fa fa-graduation-cap me-1" aria-hidden="true"></i>' . $h(mb_strimwidth($x['corso'], 0, 100, '…')) . '</div>' : ''; ?>
                         <?php $all_x = (string)($x['allegati_json'] ?? '') !== '' ? (json_decode((string)$x['allegati_json'], true) ?: []) : []; if ($all_x): ?>

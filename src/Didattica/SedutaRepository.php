@@ -93,7 +93,7 @@ final class SedutaRepository
         }
 
         return Righe::testo($this->db->righe(
-            'SELECT s.id, s.organo, s.organo_id, s.da_cartella, s.allegati_json, s.data, s.anno_accademico, s.numero_verbale, s.origine, s.verbale_stato, s.verbale_pdf, s.nome_originale, s.consiglio_id, s.odg, s.pubblicabile, s.verbale_pubblico_pdf, COALESCE(NULLIF(ao.corso, \'\'), dc.nome, \'\') AS corso
+            'SELECT s.id, s.organo, s.organo_id, s.da_cartella, s.allegati_json, s.data, s.anno_accademico, s.numero_verbale, s.origine, s.verbale_stato, s.verbale_pdf, s.nome_originale, s.consiglio_id, s.odg, s.pubblicabile, s.verbale_pubblico_pdf, COALESCE(NULLIF(ao.corso, \'\'), dc.nome, \'\') AS corso, (SELECT MIN(cc.id) FROM didattica_consigli cc WHERE cc.nome = ao.corso) AS corso_consiglio_id
              FROM didattica_sedute s LEFT JOIN archivio_organi ao ON ao.id = s.organo_id LEFT JOIN didattica_consigli dc ON dc.id = s.consiglio_id WHERE ' . implode(' AND ', $dove) . ' ORDER BY s.data IS NULL DESC, s.data DESC, s.id DESC LIMIT ' . (int) $limite,
             $par
         ));
@@ -107,10 +107,20 @@ final class SedutaRepository
     public function pubblici(): array
     {
         return $this->db->righe(
-            "SELECT s.*, c.nome AS consiglio_nome FROM didattica_sedute s LEFT JOIN didattica_consigli c ON c.id = s.consiglio_id
-             WHERE s.pubblicabile = 1 AND (s.verbale_stato = 'firmato' OR s.origine = 'importato') AND s.verbale_pdf IS NOT NULL ORDER BY s.data DESC, s.id DESC"
+            self::SQL_PUBBLICO . " WHERE s.pubblicabile = 1 AND (s.verbale_stato = 'firmato' OR s.origine = 'importato') AND s.verbale_pdf IS NOT NULL ORDER BY s.data DESC, s.id DESC"
         );
     }
+
+    /** Un verbale con il suo corso di studi e il suo organo (per decidere se un accesso lo può vedere). @return array<string, mixed>|null */
+    public function perIdPubblico(int $id): ?array
+    {
+        return $this->db->riga(self::SQL_PUBBLICO . ' WHERE s.id = ?', [$id]);
+    }
+
+    /** Verbale + consiglio + altro organo + corso di studi (quello dell'organo, o il consiglio) + il consiglio che dà il nome al corso dell'organo. */
+    private const SQL_PUBBLICO = "SELECT s.*, c.nome AS consiglio_nome, ao.nome AS organo_nome, ao.tipo AS organo_tipo, COALESCE(NULLIF(ao.corso, ''), c.nome, '') AS corso,
+        (SELECT MIN(cc.id) FROM didattica_consigli cc WHERE cc.nome = ao.corso) AS corso_consiglio_id
+        FROM didattica_sedute s LEFT JOIN didattica_consigli c ON c.id = s.consiglio_id LEFT JOIN archivio_organi ao ON ao.id = s.organo_id";
 
     /** Segna il verbale come pubblicabile; $filePubblico = PDF con gli omissis (null = si pubblica il PDF firmato). */
     public function pubblica(int $id, ?string $filePubblico, string $da): void

@@ -207,7 +207,79 @@ final class ServizioVerbaliPubblici
             return false;
         }
 
-        return in_array('*', $ambiti, true) || ($s['consiglio_id'] !== null && in_array((int) $s['consiglio_id'], array_map('intval', $ambiti), true));
+        $ammessi = array_map('intval', $ambiti);
+
+        // il consiglio dell'accesso e gli altri organi dello stesso corso di studi (commissione, riesame, studenti…)
+        return in_array('*', $ambiti, true)
+            || ($s['consiglio_id'] !== null && in_array((int) $s['consiglio_id'], $ammessi, true))
+            || (!empty($s['corso_consiglio_id']) && in_array((int) $s['corso_consiglio_id'], $ammessi, true));
+    }
+
+    /** Il nome dell'organo come si legge nella pagina pubblica: «Consiglio», oppure il nome dell'organo senza il corso in coda. @param array<string, mixed> $v */
+    public static function etichettaOrgano(array $v): string
+    {
+        if (!empty($v['consiglio_id']) && empty($v['organo_id'])) {
+            return 'Consiglio';
+        }
+        $nome = trim((string) ($v['organo_nome'] ?? '') !== '' ? (string) $v['organo_nome'] : (string) ($v['organo'] ?? ''));
+        $coda = ' – ' . (string) ($v['corso'] ?? '');
+        if ((string) ($v['corso'] ?? '') !== '' && str_ends_with($nome, $coda)) {
+            $nome = substr($nome, 0, -strlen($coda));
+        }
+
+        return $nome !== '' ? $nome : 'Altro organo';
+    }
+
+    /** @param array<string, mixed> $v  il consiglio per primo, poi gli altri organi nell'ordine dei tipi */
+    public static function ordineOrgano(array $v): int
+    {
+        if (!empty($v['consiglio_id']) && empty($v['organo_id'])) {
+            return 0;
+        }
+        $i = array_search((string) ($v['organo_tipo'] ?? 'altro'), array_keys(OrganiArchivio::TIPI), true);
+
+        return 1 + ($i === false ? 99 : (int) $i);
+    }
+
+    /**
+     * I verbali di un accesso con corso e organo, e le scelte dei filtri a tendina (corso, organo, anno accademico).
+     *
+     * @param list<array<string, mixed>> $verbali
+     * @param array<string, string> $filtro corso, organo, aa (vuoti = tutti)
+     * @return array{verbali: list<array<string, mixed>>, corsi: list<string>, organi: list<string>, anni: list<string>}
+     */
+    public static function organizza(array $verbali, array $filtro = []): array
+    {
+        $tutti = [];
+        foreach ($verbali as $v) {
+            $v['corso_nome'] = (string) ($v['corso'] ?? '') !== '' ? (string) $v['corso'] : ((string) ($v['consiglio_nome'] ?? '') !== '' ? (string) $v['consiglio_nome'] : 'Altri verbali');
+            $v['organo_etichetta'] = self::etichettaOrgano($v);
+            $v['organo_ordine'] = self::ordineOrgano($v);
+            $v['aa'] = (string) ($v['anno_accademico'] ?? '') !== '' ? (string) $v['anno_accademico'] : 'Senza anno';
+            $tutti[] = $v;
+        }
+        $corsi = array_values(array_unique(array_column($tutti, 'corso_nome')));
+        natcasesort($corsi);
+        $corsi = array_values($corsi);
+        $corso = in_array((string) ($filtro['corso'] ?? ''), $corsi, true) ? (string) $filtro['corso'] : '';
+        $delCorso = $corso === '' ? $tutti : array_values(array_filter($tutti, static fn (array $v): bool => $v['corso_nome'] === $corso));
+
+        // gli organi tra cui scegliere sono quelli del corso scelto (o di tutti), il consiglio per primo
+        $organi = [];
+        foreach ($delCorso as $v) {
+            $organi[$v['organo_etichetta']] = $v['organo_ordine'];
+        }
+        uksort($organi, static fn (string $a, string $b): int => [$organi[$a], $a] <=> [$organi[$b], $b]);
+        $organi = array_keys($organi);
+        $organo = in_array((string) ($filtro['organo'] ?? ''), $organi, true) ? (string) $filtro['organo'] : '';
+        $delOrgano = $organo === '' ? $delCorso : array_values(array_filter($delCorso, static fn (array $v): bool => $v['organo_etichetta'] === $organo));
+
+        $anni = array_values(array_unique(array_column($delOrgano, 'aa')));
+        rsort($anni, SORT_STRING);
+        $aa = in_array((string) ($filtro['aa'] ?? ''), $anni, true) ? (string) $filtro['aa'] : '';
+        $visibili = $aa === '' ? $delOrgano : array_values(array_filter($delOrgano, static fn (array $v): bool => $v['aa'] === $aa));
+
+        return ['verbali' => $visibili, 'corsi' => $corsi, 'organi' => $organi, 'anni' => $anni];
     }
 
     /**
@@ -229,7 +301,7 @@ final class ServizioVerbaliPubblici
      */
     public function file(array $accesso, int $sedutaId): ?array
     {
-        $s = $this->sedute->perId($sedutaId);
+        $s = $this->sedute->perIdPubblico($sedutaId);
         if (!$s || !self::visibile($accesso, $s)) {
             return null;
         }
