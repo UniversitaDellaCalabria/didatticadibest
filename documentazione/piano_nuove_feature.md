@@ -338,6 +338,7 @@ ss -ltnp | grep 11434
 free -h
 ```
 
+* **Alternativa esterna provata (18/10/2026):** collegamento a Gemini via chiave API provato con `strumenti/locale/prova_gemini.php` (chiave in `.env.locale`, testo inventato): funziona, riassunto in stile verbale corretto in 6 secondi con il modello `gemini-flash-latest`. **Non si procede:** per usare l'API serve un account di fatturazione (piano gratuito con limiti, poi a pagamento; il piano gratuito può usare i dati per addestrare i modelli) e il parere del DPO. Si riprende solo se l'Ateneo mette a disposizione un servizio, o per l'IA locale. Copilot non ha un'API utilizzabile (servirebbe Azure OpenAI).
 * **Per togliere tutto** se la qualità non convince: `sudo systemctl disable --now ollama`, poi `sudo rm -rf /usr/local/bin/ollama /usr/share/ollama ~/.ollama ~/ia`.
 * **Da concordare prima di costruirlo**: chi approva la bozza (referente o anche Presidente), se le sedute si registrano già e con quale consenso, parere del DPO per la fase audio.
 
