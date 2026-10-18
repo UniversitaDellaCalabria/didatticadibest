@@ -28,8 +28,9 @@ Guida passo per passo, da seguire con calma (circa 2 ore, la prima volta). Non c
 1. **Pannello di controllo → Cartella condivisa → Crea.** Nome: `portale_didattica`. Non attivare «Nascondi nei risultati di ricerca» se non serve; **attiva il Cestino**; **non cifrare** (o, se cifri, il volume deve montarsi da solo all'avvio).
 2. **Pannello di controllo → Utente → Crea.** Nome: `portale`. Password lunga (20+ caratteri, la salvi nel gestore di password). Nessun gruppo di amministratori. Assegna **lettura/scrittura solo** alla cartella `portale_didattica`, nessun accesso alle altre cartelle, nessuna applicazione (disattiva File Station, DSM, ecc.).
 3. **Servizi file → SMB:** abilita SMB; protocollo minimo **SMB2** (meglio SMB3).
-4. Dentro `portale_didattica` crea queste sottocartelle (File Station → Crea cartella):
-   `verbali`, `convenzioni`, `convenzioni_tesi`, `convenzioni_compilate`, `modelli_convenzione`, `pratiche`, `incarichi`, `autorizzazioni`, `modulistica`, `personale`, `allegati_prenotazioni`.
+4. Dentro `portale_didattica` crea queste sottocartelle (da Nextcloud, File Station o dalla cartella di rete):
+   `verbali` (con dentro `archivio`), `pratiche`, `convenzioni`, `convenzioni_compilate`, `convenzioni_tesi`, `autorizzazioni`, `incarichi`, `allegati_prenotazioni`, e `backup`.
+   **Non spostare** `personale` (foto), `modulistica` (moduli da scaricare), `modelli_convenzione` (modelli), `slide_home`, i loghi e i banner: sono file pubblici, il sito li mostra direttamente e devono restare sul server. Le sottocartelle che il portale usa dentro le altre (`firmate`, `definitive`, …) le crea da solo.
 5. **Snapshot:** *Snapshot Replication* (o equivalente) → programma uno snapshot **ogni giorno** della cartella con conservazione di 30 giorni. Così anche un file cancellato per errore si recupera.
 6. **Sicurezza di rete:** il NAS non deve essere raggiungibile da Internet (niente port forwarding). Se hai un firewall sul NAS, consenti SMB (porta 445) solo dall'IP del server.
 7. Controlla che il volume sia in **RAID** (Gestione archiviazione → stato «Integro») e che esista una copia periodica altrove.
@@ -80,6 +81,23 @@ df -h /mnt/nas_portale
 
 ## 4. Spostare i file esistenti (orario tranquillo, es. sera)
 
+### Metodo veloce: lo script (consigliato)
+Lo script `strumenti/sposta_su_nas.sh` fa tutto il punto 4 per te, cartella per cartella, con controlli e ritorno indietro automatico se qualcosa non va. **Non fa parte del pacchetto** (le cartelle `strumenti/` non vanno sul server): copialo da solo.
+
+```bash
+# dal tuo PC (cartella del progetto)
+scp strumenti/sposta_su_nas.sh UTENTE@160.97.37.188:/tmp/
+# sul server
+sudo bash /tmp/sposta_su_nas.sh --prova      # mostra cosa farebbe, non cambia nulla
+sudo bash /tmp/sposta_su_nas.sh              # sposta tutte le cartelle riservate
+```
+
+Predefiniti: portale in `/opt/lampp/htdocs/didattica`, NAS in `/mnt/nas_nuovo/portale_didattica`, utente di Apache `daemon`. Se sono diversi: `sudo SITO=... NAS=... WEB=... bash /tmp/sposta_su_nas.sh`.
+Si può anche scegliere: `sudo bash /tmp/sposta_su_nas.sh pratiche convenzioni`. Per tornare indietro su una cartella: `sudo bash /tmp/sposta_su_nas.sh --ripristina pratiche`.
+Fai prima un backup manuale (Sistema → Backup → «Esegui ora») e **aspetta che finisca**. Dopo lo script vai al punto 5 (prove).
+
+### Metodo a mano (se preferisci vedere ogni passo)
+
 Cartella del portale: `/opt/lampp/htdocs/didattica`. Fai prima un backup manuale (`Sistema → Backup → Esegui ora`) e **aspetta che finisca**.
 
 Per **ogni** cartella della lista (esempio con `verbali`; ripeti cambiando il nome):
@@ -120,9 +138,10 @@ sudo mv verbali.vecchia verbali
 ```
 Ma se nel frattempo sono arrivati file nuovi, prima copiali dal NAS: `sudo rsync -rt /mnt/nas_portale/verbali/ verbali.vecchia/`.
 
-## 7. Cose che faccio io nel portale (codice, nella sessione dopo)
+## 7. Cosa controlla il portale (già pronto)
 
-- In **Sistema** una riga «File sul NAS: raggiungibile / non raggiungibile» (scrive e cancella un file di prova).
+- In **Sistema → Controllo del sito** compare una riga per ogni cartella spostata sul NAS: «File sul NAS: uploads/pratiche → … (raggiungibile e scrivibile)». Se il NAS è spento o non montato, o non si può scrivere, il controllo notturno (dalle 3) manda un'email agli amministratori. Con il pulsante del controllo lo vedi subito.
+- (Idee per dopo, non ancora fatte:)
 - Il backup notturno non scarica più i file dal NAS (non segue i collegamenti): l'archivio contiene database e codice; i file hanno gli snapshot del NAS. Il report settimanale segnala se il NAS non risponde.
 - Messaggio chiaro agli utenti se un file non si apre perché il NAS è fuori linea (invece di una pagina vuota).
 

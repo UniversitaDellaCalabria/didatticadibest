@@ -28,6 +28,36 @@ final class ControlloSito
     ) {
     }
 
+    /** Le cartelle dei file riservati che si possono tenere sul NAS (collegamenti simbolici verso la cartella di rete). */
+    public const CARTELLE_SUL_NAS = ['verbali', 'pratiche', 'convenzioni', 'convenzioni_compilate', 'convenzioni_tesi', 'autorizzazioni', 'incarichi', 'allegati_prenotazioni'];
+
+    /**
+     * Le cartelle dei file che stanno sul NAS (collegamenti verso un'altra cartella): si leggono e si scrivono? Una cartella normale sul server non compare.
+     *
+     * @return list<array{ok: bool|null, voce: string}>
+     */
+    public function archiviSuNas(): array
+    {
+        $esiti = [];
+        foreach (self::CARTELLE_SUL_NAS as $c) {
+            $p = $this->sito->radice() . '/uploads/' . $c;
+            if (!is_link($p)) {
+                continue;
+            }
+            $dest = (string) readlink($p);
+            if (!is_dir($p)) {
+                $esiti[] = ['ok' => false, 'voce' => "File sul NAS non raggiungibili: uploads/$c → $dest (NAS spento o non montato?)"];
+                continue;
+            }
+            $prova = $p . '/.prova_scrittura_' . bin2hex(random_bytes(4));
+            $scrive = @file_put_contents($prova, 'x') !== false;
+            @unlink($prova);
+            $esiti[] = ['ok' => $scrive, 'voce' => "File sul NAS: uploads/$c → $dest" . ($scrive ? ' (raggiungibile e scrivibile)' : ' (raggiungibile ma NON scrivibile dal server web: permessi del montaggio?)')];
+        }
+
+        return $esiti;
+    }
+
     /** @return list<array{ok: bool|null, voce: string}> esiti (ok null = solo informazione) */
     public function esiti(): array
     {
@@ -49,6 +79,9 @@ final class ControlloSito
         if ($libero !== false) {
             $gb = $libero / 1073741824;
             $voce($gb >= 1, 'Spazio libero sul disco del portale: ' . number_format($gb, 1, ',', '.') . ' GB' . ($gb < 1 ? ' (meno di 1 GB)' : ''));
+        }
+        foreach ($this->archiviSuNas() as $e) {
+            $esiti[] = $e;
         }
         $bk = $this->backup->leggi();
         if (!$bk) {

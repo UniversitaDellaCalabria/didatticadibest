@@ -1148,6 +1148,28 @@ var PACCHETTI = [
     ],
     nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
     commit: "Archivio verbali: altri organi (commissione didattica, riesame, studenti) e cartella sul NAS letta in automatico"
+  },
+  {
+    id: "file-sul-nas",
+    titolo: "Pacchetto 25 · File riservati sul NAS: controllo nel portale e script per spostarli",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare",
+    schema: "nessun cambiamento",
+    riassunto: "Le cartelle dei file riservati (pratiche, convenzioni, convenzioni compilate e di tesi, autorizzazioni, incarichi, allegati delle prenotazioni, verbali) si spostano sul NAS con <strong>collegamenti</strong> (<code>uploads/pratiche → NAS</code>): il portale non cambia, i file stanno sul NAS. Lo script <code>strumenti/sposta_su_nas.sh</code> fa tutto per te (prova, copia, controllo, collegamento, ritorno indietro automatico se qualcosa non va). Nel portale, <strong>Sistema → Controllo del sito</strong> mostra per ogni cartella sul NAS se è raggiungibile e scrivibile, e il controllo notturno avvisa gli amministratori per email se il NAS non risponde. Guida: <code>documentazione/guida_file_sul_nas.md</code>.",
+    passi: [["F12", "File del portale sul NAS"]],
+    cartelle: [
+      { cartella: "src/Sistema/", file: [
+        ["src/Sistema/ControlloSito.php", "mod", "F12", "controllo delle cartelle sul NAS (raggiungibili e scrivibili) con avviso agli amministratori"]
+      ]}
+    ],
+    dopo: [
+      "Lo script <code>strumenti/sposta_su_nas.sh</code> <strong>non fa parte del pacchetto</strong>: copialo da solo sul server, per esempio <code>scp strumenti/sposta_su_nas.sh UTENTE@160.97.37.188:/tmp/</code>.",
+      "Sul server: <code>sudo bash /tmp/sposta_su_nas.sh --prova</code> (non cambia nulla), poi <code>sudo bash /tmp/sposta_su_nas.sh</code>. Prima di tutto un backup manuale (Sistema → Backup → «Esegui ora»).",
+      "Poi prova il portale (scarica un verbale, un allegato di pratica, una convenzione) e apri Sistema → Controllo del sito: ci devono essere righe «File sul NAS … raggiungibile e scrivibile».",
+      "Dopo due settimane, se tutto va bene: <code>sudo rm -rf /opt/lampp/htdocs/didattica/uploads/*.vecchia</code>."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code> (tranne lo script indicato), <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "File sul NAS: controllo delle cartelle collegate in Sistema e script per spostare i file riservati"
   }
 ];
 
@@ -1174,8 +1196,8 @@ var PROSSIMI = [
   ["F10b · Tesi: collegare l'azienda convenzionata alla pratica di tesi dello studente", "fatto in locale: vedi Pacchetto 22"],
   ["F10c · Convenzione di tesi: dati del Direttore nel modello Word", "fatto in locale: vedi Pacchetto 22"],
   ["Prova sul server · firma PAdES vera (azienda e Direttore) nelle convenzioni di tesi", "da fare (a cura tua, 20 minuti): strumento strumenti/verifica_firma_pdf.php e guida documentazione/prova_firma_vera_convenzioni_tesi.md pronti"],
-  ["Pacchetto 24 · caricamento sul server (include i precedenti)", "da fare (a cura tua): scp del pacchetto, estrazione, schema v77, aggiunta delle persone nell'«Ufficio convenzioni di tesi», voci di menu (vedi «dopo» dei pacchetti)"],
-  ["F12 · File del portale sul NAS (verbali, convenzioni, pratiche degli studenti)", "da fare (19/10 mattina, a cura tua con la guida): documentazione/guida_file_sul_nas.md; poi un piccolo pacchetto di codice (controllo NAS in Sistema, backup)"],
+  ["Pacchetti 24-25 · caricamento sul server (include i precedenti)", "da fare (a cura tua): scp del pacchetto, estrazione, schema v77, aggiunta delle persone nell'«Ufficio convenzioni di tesi», voci di menu (vedi «dopo» dei pacchetti)"],
+  ["F12 · File del portale sul NAS (verbali, convenzioni, pratiche degli studenti)", "fatto in locale: vedi Pacchetto 25 (script, controllo in Sistema, guida); lo spostamento sul server è a cura tua"],
   ["Idea · Tempi per passo delle pratiche (dove si fermano, quanto aspettano)", "da fare: statistica dei giorni medi in ogni passo, per accorgersi dei colli di bottiglia"],
   ["Idea · Valutazione dello studente FSL con attestato delle competenze", "da fare: la struttura ospitante valuta lo studente e l'attestato riporta le competenze"],
   ["Idea · Cerca ovunque nel pannello", "fatto in locale: vedi Pacchetto 23"],

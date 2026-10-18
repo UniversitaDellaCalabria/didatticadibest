@@ -69,6 +69,29 @@ final class SistemaIntegrazioneTest extends DatabaseDiProva
         return new ControlloSito($this->db, $this->sito, $this->backup, $this->logEmail, $this->utenti, $this->mailer, true);
     }
 
+    public function testControlloDeiFileSulNas(): void
+    {
+        self::assertSame([], $this->controllo()->archiviSuNas(), 'cartelle normali sul server: niente da dire');
+        $nas = sys_get_temp_dir() . '/nas_prova_' . uniqid();
+        mkdir($nas);
+        if (!@symlink($nas, $this->radice . '/uploads/pratiche')) {
+            rmdir($nas);
+            self::markTestSkipped('Collegamenti simbolici non permessi in questo ambiente.');
+        }
+        $e = $this->controllo()->archiviSuNas();
+        self::assertCount(1, $e);
+        self::assertTrue($e[0]['ok']);
+        self::assertStringContainsString('raggiungibile e scrivibile', $e[0]['voce']);
+        self::assertSame([], glob($nas . '/.prova*') ?: [], 'il file di prova non resta');
+
+        // NAS non montato: la cartella di destinazione non c'è
+        rmdir($nas);
+        $e = $this->controllo()->archiviSuNas();
+        self::assertFalse($e[0]['ok']);
+        self::assertStringContainsString('non raggiungibili', $e[0]['voce']);
+        self::assertSame(1, $this->controllo()->esegui(false)['problemi']);
+        unlink($this->radice . '/uploads/pratiche');
+    }
     public function testControlloSitoSegnalaIlBackupMancanteESalvaLoStato(): void
     {
         $voci = array_column($this->controllo()->esiti(), 'voce');
