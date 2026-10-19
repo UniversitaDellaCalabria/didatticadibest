@@ -460,6 +460,7 @@ $colore_lato = $modulo_corrente === 'portale' ? '#64748b' : $colore_modulo; // l
                         <?php $chiudi_gruppo(); ?>
                         <?php $voce_menu(['utenti.php'], 'utenti.php', 'fa-users-cog', 'Utenti e abilitazioni'); ?>
                         <?php $voce_menu(['uffici.php', 'uffici_ateneo.php'], 'uffici.php', 'fa-sitemap', 'Uffici e persone'); ?>
+                        <?php $voce_menu(['email.php'], 'email.php', 'fa-envelope-open-text', 'Testi delle email'); ?>
                         <?php $voce_menu(['sistema.php', 'audit_log.php', 'log_accessi.php'], 'sistema.php', 'fa-gear', 'Sistema e registri'); ?>
                     <?php endif; ?>
                 <?php endif; ?>

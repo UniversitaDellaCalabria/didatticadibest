@@ -26,6 +26,12 @@ final class CatalogoEmail
         return array_values(array_unique(array_column(self::modelli(), 'gruppo')));
     }
 
+    /** Colore dell'impaginazione dell'email di un gruppo (null = rosso istituzionale). */
+    public static function colore(string $gruppo): ?string
+    {
+        return str_starts_with($gruppo, 'Tutorato') ? '#047857' : null;
+    }
+
     /** Descrizioni ed esempi dei segnaposto più usati. @return array<string, array{d: string, esempio: string}> */
     private static function dizionario(): array
     {

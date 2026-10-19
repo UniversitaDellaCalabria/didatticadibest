@@ -226,7 +226,8 @@ $passi_html = function (array $i) use ($h) {
 <?php
 echo pn_testata('Tutorato · lettere di incarico', 'fa-user-graduate',
     'Per ogni bando: i vincitori, la lettera di incarico, la conferma dello studente, le firme e il protocollo.',
-    !firma_remota_disponibile() ? '<span class="small text-secondary"><i class="fa fa-circle-info me-1" aria-hidden="true"></i>Firma remota Aruba non configurata (.env): docente e direttore caricano il PDF firmato in PAdES.</span>' : '',
+    (!firma_remota_disponibile() ? '<span class="small text-secondary me-2"><i class="fa fa-circle-info me-1" aria-hidden="true"></i>Firma remota Aruba non configurata (.env): docente e direttore caricano il PDF firmato in PAdES.</span>' : '')
+        . '<a class="btn btn-sm btn-outline-secondary" href="email.php?p_id=' . (int)$filtro_p . '"><i class="fa fa-envelope-open-text me-1" aria-hidden="true"></i>Testi delle email</a>',
     '<a href="didattica.php?p_id=' . (int)$filtro_p . '">Didattica</a> › Tutorato');
 ?>
 
