@@ -141,13 +141,9 @@ echo '<meta name="robots" content="noindex, nofollow, noarchive">';
     </div></div>
 <?php else:
     $tutti = $serv->verbali($accesso);
-    $filtro = ['corso' => (string)($_GET['corso'] ?? ''), 'organo' => (string)($_GET['organo'] ?? ''), 'aa' => (string)($_GET['aa'] ?? '')];
-    $org = \App\Didattica\ServizioVerbaliPubblici::organizza($tutti, $filtro);
-    $sel = ['corso' => in_array($filtro['corso'], $org['corsi'], true) ? $filtro['corso'] : '', 'organo' => in_array($filtro['organo'], $org['organi'], true) ? $filtro['organo'] : '', 'aa' => in_array($filtro['aa'], $org['anni'], true) ? $filtro['aa'] : ''];
-    // per corso → per organo (il consiglio per primo) → per anno accademico
-    $albero = [];
-    foreach ($org['verbali'] as $v) $albero[$v['corso_nome']][$v['organo_ordine'] . '|' . $v['organo_etichetta']][$v['aa']][] = $v;
-    ksort($albero, SORT_NATURAL | SORT_FLAG_CASE);
+    // corso, organo (il consiglio per primo) e anno accademico di ogni verbale; l'elenco si disegna nel browser (vista «Per corso» e vista «Cerca»)
+    $org = \App\Didattica\ServizioVerbaliPubblici::organizza($tutti, []);
+    $dati_js = array_map(fn($v) => ['id' => (int)$v['id'], 'c' => $v['corso_nome'], 'o' => $v['organo_etichetta'], 'oo' => (int)$v['organo_ordine'], 'a' => $v['aa'], 'd' => (string)($v['data'] ?? ''), 'n' => (string)($v['numero_verbale'] ?? '')], $org['verbali']);
 ?>
     <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
         <p class="text-secondary mb-0">Accesso: <strong><?php echo $h($accesso['etichetta']); ?></strong><?php echo $accesso['scade_il'] ? ' · valido fino al ' . date('d/m/Y', strtotime($accesso['scade_il'])) : ''; ?></p>
@@ -162,105 +158,166 @@ echo '<meta name="robots" content="noindex, nofollow, noarchive">';
     <?php endif; ?>
 
     <?php if ($tutti): ?>
-    <form method="GET" class="card border-0 shadow-sm mb-3" aria-label="Filtra i verbali"><div class="card-body">
-        <div class="row g-2 align-items-end">
-            <?php if (count($org['corsi']) > 1): ?>
-            <div class="col-md-4"><label class="form-label small fw-bold mb-0" for="vpCorso">Corso di studi</label>
-                <select class="form-select" id="vpCorso" name="corso" onchange="document.getElementById('vpOrg').selectedIndex = 0; this.form.submit();">
-                    <option value="">Tutti i corsi</option>
-                    <?php foreach ($org['corsi'] as $c): ?><option value="<?php echo $h($c); ?>"<?php echo $sel['corso'] === $c ? ' selected' : ''; ?>><?php echo $h(mb_strimwidth($c, 0, 90, '…')); ?></option><?php endforeach; ?>
-                </select></div>
-            <?php endif; ?>
-            <div class="col-md-4"><label class="form-label small fw-bold mb-0" for="vpOrg">Organo</label>
-                <select class="form-select" id="vpOrg" name="organo" onchange="this.form.submit();">
-                    <option value="">Tutti gli organi</option>
-                    <?php foreach ($org['organi'] as $o): ?><option value="<?php echo $h($o); ?>"<?php echo $sel['organo'] === $o ? ' selected' : ''; ?>><?php echo $h($o); ?></option><?php endforeach; ?>
-                </select></div>
-            <div class="col-md-3"><label class="form-label small fw-bold mb-0" for="vpAa">Anno accademico</label>
-                <select class="form-select" id="vpAa" name="aa" onchange="this.form.submit();">
-                    <option value="">Tutti gli anni</option>
-                    <?php foreach ($org['anni'] as $a): ?><option value="<?php echo $h($a); ?>"<?php echo $sel['aa'] === $a ? ' selected' : ''; ?>><?php echo $h($a); ?></option><?php endforeach; ?>
-                </select></div>
-            <div class="col-md-1 d-flex gap-1"><noscript><button class="btn btn-primary" type="submit">Filtra</button></noscript><?php if (array_filter($sel)): ?><a class="btn btn-outline-secondary" href="verbali.php" title="Azzera i filtri" aria-label="Azzera i filtri"><i class="fa fa-xmark" aria-hidden="true"></i></a><?php endif; ?></div>
-        </div>
-        <div class="small text-secondary mt-2"><?php echo count($org['verbali']); ?> verbali<?php echo array_filter($sel) ? ' con questi filtri' : ''; ?>.</div>
-    </div></form>
-    <?php endif; ?>
-
     <style>
-        .vp-organo { background: #fff; border-radius: .6rem; box-shadow: 0 1px 6px rgba(0,0,0,.09); overflow: hidden; margin-bottom: .9rem; }
-        .vp-organo > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; padding: 1rem 1.3rem; background: #8e0f1f; border-bottom: 5px solid #5a0a14; color: #fff; }
-        .vp-organo > summary::-webkit-details-marker { display: none; }
-        .vp-organo > summary:hover { background: #7c0d1b; }
-        .vp-organo > summary .vp-freccia { transition: transform .15s; font-size: 1rem; }
-        .vp-organo[open] > summary .vp-freccia { transform: rotate(90deg); }
-        .vp-organo h3 { font-size: 1.55rem; line-height: 1.2; font-weight: 800; margin: 0; flex: 1 1 auto; color: #fff; }
-        .vp-organo summary .badge { background: rgba(255,255,255,.18) !important; color: #fff !important; border: 1px solid rgba(255,255,255,.45) !important; font-size: .82rem; font-weight: 500; }
-        .vp-ultimo { font-size: .82rem; color: rgba(255,255,255,.85); }
-        .vp-aa > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: .55rem; padding: .6rem 1.3rem .6rem 1.6rem; font-size: 1.02rem; font-weight: 600; color: #3d4852; background: #f7f8fa; border-bottom: 1px solid #e3e7ec; }
-        .vp-aa > summary::-webkit-details-marker { display: none; }
-        .vp-aa > summary .vp-freccia { transition: transform .15s; color: #8e0f1f; font-size: .8rem; }
-        .vp-aa[open] > summary .vp-freccia { transform: rotate(90deg); }
-        .vp-aa > summary:hover { background: #eef1f5; }
-        .vp-aa > summary .badge { font-size: .75rem; font-weight: 600; }
-        .vp-lista a { display: flex; align-items: center; gap: .6rem; padding: .65rem 1.3rem .65rem 2.4rem; border-bottom: 1px solid #f0f2f5; text-decoration: none; }
-        .vp-lista a:hover { background: #f8fafc; }
-        .vp-lista .vp-nome { flex: 1 1 auto; }
-        .vp-lista .vp-apri { font-size: .85rem; white-space: nowrap; }
+        .vb-vista { display:inline-flex; border:1px solid #cbd5e1; border-radius:.5rem; overflow:hidden; background:#fff; }
+        .vb-vista button { border:0; background:transparent; padding:.45rem 1rem; font-weight:600; color:#475569; }
+        .vb-vista button.on { background:#8e0f1f; color:#fff; }
+        .vb-corsi { display:flex; flex-direction:column; gap:.35rem; }
+        .vb-corso { text-align:left; border:1px solid #e2e8f0; background:#fff; border-radius:.5rem; padding:.55rem .75rem; display:flex; gap:.6rem; align-items:flex-start; cursor:pointer; }
+        .vb-corso:hover { background:#f8fafc; }
+        .vb-corso.on { border-color:#8e0f1f; background:#fdf2f4; }
+        .vb-corso .t { flex:1; font-size:.9rem; line-height:1.3; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+        .vb-corso .n { font-size:.78rem; background:#f1f5f9; color:#475569; border-radius:.4rem; padding:.05rem .45rem; }
+        .vb-corso.on .n { background:#8e0f1f; color:#fff; }
+        .vb-chip { border:1px solid #cbd5e1; background:#fff; border-radius:2rem; padding:.3rem .9rem; font-size:.9rem; cursor:pointer; margin:0 .4rem .4rem 0; }
+        .vb-chip.on { background:#1e293b; color:#fff; border-color:#1e293b; }
+        .vb-chip small { opacity:.7; margin-left:.3rem; }
+        .vb-anno { border:1px solid #e2e8f0; border-radius:.5rem; background:#fff; margin-bottom:.6rem; }
+        .vb-anno > summary { list-style:none; cursor:pointer; padding:.65rem 1rem; display:flex; gap:.6rem; align-items:center; font-weight:600; }
+        .vb-anno > summary::-webkit-details-marker { display:none; }
+        .vb-anno > summary .fa-chevron-right { transition:transform .15s; font-size:.75rem; color:#8e0f1f; }
+        .vb-anno[open] > summary .fa-chevron-right { transform:rotate(90deg); }
+        .vb-riga { display:flex; align-items:center; gap:.7rem; padding:.55rem 1rem; border-top:1px solid #f1f5f9; }
+        .vb-riga a.leggi { flex:1; color:inherit; text-decoration:none; }
+        .vb-riga a.leggi:hover { text-decoration:underline; }
+        .vb-tab th { cursor:pointer; white-space:nowrap; font-size:.8rem; text-transform:uppercase; letter-spacing:.03em; color:#64748b; }
+        .vb-tab td { vertical-align:middle; }
+        .vb-tab .cut { max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        @media (max-width: 767px) { .vb-corsi { display:none; } .vb-sel-corso { display:block !important; } }
     </style>
-    <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
-        <button type="button" class="btn btn-sm btn-outline-primary" id="vpApri"><i class="fa fa-angles-down me-1" aria-hidden="true"></i>Espandi tutto</button>
-        <button type="button" class="btn btn-sm btn-outline-secondary" id="vpChiudi"><i class="fa fa-angles-up me-1" aria-hidden="true"></i>Comprimi tutto</button>
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+        <div class="vb-vista" role="group" aria-label="Come vedere i verbali">
+            <button type="button" id="vbBCorso" class="on"><i class="fa fa-sitemap me-1" aria-hidden="true"></i>Per corso</button>
+            <button type="button" id="vbBCerca"><i class="fa fa-magnifying-glass me-1" aria-hidden="true"></i>Cerca</button>
+        </div>
+        <span class="text-secondary small"><?php echo count($dati_js); ?> verbali</span>
     </div>
-    <?php
-        $n_organi_tot = 0; foreach ($albero as $os) $n_organi_tot += count($os);
-        $aperti = array_filter($sel) || $n_organi_tot === 1; // con un filtro, o con un solo organo, si parte già aperti
-    ?>
-    <?php foreach ($albero as $corso => $organi): ksort($organi, SORT_NATURAL | SORT_FLAG_CASE); ?>
-        <section class="mb-4" aria-labelledby="c_<?php echo md5($corso); ?>">
-            <h2 class="h4 fw-bold mb-3" id="c_<?php echo md5($corso); ?>"><i class="fa fa-graduation-cap me-2 text-primary" aria-hidden="true"></i><?php echo $h($corso); ?></h2>
-            <?php foreach ($organi as $chiave => $anni):
-                $nome_organo = substr($chiave, strpos($chiave, '|') + 1);
-                krsort($anni, SORT_STRING);
-                $n_org = array_sum(array_map('count', $anni));
-                $ultimo = null; foreach ($anni as $lista_u) foreach ($lista_u as $v_u) { if ($v_u['data'] && ($ultimo === null || $v_u['data'] > $ultimo)) $ultimo = $v_u['data']; }
-            ?>
-                <details class="vp-organo"<?php echo $aperti ? ' open' : ''; ?>>
-                    <summary>
-                        <i class="fa fa-chevron-right vp-freccia" aria-hidden="true"></i>
-                        <h3><?php echo $h($nome_organo); ?></h3>
-                        <span class="badge"><?php echo $n_org; ?> verbali</span>
-                        <?php if ($ultimo): ?><span class="vp-ultimo">ultimo: <?php echo date('d/m/Y', strtotime($ultimo)); ?></span><?php endif; ?>
-                    </summary>
-                    <?php foreach ($anni as $anno => $lista): ?>
-                        <details class="vp-aa"<?php echo $sel['aa'] !== '' ? ' open' : ''; ?>>
-                            <summary><i class="fa fa-chevron-right vp-freccia" aria-hidden="true"></i><span>Anno accademico <?php echo $h($anno); ?></span><span class="badge text-bg-light border ms-auto"><?php echo count($lista); ?></span></summary>
-                            <div class="vp-lista">
-                                <?php foreach ($lista as $v): ?>
-                                    <div class="d-flex align-items-center">
-                                    <a href="verbali.php?v=<?php echo (int)$v['id']; ?>" target="_blank" rel="noopener" class="flex-grow-1">
-                                        <i class="fa fa-file-pdf text-danger" aria-hidden="true"></i>
-                                        <span class="vp-nome">Verbale<?php echo $v['numero_verbale'] !== '' ? ' n. ' . $h($v['numero_verbale']) : ''; ?><?php echo $v['data'] ? ' del ' . date('d/m/Y', strtotime($v['data'])) : ''; ?></span>
-                                        <span class="vp-apri text-primary">Leggi <i class="fa fa-arrow-up-right-from-square ms-1" aria-hidden="true"></i></span>
-                                    </a>
-                                    <?php if ($puo_scaricare): ?><a class="btn btn-sm btn-outline-success me-3 py-0 flex-shrink-0" style="padding:.2rem .6rem !important;" href="verbali.php?d=<?php echo (int)$v['id']; ?>"><i class="fa fa-download me-1" aria-hidden="true"></i>Scarica</a><?php endif; ?>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        </details>
-                    <?php endforeach; ?>
-                </details>
-            <?php endforeach; ?>
-        </section>
-    <?php endforeach; ?>
+
+    <div id="vbCorso" class="row g-3">
+        <div class="col-md-4 col-lg-3">
+            <select class="form-select vb-sel-corso mb-2" id="vbSelCorso" aria-label="Corso di studi" style="display:none;"></select>
+            <div class="vb-corsi" id="vbCorsi" role="list" aria-label="Corsi di studi"></div>
+        </div>
+        <div class="col-md-8 col-lg-9">
+            <h2 class="h5 fw-bold mb-1" id="vbTitolo"></h2>
+            <div class="small text-secondary mb-2" id="vbSotto"></div>
+            <div id="vbOrgani" class="mb-2" role="tablist" aria-label="Organi"></div>
+            <div id="vbAnni"></div>
+        </div>
+    </div>
+
+    <div id="vbCerca" hidden>
+        <div class="row g-2 mb-2">
+            <div class="col-md-5"><label class="form-label small fw-bold mb-0" for="vbQ">Cerca</label><input type="search" class="form-control" id="vbQ" placeholder="Data, numero, anno o organo" autocomplete="off"></div>
+            <div class="col-md-4"><label class="form-label small fw-bold mb-0" for="vbFC">Corso di studi</label><select class="form-select" id="vbFC"></select></div>
+            <div class="col-md-3"><label class="form-label small fw-bold mb-0" for="vbFA">Anno accademico</label><select class="form-select" id="vbFA"></select></div>
+        </div>
+        <div id="vbFO" class="mb-2"></div>
+        <div class="table-responsive bg-white border rounded"><table class="table table-sm table-hover align-middle mb-0 vb-tab">
+            <thead><tr><th id="vbOrdData" title="Ordina per data">Data <i class="fa fa-arrow-down-long ms-1" aria-hidden="true"></i></th><th>Organo</th><th>Corso</th><th>Anno</th><th></th></tr></thead>
+            <tbody id="vbRighe"></tbody></table></div>
+        <div class="d-flex align-items-center gap-2 mt-2"><span class="small text-secondary" id="vbConta"></span>
+            <button type="button" class="btn btn-sm btn-outline-secondary ms-auto" id="vbPrec">&larr; Precedenti</button><button type="button" class="btn btn-sm btn-outline-secondary" id="vbSucc">Successivi &rarr;</button></div>
+    </div>
     <script>
     (function () {
-        var tutti = function (aperto) { document.querySelectorAll('details.vp-organo, details.vp-aa').forEach(function (d) { d.open = aperto; }); };
-        var a = document.getElementById('vpApri'), c = document.getElementById('vpChiudi');
-        if (a) a.addEventListener('click', function () { tutti(true); });
-        if (c) c.addEventListener('click', function () { tutti(false); });
+        var D = <?php echo json_encode(array_values($dati_js), JSON_UNESCAPED_UNICODE); ?>;
+        var SCARICA = <?php echo $puo_scaricare ? 'true' : 'false'; ?>;
+        var PAG = 20;
+        var $ = function (id) { return document.getElementById(id); };
+        var st = { vista: 'corso', corso: '', organo: '', q: '', fc: '', fo: '', fa: '', asc: false, pag: 0 };
+        try { var v0 = localStorage.getItem('vbVista'); if (v0 === 'cerca') st.vista = 'cerca'; } catch (e) {}
+        var esc = function (x) { return String(x).replace(/[&<>"']/g, function (c) { return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]; }); };
+        var dm = function (d) { return d ? d.slice(8, 10) + '/' + d.slice(5, 7) + '/' + d.slice(0, 4) : 'senza data'; };
+        var nome = function (r) { return 'Verbale' + (r.n ? ' n. ' + r.n : '') + (r.d ? ' del ' + dm(r.d) : ''); };
+        var uniq = function (a) { return a.filter(function (x, i) { return a.indexOf(x) === i; }); };
+        var corsi = uniq(D.map(function (r) { return r.c; })).sort(function (a, b) { return a.localeCompare(b, 'it'); });
+        var anni = uniq(D.map(function (r) { return r.a; })).sort().reverse();
+        var organiTutti = uniq(D.slice().sort(function (a, b) { return a.oo - b.oo; }).map(function (r) { return r.o; }));
+        var ultimo = function (L) { var m = ''; L.forEach(function (r) { if (r.d > m) m = r.d; }); return m; };
+        var cmpData = function (a, b) { return (b.d || '').localeCompare(a.d || '') || b.id - a.id; };
+        var riga = function (r) {
+            return '<div class="vb-riga"><i class="fa fa-file-pdf text-danger" aria-hidden="true"></i><a class="leggi" href="verbali.php?v=' + r.id + '" target="_blank" rel="noopener">' + esc(nome(r)) + '</a>'
+                + '<a class="small text-primary text-decoration-none" href="verbali.php?v=' + r.id + '" target="_blank" rel="noopener">Leggi</a>'
+                + (SCARICA ? '<a class="btn btn-sm btn-outline-success py-0" href="verbali.php?d=' + r.id + '"><i class="fa fa-download me-1" aria-hidden="true"></i>Scarica</a>' : '') + '</div>';
+        };
+
+        // ── Vista «Per corso»: corsi a sinistra, organi a schede, anni a comparsa ──
+        function disegnaCorso() {
+            if (corsi.indexOf(st.corso) < 0) st.corso = corsi[0];
+            var delCorso = D.filter(function (r) { return r.c === st.corso; });
+            var organi = uniq(delCorso.slice().sort(function (a, b) { return a.oo - b.oo; }).map(function (r) { return r.o; }));
+            if (organi.indexOf(st.organo) < 0) st.organo = organi[0];
+            $('vbCorsi').innerHTML = corsi.map(function (c) {
+                var n = D.filter(function (r) { return r.c === c; }).length;
+                return '<button type="button" class="vb-corso' + (c === st.corso ? ' on' : '') + '" data-c="' + esc(c) + '" role="listitem"><span class="t">' + esc(c) + '</span><span class="n">' + n + '</span></button>';
+            }).join('');
+            $('vbSelCorso').innerHTML = corsi.map(function (c) { return '<option value="' + esc(c) + '"' + (c === st.corso ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('');
+            $('vbTitolo').textContent = st.corso;
+            $('vbSotto').textContent = delCorso.length + ' verbali · ultimo ' + dm(ultimo(delCorso));
+            $('vbOrgani').innerHTML = organi.map(function (o) {
+                var n = delCorso.filter(function (r) { return r.o === o; }).length;
+                return '<button type="button" class="vb-chip' + (o === st.organo ? ' on' : '') + '" data-o="' + esc(o) + '" role="tab">' + esc(o) + '<small>' + n + '</small></button>';
+            }).join('');
+            var L = delCorso.filter(function (r) { return r.o === st.organo; }).sort(cmpData);
+            var perAnno = {}; L.forEach(function (r) { (perAnno[r.a] = perAnno[r.a] || []).push(r); });
+            var ak = Object.keys(perAnno).sort().reverse();
+            $('vbAnni').innerHTML = ak.map(function (a, i) {
+                return '<details class="vb-anno"' + (i === 0 ? ' open' : '') + '><summary><i class="fa fa-chevron-right" aria-hidden="true"></i>Anno accademico ' + esc(a) + '<span class="badge text-bg-light border ms-auto">' + perAnno[a].length + '</span></summary>' + perAnno[a].map(riga).join('') + '</details>';
+            }).join('') || '<div class="text-secondary">Nessun verbale.</div>';
+        }
+        $('vbCorsi').addEventListener('click', function (e) { var b = e.target.closest('[data-c]'); if (b) { st.corso = b.getAttribute('data-c'); st.organo = ''; disegnaCorso(); } });
+        $('vbSelCorso').addEventListener('change', function () { st.corso = this.value; st.organo = ''; disegnaCorso(); });
+        $('vbOrgani').addEventListener('click', function (e) { var b = e.target.closest('[data-o]'); if (b) { st.organo = b.getAttribute('data-o'); disegnaCorso(); } });
+
+        // ── Vista «Cerca»: ricerca, filtri e tabella ordinata per data ──
+        function filtrati() {
+            var q = st.q.trim().toLowerCase();
+            return D.filter(function (r) {
+                if (st.fc && r.c !== st.fc) return false;
+                if (st.fo && r.o !== st.fo) return false;
+                if (st.fa && r.a !== st.fa) return false;
+                if (!q) return true;
+                return (nome(r) + ' ' + r.a + ' ' + r.o + ' ' + r.c + ' ' + (r.d || '')).toLowerCase().indexOf(q) >= 0;
+            }).sort(function (a, b) { var x = cmpData(a, b); return st.asc ? -x : x; });
+        }
+        function disegnaCerca() {
+            $('vbFC').innerHTML = '<option value="">Tutti i corsi</option>' + corsi.map(function (c) { return '<option value="' + esc(c) + '"' + (c === st.fc ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('');
+            $('vbFA').innerHTML = '<option value="">Tutti gli anni</option>' + anni.map(function (a) { return '<option value="' + esc(a) + '"' + (a === st.fa ? ' selected' : '') + '>' + esc(a) + '</option>'; }).join('');
+            $('vbFO').innerHTML = '<button type="button" class="vb-chip' + (st.fo === '' ? ' on' : '') + '" data-o="">Tutti gli organi</button>' + organiTutti.map(function (o) { return '<button type="button" class="vb-chip' + (o === st.fo ? ' on' : '') + '" data-o="' + esc(o) + '">' + esc(o) + '</button>'; }).join('');
+            var L = filtrati(), tot = L.length, max = Math.max(0, Math.ceil(tot / PAG) - 1);
+            if (st.pag > max) st.pag = max;
+            var pg = L.slice(st.pag * PAG, st.pag * PAG + PAG);
+            $('vbRighe').innerHTML = pg.map(function (r) {
+                return '<tr><td class="text-nowrap">' + esc(dm(r.d)) + '</td><td>' + esc(r.o) + '</td><td class="cut" title="' + esc(r.c) + '">' + esc(r.c) + '</td><td class="text-nowrap">' + esc(r.a) + '</td>'
+                    + '<td class="text-end text-nowrap"><a class="small text-primary text-decoration-none me-2" href="verbali.php?v=' + r.id + '" target="_blank" rel="noopener">Leggi</a>'
+                    + (SCARICA ? '<a class="btn btn-sm btn-outline-success py-0" href="verbali.php?d=' + r.id + '"><i class="fa fa-download" aria-hidden="true" title="Scarica"></i></a>' : '') + '</td></tr>';
+            }).join('') || '<tr><td colspan="5" class="text-secondary p-3">Nessun verbale con questi filtri.</td></tr>';
+            $('vbConta').textContent = tot ? (st.pag * PAG + 1) + '–' + (st.pag * PAG + pg.length) + ' di ' + tot : '0 verbali';
+            $('vbPrec').disabled = st.pag === 0; $('vbSucc').disabled = st.pag >= max;
+        }
+        $('vbQ').addEventListener('input', function () { st.q = this.value; st.pag = 0; disegnaCerca(); });
+        $('vbFC').addEventListener('change', function () { st.fc = this.value; st.pag = 0; disegnaCerca(); });
+        $('vbFA').addEventListener('change', function () { st.fa = this.value; st.pag = 0; disegnaCerca(); });
+        $('vbFO').addEventListener('click', function (e) { var b = e.target.closest('[data-o]'); if (b) { st.fo = b.getAttribute('data-o'); st.pag = 0; disegnaCerca(); } });
+        $('vbOrdData').addEventListener('click', function () { st.asc = !st.asc; this.querySelector('i').className = 'fa ms-1 ' + (st.asc ? 'fa-arrow-up-long' : 'fa-arrow-down-long'); disegnaCerca(); });
+        $('vbPrec').addEventListener('click', function () { st.pag = Math.max(0, st.pag - 1); disegnaCerca(); });
+        $('vbSucc').addEventListener('click', function () { st.pag++; disegnaCerca(); });
+
+        // ── Cambio di vista ──
+        function vista(v) {
+            st.vista = v;
+            $('vbCorso').hidden = v !== 'corso'; $('vbCerca').hidden = v !== 'cerca';
+            $('vbBCorso').classList.toggle('on', v === 'corso'); $('vbBCerca').classList.toggle('on', v === 'cerca');
+            try { localStorage.setItem('vbVista', v); } catch (e) {}
+            if (v === 'corso') disegnaCorso(); else disegnaCerca();
+        }
+        $('vbBCorso').addEventListener('click', function () { vista('corso'); });
+        $('vbBCerca').addEventListener('click', function () { vista('cerca'); });
+        vista(st.vista);
     })();
     </script>
+    <?php endif; ?>
     <?php if (!$tutti): ?><div class="alert alert-light border">Non ci sono ancora verbali pubblicati per il tuo accesso.</div>
     <?php elseif (!$org['verbali']): ?><div class="alert alert-light border">Nessun verbale con questi filtri.</div><?php endif; ?>
 <?php endif; ?>
