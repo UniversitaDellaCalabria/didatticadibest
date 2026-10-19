@@ -127,7 +127,37 @@ titolo('Ripristino');
 $admin->invia($P . '?k=tutorato_invito_studente', ['chiave' => 'tutorato_invito_studente', 'ripristina' => 1]);
 prova('il testo torna originale', !q("SELECT chiave FROM email_modelli WHERE chiave = 'tutorato_invito_studente'"));
 
+titolo('I due pulsanti manuali del tutorato');
+$db->query("UPDATE tutorato_incarichi SET stato = 'firmata', firmata_direttore_il = NOW(), data_inizio = CURDATE() - INTERVAL 40 DAY, data_fine = CURDATE() + INTERVAL 30 DAY, docente_email = 'anna.verdi@example.org' WHERE id = $iid");
+$db->query("INSERT INTO tutorato_registro (incarico_id, data, ore, attivita, stato) VALUES ($iid, CURDATE() - INTERVAL 5 DAY, 4, 'Esercitazione', 'inviata')");
+$pg = $admin->vai($T . '&incarico=' . $iid);
+prova('la scheda ha i due pulsanti', str_contains($pg, 'Invita a compilare il registro') && str_contains($pg, 'Invia al docente la fine attività da firmare'), 'HTTP ' . $admin->codice);
+prova('quello per il docente è spento finché ci sono ore da approvare', (bool) preg_match('/name="invia_fine_docente"[^>]*disabled/', $pg));
+$pb = $admin->vai($T . '&bando=' . $bid);
+prova('nella pagina del bando c\'è l\'invito in blocco con il numero', str_contains($pb, 'Invita a compilare il registro (1 in ritardo)'));
+foreach (glob('cache/email_locali/*') ?: [] as $f) { @unlink($f); }
+$admin->invia($T . '&incarico=' . $iid, ['incarico_id' => $iid, 'invita_registro' => 1]);
+$mail = glob('cache/email_locali/*maria.verdi.email*') ?: [];
+prova('l\'invito arriva al tutor con il link del registro', $mail && str_contains((string) file_get_contents(end($mail)), 'registro_tutorato.php?id=' . $iid));
+$pg = $admin->vai($T . '&incarico=' . $iid);
+prova('l\'ultimo invito compare nella scheda', str_contains($pg, 'Ultimo invito al tutor'));
+foreach (glob('cache/email_locali/*') ?: [] as $f) { @unlink($f); }
+$admin->invia($T . '&bando=' . $bid, ['bando_id' => $bid, 'invita_registro_bando' => 1]);
+prova('l\'invito in blocco manda un\'email al tutor in ritardo', count(glob('cache/email_locali/*maria.verdi.email*') ?: []) === 1);
+$db->query("UPDATE tutorato_registro SET stato = 'approvata' WHERE incarico_id = $iid");
+$pg = $admin->vai($T . '&incarico=' . $iid);
+prova('con le ore approvate il pulsante per il docente è acceso', !preg_match('/name="invia_fine_docente"[^>]*disabled/', $pg));
+foreach (glob('cache/email_locali/*') ?: [] as $f) { @unlink($f); }
+$admin->invia($T . '&incarico=' . $iid, ['incarico_id' => $iid, 'invia_fine_docente' => 1]);
+$r = q("SELECT fine_stato, token_fine FROM tutorato_incarichi WHERE id = $iid");
+prova('la dichiarazione è pronta da firmare', ($r['fine_stato'] ?? '') === 'da_firmare' && !empty($r['token_fine']), json_encode($r));
+$mail = glob('cache/email_locali/*anna.verdi*') ?: [];
+$testo = $mail ? (string) file_get_contents(end($mail)) : '';
+prova('il docente riceve l\'email con il link per firmare', str_contains($testo, 'firma_incarico.php?t=' . ($r['token_fine'] ?? 'x')) && str_contains($testo, 'Apri e firma la dichiarazione'), $testo === '' ? 'nessuna email' : '');
+$pg = $admin->vai($T . '&incarico=' . $iid);
+prova('ora si può rimandare l\'email', str_contains($pg, 'Rimanda al docente l&#039;email per la firma') || str_contains($pg, "Rimanda al docente l'email per la firma"));
 // pulizia
+$db->query("DELETE FROM tutorato_registro WHERE incarico_id = $iid");
 $db->query("DELETE FROM tutorato_eventi WHERE incarico_id = $iid");
 $db->query("DELETE FROM tutorato_incarichi WHERE id = $iid");
 $db->query("DELETE FROM tutorato_bandi WHERE id = $bid");

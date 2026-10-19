@@ -171,6 +171,104 @@ final class ServizioRegistroTutorato
         return null;
     }
 
+    /** Il tutor ha il registro indietro: lettera aperta, fine attività non ancora dichiarata, meno ore segnate di quelle previste. @param array<string, mixed> $i */
+    public function registroIndietro(array $i): bool
+    {
+        return self::aperto($i) && (string) $i['fine_stato'] === '' && self::ore($this->registro->righe((int) $i['id']))['totale'] < (float) $i['ore'];
+    }
+
+    /**
+     * Le lettere di un bando i cui tutor hanno il registro indietro (per l'invito in blocco).
+     *
+     * @return list<int>
+     */
+    public function idRegistroIndietro(int $bandoId): array
+    {
+        $r = [];
+        foreach ($this->incarichi->delBando($bandoId) as $x) {
+            if (($i = $this->incarichi->perId((int) $x['id'])) && $this->registroIndietro($i) && trim((string) $i['email']) !== '') {
+                $r[] = (int) $i['id'];
+            }
+        }
+
+        return $r;
+    }
+
+    /** Pulsante manuale: invita il tutor a compilare il registro. Ritorna un errore o null. */
+    public function invitaARegistro(int $id, string $autore = ''): ?string
+    {
+        $i = $this->incarichi->perId($id);
+        if (!$i) {
+            return 'Lettera non trovata.';
+        }
+        if (!self::aperto($i) || (string) $i['fine_stato'] !== '') {
+            return 'Il registro si compila dopo la firma del Direttore e fino a quando il tutor non dichiara concluse le attività.';
+        }
+        if (trim((string) $i['email']) === '') {
+            return 'La lettera non ha l\'indirizzo email del tutor.';
+        }
+        $this->notifiche->inviaModello(
+            $i['email'],
+            'tutorato_invito_registro',
+            ServizioIncarichi::datiEmail($i) + ['ore_segnate' => DatiLettera::oreTesto(self::ore($this->registro->righe($id))['totale']), 'ore_previste' => DatiLettera::oreTesto($i['ore'])],
+            $this->sito->urlBase() . '/registro_tutorato.php?id=' . $id
+        );
+        $this->lettere->evento($id, 'invito_registro', 'Invito a compilare il registro inviato a ' . $i['email'], $autore);
+
+        return null;
+    }
+
+    /**
+     * Invito in blocco: a tutti i tutor del bando che hanno il registro indietro.
+     *
+     * @return int quanti inviti sono partiti
+     */
+    public function invitaARegistroIlBando(int $bandoId, string $autore = ''): int
+    {
+        $n = 0;
+        foreach ($this->idRegistroIndietro($bandoId) as $id) {
+            if ($this->invitaARegistro($id, $autore) === null) {
+                $n++;
+            }
+        }
+
+        return $n;
+    }
+
+    /**
+     * Pulsante manuale: il portale prepara la dichiarazione di fine attività (le ore devono essere tutte approvate) e il docente riceve
+     * l'email per firmarla. Se la dichiarazione è già pronta e aspetta la firma, l'email si rimanda con lo stesso link.
+     */
+    public function inviaFineAlDocente(int $id, string $autore = ''): ?string
+    {
+        $i = $this->incarichi->perId($id);
+        if (!$i) {
+            return 'Lettera non trovata.';
+        }
+        if (trim((string) $i['docente_email']) === '') {
+            return 'La lettera non ha l\'indirizzo email del docente responsabile.';
+        }
+        $rimandata = (string) $i['fine_stato'] === 'da_firmare';
+        if ($rimandata) {
+            $tok = (string) $i['token_fine'];
+        } else {
+            [$tok, $err] = $this->confermaFine($id, $autore);
+            if ($err !== null) {
+                return $err;
+            }
+            $i = $this->incarichi->perId($id) ?? $i;
+        }
+        $this->notifiche->inviaModello(
+            $i['docente_email'],
+            'tutorato_docente_fine_da_firmare',
+            ServizioIncarichi::datiEmail($i) + ['ore' => DatiLettera::oreTesto($i['ore_approvate']), 'ore_previste' => DatiLettera::oreTesto($i['ore'])],
+            $this->sito->urlBase() . '/firma_incarico.php?t=' . $tok
+        );
+        $this->lettere->evento($id, 'fine_al_docente', ($rimandata ? 'Email di nuovo al docente' : 'Dichiarazione di fine attività inviata al docente') . ' per la firma: ' . $i['docente_email'], $autore);
+
+        return null;
+    }
+
     /**
      * Il docente conferma la fine: ore approvate, dichiarazione in PDF da firmare (link firma_incarico.php?t=token_fine).
      *

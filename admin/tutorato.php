@@ -59,6 +59,13 @@ if (isset($_GET['file'], $_GET['incarico'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify($_POST['csrf_token'] ?? '');
     // Decreti in PDF, estremi del decreto di approvazione atti e ufficio di Ateneo che paga i tutor del bando
+    if (isset($_POST['invita_registro_bando'])) {
+        $bid = (int)($_POST['bando_id'] ?? 0);
+        $n_inv = \App\Core\App::per($conn)->get(\App\Tutorato\ServizioRegistroTutorato::class)->invitaARegistroIlBando($bid, $autore);
+        if ($n_inv) registra_log_audit($conn, "Tutorato: invito in blocco a compilare il registro", ["Bando" => $bid, "Inviti" => $n_inv]);
+        flash_set($n_inv ? "Invito inviato a $n_inv tutor." : "Nessun tutor ha il registro indietro: non è partito niente.", $n_inv ? 'success' : 'warning');
+        admin_redirect("$base&bando=$bid");
+    }
     if (isset($_POST['salva_decreti'])) {
         $bid = (int)($_POST['bando_id'] ?? 0);
         $fsv = \App\Core\App::per($conn)->get(\App\Tutorato\FileTutorato::class);
@@ -152,6 +159,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$err) registra_log_audit($conn, "Tutorato: iter della lettera cambiato", ["Lettera" => $iid, "Iter" => $_POST['iter'] ?? '']);
         flash_set($err ?? "Iter della lettera aggiornato.", $err ? 'danger' : 'success');
         admin_redirect("$base&incarico=$iid");
+    }
+    if (isset($_POST['invita_registro'])) {
+        $err = \App\Core\App::per($conn)->get(\App\Tutorato\ServizioRegistroTutorato::class)->invitaARegistro($iid, $autore);
+        if (!$err) registra_log_audit($conn, "Tutorato: invito a compilare il registro", ["Lettera" => $iid]);
+        flash_set($err ?? "Invito inviato al tutor.", $err ? 'danger' : 'success');
+        admin_redirect("$base&incarico=$iid#fine");
+    }
+    if (isset($_POST['invia_fine_docente'])) {
+        $err = \App\Core\App::per($conn)->get(\App\Tutorato\ServizioRegistroTutorato::class)->inviaFineAlDocente($iid, $autore);
+        if (!$err) registra_log_audit($conn, "Tutorato: fine attività inviata al docente per la firma", ["Lettera" => $iid]);
+        flash_set($err ?? "Dichiarazione di fine attività inviata al docente per la firma.", $err ? 'danger' : 'success');
+        admin_redirect("$base&incarico=$iid#fine");
     }
     if (isset($_POST['presa_servizio'])) {
         $err = \App\Core\App::per($conn)->get(\App\Tutorato\ServizioIncarichi::class)->presaServizio($iid, $autore);
@@ -507,6 +526,29 @@ $vista_validare = ($_GET['vista'] ?? '') === 'validare';
                             <a class="btn btn-sm btn-outline-secondary" href="<?php echo $base; ?>&amp;incarico=<?php echo (int)$i['id']; ?>&amp;file=fine_anteprima" target="_blank" rel="noopener"><i class="fa fa-file-pdf me-1" aria-hidden="true"></i>Anteprima della dichiarazione</a>
                         <?php endif; ?>
                     </div>
+                    <?php if (in_array($fs, ['', 'richiesta', 'da_firmare'], true)):
+                        $ultimo_ev = [];
+                        foreach (\App\Core\App::per($conn)->get(\App\Tutorato\ServizioIncarichi::class)->eventi((int)$i['id']) as $ev_p) {
+                            if (in_array($ev_p['tipo'], ['invito_registro', 'fine_al_docente'], true) && (!isset($ultimo_ev[$ev_p['tipo']]) || $ev_p['creato_il'] > $ultimo_ev[$ev_p['tipo']])) $ultimo_ev[$ev_p['tipo']] = $ev_p['creato_il'];
+                        }
+                        $fine_pronta = $o['inviata'] <= 0 && $o['approvata'] > 0; ?>
+                        <form method="POST" class="border-top pt-2 mb-2"><?php csrf_field(); ?><input type="hidden" name="incarico_id" value="<?php echo (int)$i['id']; ?>">
+                            <div class="small fw-bold mb-1">Promemoria manuali</div>
+                            <div class="d-flex flex-wrap gap-2">
+                                <?php if ($fs === ''): ?>
+                                    <button type="submit" name="invita_registro" value="1" class="btn btn-sm btn-outline-primary"><i class="fa fa-bell me-1" aria-hidden="true"></i>Invita a compilare il registro</button>
+                                <?php endif; ?>
+                                <?php if ($fs === 'da_firmare'): ?>
+                                    <button type="submit" name="invia_fine_docente" value="1" class="btn btn-sm btn-outline-primary"><i class="fa fa-paper-plane me-1" aria-hidden="true"></i>Rimanda al docente l'email per la firma</button>
+                                <?php else: ?>
+                                    <button type="submit" name="invia_fine_docente" value="1" class="btn btn-sm btn-outline-primary"<?php echo $fine_pronta ? ' data-confirm="Il portale prepara la dichiarazione di fine attività con le ore approvate e la manda al docente per la firma. Procedere?"' : ' disabled title="Servono ore approvate e nessuna ora ancora da approvare"'; ?>><i class="fa fa-file-signature me-1" aria-hidden="true"></i>Invia al docente la fine attività da firmare</button>
+                                <?php endif; ?>
+                            </div>
+                            <?php if (isset($ultimo_ev['invito_registro']) && $fs === ''): ?><div class="form-text">Ultimo invito al tutor: <?php echo date('d/m/Y H:i', strtotime($ultimo_ev['invito_registro'])); ?></div><?php endif; ?>
+                            <?php if (isset($ultimo_ev['fine_al_docente'])): ?><div class="form-text">Ultimo invio al docente: <?php echo date('d/m/Y H:i', strtotime($ultimo_ev['fine_al_docente'])); ?></div><?php endif; ?>
+                            <?php if ($fs !== 'da_firmare' && !$fine_pronta): ?><div class="form-text">Il pulsante per il docente si attiva quando le ore del registro sono tutte approvate.</div><?php endif; ?>
+                        </form>
+                    <?php endif; ?>
                     <?php if (in_array($fs, ['', 'richiesta'], true)): ?>
                         <form method="POST" class="border-top pt-2"><?php csrf_field(); ?><input type="hidden" name="incarico_id" value="<?php echo (int)$i['id']; ?>">
                             <div class="small fw-bold mb-1">Dati per la dichiarazione (si compila da sola)</div>
@@ -637,6 +679,8 @@ $vista_validare = ($_GET['vista'] ?? '') === 'validare';
             <div class="small text-secondary">a.a. <?php echo $h($b['anno_accademico']); ?> · bando D.D. n. <?php echo $h(decreto_testo($b['decreto_bando'], $b['decreto_bando_data'])); ?><?php echo $b['decreto_commissione'] !== '' ? ' · atti D.D. n. ' . $h(decreto_testo($b['decreto_commissione'], $b['decreto_commissione_data'])) : ''; ?> · Direttore <?php echo $h($b['direttore_nome']); ?></div></div>
         <a class="btn btn-sm btn-outline-secondary" href="<?php echo $base; ?>&amp;bando=<?php echo (int)$b['id']; ?>&amp;modifica=1"><i class="fa fa-pen me-1" aria-hidden="true"></i>Modifica il bando</a>
         <a class="btn btn-sm btn-outline-primary fw-bold" href="<?php echo $base; ?>&amp;bando=<?php echo (int)$b['id']; ?>&amp;importa=1"><i class="fa fa-file-import me-1" aria-hidden="true"></i>Importa dalla graduatoria (Word)</a>
+        <?php $n_indietro = count(\App\Core\App::per($conn)->get(\App\Tutorato\ServizioRegistroTutorato::class)->idRegistroIndietro((int)$b['id'])); ?>
+        <?php if ($n_indietro): ?><form method="POST" class="m-0"><?php csrf_field(); ?><input type="hidden" name="bando_id" value="<?php echo (int)$b['id']; ?>"><button type="submit" name="invita_registro_bando" value="1" class="btn btn-sm btn-outline-primary" data-confirm="Mandare l'invito a compilare il registro a <?php echo $n_indietro; ?> tutor?"><i class="fa fa-bell me-1" aria-hidden="true"></i>Invita a compilare il registro (<?php echo $n_indietro; ?> in ritardo)</button></form><?php endif; ?>
         <a class="btn btn-sm btn-primary fw-bold" href="<?php echo $base; ?>&amp;nuovo_incarico=1&amp;bando=<?php echo (int)$b['id']; ?>"><i class="fa fa-user-plus me-1" aria-hidden="true"></i>Nuovo vincitore</a>
     </div></div>
     <?php $uffici_ateneo_b = \App\Core\App::per($conn)->get(\App\Ateneo\ServizioUfficiAteneo::class)->elenco(true);

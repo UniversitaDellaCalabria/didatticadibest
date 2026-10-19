@@ -83,7 +83,6 @@ final class CatalogoEmail
         $R = 'Tutorato · Registro e fine attività';
         $F = 'Tutorato · Firme ferme';
         $P = 'Tutorato · Pagamenti';
-        $E = ['tutor', 'tutor_cn', 'bando'];
 
         return [
             'tutorato_invito_studente' => self::m($L, 'Invito al tutor a confermare la lettera (iter nel portale)', "L'ufficio preme «Invia email allo studente» (o «Invia di nuovo l'email»).", 'Il tutor vincitore', ['tutor', 'bando'],
@@ -140,6 +139,14 @@ final class CatalogoEmail
                 'Tutorato: fine attività di {{tutor_cn}}',
                 "Gentile {{docente_con_titolo}},\n\n{{tutor}} ha dichiarato concluse le attività di tutorato ({{bando}}) di cui è responsabile.\n\nOre nel registro: **{{ore}}** su {{ore_previste}}{{da_approvare}}.\n\nControlli il registro, approvi le ore e confermi la fine delle attività: il portale prepara la dichiarazione di fine attività da firmare in PAdES.",
                 'Apri il registro'),
+            'tutorato_invito_registro' => self::m($R, 'Invito al tutor a compilare il registro (manuale)', "L'ufficio preme «Invita a compilare il registro» (nella scheda della lettera, oppure per tutti i tutor in ritardo di un bando).", 'Il tutor', ['tutor', 'bando', 'ore_segnate' => ['d' => 'Ore già segnate nel registro', 'esempio' => '12'], 'ore_previste'],
+                'Tutorato: compila il registro delle attività',
+                "Gentile {{tutor}},\n\nti invitiamo a compilare il **registro delle attività** del tuo incarico di tutorato ({{bando}}): segna i giorni, le ore e le attività svolte. Il docente responsabile le approva.\n\nOre segnate: {{ore_segnate}} su {{ore_previste}}.\n\nQuando hai finito clicca su **«Ho concluso le attività»**.",
+                'Apri il registro'),
+            'tutorato_docente_fine_da_firmare' => self::m($R, 'Al docente: fine attività già pronta, da firmare (manuale)', "L'ufficio preme «Invia al docente la fine attività da firmare»: le ore sono tutte approvate e il portale ha preparato la dichiarazione.", 'Il docente responsabile', ['docente_con_titolo', 'tutor', 'tutor_cn', 'bando', 'ore', 'ore_previste'],
+                'Tutorato: dichiarazione di fine attività da firmare – {{tutor_cn}}',
+                "Gentile {{docente_con_titolo}},\n\nè pronta la **dichiarazione di fine attività** di tutorato di **{{tutor}}** ({{bando}}), già compilata con le ore approvate: **{{ore}} ore** su {{ore_previste}}.\n\nLa controlli e la firmi digitalmente **in formato PAdES** (firma remota Aruba dal portale o caricando il PDF firmato): non serve altro.",
+                'Apri e firma la dichiarazione'),
             'tutorato_fine_firmata_operatore' => self::m($R, "All'operatore: fine attività firmata, da validare", 'Il docente ha firmato la dichiarazione di fine attività (con il PDF firmato allegato).', 'Gli operatori (come per la lettera da protocollare)', ['tutor', 'tutor_cn', 'bando', 'ore', 'ore_previste', '!tabella' => ['d' => 'Tabella delle giornate approvate (la prepara il portale)', 'esempio' => "<table style='border-collapse:collapse;font-size:13px;'><tr><th style='text-align:left;padding:3px 8px;'>Data</th><th style='padding:3px 8px;'>Ore</th><th style='text-align:left;padding:3px 8px;'>Attività</th></tr><tr><td style='padding:3px 8px;'>10/02/2027</td><td style='padding:3px 8px;text-align:center;'>4</td><td style='padding:3px 8px;'>Esercitazioni</td></tr></table>"]],
                 'Fine attività firmata: da validare – {{tutor_cn}} – {{ore}} ore',
                 "Il tutor **{{tutor}}** ({{bando}}) ha completato le attività: **{{ore}} ore** approvate su {{ore_previste}}.\n\nLa dichiarazione di fine attività è firmata in PAdES dal docente titolare (non serve il protocollo): controlla ore e documenti e passa la pratica all'ufficio pagamenti dalla vista «Da validare» del tutorato.\n\n{{!tabella}}",
