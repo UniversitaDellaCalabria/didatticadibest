@@ -1261,11 +1261,52 @@ var PACCHETTI = [
     ],
     nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
     commit: "Tutorato: iter per Uniticket (presa di servizio verificata, modello SCAFIS con dati SPID, due file da allegare, senza pagamenti)"
+  },
+  {
+    id: "email-modificabili",
+    titolo: "Pacchetto 28 · Testi delle email modificabili + promemoria manuali del tutorato",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare",
+    schema: "v82 (tabella nuova email_modelli)",
+    riassunto: "Nuova pagina <strong>Gestione del portale → «Testi delle email»</strong> (e pulsante nella pagina del tutorato): per ogni email si vede <em>quando parte e a chi arriva</em> e si cambiano oggetto, testo e pulsante <strong>senza toccare il codice</strong>. Il testo si scrive con i segnaposto (<code>{{tutor}}</code>, <code>{{bando}}</code>…) che il portale riempie da solo; c'è l'<strong>anteprima</strong> con dati d'esempio, <strong>«Inviami una prova»</strong> e <strong>«Ripristina l'originale»</strong>; ogni modifica resta nel registro attività. In questo pacchetto ci sono le <strong>email del tutorato</strong> (23 modelli: le 18 di prima, alcune divise in due testi, e due nuove). Senza modifiche le email partono <strong>identiche a prima</strong>. Chi può modificare: gli amministratori tutte le email; chi gestisce il tutorato quelle del tutorato. <strong>Due pulsanti nuovi nella scheda della lettera:</strong> «Invita a compilare il registro» (e nella pagina del bando «Invita… (N in ritardo)» per tutti i tutor con le ore indietro) e «Invia al docente la fine attività da firmare» (con tutte le ore approvate il portale prepara la dichiarazione e il docente riceve l'email con «Apri e firma»; se è già pronta si può rimandare). Ogni invio resta nella storia della lettera.",
+    passi: [["Gestione del portale", "Testi delle email"], ["Tutorato", "Promemoria manuali"]],
+    cartelle: [
+      { cartella: "admin/", file: [
+        ["admin/email.php", "nuovo", "Testi delle email", "la pagina: elenco, ricerca, editor, anteprima, prova, ripristino"],
+        ["admin/admin_header.php", "mod", "Testi delle email", "voce di menu «Testi delle email»"],
+        ["admin/tutorato.php", "mod", "Tutorato", "pulsante «Testi delle email», promemoria manuali (scheda e bando)"]
+      ]},
+      { cartella: "inc/", file: [
+        ["inc/sezioni.php", "mod", "Testi delle email", "la pagina email.php nel modulo Gestione del portale"]
+      ]},
+      { cartella: "src/Email/ (cartella nuova)", file: [
+        ["src/Email/ModelliEmail.php", "nuovo", "Testi delle email", "testi dal catalogo e dalle modifiche, segnaposto sicuri, controlli"],
+        ["src/Email/CatalogoEmail.php", "nuovo", "Testi delle email", "i 23 modelli del tutorato con testo originale"]
+      ]},
+      { cartella: "src/Tutorato/", file: [
+        ["src/Tutorato/NotificheIncarichi.php", "mod", "Tutorato", "inviaModello(): le email vengono dai modelli"],
+        ["src/Tutorato/ServizioIncarichi.php", "mod", "Tutorato", "le email della lettera dai modelli"],
+        ["src/Tutorato/ServizioRegistroTutorato.php", "mod", "Tutorato", "email del registro e solleciti dai modelli; invito al tutor e fine attività al docente"],
+        ["src/Tutorato/NotifichePagamenti.php", "mod", "Tutorato", "email dei pagamenti dai modelli"]
+      ]},
+      { cartella: "src/Core/Schema/", file: [
+        ["src/Core/Schema/Definizioni.php", "mod", "Testi delle email", "tabella email_modelli"],
+        ["src/Core/Schema/Migrazioni.php", "mod", "Testi delle email", "versione dello schema: 82"]
+      ]}
+    ],
+    dopo: [
+      "Apri una pagina del pannello: lo schema passa alla v82 (tabella <code>email_modelli</code>; all'inizio è vuota e le email partono come prima).",
+      "Gestione del portale → <strong>Testi delle email</strong>: scegli un'email, cambia il testo, premi <strong>Anteprima</strong> e <strong>Inviami una prova</strong>, poi <strong>Salva</strong>.",
+      "Tutorato → apri una lettera firmata: nella scheda «Registro e fine attività» ci sono i <strong>Promemoria manuali</strong>; nella pagina del bando compare «Invita a compilare il registro (N in ritardo)» quando ci sono tutor indietro.",
+      "Le altre email del portale (pratiche, convenzioni, risorse, eventi…) restano per ora com'erano: passeranno dalla stessa pagina nei prossimi pacchetti."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Email modificabili: modelli con segnaposto, pagina «Testi delle email» e le email del tutorato; pulsanti manuali del tutorato"
   }
 ];
 
 var PROSSIMI = [
-  ["F15 · Email modificabili da una pagina del pannello + promemoria manuali del tutorato", "da fare (piano del 20/10 nel §F15): pagina «Email», le 18 email del tutorato, due pulsanti, poi le altre aree"],
+  ["F15 · Email modificabili: step 5-8", "restano le email di pratiche e didattica, convenzioni (FSL e tesi), risorse, iscrizioni, attestati, sondaggi, direzione e la guida (piano §F15)"],
   ["F11 · Verbali pubblici: sola visualizzazione e download con le credenziali di Ateneo", "fatto in locale (schema v80): vedi il piano (F11). File: verbali.php, admin/didattica_accessi.php, admin/didattica_sedute.php, src/Didattica/ServizioVerbaliPubblici.php, src/Didattica/AccessoVerbaliRepository.php, src/Uffici/*, src/Core/Schema/*, assets/vendor/cdnjs/ajax/libs/pdf.js/ (nuova cartella: 2 file)"],
   ["F10 · Convenzioni di tesi con enti e aziende esterne", "fatto in locale: vedi Pacchetto 20 (link all'azienda senza registrazione, modifiche agli articoli, firma del Direttore, archivio ed elenco pubblico)"],
   ["F8 · Uffici di Dipartimento e di Ateneo in un'unica anagrafe, Direttore e vice, «Direttore assente»", "fatto in locale: vedi Pacchetto 19 (restano da decidere la pagina pubblica «Organigramma» e un selettore unico per gli eventi)"],
