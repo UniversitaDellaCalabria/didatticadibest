@@ -62,9 +62,9 @@ final class AccessoVerbaliRepository
         $this->db->esegui('UPDATE verbali_accessi SET ultimo_accesso_il = NOW(), n_accessi = n_accessi + 1 WHERE id = ?', [$id]);
     }
 
-    public function registra(?int $accessoId, string $azione, ?int $sedutaId, string $ip): void
+    public function registra(?int $accessoId, string $azione, ?int $sedutaId, string $ip, string $utente = ''): void
     {
-        $this->db->esegui('INSERT INTO verbali_accessi_log (accesso_id, azione, seduta_id, ip) VALUES (?, ?, ?, ?)', [$accessoId, $azione, $sedutaId, $ip]);
+        $this->db->esegui('INSERT INTO verbali_accessi_log (accesso_id, azione, seduta_id, ip, utente) VALUES (?, ?, ?, ?, ?)', [$accessoId, $azione, $sedutaId, $ip, mb_substr($utente, 0, 150)]);
     }
 
     /** Toglie dal registro le righe più vecchie dei mesi indicati. */
@@ -77,7 +77,7 @@ final class AccessoVerbaliRepository
     public function registro(int $limite = 100): array
     {
         return Righe::testo($this->db->righe(
-            'SELECT l.creato_il, l.azione, l.ip, l.seduta_id, a.etichetta, s.data AS seduta_data, s.organo AS seduta_organo
+            'SELECT l.creato_il, l.azione, l.ip, l.seduta_id, l.utente, COALESCE(a.etichetta, l.utente) AS etichetta, s.data AS seduta_data, s.organo AS seduta_organo
              FROM verbali_accessi_log l LEFT JOIN verbali_accessi a ON a.id = l.accesso_id LEFT JOIN didattica_sedute s ON s.id = l.seduta_id
              ORDER BY l.id DESC LIMIT ' . (int) $limite
         ));

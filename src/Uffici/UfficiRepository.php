@@ -15,8 +15,8 @@ final class UfficiRepository
 {
     public const DIPARTIMENTO = 'dipartimento';
     public const ATENEO = 'ateneo';
-    /** Uffici fissi del Dipartimento: non si eliminano. Le loro persone non sono «operatori» della Didattica (senza op_id). */
-    public const CHIAVI_DIREZIONE = ['direzione', 'segreteria_direzione'];
+    /** Uffici fissi del Dipartimento: servono al portale, non si eliminano. Le loro persone non sono «operatori» della Didattica (senza op_id). */
+    public const CHIAVI_FISSE = ['direzione', 'segreteria_direzione', 'convenzioni_fsl', 'verbali_scarico'];
 
     public function __construct(private Database $db)
     {
@@ -112,7 +112,7 @@ final class UfficiRepository
             return false;
         }
         $u = $this->perId($ufficioId);
-        $operatore = $u && $u['ambito'] === self::DIPARTIMENTO && !in_array((string) $u['chiave'], self::CHIAVI_DIREZIONE, true);
+        $operatore = $u && $u['ambito'] === self::DIPARTIMENTO && !in_array((string) $u['chiave'], self::CHIAVI_FISSE, true);
         $op = $operatore ? (int) ($this->db->valore('SELECT MIN(op_id) FROM uffici_persone WHERE email = ? AND op_id IS NOT NULL', [$email]) ?? 0) : 0;
         $nuovo = $this->db->inserisci(
             'INSERT INTO uffici_persone (ufficio_id, persona_id, email, nominativo, struttura, ruolo, compiti, corsi, op_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',

@@ -8,6 +8,7 @@ use App\Auth\LimiteRichieste;
 use App\Auth\Sessione;
 use App\Core\IndirizzoClient;
 use App\Core\Sito;
+use App\Uffici\UfficiRepository;
 
 /**
  * La pagina pubblica dei verbali con password. Gli accessi li crea l'Ufficio didattico (una password per gruppo di esterni, con i consigli che
@@ -23,6 +24,9 @@ final class ServizioVerbaliPubblici
     public const FINESTRA = 900;
     public const MESI_REGISTRO = 12;
     public const MIN_PASSWORD = 10;
+    public const CHIAVE_TOKEN = 'verbali_pubblici_token';
+    /** Secondi di validità del permesso con cui il visualizzatore legge il PDF (una sola lettura). */
+    public const VALIDITA_TOKEN = 600;
     private const ALFABETO = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
 
     public function __construct(
@@ -33,6 +37,7 @@ final class ServizioVerbaliPubblici
         private LimiteRichieste $limite,
         private IndirizzoClient $client,
         private Sito $sito,
+        private UfficiRepository $uffici,
         private string $cartella = Costanti::DIR_VERBALI
     ) {
     }
@@ -294,12 +299,80 @@ final class ServizioVerbaliPubblici
     }
 
     /**
-     * Il PDF da scaricare (la versione con omissis se c'è) e il nome, dopo aver controllato che l'accesso possa vederlo; registra lo scaricamento.
+     * Chi può scaricare i verbali: gli amministratori e le persone dell'ufficio «Download dei verbali» (Gestione del portale → Uffici), scelte dall'anagrafe
+     * di Ateneo, che accedono con le credenziali di Ateneo. Chi entra solo con la password pubblica vede i verbali in sola visualizzazione.
+     *
+     * @param array<string, mixed>|null $utente l'utente collegato con le credenziali di Ateneo
+     */
+    public function puoScaricare(?array $utente): bool
+    {
+        if (!$utente || empty($utente['id'])) {
+            return false;
+        }
+        if ((int) ($utente['ruolo_id'] ?? 0) === 1 || in_array('1', explode(',', (string) ($utente['ruoli_secondari'] ?? '')), true)) {
+            return true;
+        }
+        $u = $this->uffici->perChiave('verbali_scarico');
+
+        return $u !== null && $this->uffici->membro((int) $u['id'], (string) ($utente['email'] ?? ''));
+    }
+
+    /**
+     * L'accesso di chi è autorizzato al download e ha fatto l'accesso con le credenziali di Ateneo: vede tutti i verbali pubblicabili, senza password.
+     *
+     * @param array<string, mixed>|null $utente
+     * @return array<string, mixed>|null
+     */
+    public function accessoDaCredenziali(?array $utente): ?array
+    {
+        if (!$this->puoScaricare($utente)) {
+            return null;
+        }
+
+        return ['id' => 0, 'etichetta' => 'Credenziali di Ateneo: ' . trim((string) ($utente['nome'] ?? '') . ' ' . (string) ($utente['cognome'] ?? '')), 'ambiti_json' => '["*"]', 'scade_il' => null, 'sso' => true, 'email' => (string) ($utente['email'] ?? '')];
+    }
+
+    /** Permesso monouso con cui il visualizzatore (la pagina con il PDF disegnato nella pagina) legge il file: vale per un solo verbale e per pochi minuti. */
+    public function tokenVista(int $sedutaId): string
+    {
+        $t = bin2hex(random_bytes(16));
+        $m = $this->tokenAttivi();
+        $m[$t] = ['s' => $sedutaId, 't' => time()];
+        $this->sessione->scrivi(self::CHIAVE_TOKEN, array_slice($m, -20, null, true));
+
+        return $t;
+    }
+
+    /** Controlla e consuma il permesso: ritorna true una sola volta. */
+    public function consumaToken(string $token, int $sedutaId): bool
+    {
+        $m = $this->tokenAttivi();
+        if (!isset($m[$token]) || (int) $m[$token]['s'] !== $sedutaId) {
+            return false;
+        }
+        unset($m[$token]);
+        $this->sessione->scrivi(self::CHIAVE_TOKEN, $m);
+
+        return true;
+    }
+
+    /** @return array<string, array{s: int, t: int}> */
+    private function tokenAttivi(): array
+    {
+        $m = $this->sessione->leggi(self::CHIAVE_TOKEN);
+        $m = is_array($m) ? $m : [];
+
+        return array_filter($m, static fn ($x): bool => is_array($x) && time() - (int) ($x['t'] ?? 0) <= self::VALIDITA_TOKEN);
+    }
+
+    /**
+     * Il PDF di un verbale (la versione con omissis se c'è) e il nome, dopo aver controllato che l'accesso possa vederlo; registra l'operazione:
+     * «visualizza» quando il visualizzatore lo legge, «scarica» quando lo scarica chi è autorizzato. Il controllo del diritto al download è della pagina (puoScaricare).
      *
      * @param array<string, mixed> $accesso
      * @return array{percorso: string, nome: string}|null
      */
-    public function file(array $accesso, int $sedutaId): ?array
+    public function file(array $accesso, int $sedutaId, string $azione = 'scarica'): ?array
     {
         $s = $this->sedute->perIdPubblico($sedutaId);
         if (!$s || !self::visibile($accesso, $s)) {
@@ -311,9 +384,17 @@ final class ServizioVerbaliPubblici
         if (!$base || !$p || strpos($p, $base . DIRECTORY_SEPARATOR) !== 0 || !is_file($p)) {
             return null;
         }
-        $this->accessi->registra((int) $accesso['id'], 'scarica', $sedutaId, self::ipAnonimo($this->client->ip()));
+        $this->accessi->registra((int) $accesso['id'] ?: null, $azione, $sedutaId, self::ipAnonimo($this->client->ip()), (string) ($accesso['email'] ?? ''));
 
         return ['percorso' => $p, 'nome' => 'Verbale_' . ($s['data'] ? date('d_m_Y', strtotime((string) $s['data'])) : 'seduta') . '.pdf'];
+    }
+
+    /** I dati di un verbale per il titolo del visualizzatore (numero e data), se l'accesso può vederlo. @param array<string, mixed> $accesso @return array<string, mixed>|null */
+    public function dati(array $accesso, int $sedutaId): ?array
+    {
+        $s = $this->sedute->perIdPubblico($sedutaId);
+
+        return $s && self::visibile($accesso, $s) ? $s : null;
     }
 
     /**

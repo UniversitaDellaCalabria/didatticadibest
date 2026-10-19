@@ -12,7 +12,10 @@ $url_pubblico = rtrim((string)\App\Core\App::get(\App\Core\Sito::class)->urlBase
 $n_pubblici = count(\App\Core\App::per($conn)->get(\App\Didattica\SedutaRepository::class)->pubblici());
 $nome_consigli = fn(array $a) => in_array('*', (array)json_decode((string)$a['ambiti_json'], true), true) ? 'tutti i consigli'
     : implode(', ', array_map(fn($i) => mb_strimwidth($consigli[(int)$i]['nome'] ?? '—', 0, 60, '…'), (array)json_decode((string)$a['ambiti_json'], true)));
-$azioni_log = ['accesso' => 'è entrato', 'scarica' => 'ha scaricato', 'rifiutato' => 'password rifiutata'];
+$azioni_log = ['accesso' => 'è entrato', 'visualizza' => 'ha letto', 'scarica' => 'ha scaricato', 'rifiutato' => 'password rifiutata'];
+$uff_sv_v = \App\Core\App::per($conn)->get(\App\Uffici\ServizioUffici::class);
+$uff_scarico_v = $uff_sv_v->perChiave('verbali_scarico');
+$scaricatori = $uff_scarico_v ? $uff_sv_v->persone((int)$uff_scarico_v['id']) : [];
 $form_consigli = function (?array $a) use ($consigli, $h) {
     $amb = $a ? (array)json_decode((string)$a['ambiti_json'], true) : [];
     $tutti = in_array('*', $amb, true);
@@ -27,7 +30,7 @@ $form_consigli = function (?array $a) use ($consigli, $h) {
 ?>
     <nav class="small mb-2"><a href="<?php echo $base; ?>&amp;tab=sedute&amp;archivio=1" class="text-decoration-none"><i class="fa fa-arrow-left me-1" aria-hidden="true"></i>Archivio verbali</a></nav>
     <h2 class="h5 fw-bold mb-1"><i class="fa fa-key me-1" style="color:var(--pn-mod);" aria-hidden="true"></i>Accesso ai verbali (pagina pubblica)</h2>
-    <p class="small text-secondary mb-3">Chi non ha le credenziali di Ateneo (per esempio i rappresentanti esterni) entra con una <strong>password</strong> che gli dai tu, nella pagina <code><?php echo $h($url_pubblico); ?></code>. Vede solo i verbali <strong>firmati e segnati come pubblicabili</strong> dei consigli che hai scelto <strong>e degli altri organi dello stesso corso di studi</strong> (commissione, riesame…), organizzati per organo e con i filtri per organo e anno accademico, fino alla scadenza. Ogni accesso e ogni scaricamento si registra (IP anonimizzato, conservato <?php echo \App\Didattica\ServizioVerbaliPubblici::MESI_REGISTRO; ?> mesi). Ora sono pubblicabili <strong><?php echo $n_pubblici; ?></strong> verbali: si scelgono dall'archivio (icona del mondo).</p>
+    <p class="small text-secondary mb-3">Chi non ha le credenziali di Ateneo (per esempio i rappresentanti esterni) entra con una <strong>password</strong> che gli dai tu, nella pagina <code><?php echo $h($url_pubblico); ?></code>. Li <strong>legge nella pagina senza poterli scaricare né stampare</strong> (il download è riservato a chi ha le credenziali di Ateneo ed è abilitato, vedi a destra). Vede solo i verbali <strong>firmati e segnati come pubblicabili</strong> dei consigli che hai scelto <strong>e degli altri organi dello stesso corso di studi</strong> (commissione, riesame…), organizzati per organo e con i filtri per organo e anno accademico, fino alla scadenza. Ogni accesso, lettura e scaricamento si registra (IP anonimizzato, conservato <?php echo \App\Didattica\ServizioVerbaliPubblici::MESI_REGISTRO; ?> mesi). Ora sono pubblicabili <strong><?php echo $n_pubblici; ?></strong> verbali: si scelgono dall'archivio (icona del mondo).</p>
 
     <?php if ($nuova): $acc_n = $rep_acc->perId((int)$nuova[0]); ?>
     <div class="alert alert-success"><div class="fw-bold mb-1"><i class="fa fa-circle-check me-1" aria-hidden="true"></i>Password di «<?php echo $h($acc_n['etichetta'] ?? ''); ?>»: copiala adesso, non si potrà rivedere.</div>
@@ -77,6 +80,28 @@ $form_consigli = function (?array $a) use ($consigli, $h) {
             </div></div>
         </div>
         <div class="col-lg-4">
+            <div class="card border-0 shadow-sm mb-3" id="scaricatori" style="border-left:5px solid #15803d !important;"><div class="card-body">
+                <h6 class="fw-bold"><i class="fa fa-download me-1 text-success" aria-hidden="true"></i>Chi può scaricare i verbali</h6>
+                <p class="small text-secondary">Con la sola password i verbali si <strong>leggono nella pagina ma non si scaricano né si stampano</strong>. Scarica chi accede con le <strong>credenziali di Ateneo</strong> ed è in questo elenco (persone dell'anagrafe di Ateneo) oppure è amministratore: vede tutti i verbali pubblicabili.</p>
+                <?php foreach ($scaricatori as $sc): ?>
+                    <form method="POST" class="d-flex gap-2 align-items-center border-bottom py-1"><?php csrf_field(); ?>
+                        <div class="flex-grow-1 small"><strong><?php echo $h($sc['nominativo']); ?></strong><div class="text-secondary"><?php echo $h($sc['email']); ?><?php echo $sc['struttura'] ? ' · ' . $h($sc['struttura']) : ''; ?></div></div>
+                        <button type="submit" name="togli_scaricatore_verbali" value="<?php echo (int)$sc['id']; ?>" class="btn btn-sm btn-outline-danger py-0" data-confirm="Togliere <?php echo $h($sc['nominativo']); ?> dal download dei verbali?" aria-label="Togli"><i class="fa fa-user-minus" aria-hidden="true"></i></button>
+                    </form>
+                <?php endforeach; ?>
+                <?php if (!$scaricatori): ?><p class="small text-muted mb-2">Nessuna persona: per ora scaricano solo gli amministratori.</p><?php endif; ?>
+                <form method="POST" class="mt-2 dd-scelta-persona" id="formScaricatore"><?php csrf_field(); ?><input type="hidden" name="persona_id" value=""><input type="hidden" name="aggiungi_scaricatore_verbali" value="1">
+                    <div class="small fw-bold mb-1">Abilita una persona dall'anagrafe</div>
+                    <?php echo html_ricerca_personale($conn, 'Abilita'); ?>
+                </form>
+                <script>
+                (function () {
+                    var f = document.getElementById('formScaricatore'); if (!f) return;
+                    f.addEventListener('persona-scelta', function (e) { f.querySelector('[name=persona_id]').value = e.detail.id; f.submit(); });
+                    f.addEventListener('submit', function (e) { if (!f.querySelector('[name=persona_id]').value) e.preventDefault(); });
+                })();
+                </script>
+            </div></div>
             <form method="POST" class="card border-0 shadow-sm"><div class="card-body">
                 <?php csrf_field(); ?>
                 <h6 class="fw-bold"><i class="fa fa-plus me-1 text-success" aria-hidden="true"></i>Nuovo accesso</h6>

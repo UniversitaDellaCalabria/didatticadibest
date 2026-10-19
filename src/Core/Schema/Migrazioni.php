@@ -16,8 +16,8 @@ use Closure;
  */
 final class Migrazioni
 {
-    /** 75: dati del Direttore nel testo della convenzione di tesi (colonne tesi_direttore_* di impostazioni_sistema). 74: nella richiesta di tesi la sede esterna sceglie l'azienda tra le convenzionate (aggiorna il modulo già creato). 73: convenzioni di tesi con enti e aziende (tabella convenzioni_tesi e ufficio «convenzioni_tesi»). 72: interruttore per sospendere i promemoria al Direttore e agli uffici. 71: uffici di Dipartimento e di Ateneo in un'unica anagrafe (tabelle uffici e uffici_persone): la migrazione copia i dati delle quattro tabelle di prima. */
-    public const VERSIONE = 79;
+    /** 80: verbali pubblici in sola visualizzazione, download con le credenziali di Ateneo (ufficio «verbali_scarico»). 75: dati del Direttore nel testo della convenzione di tesi (colonne tesi_direttore_* di impostazioni_sistema). 74: nella richiesta di tesi la sede esterna sceglie l'azienda tra le convenzionate (aggiorna il modulo già creato). 73: convenzioni di tesi con enti e aziende (tabella convenzioni_tesi e ufficio «convenzioni_tesi»). 72: interruttore per sospendere i promemoria al Direttore e agli uffici. 71: uffici di Dipartimento e di Ateneo in un'unica anagrafe (tabelle uffici e uffici_persone): la migrazione copia i dati delle quattro tabelle di prima. */
+    public const VERSIONE = 80;
 
     /**
      * @param list<string> $gruppiPersonale gruppi assegnati al login in base al ruolo in Ateneo (GRUPPI_PERSONALE)
@@ -228,14 +228,18 @@ final class Migrazioni
             $this->db->comando("INSERT INTO uffici (nome, descrizione, chiave, ambito, ordine) VALUES ('Ufficio convenzioni di tesi', 'Prende in carico le convenzioni per la tesi con enti e aziende: protocollo in entrata e definitivo, modifiche agli articoli', 'convenzioni_tesi', 'dipartimento', 0)");
         }
 
+        // Uffici fissi che servono al portale (se mancano si creano): convenzioni FSL e persone che possono scaricare i verbali
+        foreach ([['convenzioni_fsl', 'Ufficio convenzioni FSL', 'Prende in carico le convenzioni delle scuole (Formazione Scuola Lavoro): protocollo in entrata e definitivo', 90],
+                  ['verbali_scarico', 'Download dei verbali', 'Persone che possono scaricare i verbali dalla pagina pubblica (accedendo con le credenziali di Ateneo)', 91]] as [$chiave, $nome, $descr, $ord]) {
+            if ((int) $this->db->valore('SELECT COUNT(*) FROM uffici WHERE chiave = ?', [$chiave]) === 0) {
+                $this->db->inserisci("INSERT INTO uffici (nome, descrizione, chiave, ambito, ordine) VALUES (?, ?, ?, 'dipartimento', ?)", [$nome, $descr, $chiave, $ord]);
+            }
+        }
         // Direzione del Dipartimento (Direttore e vice) e segreteria di direzione: sempre presenti. Il Direttore delle impostazioni diventa il primo membro.
         if (!$giaFatto) {
             $dir = $this->db->inserisci("INSERT INTO uffici (nome, descrizione, chiave, ambito, ordine) VALUES ('Direzione del Dipartimento', 'Direttore e vice direttore: firmano convenzioni e pratiche', 'direzione', 'dipartimento', 0)");
             if ((int) $this->db->valore("SELECT COUNT(*) FROM uffici WHERE chiave = 'segreteria_direzione'") === 0) {
                 $this->db->inserisci("INSERT INTO uffici (nome, descrizione, chiave, ambito, ordine) VALUES ('Segreteria di direzione', 'Può attivare «Direttore assente»', 'segreteria_direzione', 'dipartimento', 0)");
-            }
-            if ((int) $this->db->valore("SELECT COUNT(*) FROM uffici WHERE chiave = 'convenzioni_fsl'") === 0) {
-                $this->db->inserisci("INSERT INTO uffici (nome, descrizione, chiave, ambito, ordine) VALUES ('Ufficio convenzioni FSL', 'Prende in carico le convenzioni delle scuole (Formazione Scuola Lavoro): protocollo in entrata e definitivo', 'convenzioni_fsl', 'dipartimento', 90)");
             }
             $imp = $this->db->riga('SELECT conv_direttore_nome, conv_direttore_email FROM impostazioni_sistema WHERE id = 1');
             $mail = strtolower(trim((string) ($imp['conv_direttore_email'] ?? '')));

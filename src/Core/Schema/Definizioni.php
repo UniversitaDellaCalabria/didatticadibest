@@ -328,7 +328,7 @@ final class Definizioni
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         'verbali_accessi_log' => "CREATE TABLE IF NOT EXISTS verbali_accessi_log (
             id INT AUTO_INCREMENT PRIMARY KEY, accesso_id INT DEFAULT NULL, azione VARCHAR(20) NOT NULL DEFAULT '', seduta_id INT DEFAULT NULL, ip VARCHAR(45) DEFAULT '',
-            creato_il DATETIME DEFAULT CURRENT_TIMESTAMP, INDEX idx_accesso (accesso_id, creato_il), INDEX idx_data (creato_il)
+            utente VARCHAR(150) DEFAULT '', creato_il DATETIME DEFAULT CURRENT_TIMESTAMP, INDEX idx_accesso (accesso_id, creato_il), INDEX idx_data (creato_il)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         // v55: punti dell'ordine del giorno di una seduta con il testo scritto per il verbale (tipo: testo | pratiche = qui vanno le pratiche portate in seduta)
         'didattica_sedute_punti' => "CREATE TABLE IF NOT EXISTS didattica_sedute_punti (
@@ -648,6 +648,10 @@ final class Definizioni
             'file_allegato_scuola'     => "ADD COLUMN file_allegato_scuola VARCHAR(255) DEFAULT NULL",
             'protocollo_ingresso'      => "ADD COLUMN protocollo_ingresso VARCHAR(80) NOT NULL DEFAULT ''",
             'protocollo_ingresso_data' => "ADD COLUMN protocollo_ingresso_data DATE DEFAULT NULL",
+        ],
+        // v80: chi ha visualizzato o scaricato un verbale con le credenziali di Ateneo (email)
+        'verbali_accessi_log' => [
+            'utente' => "ADD COLUMN utente VARCHAR(150) DEFAULT ''",
         ],
         'ufficio_didattica' => [
             // v37: ufficio di appartenenza (didattica_uffici) e corsi di studio seguiti (uffici che seguono i corsi)

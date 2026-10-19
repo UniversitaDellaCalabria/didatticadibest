@@ -53,7 +53,7 @@ final class ServizioUffici
 
     public static function fisso(array $u): bool
     {
-        return in_array((string) ($u['chiave'] ?? ''), UfficiRepository::CHIAVI_DIREZIONE, true);
+        return in_array((string) ($u['chiave'] ?? ''), UfficiRepository::CHIAVI_FISSE, true);
     }
 
     /** L'ufficio ha un ruolo nel flusso delle pratiche (tipo, smista, segue i corsi): chi ci entra lavora le pratiche. */

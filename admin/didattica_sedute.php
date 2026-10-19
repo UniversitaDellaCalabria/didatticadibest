@@ -232,12 +232,28 @@ if ($fase === 'azioni') {
         admin_redirect("$base&tab=sedute&archivio=1");
     }
     // ── Pagina pubblica dei verbali: accessi con password e pubblicazione dei singoli verbali (solo Ufficio didattico) ──
-    if (array_intersect(array_keys($_POST), ['crea_accesso_verbali', 'salva_accesso_verbali', 'nuova_password_verbali', 'stato_accesso_verbali', 'elimina_accesso_verbali', 'pubblica_verbale', 'ritira_verbale', 'pubblica_blocco', 'ritira_blocco'])) {
+    if (array_intersect(array_keys($_POST), ['aggiungi_scaricatore_verbali', 'togli_scaricatore_verbali', 'crea_accesso_verbali', 'salva_accesso_verbali', 'nuova_password_verbali', 'stato_accesso_verbali', 'elimina_accesso_verbali', 'pubblica_verbale', 'ritira_verbale', 'pubblica_blocco', 'ritira_blocco'])) {
         if (!$puo_didattica_tutto) nega_accesso();
         $pubb = \App\Core\App::per($conn)->get(\App\Didattica\ServizioVerbaliPubblici::class);
         $rep_acc = \App\Core\App::per($conn)->get(\App\Didattica\AccessoVerbaliRepository::class);
         $url_acc = "$base&tab=sedute&accessi=1";
         $scade_p = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['scade_il'] ?? '')) ? (string)$_POST['scade_il'] : null;
+        // Chi può SCARICARE i verbali (accedendo con le credenziali di Ateneo): persone dell'anagrafe nell'ufficio «Download dei verbali»
+        if (isset($_POST['aggiungi_scaricatore_verbali']) || isset($_POST['togli_scaricatore_verbali'])) {
+            $uff_sv = \App\Core\App::per($conn)->get(\App\Uffici\ServizioUffici::class);
+            $uff_scarico = $uff_sv->perChiave('verbali_scarico');
+            if (!$uff_scarico) { flash_set("L'ufficio «Download dei verbali» non esiste ancora: apri una pagina del pannello per aggiornare il database.", 'danger'); admin_redirect($url_acc); }
+            if (isset($_POST['aggiungi_scaricatore_verbali'])) {
+                $err = $uff_sv->aggiungiDaAnagrafe((int)$uff_scarico['id'], (string)($_POST['persona_id'] ?? ''), 'Download dei verbali', []);
+                if (!$err) registra_log_audit($conn, "Verbali pubblici: persona abilitata al download", ["Persona" => (string)($_POST['persona_id'] ?? '')]);
+                flash_set($err ?? "Persona abilitata: accedendo con le credenziali di Ateneo potrà scaricare i verbali.", $err ? 'danger' : 'success');
+            } else {
+                $uff_sv->togliPersona((int)$_POST['togli_scaricatore_verbali']);
+                registra_log_audit($conn, "Verbali pubblici: persona tolta dal download", ["Riga" => (int)$_POST['togli_scaricatore_verbali']]);
+                flash_set("Persona tolta: non può più scaricare i verbali.", 'warning');
+            }
+            admin_redirect($url_acc . '#scaricatori');
+        }
         if (isset($_POST['crea_accesso_verbali'])) {
             [$err, $nid, $pw] = $pubb->crea((string)($_POST['etichetta'] ?? ''), (string)($_POST['password'] ?? ''), $scade_p, (array)($_POST['consigli_ids'] ?? []), !empty($_POST['tutti']), $consigli, $autore_nome);
             if (!$err) { $_SESSION['verbali_nuova_password'] = [(int)$nid, $pw]; registra_log_audit($conn, "Verbali pubblici: accesso creato", ["Accesso" => trim((string)$_POST['etichetta'])]); }

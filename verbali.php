@@ -1,7 +1,10 @@
 <?php
 // verbali.php - Pagina pubblica dei verbali con password: per chi non ha le credenziali di Ateneo. Si entra con la password data
 // dall'Ufficio didattico (sessione separata dal login SSO) e si scaricano solo i verbali firmati e pubblicabili dei consigli
-// dell'accesso. Non indicizzabile; ogni accesso e scaricamento si registra. Logica in App\Didattica\ServizioVerbaliPubblici.
+// dell'accesso. Con la sola password i verbali sono in SOLA VISUALIZZAZIONE (il PDF è disegnato nella pagina, con una filigrana, senza pulsanti di
+// scaricamento o stampa); scarica solo chi si è autenticato con le credenziali di Ateneo ed è stato abilitato dall'Ufficio didattico (Gestione del portale →
+// Uffici → «Download dei verbali», persone scelte dall'anagrafe) o è amministratore. Non indicizzabile; ogni accesso, lettura e scaricamento si registra.
+// Logica in App\Didattica\ServizioVerbaliPubblici.
 // Pagina per chi entra con una password (non con le credenziali di Ateneo): niente controllo dell'accesso SSO, che per un visitatore anonimo
 // usa la sessione di SimpleSAML e può far perdere quella del portale (token del modulo non valido: «problema di sessione»).
 define('PAGINA_SENZA_SSO', true);
@@ -20,15 +23,99 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accedi'])) {
     unset($_POST['password']);
     if (!$errore) { header('Location: verbali.php'); exit; }
 }
-$accesso = $serv->corrente();
+// Credenziali di Ateneo (login separato dalla password): chi è abilitato al download scarica; chi entra solo con la password vede i verbali senza scaricarli
+$utente_sso = !empty($_SESSION['utente_id']) ? \App\Core\App::get(\App\Auth\UtenteRepository::class)->perId((int)$_SESSION['utente_id']) : null;
+$puo_scaricare = $serv->puoScaricare($utente_sso);
+$accesso = $serv->corrente() ?? $serv->accessoDaCredenziali($utente_sso);
+$url_accedi_sso = 'saml_login.php?redirect=' . urlencode('verbali.php');
 
+// Scaricamento: solo chi è abilitato (credenziali di Ateneo)
 if ($accesso && isset($_GET['d'])) {
-    $f = $serv->file($accesso, (int)$_GET['d']);
+    if (!$puo_scaricare) { http_response_code(403); exit('Il download non è consentito con questo accesso: i verbali si consultano in sola visualizzazione.'); }
+    $f = $serv->file($accesso, (int)$_GET['d'], 'scarica');
     if (!$f) { http_response_code(404); exit('Verbale non disponibile.'); }
     while (ob_get_level() > 0) ob_end_clean();
     header('Content-Type: application/pdf'); header('X-Content-Type-Options: nosniff'); header('Content-Length: ' . filesize($f['percorso']));
-    header('Content-Disposition: inline; filename="' . $f['nome'] . '"');
+    header('Content-Disposition: attachment; filename="' . $f['nome'] . '"');
     readfile($f['percorso']); exit;
+}
+// Lettura del PDF da parte del visualizzatore: permesso monouso, mai aprire l'indirizzo direttamente, niente cache
+if ($accesso && isset($_GET['f'])) {
+    $id_f = (int)$_GET['f'];
+    $dest = strtolower((string)($_SERVER['HTTP_SEC_FETCH_DEST'] ?? ''));
+    if (in_array($dest, ['document', 'iframe', 'embed', 'object', 'frame'], true) || !$serv->consumaToken((string)($_GET['t'] ?? ''), $id_f)) { http_response_code(403); exit('Non disponibile.'); }
+    $f = $serv->file($accesso, $id_f, 'visualizza');
+    if (!$f) { http_response_code(404); exit('Verbale non disponibile.'); }
+    while (ob_get_level() > 0) ob_end_clean();
+    header('Content-Type: application/pdf'); header('X-Content-Type-Options: nosniff'); header('Content-Length: ' . filesize($f['percorso']));
+    header('Cache-Control: no-store, no-cache, must-revalidate, private'); header('Pragma: no-cache'); header('Content-Disposition: inline');
+    readfile($f['percorso']); exit;
+}
+// Visualizzatore: il PDF è disegnato nella pagina (PDF.js), con filigrana e senza pulsanti di scaricamento o stampa
+if ($accesso && isset($_GET['v'])) {
+    $id_v = (int)$_GET['v'];
+    $dv = $serv->dati($accesso, $id_v);
+    if (!$dv) { http_response_code(404); exit('Verbale non disponibile.'); }
+    $token_v = $serv->tokenVista($id_v);
+    $titolo_v = 'Verbale' . ($dv['numero_verbale'] !== '' ? ' n. ' . $dv['numero_verbale'] : '') . ($dv['data'] ? ' del ' . date('d/m/Y', strtotime($dv['data'])) : '');
+    $filigrana = 'Consultazione riservata · ' . $accesso['etichetta'] . ' · ' . date('d/m/Y H:i');
+    $vend = 'assets/vendor/cdnjs/ajax/libs/pdf.js/3.11.174/';
+    header('Cache-Control: no-store, private'); header('X-Frame-Options: DENY');
+    ?><!doctype html>
+<html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex, nofollow, noarchive">
+<title><?php echo $h($titolo_v); ?></title>
+<style>
+body { margin:0; background:#475569; font-family:system-ui,sans-serif; -webkit-user-select:none; user-select:none; }
+.vv-barra { position:sticky; top:0; z-index:5; background:#1e293b; color:#fff; padding:.55rem 1rem; display:flex; flex-wrap:wrap; gap:.6rem; align-items:center; }
+.vv-barra a { color:#fff; text-decoration:none; background:#334155; padding:.3rem .7rem; border-radius:.4rem; font-size:.9rem; }
+.vv-barra a:hover { background:#475569; }
+.vv-barra .vv-nota { margin-left:auto; font-size:.8rem; color:#cbd5e1; }
+#vvPagine { padding:1rem 0 2rem; display:flex; flex-direction:column; align-items:center; gap:1rem; }
+#vvPagine canvas { max-width:96vw; height:auto !important; background:#fff; box-shadow:0 2px 10px rgba(0,0,0,.4); pointer-events:none; }
+#vvStato { color:#fff; text-align:center; padding:2rem 1rem; }
+@media print { body * { display:none !important; } body::after { content:'La stampa non è consentita.'; display:block; padding:2rem; } }
+</style></head>
+<body oncontextmenu="return false" ondragstart="return false">
+<div class="vv-barra">
+    <a href="verbali.php">&larr; Elenco dei verbali</a><strong><?php echo $h($titolo_v); ?></strong>
+    <?php if ($puo_scaricare): ?><a href="verbali.php?d=<?php echo $id_v; ?>" style="background:#15803d;">Scarica il PDF</a>
+    <?php else: ?><span class="vv-nota">Sola visualizzazione: il download è riservato alle persone abilitate (accesso con le credenziali di Ateneo).</span><?php endif; ?>
+</div>
+<div id="vvStato">Caricamento del verbale…</div>
+<div id="vvPagine" aria-label="Pagine del verbale"></div>
+<script src="<?php echo $h($vend); ?>pdf.min.js"></script>
+<script>
+(function () {
+    var stato = document.getElementById('vvStato'), box = document.getElementById('vvPagine');
+    var testo = <?php echo json_encode($filigrana, JSON_UNESCAPED_UNICODE); ?>;
+    document.addEventListener('keydown', function (e) { var k = (e.key || '').toLowerCase(); if ((e.ctrlKey || e.metaKey) && ['s', 'p', 'u', 'c', 'a'].indexOf(k) !== -1) { e.preventDefault(); } });
+    document.addEventListener('copy', function (e) { e.preventDefault(); });
+    if (typeof pdfjsLib === 'undefined') { stato.textContent = 'Il visualizzatore non è disponibile (file mancante sul server).'; return; }
+    pdfjsLib.GlobalWorkerOptions.workerSrc = <?php echo json_encode($vend . 'pdf.worker.min.js'); ?>;
+    function filigrana(ctx, w, h) {
+        ctx.save(); ctx.globalAlpha = 0.13; ctx.fillStyle = '#7f1d1d'; ctx.font = Math.round(w / 40) + 'px sans-serif';
+        ctx.rotate(-Math.PI / 6);
+        var larg = ctx.measureText(testo).width + w / 10, passo = Math.round(w / 6);
+        for (var y = -h; y < h * 1.6; y += passo) { for (var x = -w, k = 0; x < w * 1.6; x += larg, k++) { ctx.fillText(testo, x + (Math.round(y / passo) % 2 ? larg / 2 : 0), y); } }
+        ctx.restore();
+    }
+    pdfjsLib.getDocument({ url: <?php echo json_encode('verbali.php?f=' . $id_v . '&t=' . $token_v); ?>, disableRange: true, disableStream: true, disableAutoFetch: true }).promise.then(function (pdf) {
+        stato.textContent = '';
+        var scala = Math.min(2.2, Math.max(1.4, (window.devicePixelRatio || 1) * 1.4));
+        var vai = function (n) {
+            if (n > pdf.numPages) return;
+            pdf.getPage(n).then(function (pagina) {
+                var vp = pagina.getViewport({ scale: scala });
+                var c = document.createElement('canvas'); c.width = vp.width; c.height = vp.height; box.appendChild(c);
+                var ctx = c.getContext('2d');
+                pagina.render({ canvasContext: ctx, viewport: vp }).promise.then(function () { filigrana(ctx, vp.width, vp.height); vai(n + 1); });
+            });
+        };
+        vai(1);
+    }).catch(function () { stato.textContent = 'Non è stato possibile aprire il verbale. Torna all\'elenco e riprova.'; });
+})();
+</script></body></html><?php
+    exit;
 }
 
 $page_cfg['titolo'] = 'Verbali';
@@ -46,7 +133,12 @@ echo '<meta name="robots" content="noindex, nofollow, noarchive">';
         <input type="password" class="form-control mb-3" id="vpPw" name="password" autocomplete="off" required maxlength="100" autofocus>
         <button type="submit" name="accedi" value="1" class="btn btn-primary fw-bold"><i class="fa fa-unlock me-1" aria-hidden="true"></i>Entra</button>
     </div></form>
-    <p class="small text-secondary mt-3">Gli accessi e i verbali scaricati vengono registrati. Se non hai una password e pensi di averne diritto, scrivi all'Ufficio didattico.</p>
+    <p class="small text-secondary mt-3">Gli accessi e le letture dei verbali vengono registrati. Se non hai una password e pensi di averne diritto, scrivi all'Ufficio didattico.</p>
+    <div class="card border-0 shadow-sm mt-3" style="max-width:460px;"><div class="card-body">
+        <div class="fw-bold mb-1"><i class="fa fa-id-badge me-1 text-primary" aria-hidden="true"></i>Hai le credenziali di Ateneo?</div>
+        <p class="small text-secondary mb-2">Le persone abilitate dall'Ufficio didattico accedono con le credenziali di Ateneo, vedono tutti i verbali e possono scaricarli.</p>
+        <a class="btn btn-outline-primary btn-sm fw-bold" href="<?php echo $h($url_accedi_sso); ?>"><i class="fa fa-right-to-bracket me-1" aria-hidden="true"></i>Accedi con le credenziali di Ateneo</a>
+    </div></div>
 <?php else:
     $tutti = $serv->verbali($accesso);
     $filtro = ['corso' => (string)($_GET['corso'] ?? ''), 'organo' => (string)($_GET['organo'] ?? ''), 'aa' => (string)($_GET['aa'] ?? '')];
@@ -61,6 +153,13 @@ echo '<meta name="robots" content="noindex, nofollow, noarchive">';
         <p class="text-secondary mb-0">Accesso: <strong><?php echo $h($accesso['etichetta']); ?></strong><?php echo $accesso['scade_il'] ? ' · valido fino al ' . date('d/m/Y', strtotime($accesso['scade_il'])) : ''; ?></p>
         <a class="btn btn-sm btn-outline-secondary ms-auto" href="verbali.php?esci=1"><i class="fa fa-right-from-bracket me-1" aria-hidden="true"></i>Esci</a>
     </div>
+    <?php if ($puo_scaricare): ?>
+        <div class="alert alert-success small py-2"><i class="fa fa-download me-1" aria-hidden="true"></i><strong>Puoi scaricare i verbali</strong>: sei abilitato (accesso con le credenziali di Ateneo).</div>
+    <?php else: ?>
+        <div class="alert alert-info small py-2"><i class="fa fa-eye me-1" aria-hidden="true"></i><strong>Sola visualizzazione.</strong> I verbali si leggono qui nella pagina ma non si possono scaricare né stampare.
+            <?php if ($utente_sso): ?>Il tuo account (<?php echo $h($utente_sso['email'] ?? ''); ?>) non è abilitato al download: se ne hai bisogno scrivi all'Ufficio didattico.
+            <?php else: ?>Le persone abilitate dall'Ufficio didattico possono scaricarli <a class="fw-bold" href="<?php echo $h($url_accedi_sso); ?>">accedendo con le credenziali di Ateneo</a>.<?php endif; ?></div>
+    <?php endif; ?>
 
     <?php if ($tutti): ?>
     <form method="GET" class="card border-0 shadow-sm mb-3" aria-label="Filtra i verbali"><div class="card-body">
@@ -138,11 +237,14 @@ echo '<meta name="robots" content="noindex, nofollow, noarchive">';
                             <summary><i class="fa fa-chevron-right vp-freccia" aria-hidden="true"></i><span>Anno accademico <?php echo $h($anno); ?></span><span class="badge text-bg-light border ms-auto"><?php echo count($lista); ?></span></summary>
                             <div class="vp-lista">
                                 <?php foreach ($lista as $v): ?>
-                                    <a href="verbali.php?d=<?php echo (int)$v['id']; ?>" target="_blank" rel="noopener">
+                                    <div class="d-flex align-items-center">
+                                    <a href="verbali.php?v=<?php echo (int)$v['id']; ?>" target="_blank" rel="noopener" class="flex-grow-1">
                                         <i class="fa fa-file-pdf text-danger" aria-hidden="true"></i>
                                         <span class="vp-nome">Verbale<?php echo $v['numero_verbale'] !== '' ? ' n. ' . $h($v['numero_verbale']) : ''; ?><?php echo $v['data'] ? ' del ' . date('d/m/Y', strtotime($v['data'])) : ''; ?></span>
-                                        <span class="vp-apri text-primary">Apri <i class="fa fa-arrow-up-right-from-square ms-1" aria-hidden="true"></i></span>
+                                        <span class="vp-apri text-primary">Leggi <i class="fa fa-arrow-up-right-from-square ms-1" aria-hidden="true"></i></span>
                                     </a>
+                                    <?php if ($puo_scaricare): ?><a class="btn btn-sm btn-outline-success me-3 py-0 flex-shrink-0" style="padding:.2rem .6rem !important;" href="verbali.php?d=<?php echo (int)$v['id']; ?>"><i class="fa fa-download me-1" aria-hidden="true"></i>Scarica</a><?php endif; ?>
+                                    </div>
                                 <?php endforeach; ?>
                             </div>
                         </details>
