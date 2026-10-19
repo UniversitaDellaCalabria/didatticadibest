@@ -1,5 +1,6 @@
 <?php
 // sondaggio_pratica.php - Sondaggio facoltativo a fine pratica (due domande): si apre dal link personale nell'email di conclusione o dalla pagina della pratica.
+define('PAGINA_SENZA_SSO', true); // link personale con codice: nessun accesso SSO (vedi verbali.php)
 require_once 'config.php';
 require_once 'functions.php';
 

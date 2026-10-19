@@ -18,7 +18,7 @@ if (session_status() === PHP_SESSION_NONE) { session_start(); }
 if (file_exists(__DIR__ . '/functions.php')) {
     require_once __DIR__ . '/functions.php';
     $pagina_corrente = basename($_SERVER['PHP_SELF']);
-    if (function_exists('sync_sso_user') && $pagina_corrente !== 'logout-success.php' && $pagina_corrente !== 'esci.php') {
+    if (function_exists('sync_sso_user') && !defined('PAGINA_SENZA_SSO') && $pagina_corrente !== 'logout-success.php' && $pagina_corrente !== 'esci.php') {
         sync_sso_user($conn);
     }
 }

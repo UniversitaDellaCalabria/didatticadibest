@@ -1174,28 +1174,40 @@ var PACCHETTI = [
   },
   {
     id: "tipi-organo",
-    titolo: "Pacchetto 26 · Archivio verbali: organi raggruppati per corso di studi e tipi di organo",
+    titolo: "Pacchetto 26 · Archivio verbali: organi per corso, allegati, pagina pubblica per organi, correzione della sessione",
     stato: "pronto",
     statoTesto: "Pronto da caricare",
     schema: "v78 e v79 (colonne nuove in archivio_organi e didattica_sedute)",
-    riassunto: "<strong>Collegamento automatico:</strong> per la struttura «Corso / Organo / anno» (per esempio <code>VERBALI_GEOLOGIA/COMMISSIONE_DIDATTICA/2020</code>) il portale propone da solo cosa fare per ogni cartella — abbina il consiglio al consiglio già nel portale (per nome), crea gli altri organi del corso con il tipo capito dal nome — e con «Collega tutto come proposto» le collega in un clic, senza ancora leggere i PDF. <strong>Allegati:</strong> una cartella di verbale dentro l'anno (per esempio <code>2025/Verb. CCL_02-10-2025/</code>) è <em>un verbale</em>: il PDF col nome della cartella (o che comincia per «Verb») è il verbale e tutto il resto della cartella — PDF, Excel, Word… — sono i suoi <strong>allegati</strong>, che compaiono nell'elenco con «📎 N allegati» e si scaricano uno per uno; i PDF sciolti con nome «Allegato…» e le cartelle con soli allegati non diventano verbali e sono segnalati. <strong>Pagina pubblica riorganizzata:</strong> chi entra con la password di un consiglio vede i verbali di quel consiglio <em>e degli altri organi dello stesso corso di studi</em> (commissione, riesame, welcome day…, quando il «corso di studi» dell'organo ha il nome del consiglio), organizzati per corso → organo (il consiglio per primo): <strong>una scheda per organo, due per riga</strong>, con il nome dell'organo in evidenza in una fascia bordeaux e dentro gli anni accademici a comparsa (si apre il più recente; «Espandi tutti gli anni» / «Comprimi tutti»), con le tendine <strong>Corso di studi</strong> (se l'accesso ne copre più di uno), <strong>Organo</strong> e <strong>Anno accademico</strong>. <strong>Pubblicazione in blocco:</strong> nell'elenco dell'archivio si spuntano più verbali (o «seleziona tutti» / «solo quelli non ancora pubblici») e si pubblicano o ritirano insieme nella pagina pubblica con password, con la conferma sui dati personali; vale per i verbali di un consiglio. <strong>Pausa:</strong> pulsante per sospendere la scansione automatica oraria (resta «Scansiona ora»). <strong>Organi per corso di studi:</strong> nella sezione «Organi per corso di studi e cartelle sul NAS» ogni corso è una scheda con il suo consiglio (cartella principale) e gli altri organi (commissione, riesame, welcome day…, di solito sottocartelle); in «Cartelle da collegare» il portale propone da solo nome e tipo dalla cartella e il corso di quella principale, e nell'elenco dei verbali si vede il corso di ogni verbale e si filtra per <em>Corso di studi</em>. <strong>Tipi:</strong> nel campo «Tipo» degli organi c'è ora anche <strong>Consiglio di corso di studi</strong> e <strong>Commissione paritetica</strong> (insieme a commissione didattica, gruppo di riesame, riunione con gli studenti e altro organo) e, scegliendo <strong>«➕ Nuovo tipo…»</strong>, si scrive un tipo nuovo (per esempio «Comitato di indirizzo»): da quel momento compare nell'elenco dei tipi per tutti gli altri organi.",
+    riassunto: "<strong>Collegamento automatico:</strong> per la struttura «Corso / Organo / anno» (per esempio <code>VERBALI_GEOLOGIA/COMMISSIONE_DIDATTICA/2020</code>) il portale propone da solo cosa fare per ogni cartella — abbina il consiglio al consiglio già nel portale (per nome), crea gli altri organi del corso con il tipo capito dal nome — e con «Collega tutto come proposto» le collega in un clic, senza ancora leggere i PDF. <strong>Allegati:</strong> una cartella di verbale dentro l'anno (per esempio <code>2025/Verb. CCL_02-10-2025/</code>) è <em>un verbale</em>: il PDF col nome della cartella (o che comincia per «Verb») è il verbale e tutto il resto della cartella — PDF, Excel, Word… — sono i suoi <strong>allegati</strong>, che compaiono nell'elenco con «📎 N allegati» e si scaricano uno per uno; i PDF sciolti con nome «Allegato…» e le cartelle con soli allegati non diventano verbali e sono segnalati. <strong>Pagina pubblica riorganizzata:</strong> chi entra con la password di un consiglio vede i verbali di quel consiglio <em>e degli altri organi dello stesso corso di studi</em> (commissione, riesame, welcome day…, quando il «corso di studi» dell'organo ha il nome del consiglio), organizzati per corso → organo (il consiglio per primo): <strong>una scheda per organo, una per riga</strong>, con il nome dell'organo in una fascia bordeaux che si apre al clic sugli anni accademici, anch'essi a comparsa; un clic sul verbale lo apre in una nuova scheda (pulsanti «Espandi tutto» / «Comprimi tutto»). <strong>Sessione:</strong> corretto il «problema di sessione» di chi entra con la password senza credenziali di Ateneo (il controllo SSO di SimpleSAML faceva perdere il cookie della sessione del portale ai visitatori anonimi: ora le pagine per chi non ha credenziali — verbali, sondaggio, convenzioni di tesi per le aziende — non lo eseguono e il cookie si ripristina con i suoi parametri), con le tendine <strong>Corso di studi</strong> (se l'accesso ne copre più di uno), <strong>Organo</strong> e <strong>Anno accademico</strong>. <strong>Pubblicazione in blocco:</strong> nell'elenco dell'archivio si spuntano più verbali (o «seleziona tutti» / «solo quelli non ancora pubblici») e si pubblicano o ritirano insieme nella pagina pubblica con password, con la conferma sui dati personali; vale per i verbali di un consiglio. <strong>Pausa:</strong> pulsante per sospendere la scansione automatica oraria (resta «Scansiona ora»). <strong>Organi per corso di studi:</strong> nella sezione «Organi per corso di studi e cartelle sul NAS» ogni corso è una scheda con il suo consiglio (cartella principale) e gli altri organi (commissione, riesame, welcome day…, di solito sottocartelle); in «Cartelle da collegare» il portale propone da solo nome e tipo dalla cartella e il corso di quella principale, e nell'elenco dei verbali si vede il corso di ogni verbale e si filtra per <em>Corso di studi</em>. <strong>Tipi:</strong> nel campo «Tipo» degli organi c'è ora anche <strong>Consiglio di corso di studi</strong> e <strong>Commissione paritetica</strong> (insieme a commissione didattica, gruppo di riesame, riunione con gli studenti e altro organo) e, scegliendo <strong>«➕ Nuovo tipo…»</strong>, si scrive un tipo nuovo (per esempio «Comitato di indirizzo»): da quel momento compare nell'elenco dei tipi per tutti gli altri organi.",
     passi: [["Archivio", "Tipi di organo"]],
     cartelle: [
       { cartella: "admin/", file: [
-        ["admin/didattica_archivio.php", "mod", "Archivio", "il campo Tipo con la scelta del tipo nuovo"],
-        ["admin/didattica_sedute.php", "mod", "Archivio", "salvataggio del tipo scritto a mano"]
+        ["admin/didattica.php", "mod", "Archivio", "download degli allegati dei verbali"],
+        ["admin/didattica_accessi.php", "mod", "Archivio", "testo dell'accesso con password"],
+        ["admin/didattica_archivio.php", "mod", "Archivio", "organi per corso, collegamento automatico, allegati, pubblicazione in blocco, filtro per corso"],
+        ["admin/didattica_sedute.php", "mod", "Archivio", "azioni: organi, cartelle, collegamento automatico, pausa, pubblicazione in blocco"]
+      ]},
+      { cartella: "/ (radice del portale)", file: [
+        ["verbali.php", "mod", "Archivio", "la pagina pubblica: schede per organo e anno a comparsa, filtri, il verbale si apre"],
+        ["header.php", "mod", "Sessione", "le pagine per chi non ha credenziali non eseguono il controllo SSO"],
+        ["sondaggio_pratica.php", "mod", "Sessione", "senza controllo SSO"],
+        ["richiedi_convenzione_tesi.php", "mod", "Sessione", "senza controllo SSO"],
+        ["convenzione_tesi.php", "mod", "Sessione", "senza controllo SSO"]
+      ]},
+      { cartella: "src/Auth/Saml/", file: [
+        ["src/Auth/Saml/AccessoSso.php", "mod", "Sessione", "il cookie della sessione si ripristina con i suoi parametri dopo SimpleSAML"]
       ]},
       { cartella: "src/Didattica/", file: [
-        ["src/Didattica/OrganiArchivio.php", "mod", "Archivio", "tipi predefiniti e tipi scritti a mano; tipo e nome proposti dalla cartella"],
-        ["src/Didattica/SedutaRepository.php", "mod", "Archivio", "corso di studi di ogni verbale e filtro per corso"],
+        ["src/Didattica/ArchivioVerbali.php", "mod", "Archivio", "percorso sicuro degli allegati"],
+        ["src/Didattica/OrganiArchivio.php", "mod", "Archivio", "tipi predefiniti e scritti a mano; tipo e nome proposti dalla cartella"],
         ["src/Didattica/ProposteCartelle.php", "nuovo", "Archivio", "collegamento automatico delle cartelle agli organi"],
-        ["src/Didattica/ServizioVerbaliPubblici.php", "mod", "Archivio", "gli organi del corso nell'accesso; verbali organizzati per organo, con i filtri"],
         ["src/Didattica/ScansioneArchivio.php", "mod", "Archivio", "cartelle dei verbali con gli allegati; pausa della scansione automatica"],
-        ["src/Didattica/ArchivioVerbali.php", "mod", "Archivio", "percorso sicuro degli allegati"]
+        ["src/Didattica/SedutaRepository.php", "mod", "Archivio", "corso di studi di ogni verbale, allegati, filtro per corso"],
+        ["src/Didattica/ServizioVerbaliPubblici.php", "mod", "Archivio", "gli organi del corso nell'accesso; verbali organizzati per organo"]
       ]},
       { cartella: "src/Core/Schema/", file: [
-        ["src/Core/Schema/Definizioni.php", "mod", "Archivio", "colonna tipo_nome"],
-        ["src/Core/Schema/Migrazioni.php", "mod", "Archivio", "versione dello schema: 78"]
+        ["src/Core/Schema/Definizioni.php", "mod", "Archivio", "colonne tipo_nome e allegati_json"],
+        ["src/Core/Schema/Migrazioni.php", "mod", "Archivio", "versione dello schema: 79"]
       ]}
     ],
     dopo: [

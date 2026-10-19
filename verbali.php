@@ -2,6 +2,9 @@
 // verbali.php - Pagina pubblica dei verbali con password: per chi non ha le credenziali di Ateneo. Si entra con la password data
 // dall'Ufficio didattico (sessione separata dal login SSO) e si scaricano solo i verbali firmati e pubblicabili dei consigli
 // dell'accesso. Non indicizzabile; ogni accesso e scaricamento si registra. Logica in App\Didattica\ServizioVerbaliPubblici.
+// Pagina per chi entra con una password (non con le credenziali di Ateneo): niente controllo dell'accesso SSO, che per un visitatore anonimo
+// usa la sessione di SimpleSAML e può far perdere quella del portale (token del modulo non valido: «problema di sessione»).
+define('PAGINA_SENZA_SSO', true);
 require_once 'config.php';
 require_once 'functions.php';
 
@@ -24,7 +27,7 @@ if ($accesso && isset($_GET['d'])) {
     if (!$f) { http_response_code(404); exit('Verbale non disponibile.'); }
     while (ob_get_level() > 0) ob_end_clean();
     header('Content-Type: application/pdf'); header('X-Content-Type-Options: nosniff'); header('Content-Length: ' . filesize($f['percorso']));
-    header('Content-Disposition: attachment; filename="' . $f['nome'] . '"');
+    header('Content-Disposition: inline; filename="' . $f['nome'] . '"');
     readfile($f['percorso']); exit;
 }
 
@@ -86,67 +89,71 @@ echo '<meta name="robots" content="noindex, nofollow, noarchive">';
     <?php endif; ?>
 
     <style>
-        .vp-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; align-items: start; }
-        @media (max-width: 767px) { .vp-grid { grid-template-columns: 1fr; } }
-        .vp-card { background: #fff; border-radius: .6rem; box-shadow: 0 1px 6px rgba(0,0,0,.09); overflow: hidden; }
-        .vp-card > header { padding: 1rem 1.2rem .9rem; background: #8e0f1f; border-bottom: 5px solid #5a0a14; color: #fff; display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
-        .vp-card h3 { font-size: 1.55rem; line-height: 1.2; font-weight: 800; margin: 0; flex: 1 1 auto; color: #fff; }
-        .vp-card header .badge { background: rgba(255,255,255,.18) !important; color: #fff !important; border: 1px solid rgba(255,255,255,.45) !important; font-size: .8rem; }
-        .vp-ultimo { font-size: .8rem; color: rgba(255,255,255,.85); width: 100%; }
-        .vp-aa > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: .55rem; padding: .55rem 1.2rem; font-size: 1rem; font-weight: 600; color: #3d4852; background: #f7f8fa; border-bottom: 1px solid #e3e7ec; }
+        .vp-organo { background: #fff; border-radius: .6rem; box-shadow: 0 1px 6px rgba(0,0,0,.09); overflow: hidden; margin-bottom: .9rem; }
+        .vp-organo > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: .8rem; flex-wrap: wrap; padding: 1rem 1.3rem; background: #8e0f1f; border-bottom: 5px solid #5a0a14; color: #fff; }
+        .vp-organo > summary::-webkit-details-marker { display: none; }
+        .vp-organo > summary:hover { background: #7c0d1b; }
+        .vp-organo > summary .vp-freccia { transition: transform .15s; font-size: 1rem; }
+        .vp-organo[open] > summary .vp-freccia { transform: rotate(90deg); }
+        .vp-organo h3 { font-size: 1.55rem; line-height: 1.2; font-weight: 800; margin: 0; flex: 1 1 auto; color: #fff; }
+        .vp-organo summary .badge { background: rgba(255,255,255,.18) !important; color: #fff !important; border: 1px solid rgba(255,255,255,.45) !important; font-size: .82rem; font-weight: 500; }
+        .vp-ultimo { font-size: .82rem; color: rgba(255,255,255,.85); }
+        .vp-aa > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: .55rem; padding: .6rem 1.3rem .6rem 1.6rem; font-size: 1.02rem; font-weight: 600; color: #3d4852; background: #f7f8fa; border-bottom: 1px solid #e3e7ec; }
         .vp-aa > summary::-webkit-details-marker { display: none; }
         .vp-aa > summary .vp-freccia { transition: transform .15s; color: #8e0f1f; font-size: .8rem; }
         .vp-aa[open] > summary .vp-freccia { transform: rotate(90deg); }
         .vp-aa > summary:hover { background: #eef1f5; }
         .vp-aa > summary .badge { font-size: .75rem; font-weight: 600; }
-        .vp-lista a { display: flex; align-items: center; gap: .6rem; padding: .6rem 1.2rem .6rem 1.8rem; border-bottom: 1px solid #f0f2f5; text-decoration: none; }
+        .vp-lista a { display: flex; align-items: center; gap: .6rem; padding: .65rem 1.3rem .65rem 2.4rem; border-bottom: 1px solid #f0f2f5; text-decoration: none; }
         .vp-lista a:hover { background: #f8fafc; }
         .vp-lista .vp-nome { flex: 1 1 auto; }
-        .vp-lista .vp-scarica { font-size: .85rem; white-space: nowrap; }
+        .vp-lista .vp-apri { font-size: .85rem; white-space: nowrap; }
     </style>
     <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
-        <button type="button" class="btn btn-sm btn-outline-primary" id="vpApri"><i class="fa fa-angles-down me-1" aria-hidden="true"></i>Espandi tutti gli anni</button>
-        <button type="button" class="btn btn-sm btn-outline-secondary" id="vpChiudi"><i class="fa fa-angles-up me-1" aria-hidden="true"></i>Comprimi tutti</button>
+        <button type="button" class="btn btn-sm btn-outline-primary" id="vpApri"><i class="fa fa-angles-down me-1" aria-hidden="true"></i>Espandi tutto</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="vpChiudi"><i class="fa fa-angles-up me-1" aria-hidden="true"></i>Comprimi tutto</button>
     </div>
+    <?php
+        $n_organi_tot = 0; foreach ($albero as $os) $n_organi_tot += count($os);
+        $aperti = array_filter($sel) || $n_organi_tot === 1; // con un filtro, o con un solo organo, si parte già aperti
+    ?>
     <?php foreach ($albero as $corso => $organi): ksort($organi, SORT_NATURAL | SORT_FLAG_CASE); ?>
         <section class="mb-4" aria-labelledby="c_<?php echo md5($corso); ?>">
             <h2 class="h4 fw-bold mb-3" id="c_<?php echo md5($corso); ?>"><i class="fa fa-graduation-cap me-2 text-primary" aria-hidden="true"></i><?php echo $h($corso); ?></h2>
-            <div class="vp-grid">
             <?php foreach ($organi as $chiave => $anni):
                 $nome_organo = substr($chiave, strpos($chiave, '|') + 1);
                 krsort($anni, SORT_STRING);
                 $n_org = array_sum(array_map('count', $anni));
                 $ultimo = null; foreach ($anni as $lista_u) foreach ($lista_u as $v_u) { if ($v_u['data'] && ($ultimo === null || $v_u['data'] > $ultimo)) $ultimo = $v_u['data']; }
-                $primo_anno = array_key_first($anni);
             ?>
-                <article class="vp-card" aria-label="<?php echo $h($nome_organo); ?>">
-                    <header>
+                <details class="vp-organo"<?php echo $aperti ? ' open' : ''; ?>>
+                    <summary>
+                        <i class="fa fa-chevron-right vp-freccia" aria-hidden="true"></i>
                         <h3><?php echo $h($nome_organo); ?></h3>
-                        <span class="badge fw-normal"><?php echo $n_org; ?> verbali</span>
-                        <?php if ($ultimo): ?><span class="vp-ultimo">Ultimo verbale: <?php echo date('d/m/Y', strtotime($ultimo)); ?></span><?php endif; ?>
-                    </header>
+                        <span class="badge"><?php echo $n_org; ?> verbali</span>
+                        <?php if ($ultimo): ?><span class="vp-ultimo">ultimo: <?php echo date('d/m/Y', strtotime($ultimo)); ?></span><?php endif; ?>
+                    </summary>
                     <?php foreach ($anni as $anno => $lista): ?>
-                        <details class="vp-aa"<?php echo $anno === $primo_anno || array_filter($sel) ? ' open' : ''; ?>>
+                        <details class="vp-aa"<?php echo $sel['aa'] !== '' ? ' open' : ''; ?>>
                             <summary><i class="fa fa-chevron-right vp-freccia" aria-hidden="true"></i><span>Anno accademico <?php echo $h($anno); ?></span><span class="badge text-bg-light border ms-auto"><?php echo count($lista); ?></span></summary>
                             <div class="vp-lista">
                                 <?php foreach ($lista as $v): ?>
-                                    <a href="verbali.php?d=<?php echo (int)$v['id']; ?>">
+                                    <a href="verbali.php?d=<?php echo (int)$v['id']; ?>" target="_blank" rel="noopener">
                                         <i class="fa fa-file-pdf text-danger" aria-hidden="true"></i>
                                         <span class="vp-nome">Verbale<?php echo $v['numero_verbale'] !== '' ? ' n. ' . $h($v['numero_verbale']) : ''; ?><?php echo $v['data'] ? ' del ' . date('d/m/Y', strtotime($v['data'])) : ''; ?></span>
-                                        <span class="vp-scarica text-primary"><i class="fa fa-download me-1" aria-hidden="true"></i>Scarica</span>
+                                        <span class="vp-apri text-primary">Apri <i class="fa fa-arrow-up-right-from-square ms-1" aria-hidden="true"></i></span>
                                     </a>
                                 <?php endforeach; ?>
                             </div>
                         </details>
                     <?php endforeach; ?>
-                </article>
+                </details>
             <?php endforeach; ?>
-            </div>
         </section>
     <?php endforeach; ?>
     <script>
     (function () {
-        var tutti = function (aperto) { document.querySelectorAll('details.vp-aa').forEach(function (d) { d.open = aperto; }); };
+        var tutti = function (aperto) { document.querySelectorAll('details.vp-organo, details.vp-aa').forEach(function (d) { d.open = aperto; }); };
         var a = document.getElementById('vpApri'), c = document.getElementById('vpChiudi');
         if (a) a.addEventListener('click', function () { tutti(true); });
         if (c) c.addEventListener('click', function () { tutti(false); });

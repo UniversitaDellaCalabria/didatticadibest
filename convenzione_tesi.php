@@ -2,6 +2,7 @@
 // convenzione_tesi.php - Convenzione per lo svolgimento della tesi presso un ente o un'azienda, compilata online dall'azienda con il link personale (?t=…),
 // senza registrazione: dati dell'ente e del rappresentante, eventuali modifiche agli articoli (che il Dipartimento valuta prima della firma),
 // download della convenzione compilata (Word e PDF), firma digitale PAdES e caricamento del PDF firmato. Logica in src/ConvenzioniTesi/.
+define('PAGINA_SENZA_SSO', true); // pagina per chi non ha le credenziali di Ateneo: niente accesso SSO (vedi verbali.php)
 require_once 'config.php';
 require_once 'functions.php';
 

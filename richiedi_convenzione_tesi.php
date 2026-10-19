@@ -2,6 +2,7 @@
 // richiedi_convenzione_tesi.php - Pagina pubblica per enti e aziende che vogliono la convenzione per la tesi: si scrive il nome dell'ente e l'email,
 // si riceve per posta il link personale per compilarla (convenzione_tesi.php). Nessuna registrazione. Anti-robot: domanda di controllo, campo trappola, limite per IP.
 // Alla stessa email si risponde sempre allo stesso modo (non si rivela se esiste già una convenzione). Logica in src/ConvenzioniTesi/.
+define('PAGINA_SENZA_SSO', true); // pagina per chi non ha le credenziali di Ateneo: niente accesso SSO (vedi verbali.php)
 require_once 'config.php';
 require_once 'functions.php';
 

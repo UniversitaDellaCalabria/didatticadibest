@@ -26,6 +26,12 @@ final class AccessoSso
     ) {
     }
 
+    /** I parametri del cookie della sessione del portale (gli stessi di config.php): vanno rimessi dopo che SimpleSAML ha usato la sua sessione. @return array<string, mixed> */
+    public static function parametriCookie(): array
+    {
+        return ['lifetime' => 0, 'path' => '/', 'secure' => !(defined('AMBIENTE_LOCALE') && AMBIENTE_LOCALE), 'httponly' => true, 'samesite' => 'Lax'];
+    }
+
     /**
      * Accesso automatico dalla sessione SSO di Ateneo (pagine protette). true se l'utente risulta collegato.
      * $uscito = l'utente aveva fatto "Esci" (cookie): niente accesso automatico, si rientra solo con "Accedi".
@@ -54,6 +60,7 @@ final class AccessoSso
                 if (session_status() !== PHP_SESSION_ACTIVE && $idSessione) {
                     session_name((string) $nomeSessione);
                     session_id($idSessione);
+                    session_set_cookie_params(self::parametriCookie()); // SimpleSAML li ha cambiati: senza, il cookie della sessione si riemette con i suoi
                     session_start();
                 }
 
@@ -70,6 +77,7 @@ final class AccessoSso
             if (session_status() !== PHP_SESSION_ACTIVE) {
                 session_name((string) $nomeSessione);
                 session_id((string) $idSessione);
+                session_set_cookie_params(self::parametriCookie());
                 session_start();
             }
 
@@ -149,7 +157,7 @@ final class AccessoSso
         if (session_status() !== PHP_SESSION_ACTIVE) {
             session_name((string) $nomeSessione);
             session_id((string) $idSessione);
-            session_set_cookie_params(['lifetime' => 0, 'path' => '/', 'secure' => true, 'httponly' => true, 'samesite' => 'Lax']);
+            session_set_cookie_params(self::parametriCookie());
             session_start();
         }
 
