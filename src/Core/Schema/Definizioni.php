@@ -319,6 +319,11 @@ final class Definizioni
             email VARCHAR(150) NOT NULL PRIMARY KEY, token VARCHAR(40) NOT NULL, escluso TINYINT(1) NOT NULL DEFAULT 0, ultimo_invio DATETIME DEFAULT NULL, settimana VARCHAR(8) NOT NULL DEFAULT '',
             UNIQUE KEY uq_token (token)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        // v82: testi delle email del portale modificabili dal pannello (pagina «Email»): solo le modifiche, senza riga vale il testo originale del codice
+        'email_modelli' => "CREATE TABLE IF NOT EXISTS email_modelli (
+            chiave VARCHAR(80) NOT NULL PRIMARY KEY, oggetto VARCHAR(300) NOT NULL DEFAULT '', corpo MEDIUMTEXT DEFAULT NULL, bottone VARCHAR(120) DEFAULT '',
+            aggiornato_il DATETIME DEFAULT NULL, aggiornato_da VARCHAR(150) DEFAULT ''
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         // v57: pagina pubblica dei verbali con password: accessi (una password per gruppo di esterni, con i consigli che possono vedere e la scadenza)
         // e registro di chi è entrato e cosa ha scaricato (IP con l'ultimo numero azzerato)
         'verbali_accessi' => "CREATE TABLE IF NOT EXISTS verbali_accessi (

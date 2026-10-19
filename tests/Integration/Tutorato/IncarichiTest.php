@@ -45,6 +45,19 @@ final class IncarichiTest extends TutoratoBase
         return $id;
     }
 
+    public function testUnaModificaDalPannelloCambiaLEmailCheParte(): void
+    {
+        $this->servizio(\App\Email\ModelliEmail::class)->salva('tutorato_invito_studente', 'Ciao {{tutor}}: la tua lettera', "Buongiorno {{tutor}}, c'è la lettera per **{{bando}}**.", 'Vai alla lettera', 'Admin');
+        $this->bando();
+        [$id] = $this->srv()->salva($this->campi());
+        $this->assertNull($this->srv()->invia($id));
+        $m = $this->mailer->inviate[0];
+        $this->assertSame('Ciao Luca Rossi: la tua lettera', $m['oggetto']);
+        $this->assertStringContainsString("<p>Buongiorno Luca Rossi, c'è la lettera per <strong>Tutorato I semestre</strong>.</p>", $m['corpo']);
+        $this->assertStringContainsString('>Vai alla lettera</a>', $m['corpo']);
+        $this->assertStringContainsString('Il link è personale', $m['corpo'], 'il pulsante con il link resta come prima');
+    }
+
     public function testBandoSalvaEControllaIDati(): void
     {
         $s = $this->srv();

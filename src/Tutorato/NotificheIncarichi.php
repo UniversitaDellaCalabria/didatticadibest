@@ -5,13 +5,26 @@ declare(strict_types=1);
 namespace App\Tutorato;
 
 use App\Auth\ServizioUtenti;
+use App\Email\ModelliEmail;
 use App\Infrastructure\Mail\Mailer;
 
 /** Email dell'iter della lettera di incarico: allo studente, al docente, al direttore e all'operatore che protocolla. */
 final class NotificheIncarichi
 {
-    public function __construct(private Mailer $mailer, private OperatoriUfficio $operatori, private ServizioUtenti $utenti)
+    public function __construct(private Mailer $mailer, private OperatoriUfficio $operatori, private ServizioUtenti $utenti, private ModelliEmail $modelli)
     {
+    }
+
+    /**
+     * Email dal catalogo dei modelli (testi modificabili dalla pagina «Email» del pannello): oggetto, testo e pulsante vengono dal modello.
+     *
+     * @param array<string, scalar|null> $dati valori dei segnaposto
+     * @param list<array{path: string, nome: string}> $allegati
+     */
+    public function inviaModello(?string $a, string $chiave, array $dati, string $link = '', array $allegati = []): void
+    {
+        $r = $this->modelli->render($chiave, $dati);
+        $this->invia($a, $r['oggetto'], $r['corpo'], $link, (string) $r['bottone'], $allegati);
     }
 
     /**

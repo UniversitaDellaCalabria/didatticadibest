@@ -339,6 +339,26 @@ final class ServizioIncarichi
         return null;
     }
 
+    /**
+     * Dati della lettera per i segnaposto delle email (i valori si «ripuliscono» da soli quando entrano nel testo).
+     *
+     * @param array<string, mixed> $i
+     * @return array<string, string>
+     */
+    public static function datiEmail(array $i): array
+    {
+        $docente = trim((string) ($i['docente_nome'] ?? '') . ' ' . (string) ($i['docente_cognome'] ?? ''));
+
+        return [
+            'tutor' => trim($i['nome'] . ' ' . $i['cognome']),
+            'tutor_cn' => trim($i['cognome'] . ' ' . $i['nome']),
+            'bando' => (string) ($i['bando_titolo'] ?? ''),
+            'docente' => $docente,
+            'docente_con_titolo' => trim((string) ($i['docente_titolo'] ?? '') . ' ' . $docente),
+            'codice' => (string) ($i['codice'] ?? ''),
+        ];
+    }
+
     /** Passo 1: la lettera va allo studente (email con il link personale). Ritorna un errore o null. */
     public function invia(int $id, string $autore = ''): ?string
     {
@@ -360,16 +380,11 @@ final class ServizioIncarichi
         $tok = $i['token_studente'] ?: bin2hex(random_bytes(20));
         $dataL = $i['data_lettera'] ?: $this->orologio->adesso()->format('Y-m-d');
         $this->incarichi->segnaInviata($id, $tok, $dataL);
-        $h = static fn ($s): string => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
-        $this->notifiche->invia(
+        $this->notifiche->inviaModello(
             $i['email'],
-            $uniticket ? 'Lettera di incarico di tutorato: compila e accetta' : 'Lettera di incarico di tutorato: controlla e conferma',
-            '<p>Gentile ' . $h($i['nome'] . ' ' . $i['cognome']) . ',</p><p>è pronta la tua <strong>lettera di incarico</strong> per le attività di tutorato (' . $h($i['bando_titolo']) . ').</p>'
-            . ($uniticket ? '<p>Abbiamo verificato la tua presa di servizio su Uniticket. Ora devi <strong>compilare i dati richiesti</strong> (dichiarazione individuale: dati personali, accredito e posizione contributiva) e <strong>accettare l\'incarico</strong>.</p>' : '')
-            . '<p>Accedi al portale <strong>con SPID o CIE</strong>, controlla i dati e clicca su <strong>Confermo e accetto</strong>: la conferma, con i dati della tua identità digitale, vale come accettazione dell\'incarico. Poi la lettera passa alla firma del docente responsabile e del Direttore.</p>'
-            . '<p>Se trovi un errore nei dati segnalalo dalla stessa pagina.</p>',
-            $this->sito->urlBase() . '/incarico.php?t=' . $tok,
-            $uniticket ? 'Compila e accetta la lettera' : 'Controlla e conferma la lettera'
+            $uniticket ? 'tutorato_invito_studente_uniticket' : 'tutorato_invito_studente',
+            $this->datiEmail($i),
+            $this->sito->urlBase() . '/incarico.php?t=' . $tok
         );
         $this->evento($id, 'inviata', ($i['stato'] === 'inviata' ? 'Email di nuovo allo studente: ' : 'Inviata allo studente: ') . $i['email'], $autore);
 
@@ -440,15 +455,7 @@ final class ServizioIncarichi
             $this->creaScafis($i, $firma, $utente);
         }
         $this->evento($id, 'confermata', 'Confermata dallo studente con ' . (Costanti::METODI_ACCESSO[$firma['metodo']] ?? $firma['metodo']) . ($firma['livello'] ? ' livello ' . $firma['livello'] : '') . ($firma['spid_code'] ? ' (spidCode ' . $firma['spid_code'] . ')' : ''), trim($i['nome'] . ' ' . $i['cognome']));
-        $h = static fn ($s): string => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
-        $this->notifiche->invia(
-            $i['docente_email'],
-            'Lettera di incarico da firmare: ' . trim($i['cognome'] . ' ' . $i['nome']),
-            '<p>Gentile Prof. ' . $h(trim($i['docente_nome'] . ' ' . $i['docente_cognome'])) . ',</p><p>' . $h(trim($i['nome'] . ' ' . $i['cognome'])) . " ha accettato l'incarico di tutorato (" . $h($i['bando_titolo']) . ") di cui è <strong>responsabile dell'attività</strong>.</p>"
-            . '<p>Apra la lettera e la firmi digitalmente <strong>in formato PAdES</strong>: con la firma remota Aruba direttamente dal portale, oppure scaricandola e caricando il PDF firmato. Dopo la sua firma la lettera passa al Direttore.</p>',
-            $this->sito->urlBase() . '/firma_incarico.php?t=' . $tok,
-            'Apri e firma la lettera'
-        );
+        $this->notifiche->inviaModello($i['docente_email'], 'tutorato_docente_da_firmare', $this->datiEmail($i), $this->sito->urlBase() . '/firma_incarico.php?t=' . $tok);
 
         return null;
     }
@@ -490,15 +497,8 @@ final class ServizioIncarichi
         }
         $this->incarichi->impostaNotaStudente($id, $testo);
         $this->evento($id, 'errore', 'Segnalazione dello studente: ' . $testo, trim($i['nome'] . ' ' . $i['cognome']));
-        $h = static fn ($s): string => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
         foreach ($this->notifiche->emailOperatori($i) as $e) {
-            $this->notifiche->invia(
-                $e,
-                'Lettera di incarico: segnalazione di ' . trim($i['cognome'] . ' ' . $i['nome']),
-                '<p>Lo studente segnala un errore nei dati della lettera <strong>' . $h($i['codice']) . "</strong>:</p><p style='background:#f1f5f9;padding:10px;border-radius:6px;'>" . nl2br($h($testo)) . '</p><p>Annulla la lettera e preparane una corretta (puoi duplicarla), poi inviala di nuovo.</p>',
-                $this->sito->urlBase() . '/admin/tutorato.php?incarico=' . (int) $i['id'],
-                'Apri nel pannello'
-            );
+            $this->notifiche->inviaModello($e, 'tutorato_segnalazione_errore', $this->datiEmail($i) + ['nota' => $testo], $this->sito->urlBase() . '/admin/tutorato.php?incarico=' . (int) $i['id']);
         }
 
         return null;
@@ -527,41 +527,19 @@ final class ServizioIncarichi
         if (!$this->archivio->salvaLettera($i, $pdf, 'firmata_' . $ruolo)) {
             return 'Non è stato possibile salvare il PDF firmato.';
         }
-        $h = static fn ($s): string => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
         $chi = $ruolo === 'docente' ? 'Prof. ' . trim($i['docente_nome'] . ' ' . $i['docente_cognome']) : 'Prof. ' . $i['direttore_nome'];
         if ($ruolo === 'docente') {
             $tok = bin2hex(random_bytes(20));
             $this->incarichi->segnaFirmataDocente($id, $tok);
             $this->evento($id, 'firma_docente', "Firmata in PAdES dal docente ($come)", $chi);
-            $this->notifiche->invia(
-                $i['direttore_email'],
-                'Lettera di incarico di tutorato da firmare: ' . trim($i['cognome'] . ' ' . $i['nome']),
-                '<p>Gentile Direttore,</p><p>la lettera di incarico di tutorato di <strong>' . $h(trim($i['nome'] . ' ' . $i['cognome'])) . '</strong> (' . $h($i['bando_titolo']) . ") è stata accettata dallo studente e firmata dal responsabile dell'attività, " . $h($chi) . '.</p>'
-                . "<p>La firmi digitalmente <strong>in formato PAdES</strong> (firma remota Aruba dal portale o caricando il PDF firmato): poi la lettera va all'Ufficio per il protocollo.</p>",
-                $this->sito->urlBase() . '/firma_incarico.php?t=' . $tok,
-                'Apri e firma la lettera'
-            );
+            $this->notifiche->inviaModello($i['direttore_email'], 'tutorato_direttore_da_firmare', $this->datiEmail($i) + ['docente_chi' => $chi], $this->sito->urlBase() . '/firma_incarico.php?t=' . $tok);
         } else {
             $this->incarichi->segnaFirmataDirettore($id);
             $this->evento($id, 'firma_direttore', "Firmata in PAdES dal direttore ($come)", $chi);
             // L'incarico è perfezionato: il tutor può segnare le ore nel registro delle attività
-            $this->notifiche->invia(
-                $i['email'],
-                'Tutorato: lettera di incarico firmata, registro delle attività aperto',
-                '<p>Gentile ' . $h($i['nome'] . ' ' . $i['cognome']) . ',</p>'
-                . '<p>la tua lettera di incarico è firmata dal docente responsabile e dal Direttore. Da ora segna nel <strong>registro delle attività</strong> i giorni, le ore e le attività svolte: il docente le approva e a fine incarico dichiari concluse le attività.</p>',
-                $this->sito->urlBase() . '/registro_tutorato.php?id=' . $id,
-                'Apri il registro'
-            );
+            $this->notifiche->inviaModello($i['email'], 'tutorato_tutor_registro_aperto', $this->datiEmail($i), $this->sito->urlBase() . '/registro_tutorato.php?id=' . $id);
             foreach ($this->notifiche->emailOperatori($i) as $e) {
-                $this->notifiche->invia(
-                    $e,
-                    'Lettera di incarico firmata: da protocollare – ' . trim($i['cognome'] . ' ' . $i['nome']),
-                    '<p>La lettera di incarico <strong>' . $h($i['codice']) . '</strong> di ' . $h(trim($i['nome'] . ' ' . $i['cognome'])) . ' (' . $h($i['bando_titolo']) . ") ha tutte le firme: accettazione dello studente con identità digitale, firma PAdES del responsabile dell'attività e del Direttore.</p>"
-                    . '<p>Scarica il PDF firmato e protocollalo, poi registra il numero di protocollo nel pannello.</p>',
-                    $this->sito->urlBase() . '/admin/tutorato.php?incarico=' . $id,
-                    'Scarica e protocolla'
-                );
+                $this->notifiche->inviaModello($e, 'tutorato_operatore_da_protocollare', $this->datiEmail($i), $this->sito->urlBase() . '/admin/tutorato.php?incarico=' . $id);
             }
         }
 
@@ -583,12 +561,10 @@ final class ServizioIncarichi
         $this->incarichi->segnaProtocollata($id, $prot, $data);
         $this->evento($id, 'protocollata', 'Protocollo ' . $prot . ' del ' . date('d/m/Y', (int) strtotime($data)), $autore);
         if ($inviaCopia && ($f = $this->archivio->pdfCorrente($i))) {
-            $h = static fn ($s): string => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
-            $this->notifiche->invia(
+            $this->notifiche->inviaModello(
                 $i['email'],
-                'Lettera di incarico di tutorato firmata (prot. ' . $prot . ')',
-                '<p>Gentile ' . $h($i['nome'] . ' ' . $i['cognome']) . ',</p><p>in allegato la tua lettera di incarico con tutte le firme, protocollata con il n. ' . $h($prot) . ' del ' . date('d/m/Y', (int) strtotime($data)) . '.</p>',
-                '',
+                'tutorato_copia_protocollata',
+                $this->datiEmail($i) + ['protocollo' => $prot, 'data' => date('d/m/Y', (int) strtotime($data))],
                 '',
                 [['path' => $f, 'nome' => DatiLettera::nomeFile($i, 'firmata')]]
             );

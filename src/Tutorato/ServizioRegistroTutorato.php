@@ -162,15 +162,11 @@ final class ServizioRegistroTutorato
         $this->incarichi->segnaFineRichiesta($id);
         $this->lettere->evento($id, 'fine_richiesta', 'Il tutor ha dichiarato concluse le attività', trim($i['nome'] . ' ' . $i['cognome']));
         $o = self::ore($this->registro->righe($id));
-        $h = fn ($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
-        $this->notifiche->invia(
+        $this->notifiche->inviaModello(
             $i['docente_email'],
-            "Tutorato: fine attività di " . trim($i['cognome'] . ' ' . $i['nome']),
-            "<p>Gentile " . $h($i['docente_titolo'] . ' ' . trim($i['docente_nome'] . ' ' . $i['docente_cognome'])) . ",</p><p>" . $h(trim($i['nome'] . ' ' . $i['cognome'])) . " ha dichiarato concluse le attività di tutorato (" . $h($i['bando_titolo']) . ") di cui è responsabile.</p>"
-            . "<p>Ore nel registro: <strong>" . DatiLettera::oreTesto($o['totale']) . "</strong> su " . DatiLettera::oreTesto($i['ore']) . ($o['inviata'] > 0 ? " (" . DatiLettera::oreTesto($o['inviata']) . " da approvare)" : '') . ".</p>"
-            . "<p>Controlli il registro, approvi le ore e confermi la fine delle attività: il portale prepara la dichiarazione di fine attività da firmare in PAdES.</p>",
-            $this->sito->urlBase() . '/registro_tutorato.php?id=' . $id,
-            'Apri il registro'
+            'tutorato_fine_dichiarata',
+            ServizioIncarichi::datiEmail($i) + ['ore' => DatiLettera::oreTesto($o['totale']), 'ore_previste' => DatiLettera::oreTesto($i['ore']), 'da_approvare' => $o['inviata'] > 0 ? ' (' . DatiLettera::oreTesto($o['inviata']) . ' da approvare)' : ''],
+            $this->sito->urlBase() . '/registro_tutorato.php?id=' . $id
         );
         return null;
     }
@@ -233,22 +229,17 @@ final class ServizioRegistroTutorato
         }
         $tab .= "</table>";
         $file = $this->archivio->fineCorrente($i);
+        $dati = ServizioIncarichi::datiEmail($i) + ['ore' => DatiLettera::oreTesto($i['ore_approvate']), 'ore_previste' => DatiLettera::oreTesto($i['ore'])];
         foreach ($this->notifiche->emailOperatori($i) as $e) {
-            $this->notifiche->invia(
+            $this->notifiche->inviaModello(
                 $e,
-                "Fine attività firmata: da validare – " . trim($i['cognome'] . ' ' . $i['nome']) . " – " . DatiLettera::oreTesto($i['ore_approvate']) . " ore",
-                "<p>Il tutor <strong>" . $h(trim($i['nome'] . ' ' . $i['cognome'])) . "</strong> (" . $h($i['bando_titolo']) . ") ha completato le attività: <strong>" . DatiLettera::oreTesto($i['ore_approvate']) . " ore</strong> approvate su " . DatiLettera::oreTesto($i['ore']) . ".</p>"
-                . "<p>La dichiarazione di fine attività è firmata in PAdES dal docente titolare (non serve il protocollo): controlla ore e documenti e passa la pratica all'ufficio pagamenti dalla vista «Da validare» del tutorato.</p>" . $tab,
+                'tutorato_fine_firmata_operatore',
+                $dati + ['tabella' => $tab],
                 $this->sito->urlBase() . '/admin/tutorato.php?vista=validare',
-                'Apri le pratiche da validare',
                 $file ? [['path' => $file, 'nome' => 'FINE_ATTIVITA_' . str_replace('LETTERA_INCARICO_', '', DatiLettera::nomeFile($i))]] : []
             );
         }
-        $this->notifiche->invia(
-            $i['email'],
-            "Tutorato: attività completate",
-            "<p>Gentile " . $h($i['nome'] . ' ' . $i['cognome']) . ",</p><p>il docente responsabile ha confermato la fine delle tue attività di tutorato: <strong>" . DatiLettera::oreTesto($i['ore_approvate']) . " ore</strong>. L'Ufficio procede con gli adempimenti per il compenso.</p>"
-        );
+        $this->notifiche->inviaModello($i['email'], 'tutorato_attivita_completate', $dati);
         return null;
     }
 
@@ -306,15 +297,16 @@ final class ServizioRegistroTutorato
             if (self::aperto($i) && $i['fine_stato'] === '' && (!$i['promemoria_tutor_il'] || strtotime($i['promemoria_tutor_il']) < $ora - 7 * 86400)) {
                 $reg = $this->registro->righe($id);
                 $ultima = $reg ? max(array_column($reg, 'data') ?: [null]) : null;
-                $testo = null;
+                $modello = null;
+                $dati = ServizioIncarichi::datiEmail($i) + ['ore_segnate' => DatiLettera::oreTesto(self::ore($reg)['totale']), 'ore_previste' => DatiLettera::oreTesto($i['ore'])];
                 if ($i['data_fine'] && $oggi >= date('Y-m-d', (int) strtotime($i['data_fine'] . ' -7 days'))) {
-                    $testo = ($oggi > $i['data_fine'] ? "il periodo dell'incarico è terminato il " : "il periodo dell'incarico termina il ") . date('d/m/Y', (int) strtotime($i['data_fine']))
-                           . ": completa il registro delle attività e, quando hai finito, clicca su <strong>«Ho concluso le attività»</strong>. Il docente responsabile confermerà le ore.";
+                    $modello = 'tutorato_promemoria_registro_scadenza';
+                    $dati['periodo'] = ($oggi > $i['data_fine'] ? 'è terminato il ' : 'termina il ') . date('d/m/Y', (int) strtotime($i['data_fine']));
                 } elseif ((!$i['data_inizio'] || $oggi >= $i['data_inizio']) && (!$ultima || $ultima < $this->orologio->adesso()->modify('-14 days')->format('Y-m-d')) && ($i['firmata_direttore_il'] !== null && strtotime($i['firmata_direttore_il']) < $ora - 14 * 86400)) {
-                    $testo = "non segni attività nel registro da più di due settimane: aggiornalo con i giorni, le ore e le attività svolte.";
+                    $modello = 'tutorato_promemoria_registro_fermo';
                 }
-                if ($testo) {
-                    $this->notifiche->invia($i['email'], "Tutorato: registro delle attività", "<p>Gentile " . $h($i['nome'] . ' ' . $i['cognome']) . ",</p><p>" . $testo . "</p><p>Ore segnate: " . DatiLettera::oreTesto(self::ore($reg)['totale']) . " su " . DatiLettera::oreTesto($i['ore']) . ".</p>", $link_reg, 'Apri il registro');
+                if ($modello) {
+                    $this->notifiche->inviaModello($i['email'], $modello, $dati, $link_reg);
                     $this->incarichi->segnaPromemoriaTutor($id);
                     $n++;
                 }
@@ -324,13 +316,7 @@ final class ServizioRegistroTutorato
                 $vecchie = $this->registro->contaDaApprovareVecchie($id);
                 $fine = $i['fine_stato'] === 'richiesta' && strtotime((string) $i['fine_richiesta_il']) < $ora - 3 * 86400;
                 if ($vecchie || $fine) {
-                    $this->notifiche->invia(
-                        $i['docente_email'],
-                        "Tutorato: registro di " . trim($i['cognome'] . ' ' . $i['nome']) . " da controllare",
-                        "<p>Nel registro delle attività di tutorato di <strong>" . $h(trim($i['nome'] . ' ' . $i['cognome'])) . "</strong> " . ($fine ? "il tutor ha dichiarato concluse le attività: approvi le ore e confermi la fine." : "ci sono ore da approvare.") . "</p>",
-                        $link_reg,
-                        'Apri il registro'
-                    );
+                    $this->notifiche->inviaModello($i['docente_email'], $fine ? 'tutorato_promemoria_docente_fine' : 'tutorato_promemoria_docente_ore', ServizioIncarichi::datiEmail($i), $link_reg);
                     $this->incarichi->segnaPromemoriaDocente($id);
                     $n++;
                 }
@@ -345,26 +331,14 @@ final class ServizioRegistroTutorato
             if ($ferma && $ferma[1]) {
                 $dal = strtotime((string)($i['sollecito_il'] ?: $ferma[1]));
                 if ($dal < $ora - $gg * 86400 && (int)$i['solleciti'] < 3) {
-                    $this->notifiche->invia(
-                        $ferma[2],
-                        "Sollecito: " . $ferma[4] . " di " . trim($i['cognome'] . ' ' . $i['nome']) . " è in attesa della sua firma",
-                        "<p>Gentile,</p><p>" . $h($ferma[4]) . " di tutorato di <strong>" . $h(trim($i['nome'] . ' ' . $i['cognome'])) . "</strong> (" . $h($i['bando_titolo']) . ") aspetta la sua firma digitale in PAdES dal " . date('d/m/Y', (int) strtotime($ferma[1])) . ".</p>",
-                        $ferma[3],
-                        'Apri e firma'
-                    );
+                    $this->notifiche->inviaModello($ferma[2], 'tutorato_sollecito_firma', ServizioIncarichi::datiEmail($i) + ['documento' => $ferma[4], 'data' => date('d/m/Y', (int) strtotime($ferma[1]))], $ferma[3]);
                     $this->incarichi->segnaSollecito($id);
                     $n++;
                     $this->lettere->evento($id, 'sollecito', 'Sollecito della firma inviato a ' . $ferma[2]);
                     // Al terzo sollecito lo sa anche l'operatore
                     if ((int)$i['solleciti'] + 1 >= 3) {
                         foreach ($this->notifiche->emailOperatori($i) as $e) {
-                            $this->notifiche->invia(
-                                $e,
-                                "Firma ferma: " . $ferma[4] . " di " . trim($i['cognome'] . ' ' . $i['nome']),
-                                "<p>Dopo tre solleciti " . $h($ferma[4]) . " non è ancora firmata da " . $h($ferma[2]) . ": serve un contatto diretto.</p>",
-                                $this->sito->urlBase() . '/admin/tutorato.php?incarico=' . $id,
-                                'Apri nel pannello'
-                            );
+                            $this->notifiche->inviaModello($e, 'tutorato_firma_ferma', ServizioIncarichi::datiEmail($i) + ['documento' => $ferma[4], 'firmatario' => $ferma[2]], $this->sito->urlBase() . '/admin/tutorato.php?incarico=' . $id);
                         }
                     }
                 }
