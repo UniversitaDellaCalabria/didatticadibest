@@ -147,6 +147,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         flash_set($err ?? "Lettera inviata: lo studente riceve l'email con il link per controllare e confermare con SPID/CIE.", $err ? 'danger' : 'success');
         admin_redirect("$base&incarico=$iid");
     }
+    if (isset($_POST['cambia_iter'])) {
+        $err = \App\Core\App::per($conn)->get(\App\Tutorato\ServizioIncarichi::class)->cambiaIter($iid, (string)($_POST['iter'] ?? ''), $autore);
+        if (!$err) registra_log_audit($conn, "Tutorato: iter della lettera cambiato", ["Lettera" => $iid, "Iter" => $_POST['iter'] ?? '']);
+        flash_set($err ?? "Iter della lettera aggiornato.", $err ? 'danger' : 'success');
+        admin_redirect("$base&incarico=$iid");
+    }
+    if (isset($_POST['presa_servizio'])) {
+        $err = \App\Core\App::per($conn)->get(\App\Tutorato\ServizioIncarichi::class)->presaServizio($iid, $autore);
+        if (!$err) registra_log_audit($conn, "Tutorato: presa di servizio su Uniticket verificata", ["Lettera" => $iid]);
+        flash_set($err ?? "Presa di servizio verificata: ora puoi inviare la lettera allo studente.", $err ? 'danger' : 'success');
+        admin_redirect("$base&incarico=$iid");
+    }
     if (isset($_POST['carica_firmato'])) {
         // L'operatore carica il PDF firmato ricevuto dal docente o dal direttore (es. firmato fuori dal portale)
         $i = incarico_tutorato($conn, $iid);
@@ -285,6 +297,9 @@ $vista_validare = ($_GET['vista'] ?? '') === 'validare';
             <div class="col-md-6"><label class="form-label small fw-bold" for="bOp">Operatore che riceve le lettere firmate e le protocolla</label>
                 <select class="form-select form-select-sm" id="bOp" name="operatore_id"><option value="0">Chi ha il compito «Bandi» nell'Ufficio didattico</option>
                     <?php foreach ($operatori_b as $o): ?><option value="<?php echo (int)$o['id']; ?>"<?php echo (int)$b['operatore_id'] === (int)$o['id'] ? ' selected' : ''; ?>><?php echo $h(etichetta_operatore($o)); ?></option><?php endforeach; ?></select></div>
+            <div class="col-md-6"><label class="form-label small fw-bold" for="bIter">Iter delle lettere di questo bando</label>
+                <select class="form-select form-select-sm" id="bIter" name="iter"><?php foreach (\App\Tutorato\Costanti::ITER as $k_it => $v_it): ?><option value="<?php echo $h($k_it); ?>"<?php echo (\App\Tutorato\Costanti::iterValido($b['iter'] ?? '')) === $k_it ? ' selected' : ''; ?>><?php echo $h($v_it[0]); ?></option><?php endforeach; ?></select>
+                <div class="form-text">«Iter per Uniticket»: il vincitore prende servizio su Uniticket e tu lo verifichi prima di mandargli la lettera; a firme finite scarichi lettera e modello SCAFIS da allegare lì. Senza pagamenti nel portale. Le nuove lettere del bando lo ereditano (finché sono in bozza lo puoi cambiare per la singola lettera).</div></div>
             <div class="col-md-3"><label class="form-label small fw-bold" for="bLuogo">Luogo della lettera</label><input class="form-control form-control-sm" id="bLuogo" name="luogo" value="<?php echo $h($b['luogo']); ?>" maxlength="100"></div>
         </div>
         <div class="mt-3 d-flex gap-2"><button type="submit" name="salva_bando" value="1" class="btn btn-primary fw-bold"><i class="fa fa-save me-1" aria-hidden="true"></i>Salva</button>
@@ -361,12 +376,25 @@ $vista_validare = ($_GET['vista'] ?? '') === 'validare';
     document.querySelectorAll('.i-doc').forEach(function (x) { x.addEventListener('input', function () { document.getElementById('iDocPid').value = ''; document.getElementById('iDocAn').hidden = true; }); });
     </script>
     <?php endif; ?>
-    <?php if ($inc_sel): ?>
+    <?php if ($inc_sel): $iter_sel = \App\Tutorato\Costanti::iterValido($inc_sel['iter'] ?? ''); $presa_ok = !empty($inc_sel['presa_servizio_il']); ?>
+        <div class="card border-0 shadow-sm mt-3" style="border-left:4px solid <?php echo $iter_sel === 'uniticket' ? '#b45309' : '#0f766e'; ?> !important;"><div class="card-body">
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+                <h6 class="fw-bold mb-0"><i class="fa fa-route me-1" aria-hidden="true"></i>Iter: <?php echo $h(\App\Tutorato\Costanti::ITER[$iter_sel][0]); ?></h6>
+                <form method="POST" class="d-flex gap-1 align-items-center m-0 ms-auto"><?php csrf_field(); ?><input type="hidden" name="incarico_id" value="<?php echo (int)$inc_sel['id']; ?>">
+                    <select class="form-select form-select-sm" name="iter" aria-label="Iter di questa lettera"><?php foreach (\App\Tutorato\Costanti::ITER as $k_it => $v_it): ?><option value="<?php echo $h($k_it); ?>"<?php echo $iter_sel === $k_it ? ' selected' : ''; ?>><?php echo $h($v_it[0]); ?></option><?php endforeach; ?></select>
+                    <button class="btn btn-sm btn-outline-secondary" name="cambia_iter" value="1">Cambia</button></form>
+            </div>
+            <?php if ($iter_sel === 'uniticket'): ?>
+                <div class="small mt-2"><?php if ($presa_ok): ?><i class="fa fa-circle-check text-success me-1" aria-hidden="true"></i>Presa di servizio su Uniticket <strong>verificata</strong> il <?php echo date('d/m/Y H:i', strtotime($inc_sel['presa_servizio_il'])); ?><?php echo $inc_sel['presa_servizio_da'] !== '' ? ' da ' . $h($inc_sel['presa_servizio_da']) : ''; ?>.
+                    <?php else: ?><i class="fa fa-hourglass-half text-warning me-1" aria-hidden="true"></i>Prima di inviare la lettera controlla su Uniticket che il vincitore abbia <strong>preso servizio</strong>.
+                        <form method="POST" class="d-inline m-0 ms-2"><?php csrf_field(); ?><input type="hidden" name="incarico_id" value="<?php echo (int)$inc_sel['id']; ?>"><button class="btn btn-sm btn-warning fw-bold" name="presa_servizio" value="1"><i class="fa fa-check me-1" aria-hidden="true"></i>Presa di servizio verificata</button></form><?php endif; ?></div>
+            <?php endif; ?>
+        </div></div>
         <div class="card border-0 shadow-sm mt-3"><div class="card-body d-flex flex-wrap gap-2 align-items-center">
             <a class="btn btn-sm btn-outline-secondary" href="<?php echo $base; ?>&amp;incarico=<?php echo (int)$inc_sel['id']; ?>&amp;file=anteprima" target="_blank" rel="noopener"><i class="fa fa-file-pdf me-1" aria-hidden="true"></i>Anteprima del PDF</a>
             <a class="btn btn-sm btn-outline-primary" href="<?php echo $base; ?>&amp;incarico=<?php echo (int)$inc_sel['id']; ?>&amp;file=word"><i class="fa fa-file-word me-1" aria-hidden="true"></i>Word precompilato</a>
             <form method="POST" class="m-0 ms-auto"><?php csrf_field(); ?><input type="hidden" name="incarico_id" value="<?php echo (int)$inc_sel['id']; ?>">
-                <button type="submit" name="invia_studente" value="1" class="btn btn-success fw-bold" data-confirm="Inviare la lettera a <?php echo $h($inc_sel['email']); ?>? Dopo l'invio i dati non si modificano più."><i class="fa fa-paper-plane me-1" aria-hidden="true"></i>Invia email allo studente per la conferma</button></form>
+                <button type="submit" name="invia_studente" value="1" class="btn btn-success fw-bold"<?php echo $iter_sel === 'uniticket' && !$presa_ok ? ' disabled title="Prima verifica la presa di servizio su Uniticket"' : ''; ?> data-confirm="Inviare la lettera a <?php echo $h($inc_sel['email']); ?>? Dopo l'invio i dati non si modificano più."><i class="fa fa-paper-plane me-1" aria-hidden="true"></i><?php echo $iter_sel === 'uniticket' ? 'Invia email allo studente per compilare e accettare' : 'Invia email allo studente per la conferma'; ?></button></form>
         </div></div>
     <?php endif; ?>
 
@@ -380,6 +408,7 @@ $vista_validare = ($_GET['vista'] ?? '') === 'validare';
     <div class="card border-0 shadow-sm mb-3"><div class="card-body">
         <div class="d-flex flex-wrap gap-2 align-items-start mb-2">
             <div class="flex-grow-1"><h5 class="fw-bold mb-0"><?php echo $h($d['TITOLO'] . ' ' . $d['NOMINATIVO']); ?></h5><div class="small text-secondary font-monospace"><?php echo $h($i['codice']); ?> · <?php echo $h($i['codice_fiscale']); ?> · <?php echo $h($i['email']); ?></div></div>
+            <?php if ((string)$i['iter'] === 'uniticket'): ?><span class="badge text-bg-warning align-self-center" title="Il vincitore prende servizio su Uniticket; lettera e modello SCAFIS vanno allegati lì"><i class="fa fa-route me-1" aria-hidden="true"></i>Iter per Uniticket</span><?php endif; ?>
             <?php echo badge_stato_incarico($i['stato']); ?><?php echo !empty($i['anonimizzata']) ? ' <span class="badge bg-secondary" title="Dati personali, PDF e registro cancellati per la conservazione dei dati">dati cancellati</span>' : ''; ?>
         </div>
         <?php if ($i['stato'] !== 'annullata') echo $passi_html($i); ?>
@@ -431,6 +460,18 @@ $vista_validare = ($_GET['vista'] ?? '') === 'validare';
                     <input type="file" name="pdf_firmato" class="form-control form-control-sm mb-2" accept=".pdf,application/pdf" required aria-label="PDF firmato">
                     <button type="submit" name="carica_firmato" value="1" class="btn btn-sm btn-primary fw-bold"><i class="fa fa-upload me-1" aria-hidden="true"></i>Carica la firma <?php echo $chi; ?></button>
                 </div></form>
+            <?php endif; ?>
+            <?php if (in_array($i['stato'], ['firmata', 'protocollata'], true) && (string)$i['iter'] === 'uniticket'): $scafis_ok = !empty($i['scafis_pdf']); ?>
+                <div class="card border-0 shadow-sm mb-3" style="border-left:4px solid #b45309 !important;"><div class="card-body">
+                    <h6 class="fw-bold"><i class="fa fa-paperclip me-1" aria-hidden="true"></i>Da allegare su Uniticket</h6>
+                    <p class="small text-secondary mb-2">Due file: la <strong>lettera di incarico firmata da tutte le parti</strong> (da protocollare) e il <strong>modello SCAFIS</strong> compilato, con i dati dell'identità digitale (SPID/CIE) del vincitore. Poi registra qui sotto il protocollo.</p>
+                    <div class="d-flex flex-wrap gap-2">
+                        <a class="btn btn-sm btn-primary fw-bold" href="<?php echo $base; ?>&amp;incarico=<?php echo (int)$i['id']; ?>&amp;file=pdf&amp;scarica=1"><i class="fa fa-download me-1" aria-hidden="true"></i>1. Lettera di incarico firmata</a>
+                        <?php if ($scafis_ok): ?><a class="btn btn-sm btn-primary fw-bold" href="../documento_tutorato.php?i=<?php echo (int)$i['id']; ?>&amp;f=scafis&amp;scarica=1"><i class="fa fa-download me-1" aria-hidden="true"></i>2. Modello SCAFIS compilato</a>
+                        <?php else: ?><span class="badge text-bg-warning align-self-center">Il modello SCAFIS non è disponibile (la dichiarazione individuale non è stata compilata)</span><?php endif; ?>
+                    </div>
+                    <div class="small text-secondary mt-2"><i class="fa fa-lock me-1" aria-hidden="true"></i>Il modello SCAFIS contiene l'IBAN: ogni apertura viene registrata.</div>
+                </div></div>
             <?php endif; ?>
             <?php if (in_array($i['stato'], ['firmata', 'protocollata'], true)): ?>
                 <form method="POST" class="card border-0 shadow-sm mb-3" style="border-left:4px solid #15803d !important;"><div class="card-body"><?php csrf_field(); ?><input type="hidden" name="incarico_id" value="<?php echo (int)$i['id']; ?>">
@@ -494,7 +535,7 @@ $vista_validare = ($_GET['vista'] ?? '') === 'validare';
                     <?php endif; ?>
                 </div></div>
             <?php endif; ?>
-            <?php if ($i['stato'] === 'protocollata'):
+            <?php if ($i['stato'] === 'protocollata' && (string)$i['iter'] !== 'uniticket'):
                 $comp_i = $pag_sv->compenso($i); $contr_i = $pag_sv->controlli($i); $ps_i = (string)$i['pagamento_stato']; ?>
                 <div class="card border-0 shadow-sm mb-3" id="pagamento" style="border-left:4px solid #15803d !important;"><div class="card-body">
                     <h6 class="fw-bold"><i class="fa fa-euro-sign me-1" aria-hidden="true"></i>UNILAV, compenso e pagamento</h6>

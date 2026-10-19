@@ -1217,6 +1217,50 @@ var PACCHETTI = [
     ],
     nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
     commit: "Archivio verbali: tipo «Consiglio di corso di studi» e tipi di organo nuovi scritti da admin"
+  },
+  {
+    id: "iter-uniticket",
+    titolo: "Pacchetto 27 · Tutorato: «Iter per Uniticket»",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare",
+    schema: "v81 (colonne nuove in tutorato_bandi e tutorato_incarichi)",
+    riassunto: "Un secondo iter del tutorato, <strong>da scegliere per bando</strong> (e per la singola lettera finché è in bozza), accanto a quello nel portale che resta com'è. <strong>Come funziona:</strong> l'ufficio inserisce il vincitore (o importa la graduatoria) → il vincitore prende servizio su Uniticket → l'ufficio lo verifica e preme <em>«Presa di servizio verificata»</em> (solo allora si può inviare la lettera) → il vincitore riceve l'email, <strong>compila la dichiarazione individuale</strong> (modello SCAFIS: dati personali, IBAN, posizione contributiva) e <strong>accetta con SPID/CIE</strong> → il docente firma in PAdES → il Direttore firma in PAdES → l'ufficio trova nella scheda «Da allegare su Uniticket» i <strong>due file</strong>: la lettera firmata da tutte le parti (da protocollare) e il <strong>modello SCAFIS con i metadati SPID/CIE</strong> (salvato alla conferma, sul NAS come la lettera) → registra il protocollo nel portale. Dopo restano il <strong>registro delle presenze</strong> e la <strong>dichiarazione di fine attività</strong> del docente; <strong>i pagamenti no</strong> (la lettera non risulta «da validare» e il tutor non vede le tappe del pagamento). Ogni apertura del modello SCAFIS (ha l'IBAN) si registra.",
+    passi: [["Tutorato", "Iter per Uniticket"]],
+    cartelle: [
+      { cartella: "admin/", file: [
+        ["admin/tutorato.php", "mod", "Tutorato", "scelta dell'iter nel bando e nella lettera, presa di servizio, i due file da allegare, niente pagamenti"]
+      ]},
+      { cartella: "/ (radice del portale)", file: [
+        ["area_personale.php", "mod", "Tutorato", "le tappe del tutor senza i pagamenti nell'iter per Uniticket"],
+        ["documento_tutorato.php", "mod", "Tutorato", "download del modello SCAFIS (referente e tutor)"],
+        ["incarico.php", "mod", "Tutorato", "avviso allo studente sulla conferma con SPID/CIE"]
+      ]},
+      { cartella: "src/Portale/", file: [
+        ["src/Portale/CoseDaFare.php", "mod", "Tutorato", "«da validare» solo per l'iter nel portale"]
+      ]},
+      { cartella: "src/Tutorato/", file: [
+        ["src/Tutorato/ArchivioIncarichi.php", "mod", "Tutorato", "il file SCAFIS"],
+        ["src/Tutorato/BandoRepository.php", "mod", "Tutorato", "iter del bando"],
+        ["src/Tutorato/Costanti.php", "mod", "Tutorato", "i due iter"],
+        ["src/Tutorato/DichiarazioneIndividuale.php", "mod", "Tutorato", "PDF con il riquadro dei dati SPID/CIE"],
+        ["src/Tutorato/IncaricoRepository.php", "mod", "Tutorato", "iter, presa di servizio e SCAFIS della lettera"],
+        ["src/Tutorato/ServizioDichiarazione.php", "mod", "Tutorato", "SCAFIS firmato e registro delle aperture"],
+        ["src/Tutorato/ServizioIncarichi.php", "mod", "Tutorato", "presa di servizio, invio bloccato, SCAFIS alla conferma"],
+        ["src/Tutorato/ServizioPagamenti.php", "mod", "Tutorato", "documento SCAFIS; i pagamenti non passano dal portale per l'iter Uniticket"]
+      ]},
+      { cartella: "src/Core/Schema/", file: [
+        ["src/Core/Schema/Definizioni.php", "mod", "Tutorato", "colonne iter, presa_servizio_il, presa_servizio_da, scafis_pdf"],
+        ["src/Core/Schema/Migrazioni.php", "mod", "Tutorato", "versione dello schema: 81"]
+      ]}
+    ],
+    dopo: [
+      "Apri una pagina del pannello: lo schema passa alla v81 (le lettere e i bandi che ci sono restano «Iter nel portale»).",
+      "Tutorato → apri o crea un bando: nel modulo c'è <strong>«Iter delle lettere di questo bando»</strong>: scegli «Iter per Uniticket» per i bandi che vuoi seguire così.",
+      "Nella lettera in bozza compare il riquadro dell'iter: dopo aver controllato su Uniticket preme <strong>«Presa di servizio verificata»</strong>, poi invia la lettera allo studente.",
+      "Il modello SCAFIS esiste solo se la <strong>cifratura della dichiarazione individuale</strong> è configurata nel <code>.env</code> (<code>CIFRATURA_CHIAVE</code>): senza, si genera solo la lettera. I PDF stanno in <code>uploads/incarichi/</code> (sul NAS con lo script di spostamento)."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Tutorato: iter per Uniticket (presa di servizio verificata, modello SCAFIS con dati SPID, due file da allegare, senza pagamenti)"
   }
 ];
 

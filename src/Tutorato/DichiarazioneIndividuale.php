@@ -177,8 +177,9 @@ final class DichiarazioneIndividuale
      *
      * @param array<string, mixed> $i lettera di incarico
      * @param array<string, mixed> $dati passo2 e passo3
+     * @param array<string, mixed>|null $firma i dati dell'identità digitale con cui il tutor ha accettato (iter per Uniticket): si aggiunge il riquadro come nella lettera
      */
-    public function pdf(array $i, array $dati, string $data): string
+    public function pdf(array $i, array $dati, string $data, ?array $firma = null): string
     {
         $a = (array) ($dati['passo2'] ?? []);
         $b = (array) ($dati['passo3'] ?? []);
@@ -218,6 +219,14 @@ final class DichiarazioneIndividuale
         }
         $pdf->paragrafo($riga('Rischio INAIL (l\'incarico rientra nell\'ambito di)', implode('; ', array_map(static fn ($k) => self::INAIL[$k] ?? $k, (array) ($b['inail'] ?? [])))), ['dopo' => 10]);
         $pdf->paragrafo("Dichiarazione compilata online e accettata dal tutor con la lettera di incarico il $data.", ['sz' => 9]);
+        if ($firma) {
+            $metodo = Costanti::METODI_ACCESSO[(string) ($firma['metodo'] ?? '')] ?? (string) ($firma['metodo'] ?? '');
+            $pdf->riquadro('**Dichiarazione accettata con identità digitale.** ' . $nome . ' (codice fiscale ' . $i['codice_fiscale'] . ') ha compilato la dichiarazione e ha confermato l’accettazione dell’incarico '
+                . 'dopo l’accesso al portale Didattica DiBEST con ' . $metodo . (!empty($firma['livello']) ? ' di livello ' . (int) $firma['livello'] : '') . '. '
+                . 'Identity provider: ' . ((string) ($firma['idp'] ?? '') ?: 'n.d.') . ((string) ($firma['spid_code'] ?? '') !== '' ? ' – spidCode: ' . $firma['spid_code'] : '') . ((string) ($firma['contesto'] ?? '') !== '' ? ' – contesto: ' . $firma['contesto'] : '') . '. '
+                . 'Autenticazione: ' . (!empty($firma['istante']) ? date('d/m/Y H:i:s', (int) strtotime((string) $firma['istante'])) : 'n.d.') . ' – conferma: ' . (!empty($firma['confermata_il']) ? date('d/m/Y H:i:s', (int) strtotime((string) $firma['confermata_il'])) : 'n.d.') . ' – indirizzo IP: ' . ((string) ($firma['ip'] ?? '') ?: 'n.d.') . '. '
+                . 'Impronta SHA-256 dei dati della lettera: ' . (string) ($firma['impronta'] ?? ''), ['sz' => 7.8, 'dopo' => 4]);
+        }
 
         return $pdf->pdf();
     }

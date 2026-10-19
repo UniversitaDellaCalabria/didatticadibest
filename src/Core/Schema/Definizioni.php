@@ -567,6 +567,8 @@ final class Definizioni
             'allegati_json'         => "ADD COLUMN allegati_json TEXT DEFAULT NULL",
         ],
         'tutorato_bandi' => [
+            // v81: iter delle lettere del bando: «portale» (tutto nel portale, con i pagamenti) o «uniticket» (presa di servizio verificata su Uniticket, due file da allegare lì)
+            'iter'                     => "ADD COLUMN iter VARCHAR(12) NOT NULL DEFAULT 'portale'",
             // v53: ufficio di Ateneo che paga i tutor di questo bando e i tre decreti in PDF (bando, commissione, approvazione atti)
             'ufficio_ateneo_id'        => "ADD COLUMN ufficio_ateneo_id INT DEFAULT NULL",
             'decreto_bando_file'       => "ADD COLUMN decreto_bando_file VARCHAR(255) DEFAULT NULL",
@@ -576,6 +578,11 @@ final class Definizioni
             'decreto_atti_file'        => "ADD COLUMN decreto_atti_file VARCHAR(255) DEFAULT NULL",
         ],
         'tutorato_incarichi' => [
+            // v81: iter della lettera (eredita quello del bando), presa di servizio su Uniticket verificata dall'ufficio e dichiarazione individuale (SCAFIS) firmata con i dati SPID/CIE
+            'iter'                   => "ADD COLUMN iter VARCHAR(12) NOT NULL DEFAULT 'portale'",
+            'presa_servizio_il'      => "ADD COLUMN presa_servizio_il DATETIME DEFAULT NULL",
+            'presa_servizio_da'      => "ADD COLUMN presa_servizio_da VARCHAR(150) NOT NULL DEFAULT ''",
+            'scafis_pdf'             => "ADD COLUMN scafis_pdf VARCHAR(255) DEFAULT NULL",
             // v53: UNILAV (PDF) con le ore a cui si riferisce, compenso ricalcolato sulle ore approvate, validazione del referente e pagamento
             // (pagamento_stato: '' | in_ufficio | rimandata | pagata)
             'unilav_file'            => "ADD COLUMN unilav_file VARCHAR(255) DEFAULT NULL",

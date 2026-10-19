@@ -56,6 +56,27 @@ final class ArchivioIncarichi
     }
 
     /**
+     * Salva il PDF della dichiarazione individuale (SCAFIS) firmata con i dati dell'identità digitale e lo rende quello corrente. Ritorna il percorso relativo.
+     *
+     * @param array<string, mixed> $i
+     */
+    public function salvaScafis(array $i, string $pdf): ?string
+    {
+        $rel = $this->scrivi((string) $i['codice'], 'scafis', $pdf);
+        if ($rel !== null) {
+            $this->incarichi->impostaScafis((int) $i['id'], $rel);
+        }
+
+        return $rel;
+    }
+
+    /** @param array<string, mixed> $i */
+    public function scafisCorrente(array $i): ?string
+    {
+        return $this->percorso($i['scafis_pdf'] ?? null);
+    }
+
+    /**
      * Percorso reale della dichiarazione di fine attività corrente, null se non c'è.
      *
      * @param array<string, mixed> $i
@@ -73,7 +94,7 @@ final class ArchivioIncarichi
     public function eliminaDellaLettera(array $i): void
     {
         $radice = $this->sito->radice();
-        foreach (['file_pdf', 'fine_pdf', 'unilav_file'] as $k) {
+        foreach (['file_pdf', 'fine_pdf', 'unilav_file', 'scafis_pdf'] as $k) {
             $p = !empty($i[$k]) ? realpath($radice . '/' . $i[$k]) : false;
             $base = realpath($radice . '/' . $this->cartella);
             if ($p && $base && strpos($p, $base . DIRECTORY_SEPARATOR) === 0) {

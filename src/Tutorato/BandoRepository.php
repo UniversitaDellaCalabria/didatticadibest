@@ -34,6 +34,12 @@ final class BandoRepository
         ));
     }
 
+    /** Iter delle lettere del bando (portale | uniticket). */
+    public function impostaIter(int $id, string $iter): void
+    {
+        $this->db->esegui('UPDATE tutorato_bandi SET iter = ? WHERE id = ?', [Costanti::iterValido($iter), $id]);
+    }
+
     /** Imposta il file PDF di uno dei decreti (colonna dalla lista consentita). */
     public function impostaFile(int $id, string $colonna, string $percorso): void
     {

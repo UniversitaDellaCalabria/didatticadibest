@@ -151,6 +151,9 @@ final class ServizioIncarichi
         } else {
             $id = $this->bandi->inserisci([...$v, $uid]);
         }
+        if (isset($d['iter'])) {
+            $this->bandi->impostaIter($id, Costanti::iterValido((string) $d['iter']));
+        }
 
         return [$id, null];
     }
@@ -254,6 +257,9 @@ final class ServizioIncarichi
             return 0;
         }
         [$nuovo] = $this->salva(array_merge($i, ['id' => 0]));
+        if ($nuovo) {
+            $this->incarichi->impostaIter((int) $nuovo, (string) ($i['iter'] ?? Costanti::ITER_PORTALE));
+        }
 
         return (int) $nuovo;
     }
@@ -290,6 +296,49 @@ final class ServizioIncarichi
         return $m;
     }
 
+    /** Cambia l'iter di una lettera ancora in bozza (di solito eredita quello del bando). Ritorna un errore o null. */
+    public function cambiaIter(int $id, string $iter, string $autore = ''): ?string
+    {
+        $i = $this->incarichi->perId($id);
+        if (!$i) {
+            return 'Lettera non trovata.';
+        }
+        if ($i['stato'] !== 'bozza') {
+            return 'L\'iter si cambia solo finché la lettera è in bozza.';
+        }
+        $iter = Costanti::iterValido($iter);
+        if ((string) $i['iter'] !== $iter) {
+            $this->incarichi->impostaIter($id, $iter);
+            $this->evento($id, 'iter', 'Iter cambiato in «' . Costanti::ITER[$iter][0] . '»', $autore);
+        }
+
+        return null;
+    }
+
+    /**
+     * Iter per Uniticket: l'ufficio ha verificato su Uniticket che il vincitore ha preso servizio. Solo dopo si può inviargli la lettera. Ritorna un errore o null.
+     */
+    public function presaServizio(int $id, string $autore = ''): ?string
+    {
+        $i = $this->incarichi->perId($id);
+        if (!$i) {
+            return 'Lettera non trovata.';
+        }
+        if ((string) $i['iter'] !== Costanti::ITER_UNITICKET) {
+            return 'La presa di servizio su Uniticket serve solo nell\'iter per Uniticket.';
+        }
+        if (!in_array($i['stato'], ['bozza', 'inviata'], true)) {
+            return 'La lettera è già stata confermata dallo studente.';
+        }
+        if (!empty($i['presa_servizio_il'])) {
+            return null;
+        }
+        $this->incarichi->segnaPresaServizio($id, $autore);
+        $this->evento($id, 'presa_servizio', 'Presa di servizio su Uniticket verificata', $autore);
+
+        return null;
+    }
+
     /** Passo 1: la lettera va allo studente (email con il link personale). Ritorna un errore o null. */
     public function invia(int $id, string $autore = ''): ?string
     {
@@ -304,18 +353,23 @@ final class ServizioIncarichi
         if ($i['stato'] === 'bozza' && ($m = self::datiMancanti($i))) {
             return 'Prima di inviare completa: ' . implode(', ', $m) . '.';
         }
+        $uniticket = (string) $i['iter'] === Costanti::ITER_UNITICKET;
+        if ($uniticket && empty($i['presa_servizio_il'])) {
+            return 'Prima verifica su Uniticket che il vincitore abbia preso servizio e segnalo («Presa di servizio verificata»).';
+        }
         $tok = $i['token_studente'] ?: bin2hex(random_bytes(20));
         $dataL = $i['data_lettera'] ?: $this->orologio->adesso()->format('Y-m-d');
         $this->incarichi->segnaInviata($id, $tok, $dataL);
         $h = static fn ($s): string => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
         $this->notifiche->invia(
             $i['email'],
-            'Lettera di incarico di tutorato: controlla e conferma',
+            $uniticket ? 'Lettera di incarico di tutorato: compila e accetta' : 'Lettera di incarico di tutorato: controlla e conferma',
             '<p>Gentile ' . $h($i['nome'] . ' ' . $i['cognome']) . ',</p><p>è pronta la tua <strong>lettera di incarico</strong> per le attività di tutorato (' . $h($i['bando_titolo']) . ').</p>'
+            . ($uniticket ? '<p>Abbiamo verificato la tua presa di servizio su Uniticket. Ora devi <strong>compilare i dati richiesti</strong> (dichiarazione individuale: dati personali, accredito e posizione contributiva) e <strong>accettare l\'incarico</strong>.</p>' : '')
             . '<p>Accedi al portale <strong>con SPID o CIE</strong>, controlla i dati e clicca su <strong>Confermo e accetto</strong>: la conferma, con i dati della tua identità digitale, vale come accettazione dell\'incarico. Poi la lettera passa alla firma del docente responsabile e del Direttore.</p>'
             . '<p>Se trovi un errore nei dati segnalalo dalla stessa pagina.</p>',
             $this->sito->urlBase() . '/incarico.php?t=' . $tok,
-            'Controlla e conferma la lettera'
+            $uniticket ? 'Compila e accetta la lettera' : 'Controlla e conferma la lettera'
         );
         $this->evento($id, 'inviata', ($i['stato'] === 'inviata' ? 'Email di nuovo allo studente: ' : 'Inviata allo studente: ') . $i['email'], $autore);
 
@@ -382,6 +436,9 @@ final class ServizioIncarichi
         }
         $tok = bin2hex(random_bytes(20));
         $this->incarichi->segnaConfermata($id, (string) json_encode($firma, JSON_UNESCAPED_UNICODE), $tok);
+        if ((string) $i['iter'] === Costanti::ITER_UNITICKET) {
+            $this->creaScafis($i, $firma, $utente);
+        }
         $this->evento($id, 'confermata', 'Confermata dallo studente con ' . (Costanti::METODI_ACCESSO[$firma['metodo']] ?? $firma['metodo']) . ($firma['livello'] ? ' livello ' . $firma['livello'] : '') . ($firma['spid_code'] ? ' (spidCode ' . $firma['spid_code'] . ')' : ''), trim($i['nome'] . ' ' . $i['cognome']));
         $h = static fn ($s): string => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
         $this->notifiche->invia(
@@ -394,6 +451,30 @@ final class ServizioIncarichi
         );
 
         return null;
+    }
+
+    /**
+     * Iter per Uniticket: la dichiarazione individuale (modello SCAFIS) compilata dal tutor si salva in PDF con i dati dell'identità digitale con cui ha accettato.
+     * Se la dichiarazione non c'è (cifratura non configurata) resta solo la lettera.
+     *
+     * @param array<string, mixed> $i
+     * @param array<string, mixed> $firma
+     * @param array<string, mixed> $utente
+     */
+    private function creaScafis(array $i, array $firma, array $utente): void
+    {
+        $pdf = $this->dichiarazione->pdfFirmato($i, $firma, $utente);
+        if ($pdf === null) {
+            $this->evento((int) $i['id'], 'scafis', 'Dichiarazione individuale non disponibile: nessun file SCAFIS da allegare');
+
+            return;
+        }
+        if ($this->archivio->salvaScafis($i, $pdf) === null) {
+            $this->evento((int) $i['id'], 'scafis', 'Il file della dichiarazione individuale (SCAFIS) non è stato salvato');
+
+            return;
+        }
+        $this->evento((int) $i['id'], 'scafis', 'Dichiarazione individuale (SCAFIS) salvata con i dati dell\'identità digitale');
     }
 
     /** Lo studente segnala un errore nei dati: l'operatore riceve un'email (la lettera resta da confermare). */

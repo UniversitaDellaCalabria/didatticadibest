@@ -518,6 +518,7 @@ require_once 'header.php';
             ['Validata dal referente e passata ai pagamenti', in_array($ps_t, ['in_ufficio', 'pagata'], true), $mt['pagamento_passato_il'] && in_array($ps_t, ['in_ufficio', 'pagata'], true) ? date('d/m/Y', strtotime($mt['pagamento_passato_il'])) : ''],
             ['Pagamento disposto', $ps_t === 'pagata', $ps_t === 'pagata' ? date('d/m/Y', strtotime($mt['pagamento_data'])) : 'ti avvisiamo con una email'],
         ];
+        if ((string)($mt['iter'] ?? 'portale') === 'uniticket') $tappe_t = array_slice($tappe_t, 0, 4); // nell'iter per Uniticket i pagamenti non passano dal portale
         $prima_non_fatta = null; foreach ($tappe_t as $k => $tp) if (!$tp[1]) { $prima_non_fatta = $k; break; } ?>
         <div class="card border-0 shadow-sm mb-4" style="border-radius: 12px; border-left: 5px solid #0f766e !important;"><div class="card-body">
             <h2 class="h6 fw-bold mb-0"><i class="fa fa-user-graduate me-1" style="color:#0f766e;" aria-hidden="true"></i>Il mio tutorato · <?php echo htmlspecialchars($mt['bando_titolo']); ?></h2>

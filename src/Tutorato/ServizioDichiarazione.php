@@ -146,6 +146,31 @@ final class ServizioDichiarazione
         return $this->dichiarazione->pdf($incarico, $d, $this->orologio->adesso()->format('d/m/Y'));
     }
 
+    /**
+     * PDF della dichiarazione (SCAFIS) con i dati dell'identità digitale con cui il tutor ha accettato: si genera alla conferma della lettera (iter per Uniticket).
+     * Registra l'apertura dei dati. Null se la dichiarazione non è completa.
+     *
+     * @param array<string, mixed> $incarico
+     * @param array<string, mixed> $firma
+     * @param array<string, mixed>|null $utente
+     */
+    public function pdfFirmato(array $incarico, array $firma, ?array $utente): ?string
+    {
+        $d = $this->apri((int) $incarico['id'], $utente, 'scafis');
+        if (!$d || empty($d['passo2']) || empty($d['passo3'])) {
+            return null;
+        }
+
+        return $this->dichiarazione->pdf($incarico, $d, $this->orologio->adesso()->format('d/m/Y'), $firma);
+    }
+
+    /** Registra che qualcuno ha aperto il file della dichiarazione (che ha l'IBAN). @param array<string, mixed>|null $utente */
+    public function registraApertura(int $incaricoId, ?array $utente, string $azione): void
+    {
+        $this->db->esegui('INSERT INTO tutorato_accessi_dati (incarico_id, utente_id, utente_email, azione) VALUES (?, ?, ?, ?)',
+            [$incaricoId, (int) ($utente['id'] ?? 0) ?: null, mb_substr((string) ($utente['email'] ?? ''), 0, 150), mb_substr($azione, 0, 30)]);
+    }
+
     /** @return array<string, mixed>|null */
     private function decifra(string $cifrato): ?array
     {

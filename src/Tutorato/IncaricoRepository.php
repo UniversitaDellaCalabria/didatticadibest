@@ -117,11 +117,16 @@ final class IncaricoRepository
      */
     public function inserisci(array $v): int
     {
-        return $this->db->inserisci(
+        $id = $this->db->inserisci(
             'INSERT INTO tutorato_incarichi (bando_id, codice, genere, cognome, nome, luogo_nascita, data_nascita, comune_residenza, indirizzo, civico, codice_fiscale, email, telefono, attivita, ore, periodo, compenso,
                                   docente_persona_id, docente_nome, docente_cognome, docente_email, docente_cf, data_lettera, aggiornata_il) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())',
             $v
         );
+        if ($id) {
+            $this->db->esegui('UPDATE tutorato_incarichi i JOIN tutorato_bandi b ON b.id = i.bando_id SET i.iter = b.iter WHERE i.id = ?', [$id]);
+        }
+
+        return $id;
     }
 
     /** @param list<mixed> $v come inserisci() senza bando e codice */
@@ -188,7 +193,7 @@ final class IncaricoRepository
     {
         return Righe::testo($this->db->righe(
             "SELECT i.*, " . self::DATI_BANDO . " FROM tutorato_incarichi i JOIN tutorato_bandi b ON b.id = i.bando_id
-             WHERE i.stato = 'protocollata' AND i.fine_stato IN ('firmata', 'protocollata') AND i.pagamento_stato IN ('', 'rimandata') ORDER BY i.pagamento_stato = 'rimandata' DESC, i.fine_firmata_il, i.cognome"
+             WHERE i.stato = 'protocollata' AND i.iter = 'portale' AND i.fine_stato IN ('firmata', 'protocollata') AND i.pagamento_stato IN ('', 'rimandata') ORDER BY i.pagamento_stato = 'rimandata' DESC, i.fine_firmata_il, i.cognome"
         ));
     }
 
@@ -231,6 +236,24 @@ final class IncaricoRepository
     {
         $this->db->esegui('DELETE FROM tutorato_dichiarazioni WHERE incarico_id = ?', [$id]);
         $this->db->esegui('DELETE FROM tutorato_accessi_dati WHERE incarico_id = ?', [$id]);
+    }
+
+    /** Iter della lettera (portale | uniticket). */
+    public function impostaIter(int $id, string $iter): void
+    {
+        $this->db->esegui('UPDATE tutorato_incarichi SET iter = ? WHERE id = ?', [Costanti::iterValido($iter), $id]);
+    }
+
+    /** L'ufficio ha verificato su Uniticket che il vincitore ha preso servizio. */
+    public function segnaPresaServizio(int $id, string $da): void
+    {
+        $this->db->esegui('UPDATE tutorato_incarichi SET presa_servizio_il = NOW(), presa_servizio_da = ?, aggiornata_il = NOW() WHERE id = ?', [mb_substr($da, 0, 150), $id]);
+    }
+
+    /** PDF della dichiarazione individuale (SCAFIS) firmata con i dati SPID/CIE. */
+    public function impostaScafis(int $id, string $percorso): void
+    {
+        $this->db->esegui('UPDATE tutorato_incarichi SET scafis_pdf = ? WHERE id = ?', [$percorso, $id]);
     }
 
     public function impostaFilePdf(int $id, string $percorso): void

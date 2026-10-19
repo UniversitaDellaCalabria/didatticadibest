@@ -29,6 +29,8 @@ if (isset($_GET['b'])) {
     if ($ruolo === null) $nega();
     // L'IBAN è solo del tutor e dell'ufficio pagamenti
     if ($f === 'dichiarazione' && !in_array($ruolo, ['tutor', 'ufficio'], true)) $nega();
+    // Il modello SCAFIS (iter per Uniticket, ha l'IBAN) lo apre il tutor e chi lavora al tutorato: ogni apertura si registra
+    if ($f === 'scafis' && !in_array($ruolo, ['tutor', 'referente'], true)) $nega();
     $doc = $pag->documento($i, $f, $user_info);
     if (!$doc) $nega();
 }

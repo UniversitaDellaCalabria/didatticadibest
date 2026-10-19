@@ -43,6 +43,9 @@ final class ServizioPagamenti
     public function controlli(array $i): array
     {
         $m = [];
+        if ((string) ($i['iter'] ?? Costanti::ITER_PORTALE) === Costanti::ITER_UNITICKET) {
+            $m[] = 'la lettera segue l\'iter per Uniticket: i pagamenti non passano dal portale';
+        }
         if ((string) $i['stato'] !== 'protocollata') {
             $m[] = 'la lettera di incarico non è ancora protocollata';
         }
@@ -279,7 +282,7 @@ final class ServizioPagamenti
         $prot = trim((string) $i['protocollo'] . ($i['protocollo_data'] ? ' del ' . $d($i['protocollo_data']) : ''));
         $stato = $this->dichiarazione->stato((int) $i['id']);
 
-        return [
+        $documenti = [
             ['chiave' => 'decreto_bando', 'etichetta' => 'Decreto del bando', 'dettaglio' => $dec((string) $i['decreto_bando'], $i['decreto_bando_data']), 'disponibile' => !empty($i['decreto_bando_file'])],
             ['chiave' => 'decreto_commissione', 'etichetta' => 'Decreto della commissione', 'dettaglio' => $dec((string) $i['decreto_commissione'], $i['decreto_commissione_data']), 'disponibile' => !empty($i['decreto_commissione_file'])],
             ['chiave' => 'decreto_atti', 'etichetta' => 'Decreto di approvazione atti', 'dettaglio' => $dec((string) $i['decreto_atti'], $i['decreto_atti_data']), 'disponibile' => !empty($i['decreto_atti_file'])],
@@ -289,6 +292,11 @@ final class ServizioPagamenti
             ['chiave' => 'fine', 'etichetta' => 'Lettera di fine attività', 'dettaglio' => $i['fine_firmata_il'] ? 'firmata dal docente titolare (PAdES) · ' . $d($i['fine_firmata_il']) : '', 'disponibile' => $this->archivio->fineCorrente($i) !== null && in_array((string) $i['fine_stato'], ['firmata', 'protocollata'], true)],
             ['chiave' => 'dichiarazione', 'etichetta' => 'Dichiarazione individuale', 'dettaglio' => $stato['completa'] ? 'compilata online dal tutor' : '', 'disponibile' => $stato['completa']],
         ];
+        if ((string) $i['iter'] === Costanti::ITER_UNITICKET) {
+            $documenti[] = ['chiave' => 'scafis', 'etichetta' => 'Modello SCAFIS (dichiarazione individuale firmata)', 'dettaglio' => (string) $i['iter'] === Costanti::ITER_UNITICKET ? 'con i dati dell\'identità digitale, da allegare su Uniticket' : '', 'disponibile' => (string) $i['iter'] === Costanti::ITER_UNITICKET && $this->archivio->scafisCorrente($i) !== null];
+        }
+
+        return $documenti;
     }
 
     /**
@@ -312,8 +320,26 @@ final class ServizioPagamenti
             'fine' => in_array((string) $i['fine_stato'], ['firmata', 'protocollata'], true) ? $path($this->archivio->fineCorrente($i)) : null,
             'registro' => ($pdf = $this->pdfRegistro($i)) !== null ? ['percorso' => null, 'contenuto' => $pdf, 'nome' => $nome] : null,
             'dichiarazione' => ($pdf = $this->dichiarazione->pdf($i, $utente)) !== null ? ['percorso' => null, 'contenuto' => $pdf, 'nome' => $nome] : null,
+            'scafis' => $this->apriScafis($i, $utente, $path),
             default => null,
         };
+    }
+
+    /**
+     * Il file SCAFIS (iter per Uniticket) con l'IBAN: ogni apertura si registra come per la dichiarazione.
+     *
+     * @param array<string, mixed> $i
+     * @param array<string, mixed>|null $utente
+     * @return array{percorso: string|null, contenuto: string|null, nome: string}|null
+     */
+    private function apriScafis(array $i, ?array $utente, callable $path): ?array
+    {
+        if ((string) $i['iter'] !== Costanti::ITER_UNITICKET || ($p = $this->archivio->scafisCorrente($i)) === null) {
+            return null;
+        }
+        $this->dichiarazione->registraApertura((int) $i['id'], $utente, 'scafis_file');
+
+        return $path($p);
     }
 
     /** Registro delle presenze (ore approvate) in PDF; null se non c'è niente. @param array<string, mixed> $i */

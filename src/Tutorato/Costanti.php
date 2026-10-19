@@ -41,6 +41,21 @@ final class Costanti
     /** Ruoli con un link personale (colonna token_<ruolo>): chi firma o conferma la lettera, e il docente per la fine attività. */
     public const RUOLI_TOKEN = ['studente', 'docente', 'direttore', 'fine'];
 
+    public const ITER_PORTALE = 'portale';
+    public const ITER_UNITICKET = 'uniticket';
+
+    /** Iter delle lettere => [nome, descrizione]. */
+    public const ITER = [
+        self::ITER_PORTALE => ['Iter nel portale', 'Tutto nel portale: lettera, firme, protocollo, registro, fine attività e pagamenti.'],
+        self::ITER_UNITICKET => ['Iter per Uniticket', 'Il vincitore prende servizio su Uniticket e l\'ufficio lo verifica prima di inviargli la lettera; a firme finite l\'ufficio scarica lettera e dichiarazione individuale (SCAFIS) da allegare su Uniticket. Restano il registro e la fine attività; i pagamenti no.'],
+    ];
+
+    /** L'iter ammesso (se il valore non è valido: quello nel portale). */
+    public static function iterValido(?string $v): string
+    {
+        return isset(self::ITER[(string) $v]) ? (string) $v : self::ITER_PORTALE;
+    }
+
     /** Titoli ammessi del docente responsabile. */
     public const TITOLI_DOCENTE = ['Prof.', 'Prof.ssa', 'Dott.', 'Dott.ssa'];
 }
