@@ -191,11 +191,26 @@ def costruisci():
               fig('tesi_6_direttore_firma', '<b>La firma del Direttore</b> sul PDF già firmato dall\'azienda.'),
               fig('map_adm_convenzioni_tesi', '<b>Il pannello:</b> le convenzioni per tappa e l\'archivio.'),
               fig('tesi_3_archivio', '<b>L\'archivio</b> delle convenzioni stipulate, con scadenze.'),
-              fig('tesi_4_elenco_pubblico', '<b>L\'elenco pubblico</b> delle aziende convenzionate, da cui lo studente sceglie nella richiesta di tesi.'))
+              fig('tesi_4_elenco_pubblico', '<b>L\'elenco</b> delle aziende convenzionate, da cui lo studente sceglie nella richiesta di tesi. Si vede solo dopo l\'accesso.'))
     )))
 
     # 12 ---------------------------------------------------------------------------------------------
-    S.append(('risorse', 'Prenotazioni e risorse', sezione('risorse', '12', 'Aule, laboratori, sportelli e auto',
+    S.append(('tirocini', 'Tirocini', sezione('tirocini', '12', 'Tirocini curriculari: dove farli',
+        'Una pagina, riservata a chi ha fatto l\'accesso, con le aziende convenzionate e i laboratori dell\'Ateneo. Il tirocinio si attiva dalla piattaforma TSP di Cineca.',
+        passi('<b>L\'ufficio</b> scarica dal TSP il report delle aziende e lo carica nel pannello: restano solo quelle con la convenzione attiva.',
+              '<b>Gli indirizzi</b> si aggiungono a mano oppure con un file Excel; la regione si ricava dalla provincia. Un indirizzo trovato in rete si pubblica solo dopo la conferma.',
+              '<b>Le ditte individuali</b> non si pubblicano se non lo si decide: sono dati di una persona.',
+              '<b>I laboratori</b> arrivano da soli dalle API pubbliche di Ateneo, insieme all\'anagrafe; se ne può nascondere qualcuno.',
+              '<b>Lo studente</b> cerca per regione, provincia, comune o settore, oppure sceglie un laboratorio interno.')
+        + gal(fig('map_pub_tirocini_accesso', '<b>Senza accesso</b> la pagina dice subito che bisogna accedere, poi riporta qui.'),
+              fig('map_pub_tirocini', '<b>Aziende ed enti</b> con ricerca per luogo e settore.'),
+              fig('map_pub_tirocini_lab', '<b>Laboratori dell\'Ateneo</b>, presi dalle anagrafi di Ateneo.'),
+              fig('map_adm_tirocini', '<b>Il pannello:</b> carica il report, completa gli indirizzi, conferma quelli trovati.'),
+              fig('map_adm_tirocini_lab', '<b>I laboratori</b> nel pannello: si possono nascondere dall\'elenco.'))
+    )))
+
+    # 13 ---------------------------------------------------------------------------------------------
+    S.append(('risorse', 'Prenotazioni e risorse', sezione('risorse', '13', 'Aule, laboratori, sportelli e auto',
         'Le risorse del Dipartimento si prenotano a slot da un calendario, con le regole scelte per ognuna.',
         gal(fig('map_pub_risorse', '<b>Le risorse</b> con orari e regole.'),
             fig('stud_calendario', '<b>Il calendario.</b> Gli slot liberi si prenotano con un clic; su quelli occupati ci si mette in lista d\'attesa.'))
@@ -214,7 +229,7 @@ def costruisci():
     )))
 
     # 13 ---------------------------------------------------------------------------------------------
-    S.append(('direttore', 'Il Direttore', sezione('direttore', '13', 'Il Direttore: un cruscotto e le firme',
+    S.append(('direttore', 'Il Direttore', sezione('direttore', '14', 'Il Direttore: un cruscotto e le firme',
         'Una pagina sola con le cose che aspettano la firma del Direttore e quelle che si sono fermate nei vari moduli.',
         gal(fig('map_dir_cruscotto', '<b>Il Cruscotto del Direttore.</b> Documenti da firmare, pratiche ferme, conferme in ritardo, verbali, convenzioni, tutorato e risorse.'),
             fig('map_dir_assente', '<b>«Direttore assente».</b> Con un interruttore firme e avvisi passano al vice direttore, fino al rientro.'))
@@ -222,7 +237,7 @@ def costruisci():
     )))
 
     # 14 ---------------------------------------------------------------------------------------------
-    S.append(('pannello', 'Il pannello', sezione('pannello', '14', 'Il pannello di gestione',
+    S.append(('pannello', 'Il pannello', sezione('pannello', '15', 'Il pannello di gestione',
         'Per chi organizza: un pannello unico, diviso in cinque moduli. Ognuno entra solo in quelli per cui è abilitato.',
         fig('map_adm_inizio', '<b>L\'ingresso.</b> Le cose da fare e i moduli a cui si ha accesso.')
         + griglia(
@@ -263,7 +278,7 @@ def costruisci():
     )))
 
     # 15 ---------------------------------------------------------------------------------------------
-    S.append(('fiducia', 'Fiducia e privacy', sezione('fiducia', '15', 'Firme, protocollo, privacy',
+    S.append(('fiducia', 'Fiducia e privacy', sezione('fiducia', '16', 'Firme, protocollo, privacy',
         'Il portale è pensato per documenti che valgono: firmati, protocollati, tracciati e protetti.',
         griglia(
             card('Firme digitali', '<p>I documenti importanti si firmano in formato <b>PAdES</b> (PDF firmato). Il portale controlla che la firma sia integra e del titolare.</p>'),
@@ -276,7 +291,7 @@ def costruisci():
     )))
 
     # 16 ---------------------------------------------------------------------------------------------
-    S.append(('guide', 'Guide', sezione('guide', '16', 'Se hai bisogno di aiuto',
+    S.append(('guide', 'Guide', sezione('guide', '17', 'Se hai bisogno di aiuto',
         'Il portale ha le sue guide «Come si fa», una per ruolo, con le schermate. Si trovano nella pagina <code>guida.php</code> e si possono stampare.',
         griglia(
             card('Studente', '<p>Presentare una pratica, seguirla, prenotare aule.</p>'),

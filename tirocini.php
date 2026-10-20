@@ -1,8 +1,10 @@
 <?php
-// tirocini.php - Pagina pubblica dei tirocini curriculari: aziende esterne con convenzione attiva (con indirizzo, ricerca per regione, provincia, comune e settore)
+// tirocini.php - Pagina (visibile dopo l'accesso) dei tirocini curriculari: aziende esterne con convenzione attiva (con indirizzo, ricerca per regione, provincia, comune e settore)
 // e laboratori interni dell'Ateneo. Solo ciò che è completo e pubblicabile (vedi admin/tirocini.php). Logica in src/Tirocini/.
 require_once 'config.php';
 require_once 'functions.php';
+require_once 'accesso_richiesto.php';
+richiedi_accesso($conn, 'Tirocini curriculari', "Qui trovi le aziende e gli enti convenzionati e i laboratori dell'Ateneo dove svolgere il tirocinio."); // solo dopo l'accesso
 
 $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
 $app_t = \App\Core\App::per($conn);

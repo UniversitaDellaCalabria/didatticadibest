@@ -1,8 +1,10 @@
 <?php
-// aziende_convenzionate_tesi.php - Elenco pubblico degli enti e delle aziende convenzionati con il Dipartimento per lo svolgimento delle tesi: solo convenzioni
+// aziende_convenzionate_tesi.php - Elenco (visibile dopo l'accesso) degli enti e delle aziende convenzionati con il Dipartimento per lo svolgimento delle tesi: solo convenzioni
 // stipulate, valide oggi e con il consenso dell'azienda a comparire. Ricerca per nome, comune o settore. Logica in src/ConvenzioniTesi/.
 require_once 'config.php';
 require_once 'functions.php';
+require_once 'accesso_richiesto.php';
+richiedi_accesso($conn, 'Aziende convenzionate per la tesi', "Qui trovi l'elenco degli enti e delle aziende convenzionati con il Dipartimento per svolgere la tesi."); // solo dopo l'accesso
 
 $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
 $svc = \App\Core\App::per($conn)->get(\App\ConvenzioniTesi\ServizioConvenzioniTesi::class);
