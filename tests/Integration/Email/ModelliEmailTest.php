@@ -31,6 +31,17 @@ final class ModelliEmailTest extends DatabaseDiProva
         }
     }
 
+    public function testOgniModelloSiComponeConIDatiDEsempio(): void
+    {
+        foreach (CatalogoEmail::modelli() as $chiave => $mod) {
+            $r = $this->m()->render($chiave, $this->m()->datiDEsempio($chiave));
+            $this->assertNotSame('', $r['oggetto'], $chiave);
+            $this->assertNotSame('', $r['corpo'], $chiave);
+            $this->assertStringNotContainsString('{{', $r['oggetto'] . $r['corpo'] . (string) $r['bottone'], "segnaposto rimasto in $chiave");
+            $this->assertSame($mod['bottone'] === null, $r['bottone'] === null, $chiave);
+        }
+    }
+
     public function testSenzaModificheValeIlTestoOriginale(): void
     {
         $r = $this->m()->render('tutorato_invito_studente', ['tutor' => 'Maria Verdi', 'bando' => 'Tutorato I semestre']);

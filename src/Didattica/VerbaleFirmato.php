@@ -6,7 +6,7 @@ namespace App\Didattica;
 
 use App\Core\Database;
 use App\Core\Sito;
-use App\Infrastructure\Mail\Mailer;
+use App\Email\InvioEmail;
 use App\Sistema\FileEnv;
 use App\Tutorato\VerificaPdfFirmato;
 
@@ -20,7 +20,7 @@ final class VerbaleFirmato
         private Database $db,
         private SedutaRepository $sedute,
         private ConsiglioRepository $consigli,
-        private Mailer $mailer,
+        private InvioEmail $invio,
         private Sito $sito,
         private FileEnv $env,
         private VerificaPdfFirmato $verifica,
@@ -56,18 +56,25 @@ final class VerbaleFirmato
         return @file_put_contents($dir . $nome, $pdf) === false ? null : $this->cartella . $nome;
     }
 
-    private function emailFirma(array $s, string $a, string $chi): void
+    private function emailFirma(array $s, string $a, string $ruolo, bool $sollecito = false): void
     {
-        $h = fn ($x) => htmlspecialchars((string)$x, ENT_QUOTES, 'UTF-8');
-        $link = $this->sito->urlBase() . '/firma_verbale.php?t=' . $s['verbale_token'];
-        $this->mailer->invia(
+        $this->invio->invia(
             $a,
-            "Verbale da firmare: " . ServizioSedute::etichetta($s),
-            "<p>Gentile,</p><p>il verbale della seduta del <strong>" . $h($s['organo']) . "</strong>" . ($s['data'] ? " del " . date('d/m/Y', strtotime($s['data'])) : '') . " aspetta la sua firma digitale in PAdES come <strong>$chi</strong>.</p>"
-            . "<p style='margin-top:18px;'><a href='" . $h($link) . "' style='background:#0056B3;color:#fff;padding:10px 18px;text-decoration:none;border-radius:6px;font-weight:bold;'>Apri e firma</a></p>"
-            . "<p style='font-size:12px;color:#64748b;'>Si entra con le credenziali Unical, SPID o CIE. Il link è personale: non inoltrarlo.</p>",
-            '#0056B3'
+            $sollecito ? 'verbale_promemoria' : 'verbale_da_firmare',
+            self::datiEmail($s) + ['ruolo' => $ruolo],
+            $this->sito->urlBase() . '/firma_verbale.php?t=' . $s['verbale_token']
         );
+    }
+
+    /**
+     * Dati della seduta per i segnaposto delle email.
+     *
+     * @param array<string, mixed> $s
+     * @return array<string, string>
+     */
+    private static function datiEmail(array $s): array
+    {
+        return ['seduta' => ServizioSedute::etichetta($s), 'organo' => (string) $s['organo'], 'data_testo' => $s['data'] ? ' del ' . date('d/m/Y', strtotime($s['data'])) : ''];
     }
 
     public function inviaAllaFirma(int $sid, string $pdf, string $email_seg, string $email_coo): ?string
@@ -136,14 +143,13 @@ final class VerbaleFirmato
         } else {
             $this->db->esegui("UPDATE didattica_sedute SET verbale_pdf = ?, verbale_stato = 'firmato', verbale_token = NULL, verbale_firmato_il = NOW() WHERE id = ?", [$file, $sid]);
             $s = $this->sedute->perId($sid) ?? $s;
-            $h = fn ($x) => htmlspecialchars((string)$x, ENT_QUOTES, 'UTF-8');
             $a = array_unique(array_filter(array_merge([$s['segretario_email']], $s['consiglio_id'] ? array_column($this->consigli->persone((int)$s['consiglio_id'], 'referente'), 'email') : [])));
             foreach ($a as $e) {
-                $this->mailer->invia(
+                $this->invio->invia(
                     $e,
-                    "Verbale firmato: " . ServizioSedute::etichetta($s),
-                    "<p>Il verbale della seduta del <strong>" . $h($s['organo']) . "</strong>" . ($s['data'] ? " del " . date('d/m/Y', strtotime($s['data'])) : '') . " è firmato in PAdES dal segretario e dal coordinatore" . ($info['nome'] !== '' ? ' (' . $h($info['nome']) . ')' : '') . ".</p><p>Il PDF è in allegato e nel pannello Didattica › Sedute.</p>",
-                    '#15803d',
+                    'verbale_firmato',
+                    self::datiEmail($s) + ['firmatario_testo' => $info['nome'] !== '' ? ' (' . $info['nome'] . ')' : ''],
+                    '',
                     [['path' => (string)$this->percorso($s), 'nome' => 'Verbale_' . ($s['data'] ? date('d_m_Y', strtotime($s['data'])) : 'seduta') . '_firmato.pdf']]
                 );
             }
@@ -170,7 +176,7 @@ final class VerbaleFirmato
         if (!filter_var($a, FILTER_VALIDATE_EMAIL)) {
             return 'Manca l\'email di chi deve firmare.';
         }
-        $this->emailFirma($s, $a, ($seg ? 'segretario verbalizzante' : 'coordinatore') . ' (sollecito)');
+        $this->emailFirma($s, $a, $seg ? 'segretario verbalizzante' : 'coordinatore', true);
         $this->db->esegui('UPDATE didattica_sedute SET verbale_sollecito_il = NOW(), verbale_solleciti = verbale_solleciti + 1 WHERE id = ?', [$sid]);
 
         return null;
@@ -187,7 +193,7 @@ final class VerbaleFirmato
                 continue;
             }
             $seg = $s['verbale_stato'] === 'segretario';
-            $this->emailFirma($s, (string)($seg ? $s['segretario_email'] : $s['coordinatore_email']), ($seg ? 'segretario verbalizzante' : 'coordinatore') . ' (sollecito)');
+            $this->emailFirma($s, (string)($seg ? $s['segretario_email'] : $s['coordinatore_email']), $seg ? 'segretario verbalizzante' : 'coordinatore', true);
             $this->db->esegui("UPDATE didattica_sedute SET verbale_sollecito_il = NOW(), verbale_solleciti = verbale_solleciti + 1 WHERE id = ?", [(int)$s['id']]);
             $n++;
         }

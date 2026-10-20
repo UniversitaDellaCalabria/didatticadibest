@@ -52,12 +52,7 @@ final class PromemoriaPratiche
             $dest = $o ? $this->notifiche->destinatariOperatore($o) : ($dellUfficio ?: array_column(array_filter($this->ufficio->operatori(), fn ($op) => array_intersect($op['_uffici'], $smistano)), 'email') ?: $this->ufficio->emailUfficio((string) $p['email_ufficio']));
             $giorni = (int) floor((time() - strtotime($p['aggiornata_il'] ?: $p['creata_il'])) / 86400);
             foreach ($dest as $e) {
-                $this->notifiche->invia(
-                    $e,
-                    "Pratica ferma da $giorni giorni: " . $p['modulo_titolo'] . ' – ' . trim($p['cognome'] . ' ' . $p['nome']),
-                    '<p>La pratica <strong>' . $h($p['codice']) . '</strong> (' . $h($p['modulo_titolo']) . ') di ' . $h(trim($p['nome'] . ' ' . $p['cognome'])) . " non ha movimenti da <strong>$giorni giorni</strong>"
-                    . ($o ? ' ed è in carico a te.' : ($dellUfficio ? " ed è all'ufficio, ma nessuno l'ha ancora presa in carico." : ' e non è ancora stata smistata.')) . '</p>' . $this->notifiche->bottone($this->notifiche->linkPannello((int) $p['id']), 'Apri la pratica')
-                );
+                $this->notifiche->modello($e, $o ? 'pratica_ferma_in_carico' : ($dellUfficio ? 'pratica_ferma_in_ufficio' : 'pratica_ferma_da_smistare'), NotifichePratiche::datiPratica($p) + ['giorni' => (string) $giorni], $this->notifiche->linkPannello((int) $p['id']));
                 $n++;
             }
             $this->pratiche->segnaPromemoria((int) $p['id']);

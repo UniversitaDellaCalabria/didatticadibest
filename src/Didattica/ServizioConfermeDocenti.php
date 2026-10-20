@@ -194,15 +194,15 @@ final class ServizioConfermeDocenti
 
     private function emailConferma(array $p, string $nome, string $email, string $token, int $righe, bool $sollecito): void
     {
-        $h = fn ($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
-        $this->notifiche->invia(
+        $this->notifiche->modello(
             $email,
-            ($sollecito ? 'Promemoria · ' : '') . 'Da confermare: ' . $p['modulo_titolo'] . ' – ' . trim($p['cognome'] . ' ' . $p['nome']),
-            '<p>Gentile ' . $h($nome) . ',</p><p>' . $h(trim($p['nome'] . ' ' . $p['cognome'])) . ($p['matricola'] !== '' ? ' (matricola ' . $h($p['matricola']) . ')' : '')
-            . ' ha presentato una richiesta (<strong>' . $h($p['modulo_titolo']) . '</strong>) e ti ha indicato come docente: ' . ($sollecito ? 'è ancora in attesa la tua conferma' : 'ti chiediamo di confermare')
-            . ' ' . ($righe === 1 ? 'una riga' : $righe . ' righe') . ' che ti riguarda' . ($righe === 1 ? '' : 'no') . '.</p>'
-            . '<p>Accedi con le tue credenziali di Ateneo, controlla i dati e premi «Confermo» (oppure «Non confermo», indicando il motivo: lo studente può correggere).</p>'
-            . $this->notifiche->bottone($this->sito->urlBase() . '/conferma_attestato.php?t=' . $token, 'Apri e conferma')
+            $sollecito ? 'pratica_conferma_docente_promemoria' : 'pratica_conferma_docente',
+            NotifichePratiche::datiPratica($p) + [
+                'docente' => $nome,
+                'matricola_testo' => $p['matricola'] !== '' ? ' (matricola ' . $p['matricola'] . ')' : '',
+                'righe_testo' => ($righe === 1 ? 'una riga' : $righe . ' righe') . ' che ti riguarda' . ($righe === 1 ? '' : 'no'),
+            ],
+            $this->sito->urlBase() . '/conferma_attestato.php?t=' . $token
         );
     }
 

@@ -6,6 +6,7 @@ namespace App\Didattica;
 
 use App\Core\Database;
 use App\Core\Sito;
+use App\Email\InvioEmail;
 
 /**
  * Il flusso delle pratiche che passano dal protocollo (la «Richiesta di convalida/riconoscimento esami»): ufficio protocollo →
@@ -214,7 +215,7 @@ final class ServizioFlussoConvalide implements FlussoPratica
                 $this->notifiche->documentoPronto($p);
                 $this->storico->evento($id, 'attivita', 'ufficio', 0, null, 'Il documento firmato dal Direttore è pronto: lo studente è stato avvisato e può scaricarlo.');
             }
-            $this->firme->avvisaOperatori($p, 'Iter concluso: pratica ' . $p['codice'], '<p>La pratica <strong>' . htmlspecialchars((string)$p['codice']) . '</strong> ha concluso tutti i passi dell\'iter: puoi chiuderla.</p>');
+            $this->firme->avvisaOperatori($p, 'pratica_iter_concluso', ['codice' => (string) $p['codice']]);
             return [null, "Non ci sono altri passi nell'iter: concludi la pratica."];
         }
         if (in_array($dopo, [Costanti::ITER_PERSONA, Costanti::ITER_DIRETTORE], true)) {
@@ -273,18 +274,21 @@ final class ServizioFlussoConvalide implements FlussoPratica
         if (trim($nota) !== '') {
             $this->storico->evento($id, 'messaggio', 'ufficio', $uid, null, mb_substr(trim($nota), 0, 3000), null, null, true, $autore_nome);
         }
-        $h = fn ($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
         foreach ($email_ufficio ? $persone : [] as $o) {
             if (!filter_var($o['email'], FILTER_VALIDATE_EMAIL)) {
                 continue;
             }
-            $this->notifiche->invia(
+            $this->notifiche->modello(
                 $o['email'],
-                "Pratica per " . $uff['nome'] . ": " . $p['modulo_titolo'] . " – " . trim($p['cognome'] . ' ' . $p['nome']),
-                "<p>Gentile " . $h($o['nominativo']) . ",</p><p>è arrivata a <strong>" . $h($uff['nome']) . "</strong> la pratica <strong>" . $h($p['codice']) . "</strong> (" . $h($p['modulo_titolo']) . ")"
-                . ($corso !== '' ? " del corso <strong>" . $h($corso) . "</strong>" : '') . ($chi ? ($chi['id'] === $o['id'] ? ": è assegnata a te." : ": è assegnata a " . $h($chi['nominativo']) . ".") : ": la può prendere in carico chiunque dell'ufficio.") . "</p>"
-                . (trim($nota) !== '' ? "<p style='background:#f1f5f9;padding:10px;border-radius:6px;'>" . nl2br($h($nota)) . "</p>" : '')
-                . "<p style='margin-top:18px;'><a href='" . $h($this->sito->urlBase() . '/admin/didattica.php?tab=pratiche&id=' . $id) . "' style='background:#047857;color:#fff;padding:10px 18px;text-decoration:none;border-radius:6px;font-weight:bold;'>Apri la pratica</a></p>"
+                'pratica_ufficio_arrivata',
+                NotifichePratiche::datiPratica($p) + [
+                    'operatore' => (string) $o['nominativo'],
+                    'ufficio' => (string) $uff['nome'],
+                    'corso' => $corso !== '' ? ' del corso ' . $corso : '',
+                    'assegnazione' => $chi ? ($chi['id'] === $o['id'] ? ': è assegnata a te.' : ': è assegnata a ' . $chi['nominativo'] . '.') : ": la può prendere in carico chiunque dell'ufficio.",
+                    'nota' => InvioEmail::riquadro($nota),
+                ],
+                $this->sito->urlBase() . '/admin/didattica.php?tab=pratiche&id=' . $id
             );
         }
         if ($p2 = $this->pratiche->perId($id)) {
@@ -417,16 +421,16 @@ final class ServizioFlussoConvalide implements FlussoPratica
                     . "<td style='padding:4px 8px;border:1px solid #e2e8f0;'>" . $h($p['modulo_titolo']) . "</td><td style='padding:4px 8px;border:1px solid #e2e8f0;'>" . $h(Costanti::ESITI_SEDUTA[$p['esito_seduta']][0] ?? '') . "</td>"
                     . "<td style='padding:4px 8px;border:1px solid #e2e8f0;'>" . ($p['_seduta']['data'] ? date('d/m/Y', strtotime($p['_seduta']['data'])) : '') . "</td></tr>";
             }
+            $tabella = "<table style='border-collapse:collapse;font-size:13px;'><tr><th style='padding:4px 8px;border:1px solid #e2e8f0;'>Pratica</th><th style='padding:4px 8px;border:1px solid #e2e8f0;'>Studente</th><th style='padding:4px 8px;border:1px solid #e2e8f0;'>Richiesta</th><th style='padding:4px 8px;border:1px solid #e2e8f0;'>Esito</th><th style='padding:4px 8px;border:1px solid #e2e8f0;'>Seduta</th></tr>$righe</table>";
             foreach ($this->personeUfficio($uff_id) as $o) {
                 if (!filter_var($o['email'], FILTER_VALIDATE_EMAIL)) {
                     continue;
                 }
-                $this->notifiche->invia(
+                $this->notifiche->modello(
                     $o['email'],
-                    count($inviate) . " pratiche lavorate per " . $uff['nome'],
-                    "<p>Gentile " . $h($o['nominativo']) . ",</p><p>" . $h($autore_nome ?: "L'ufficio") . " ha trasmesso a <strong>" . $h($uff['nome']) . "</strong> le pratiche esaminate dal Consiglio, con le convalide, l'estratto e il verbale della seduta:</p>"
-                    . "<table style='border-collapse:collapse;font-size:13px;'><tr><th style='padding:4px 8px;border:1px solid #e2e8f0;'>Pratica</th><th style='padding:4px 8px;border:1px solid #e2e8f0;'>Studente</th><th style='padding:4px 8px;border:1px solid #e2e8f0;'>Richiesta</th><th style='padding:4px 8px;border:1px solid #e2e8f0;'>Esito</th><th style='padding:4px 8px;border:1px solid #e2e8f0;'>Seduta</th></tr>$righe</table>"
-                    . "<p style='margin-top:18px;'><a href='" . $h($this->sito->urlBase() . '/admin/didattica.php?tab=pratiche&carico=ufficio') . "' style='background:#047857;color:#fff;padding:10px 18px;text-decoration:none;border-radius:6px;font-weight:bold;'>Apri le pratiche dell'ufficio</a></p>"
+                    'pratica_riepilogo_segreteria',
+                    ['operatore' => (string) $o['nominativo'], 'quante' => (string) count($inviate), 'ufficio' => (string) $uff['nome'], 'autore' => $autore_nome ?: "L'ufficio", 'tabella' => $tabella],
+                    $this->sito->urlBase() . '/admin/didattica.php?tab=pratiche&carico=ufficio'
                 );
             }
         }

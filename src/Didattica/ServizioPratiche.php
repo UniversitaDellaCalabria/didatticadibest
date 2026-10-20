@@ -7,6 +7,7 @@ namespace App\Didattica;
 use App\Auth\Sessione;
 use App\Auth\UtenteRepository;
 use App\Core\IndirizzoClient;
+use App\Email\InvioEmail;
 
 /** Pratiche degli studenti: invio, storico, cambi di stato, messaggi con l'ufficio e autodichiarazioni. */
 final class ServizioPratiche
@@ -329,12 +330,15 @@ final class ServizioPratiche
             $oCar = !empty($p['assegnata_a']) ? $this->ufficio->operatore((int) $p['assegnata_a']) : null;
             if ($oAut && $oCar && (int) $oAut['id'] !== (int) $oCar['id'] && in_array((int) $oAut['id'], $this->pratiche->operatori($id), true)) {
                 foreach ($this->notifiche->destinatariOperatore($oCar) as $destCar) {
-                $this->notifiche->invia(
+                $this->notifiche->modello(
                     $destCar,
-                    'Integrazione sulla pratica ' . $p['codice'] . ' da ' . $oAut['nominativo'],
-                    '<p>' . htmlspecialchars($this->ufficio->etichetta($oAut)) . ', che ha avuto in carico la pratica <strong>' . htmlspecialchars($p['codice']) . '</strong> (' . htmlspecialchars($p['modulo_titolo']) . '), ha aggiunto:</p>'
-                    . "<p style='background:#f1f5f9;padding:10px;border-radius:6px;'>" . nl2br(htmlspecialchars($testo !== '' ? $testo : '(documento allegato)')) . ($nomeAll ? '<br><em>Allegato: ' . htmlspecialchars($nomeAll) . '</em>' : '') . '</p>'
-                    . "<p><a href='" . htmlspecialchars($this->notifiche->linkPannello($id)) . "'>Apri la pratica</a></p>"
+                    'pratica_integrazione_aggiunta',
+                    NotifichePratiche::datiPratica($p) + [
+                        'autore' => $this->ufficio->etichetta($oAut),
+                        'autore_nome' => (string) $oAut['nominativo'],
+                        'testo' => InvioEmail::riquadro($testo !== '' ? $testo : '(documento allegato)', $nomeAll ? '<br><em>Allegato: ' . htmlspecialchars($nomeAll) . '</em>' : ''),
+                    ],
+                    $this->notifiche->linkPannello($id)
                 );
                 }
             }

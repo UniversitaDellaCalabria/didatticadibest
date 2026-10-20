@@ -17,7 +17,7 @@ final class CatalogoEmail
     /** @return array<string, array<string, mixed>> */
     public static function modelli(): array
     {
-        return self::$cache ??= self::tutorato();
+        return self::$cache ??= self::tutorato() + CatalogoDidattica::modelli();
     }
 
     /** @return list<string> i gruppi, nell'ordine del catalogo */
@@ -29,7 +29,11 @@ final class CatalogoEmail
     /** Colore dell'impaginazione dell'email di un gruppo (null = rosso istituzionale). */
     public static function colore(string $gruppo): ?string
     {
-        return str_starts_with($gruppo, 'Tutorato') ? '#047857' : null;
+        return match (true) {
+            str_starts_with($gruppo, 'Tutorato'), str_starts_with($gruppo, 'Didattica · Pratiche') => '#047857',
+            str_starts_with($gruppo, 'Didattica · Sedute') => '#0056B3',
+            default => null,
+        };
     }
 
     /** Descrizioni ed esempi dei segnaposto più usati. @return array<string, array{d: string, esempio: string}> */
@@ -44,7 +48,13 @@ final class CatalogoEmail
             'ore' => ['d' => 'Ore (approvate o segnate, secondo l\'email)', 'esempio' => '38'],
             'ore_previste' => ['d' => 'Ore previste dalla lettera di incarico', 'esempio' => '40'],
             'data' => ['d' => 'Data', 'esempio' => '15/03/2027'],
-            'codice' => ['d' => 'Codice della lettera di incarico', 'esempio' => 'TUT-2026-014'],
+            'codice' => ['d' => 'Codice della lettera di incarico o della pratica', 'esempio' => 'TUT-2026-014'],
+            'nome' => ['d' => 'Nome dello studente (solo il nome)', 'esempio' => 'Maria'],
+            'studente' => ['d' => 'Nome e cognome dello studente', 'esempio' => 'Maria Verdi'],
+            'studente_cn' => ['d' => 'Cognome e nome dello studente', 'esempio' => 'Verdi Maria'],
+            'modulo' => ['d' => 'Titolo del modulo della pratica', 'esempio' => 'Richiesta di tirocinio'],
+            'email_studente' => ['d' => "Indirizzo email dello studente", 'esempio' => 'maria.verdi@studenti.unical.it'],
+            'matricola_testo' => ['d' => 'Matricola dello studente con il suo separatore (vuota se non c\'è)', 'esempio' => ' · matricola 223456'],
         ];
     }
 
@@ -71,9 +81,9 @@ final class CatalogoEmail
      * @param array<string, string|array{d: string, esempio: string}> $segnaposto
      * @return array<string, mixed>
      */
-    private static function m(string $gruppo, string $nome, string $quando, string $a, array $segnaposto, string $oggetto, string $corpo, ?string $bottone = null): array
+    public static function m(string $gruppo, string $nome, string $quando, string $a, array $segnaposto, string $oggetto, string $corpo, ?string $bottone = null, ?string $colore = null): array
     {
-        return ['gruppo' => $gruppo, 'nome' => $nome, 'quando' => $quando, 'destinatario' => $a, 'segnaposto' => self::sp($segnaposto), 'oggetto' => $oggetto, 'corpo' => $corpo, 'bottone' => $bottone];
+        return ['colore' => $colore, 'gruppo' => $gruppo, 'nome' => $nome, 'quando' => $quando, 'destinatario' => $a, 'segnaposto' => self::sp($segnaposto), 'oggetto' => $oggetto, 'corpo' => $corpo, 'bottone' => $bottone];
     }
 
     /** @return array<string, array<string, mixed>> */

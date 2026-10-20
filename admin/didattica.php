@@ -130,7 +130,8 @@ foreach (['pratiche' => ['fa-inbox', 'Pratiche', $n_aperte, true], 'sedute' => [
 }
 if ($puo_tutorato) $schede_did['tutorato'] = ['href' => 'tutorato.php?p_id=' . (int)$filtro_p, 'testo' => 'Tutorato · lettere di incarico', 'icona' => 'fa-user-graduate'];
 echo pn_testata('Didattica · Ufficio didattico', 'fa-graduation-cap', $aiuto_did,
-    '<a href="../modulistica.php" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary"><i class="fa fa-up-right-from-square me-1" aria-hidden="true"></i>Pagina pubblica della modulistica</a>');
+    '<a href="../modulistica.php" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary"><i class="fa fa-up-right-from-square me-1" aria-hidden="true"></i>Pagina pubblica della modulistica</a>'
+    . ($puo_didattica_tutto ? ' <a class="btn btn-sm btn-outline-secondary" href="email.php?p_id=' . (int)$filtro_p . '&amp;gruppo=Didattica"><i class="fa fa-envelope-open-text me-1" aria-hidden="true"></i>Testi delle email</a>' : ''));
 echo pn_schede($schede_did, $tab, 'Sezioni della Didattica');
 ?>
 

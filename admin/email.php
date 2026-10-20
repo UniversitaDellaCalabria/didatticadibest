@@ -8,7 +8,7 @@ require_once 'admin_header.php';
 use App\Email\CatalogoEmail;
 use App\Email\ModelliEmail;
 
-if (!$puo_tutorato) nega_accesso();
+if (!$is_full_admin && !$puo_tutorato && !$puo_didattica_tutto) nega_accesso();
 function admin_redirect($url) { echo "<script>window.location.replace(" . json_encode($url) . ");</script>"; exit; }
 $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
 $app_e = \App\Core\App::per($conn);
@@ -16,9 +16,12 @@ $modelli = $app_e->get(ModelliEmail::class);
 $autore = trim(($utente_admin['nome'] ?? '') . ' ' . ($utente_admin['cognome'] ?? ''));
 $url = 'email.php?p_id=' . (int)$filtro_p;
 
-// Chi può modificare quale gruppo: l'amministratore tutti, chi gestisce il tutorato i gruppi «Tutorato · …»
-$puo_gruppo = fn(string $g): bool => $is_full_admin || ($puo_tutorato && str_starts_with($g, 'Tutorato'));
+// Chi può modificare quale gruppo: l'amministratore tutti; chi lavora in Didattica i gruppi «Didattica · …», chi gestisce il tutorato quelli «Tutorato · …»
+$puo_gruppo = fn(string $g): bool => $is_full_admin || ($puo_didattica_tutto && str_starts_with($g, 'Didattica')) || ($puo_tutorato && str_starts_with($g, 'Tutorato'));
 $visibili = array_filter($modelli->catalogo(), fn($m) => $puo_gruppo((string)$m['gruppo']));
+// ?gruppo=Didattica (dal pulsante dei moduli) mostra solo i gruppi che iniziano così
+$solo_gruppo = trim((string)($_GET['gruppo'] ?? ''));
+$lista_visibile = $solo_gruppo === '' ? $visibili : array_filter($visibili, fn($m) => str_starts_with((string)$m['gruppo'], $solo_gruppo));
 
 $chiave = (string)($_GET['k'] ?? $_POST['chiave'] ?? '');
 $m = $chiave !== '' ? ($visibili[$chiave] ?? null) : null;
@@ -70,7 +73,7 @@ if ($m && $_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $lista_modificate = [];
-foreach ($visibili as $k => $x) {
+foreach ($lista_visibile as $k => $x) {
     $mm = $modelli->modello($k);
     $lista_modificate[$k] = $mm;
 }
@@ -78,6 +81,7 @@ foreach ($visibili as $k => $x) {
 <?php echo pn_testata('Testi delle email', 'fa-envelope-open-text', 'Qui cambi oggetto e testo delle email che il portale invia, senza toccare il codice. Per ogni email vedi quando parte e a chi arriva; i dati (nome, bando, date…) si inseriscono con i segnaposto tra doppie graffe. Puoi guardare l\'anteprima, farti inviare una prova e tornare al testo originale.'); ?>
 
 <?php if (!$m): ?>
+    <?php if ($solo_gruppo !== ''): ?><p class="small text-secondary mb-2">Stai vedendo solo le email «<?php echo $h($solo_gruppo); ?>…». <a href="<?php echo $h($url); ?>">Mostra tutte</a></p><?php endif; ?>
     <div class="card border-0 shadow-sm mb-3"><div class="card-body py-2">
         <label for="cerca-email" class="visually-hidden">Cerca un'email</label>
         <input type="search" id="cerca-email" class="form-control" placeholder="Cerca un'email: scrivi una parola del nome, di chi la riceve o di quando parte…" autocomplete="off">
@@ -126,7 +130,7 @@ foreach ($visibili as $k => $x) {
     })();
     </script>
 <?php else: ?>
-    <p class="mb-2"><a href="<?php echo $h($url); ?>" class="text-decoration-none"><i class="fa fa-arrow-left me-1" aria-hidden="true"></i>Tutte le email</a></p>
+    <p class="mb-2"><a href="<?php echo $h($url . ($solo_gruppo !== '' ? '&gruppo=' . urlencode($solo_gruppo) : '')); ?>" class="text-decoration-none"><i class="fa fa-arrow-left me-1" aria-hidden="true"></i>Tutte le email</a></p>
     <div class="card border-0 shadow-sm mb-3"><div class="card-body">
         <h2 class="h5 fw-bold mb-1"><?php echo $h($m['nome']); ?></h2>
         <div class="small text-secondary"><span class="badge bg-light text-secondary border"><?php echo $h($m['gruppo']); ?></span></div>

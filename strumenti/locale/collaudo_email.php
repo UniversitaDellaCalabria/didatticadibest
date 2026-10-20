@@ -95,6 +95,18 @@ $h = $admin->vai($P);
 prova('nell\'elenco compare «modificata»', str_contains($h, '>modificata<'));
 prova('la modifica è nel registro attività', (int) q("SELECT COUNT(*) n FROM log_attivita WHERE azione LIKE 'Testo di un%email modificato'")['n'] >= 1);
 
+titolo('Le email della Didattica');
+$h = $admin->vai($P);
+prova('l\'elenco ha anche i gruppi della Didattica', str_contains($h, 'Didattica · Pratiche · Allo studente') && str_contains($h, 'Didattica · Sedute e verbali') && str_contains($h, 'Pratica ricevuta'));
+$h = $admin->vai($P . '?gruppo=Didattica');
+prova('con ?gruppo=Didattica si vedono solo quelle della Didattica', str_contains($h, 'Pratica ricevuta') && !str_contains($h, 'Invito al tutor a confermare la lettera') && str_contains($h, 'Mostra tutte'));
+$h = $admin->vai('/eventi/admin/didattica.php');
+prova('nella pagina della Didattica c\'è il pulsante «Testi delle email»', str_contains($h, 'email.php?p_id=') && str_contains($h, 'gruppo=Didattica'), 'HTTP ' . $admin->codice);
+$h = $admin->invia($P . '?k=pratica_stato', ['chiave' => 'pratica_stato', 'oggetto' => 'Stato {{codice}}: {{stato}}', 'corpo' => "Ciao {{nome}}.\n\n{{!nota}}", 'bottone' => 'Guarda', 'anteprima' => 1]);
+prova('l\'anteprima di un\'email con riquadro funziona', str_contains($h, 'Stato P-2027-001: Accolta') || str_contains($h, 'Accolta'), 'HTTP ' . $admin->codice);
+$h = $admin->invia($P . '?k=pratica_stato', ['chiave' => 'pratica_stato', 'oggetto' => 'Stato', 'corpo' => 'Ciao {{nome}}. {{!nota}}', 'bottone' => 'Guarda', 'salva' => 1]);
+prova('un pezzo di HTML del portale non può stare dentro una frase', str_contains($h, 'da solo su una riga') && !q("SELECT chiave FROM email_modelli WHERE chiave = 'pratica_stato'"));
+$db->query("DELETE FROM email_modelli");
 titolo('La prova');
 foreach (glob('cache/email_locali/*') ?: [] as $f) { @unlink($f); }
 $admin->invia($P . '?k=tutorato_invito_studente', ['chiave' => 'tutorato_invito_studente', 'oggetto' => 'Lettera: {{bando}}', 'corpo' => 'Gentile {{tutor}}, c\'è la lettera.', 'bottone' => 'Vai', 'prova' => 1]);

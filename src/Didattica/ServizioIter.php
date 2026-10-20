@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Didattica;
 
+use App\Email\InvioEmail;
+
 /** L'iter delle pratiche: gli uffici che le ricevono in ordine, a chi sono in carico e come passano dall'uno all'altro. */
 final class ServizioIter
 {
@@ -260,13 +262,11 @@ final class ServizioIter
         if (trim($nota) !== '') {
             $this->storico->evento($id, 'messaggio', 'ufficio', $uid, null, mb_substr(trim($nota), 0, 3000), null, null, true, $autoreNome);
         }
-        $h = fn ($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
-        $this->notifiche->invia(
+        $this->notifiche->modello(
             $o['email'],
-            'Pratica assegnata: ' . $p['modulo_titolo'] . ' – ' . trim($p['cognome'] . ' ' . $p['nome']),
-            '<p>Gentile ' . $h($o['nominativo']) . ',</p><p>ti è stata assegnata la pratica <strong>' . $h($p['codice']) . '</strong> (' . $h($p['modulo_titolo']) . ') come <strong>' . $h($this->passi($m, $p)[$passo]) . '</strong>' . ($autoreNome !== '' ? ' da ' . $h($autoreNome) : '') . '.</p>'
-            . (trim($nota) !== '' ? "<p style='background:#f1f5f9;padding:10px;border-radius:6px;'>" . nl2br($h($nota)) . '</p>' : '')
-            . $this->notifiche->bottone($this->notifiche->linkPannello($id), 'Apri la pratica')
+            'pratica_assegnata',
+            NotifichePratiche::datiPratica($p) + ['operatore' => (string) $o['nominativo'], 'passo' => (string) $this->passi($m, $p)[$passo], 'da_chi' => $autoreNome !== '' ? ' da ' . $autoreNome : '', 'nota' => InvioEmail::riquadro($nota)],
+            $this->notifiche->linkPannello($id)
         );
         if ((int) ($p['assegnata_a'] ?? 0) !== $opId || (int) $p['passo'] !== $passo) {
             $this->notifiche->email($p, 'passaggio', $this->passi($m, $p)[$passo]);
@@ -300,13 +300,11 @@ final class ServizioIter
             return 'Scrivi cosa serve.';
         }
         $this->storico->evento($id, 'richiesta', 'ufficio', $uid, null, 'Richiesta a ' . $o['nominativo'] . ': ' . $testo, null, null, true, $autoreNome);
-        $h = fn ($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
-        $this->notifiche->invia(
+        $this->notifiche->modello(
             $o['email'],
-            'Integrazione richiesta sulla pratica ' . $p['codice'] . ' – ' . trim($p['cognome'] . ' ' . $p['nome']),
-            '<p>Gentile ' . $h($o['nominativo']) . ',</p><p>' . $h($autoreNome ?: "L'ufficio") . ' ti chiede di integrare la pratica <strong>' . $h($p['codice']) . '</strong> (' . $h($p['modulo_titolo']) . '), che hai avuto in carico:</p>'
-            . "<p style='background:#f1f5f9;padding:10px;border-radius:6px;'>" . nl2br($h($testo)) . '</p><p>Aggiungi i documenti come attività o nota nella pratica.</p>'
-            . $this->notifiche->bottone($this->notifiche->linkPannello($id), 'Apri la pratica')
+            'pratica_richiesta_integrazione',
+            NotifichePratiche::datiPratica($p) + ['operatore' => (string) $o['nominativo'], 'da' => $autoreNome ?: "L'ufficio", 'testo' => InvioEmail::riquadro($testo)],
+            $this->notifiche->linkPannello($id)
         );
 
         return null;

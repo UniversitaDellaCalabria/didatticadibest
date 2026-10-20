@@ -344,7 +344,7 @@ abstract class DidatticaBase extends DatabaseDiProva
         $c->istanza(ClientApiAteneo::class, new AnagrafiClientApiFinto());
         $c->istanza(AllegatiPratiche::class, new AllegatiPratiche(new Upload(), $c->get(Sito::class), $this->cartella));
         $this->cartellaVerbali = 'cache/prove_verbali_' . bin2hex(random_bytes(4)) . '/';
-        $c->istanza(VerbaleFirmato::class, new VerbaleFirmato($this->db, $c->get(SedutaRepository::class), $c->get(ConsiglioRepository::class), $this->mailer, $c->get(Sito::class), $c->get(FileEnv::class), $c->get(VerificaPdfFirmato::class), $this->cartellaVerbali));
+        $c->istanza(VerbaleFirmato::class, new VerbaleFirmato($this->db, $c->get(SedutaRepository::class), $c->get(ConsiglioRepository::class), $c->get(\App\Email\InvioEmail::class), $c->get(Sito::class), $c->get(FileEnv::class), $c->get(VerificaPdfFirmato::class), $this->cartellaVerbali));
         $this->c = $c;
         $this->db->esegui("INSERT INTO utenti (id, nome, cognome, email, ruolo_id) VALUES (1, 'Ada', 'Admin', 'admin@x.it', 1), (2, 'Luca', 'Rossi', 'luca@x.it', 5), (3, 'Maria', 'Verdi', 'maria.verdi@x.it', 5), (4, 'Paolo', 'Bianchi', 'paolo@x.it', 5)");
         $this->db->esegui("INSERT INTO personale_ateneo (id, nome, cognome, email, ruolo) VALUES ('m.verdi', 'Maria', 'Verdi', 'MARIA.VERDI@x.it', 'Professore Ordinario'), ('p.bianchi', 'Paolo', 'Bianchi', 'paolo@x.it', 'Professore Associato'), ('s.senzamail', 'Sara', 'Neri', 'boh', '')");

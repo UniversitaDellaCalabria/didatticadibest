@@ -7,7 +7,7 @@ namespace App\Didattica;
 use App\Core\Container;
 use App\Core\Database;
 use App\Core\Sito;
-use App\Infrastructure\Mail\Mailer;
+use App\Email\InvioEmail;
 use App\Infrastructure\Storage\Upload;
 use App\Iscritti\Pianificati;
 use App\Sistema\FileEnv;
@@ -32,7 +32,7 @@ final class Registrazione
             $c->get(Database::class),
             $c->get(SedutaRepository::class),
             $c->get(ConsiglioRepository::class),
-            $c->get(Mailer::class),
+            $c->get(InvioEmail::class),
             $c->get(Sito::class),
             $c->get(FileEnv::class),
             $c->get(VerificaPdfFirmato::class),

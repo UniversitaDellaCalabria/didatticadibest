@@ -151,13 +151,11 @@ final class FirmaPratica
 
     private function emailFirma(array $p, string $nome, string $email, string $token, string $ruolo, bool $sollecito): void
     {
-        $h = fn ($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
-        $this->notifiche->invia(
+        $this->notifiche->modello(
             $email,
-            ($sollecito ? 'Promemoria · ' : '') . 'Firma richiesta: ' . $p['modulo_titolo'] . ' – ' . trim($p['cognome'] . ' ' . $p['nome']),
-            '<p>Gentile ' . $h($nome) . ',</p><p>' . ($sollecito ? 'ti ricordiamo che è ancora in attesa' : 'è in attesa') . ' la tua firma digitale sulla pratica <strong>' . $h($p['codice']) . '</strong> (' . $h($p['modulo_titolo']) . ') di '
-            . $h(trim($p['nome'] . ' ' . $p['cognome'])) . ' (' . $h($ruolo) . '). Accedi con le tue credenziali di Ateneo, controlla il documento e firma (o rifiuta indicando il motivo).</p>'
-            . $this->notifiche->bottone($this->sito->urlBase() . '/firma_pratica.php?t=' . $token, 'Apri e firma')
+            $sollecito ? 'pratica_firma_promemoria' : 'pratica_firma_richiesta',
+            NotifichePratiche::datiPratica($p) + ['firmatario' => $nome, 'ruolo' => $ruolo],
+            $this->sito->urlBase() . '/firma_pratica.php?t=' . $token
         );
     }
 
@@ -278,13 +276,17 @@ final class FirmaPratica
         $this->storico->evento((int) $p['id'], 'stato', 'ufficio', 0, 'integrazione', $testo);
         $p['stato'] = 'integrazione';
         $this->notifiche->email($p, 'stato', $testo);
-        $this->avvisaOperatori($p, 'Firma rifiutata sulla pratica ' . $p['codice'], '<p>' . htmlspecialchars((string) $f['nome']) . ' ha rifiutato di firmare la pratica <strong>' . htmlspecialchars((string) $p['codice']) . '</strong>: ' . nl2br(htmlspecialchars($motivo)) . '</p><p>La pratica è tornata allo studente come «integrazione richiesta».</p>');
+        $this->avvisaOperatori($p, 'pratica_firma_rifiutata', ['firmatario' => (string) $f['nome'], 'codice' => (string) $p['codice'], 'motivo' => $motivo]);
 
         return null;
     }
 
-    /** Avvisa chi ha in carico la pratica (e chi l'ha avuta prima). */
-    public function avvisaOperatori(array $p, string $oggetto, string $corpo): void
+    /**
+     * Avvisa chi ha in carico la pratica (e chi l'ha avuta prima) con un'email del catalogo.
+     *
+     * @param array<string, scalar|null> $dati segnaposto del modello (oltre a quelli della pratica)
+     */
+    public function avvisaOperatori(array $p, string $chiave, array $dati): void
     {
         $ids = array_map('intval', $this->pratiche->operatori((int) $p['id']));
         if (!empty($p['assegnata_a'])) {
@@ -295,7 +297,7 @@ final class FirmaPratica
             $o = $this->ufficio->operatore($oid);
             if ($o && filter_var($o['email'], FILTER_VALIDATE_EMAIL) && !in_array($o['email'], $inviati, true)) {
                 $inviati[] = $o['email'];
-                $this->notifiche->invia($o['email'], $oggetto, $corpo . $this->notifiche->bottone($this->notifiche->linkPannello((int) $p['id']), 'Apri la pratica'));
+                $this->notifiche->modello($o['email'], $chiave, $dati, $this->notifiche->linkPannello((int) $p['id']));
             }
         }
     }
