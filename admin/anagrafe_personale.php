@@ -67,6 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $r_strutture->elimina($cod);
         $n_p = $r_persone->eliminaPerOrigine($cod);
         $r_corsi->eliminaDelDipartimento($cod);
+        db_esegui($conn, 'DELETE FROM tirocini_laboratori WHERE dip_cod = ?', [$cod]);
         scollega_utenti_senza_persona($conn);
         registra_log_audit($conn, "Struttura tolta dall'anagrafe", ["Codice" => $cod, "Persone tolte" => $n_p]);
         flash_set("Struttura tolta dall'anagrafe ($n_p persone). Le persone già scelte come referenti restano nelle schede, senza pagina nel portale.");

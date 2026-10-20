@@ -89,7 +89,14 @@ if (!function_exists('maiuscole_corso')) {
 if (!function_exists('sincronizza_anagrafe')) {
     // Scarica personale e corsi di studio delle strutture scelte; ritorna un riepilogo per struttura
     function sincronizza_anagrafe($conn, ?string $solo_struttura = null): array {
-        return \App\Core\App::per($conn)->get(\App\Anagrafi\SincronizzazioneAnagrafe::class)->sincronizza($solo_struttura);
+        $esiti = \App\Core\App::per($conn)->get(\App\Anagrafi\SincronizzazioneAnagrafe::class)->sincronizza($solo_struttura);
+        // Laboratori interni (per i tirocini): stesse strutture, stesse API
+        try {
+            foreach (\App\Core\App::per($conn)->get(\App\Tirocini\ServizioLaboratori::class)->sincronizza($solo_struttura) as $cod => $l) {
+                if (isset($esiti[$cod]) && $esiti[$cod]['ok']) $esiti[$cod]['esito'] .= $l['ok'] ? ', ' . $l['esito'] : ', laboratori non disponibili';
+            }
+        } catch (\Throwable $e) { error_log('Sincronizzazione laboratori: ' . $e->getMessage()); }
+        return $esiti;
     }
 }
 if (!function_exists('scollega_utenti_senza_persona')) {

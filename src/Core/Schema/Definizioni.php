@@ -267,6 +267,23 @@ final class Definizioni
             inizio DATETIME NOT NULL, fine DATETIME NOT NULL, n_slot TINYINT NOT NULL DEFAULT 1, motivo VARCHAR(500) DEFAULT '', stato VARCHAR(12) NOT NULL DEFAULT 'attesa',
             creata_il DATETIME DEFAULT CURRENT_TIMESTAMP, avvisata_il DATETIME DEFAULT NULL, INDEX idx_risorsa (risorsa_id, inizio, stato), INDEX idx_utente (utente_id, stato)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        // v83: tirocini curriculari. Aziende con convenzione attiva (dal report dell'Albo aziende del TSP di Cineca, caricato dal pannello) con l'indirizzo
+        // scritto a mano o trovato sul web («origine»; un indirizzo trovato sul web si pubblica solo dopo la conferma); laboratori interni dalle API di Ateneo.
+        // Pubblica solo chi ha la convenzione, il comune e la spunta «pubblica» (le ditte individuali partono non pubbliche).
+        'tirocini_aziende' => "CREATE TABLE IF NOT EXISTS tirocini_aziende (
+            id INT AUTO_INCREMENT PRIMARY KEY, cod_tsp VARCHAR(20) NOT NULL, nome VARCHAR(255) NOT NULL DEFAULT '', codice_fiscale VARCHAR(20) DEFAULT '', partita_iva VARCHAR(20) DEFAULT '',
+            settore VARCHAR(255) DEFAULT '', convenzione TINYINT(1) NOT NULL DEFAULT 1, indirizzo VARCHAR(255) DEFAULT '', cap VARCHAR(10) DEFAULT '', comune VARCHAR(100) DEFAULT '',
+            provincia VARCHAR(2) DEFAULT '', regione VARCHAR(40) DEFAULT '', sito VARCHAR(255) DEFAULT '', pubblica TINYINT(1) NOT NULL DEFAULT 1,
+            origine VARCHAR(10) NOT NULL DEFAULT '', verificato TINYINT(1) NOT NULL DEFAULT 0, note VARCHAR(500) DEFAULT '',
+            importata_il DATETIME DEFAULT CURRENT_TIMESTAMP, modificata_il DATETIME DEFAULT NULL,
+            UNIQUE KEY uq_cod (cod_tsp), INDEX idx_pubblica (convenzione, pubblica, regione, provincia)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        'tirocini_laboratori' => "CREATE TABLE IF NOT EXISTS tirocini_laboratori (
+            id INT NOT NULL PRIMARY KEY, nome VARCHAR(255) NOT NULL DEFAULT '', sigla VARCHAR(60) DEFAULT '', area VARCHAR(100) DEFAULT '', dip_cod VARCHAR(20) NOT NULL DEFAULT '',
+            dipartimento VARCHAR(255) DEFAULT '', interdipartimentale TINYINT(1) NOT NULL DEFAULT 0, direttore VARCHAR(150) DEFAULT '', ambiti VARCHAR(150) DEFAULT '',
+            descrizione TEXT DEFAULT NULL, infrastruttura VARCHAR(150) DEFAULT '', superficie VARCHAR(20) DEFAULT '', pubblica TINYINT(1) NOT NULL DEFAULT 1,
+            aggiornato_il DATETIME DEFAULT CURRENT_TIMESTAMP, INDEX idx_dip (dip_cod, pubblica)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         // v61: diario di bordo (auto e mezzi): un diario per prenotazione, compilato da chi ha prenotato, dagli altri conducenti o dal responsabile
         'risorse_diario' => "CREATE TABLE IF NOT EXISTS risorse_diario (
             id INT AUTO_INCREMENT PRIMARY KEY, risorsa_id INT NOT NULL, prenotazione_id INT NOT NULL, data DATE DEFAULT NULL, conducente VARCHAR(200) DEFAULT '',

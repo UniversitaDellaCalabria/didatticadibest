@@ -431,6 +431,7 @@ $colore_lato = $modulo_corrente === 'portale' ? '#64748b' : $colore_modulo; // l
                         $voce_menu([], 'didattica.php?tab=moduli', 'fa-file-lines', 'Moduli e documenti', $tab_did === 'moduli');
                         $voce_menu([], 'didattica.php?tab=ufficio', 'fa-user-clock', 'Ricevimento', $tab_did === 'ufficio');
                         if (!$is_full_admin) $voce_menu(['uffici.php'], 'uffici.php', 'fa-sitemap', 'Uffici e persone');
+                        $voce_menu(['tirocini.php'], 'tirocini.php', 'fa-briefcase', 'Tirocini');
                         $voce_menu(['sostituzioni.php'], 'sostituzioni.php', 'fa-people-arrows', 'Sostituzioni');
                         $voce_menu([], 'didattica.php?tab=statistiche', 'fa-chart-column', 'Statistiche', $tab_did === 'statistiche');
                     }
