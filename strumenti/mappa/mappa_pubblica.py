@@ -93,8 +93,12 @@ def costruisci():
               fig('fsl_attiva', '<b>5 · Convenzione attiva.</b> Le prenotazioni in attesa sono confermate.'),
               fig('fsl_email_link', '<b>Le email</b> accompagnano ogni passaggio, con il link personale.'))
         + '<h3>Parlare con la scuola</h3><p>Se una scuola non ha ancora caricato il PDF, l\'ufficio può mandare con un clic un <b>promemoria</b> (o a tutte le scuole in attesa) oppure scrivere un <b>messaggio</b>. La scuola lo legge e risponde dalla propria pagina; l\'ufficio vede il bollino «Nuova risposta».</p>'
-        + gal(fig('map_adm_fsl_iter', '<b>Per l\'ufficio:</b> le convenzioni suddivise per tappa, con i pulsanti per ricordare e scrivere.'),
-              fig('map_adm_fsl_stipulare', '<b>Convenzioni da stipulare:</b> una scheda per ogni scuola con prenotazioni in corso.'))
+        + '<h3>Per l\'ufficio: cosa devo fare</h3><p>La prima schermata di <b>Formazione Scuola Lavoro</b> mostra solo quello che c\'è da fare, con un numero e un pulsante: PDF da prendere in carico, convenzioni da protocollare, convenzioni dal Direttore, scuole senza convenzione. Nella scheda di ogni scuola i cinque passi della convenzione e l\'unica cosa da fare adesso. Le azioni rare sono nel menu «Altro»; il registro si scarica in Excel, PDF e CSV.</p>'
+        + gal(fig('map_adm_fsl_home', '<b>Convenzioni con le scuole:</b> le schede «cosa devo fare», la ricerca di una scuola e il menu «Altro».'),
+              fig('map_adm_fsl_scuola', '<b>Scheda della scuola:</b> i cinque passi e il riquadro con la cosa da fare adesso.'))
+        + gal(fig('map_adm_fsl_iter', '<b>Convenzioni da seguire:</b> le convenzioni suddivise per tappa, con i pulsanti per ricordare e scrivere.'),
+              fig('map_adm_fsl_registro', '<b>Registro delle convenzioni:</b> in vigore o scadute, con «Rinnova» e il menu «Scarica» (Excel, PDF, CSV).'))
+        + fig('map_adm_fsl_stipulare', '<b>Scuole senza convenzione:</b> una scheda per ogni scuola con prenotazioni in corso, con i documenti già compilati.')
         + '<h3>L\'elenco degli studenti</h3><p>Il docente referente riceve un link e inserisce i nomi (a mano, incollando da Excel o con il modello): bastano cognome e nome. Con quell\'elenco il portale prepara gli attestati.</p>'
         + gal(fig('fsl_elenco_2_pagina', '<b>La pagina dei documenti</b> da consegnare: elenco, autorizzazione e modello Excel.'),
               fig('fsl_elenco_4_compilato', '<b>Elenco compilato</b> riga per riga, con il contatore degli studenti.'))

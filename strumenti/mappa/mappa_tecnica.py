@@ -353,7 +353,9 @@ accessoDaCredenziali($utente)  // accesso virtuale (id 0, ambiti ["*"]) per chi 
 tokenVista($sedutaId)          // permesso monouso (10 min) in sessione
 consumaToken($t, $sedutaId)    // vale una sola volta, per quel verbale''')
         + '<p><code>verbali.php</code> ha tre rotte: <code>?v=ID</code> (visualizzatore: PDF.js disegna le pagine su <code>&lt;canvas&gt;</code> con filigrana; niente toolbar, niente testo selezionabile), <code>?f=ID&amp;t=TOKEN</code> (legge il PDF, rifiuta <code>Sec-Fetch-Dest: document</code> e un token già usato; <code>Cache-Control: no-store</code>) e <code>?d=ID</code> (download: 403 senza <code>puoScaricare</code>). Ogni lettura e download va in <code>verbali_accessi_log</code>.</p>'
-        + gal(fig('map_adm_fsl_iter', '<b>Pannello delle convenzioni</b> (<code>admin/fsl.php?tab=iter</code>): le fasi corrispondono agli stati.'),
+        + gal(fig('map_adm_fsl_home', '<b>Pannello FSL</b> (<code>admin/fsl.php</code>, <code>tab=home</code>): schede «cosa devo fare» (<code>Pannello::compiti</code>), esportazioni con <code>TabellaEsportabile</code>.'),
+              fig('map_adm_fsl_iter', '<b>Pannello delle convenzioni</b> (<code>admin/fsl.php?tab=iter</code>): le fasi corrispondono agli stati.'))
+        + gal(fig('map_adm_fsl_scuola', '<b>Scheda della scuola</b> (<code>tab=scuola</code>): i cinque passi dello <code>stato_iter</code>.'),
               fig('map_pub_verbali_sola_lettura', '<b><code>verbali.php</code></b> in sola lettura (viste «Per corso» e «Cerca» disegnate da JavaScript su un array JSON).'))
     )))
 
