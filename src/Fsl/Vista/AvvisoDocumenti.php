@@ -65,31 +65,32 @@ final class AvvisoDocumenti
     }
 
     /**
-     * Promemoria periodico (o ultimo avviso) con quello che ancora manca.
+     * Dati per l'email di promemoria (o ultimo avviso) con quello che ancora manca: i segnaposto dei modelli fsl_documenti_*.
      *
      * @param array<string, mixed> $p prenotazione (nome, cognome, titolo, codice_prenotazione, data_turno/data_inizio)
      * @param array{studenti: int, elenco: bool, autorizzazione: bool, scadenza: ?string, scaduti: bool} $stato
+     * @return array<string, string>
      */
-    public function promemoria(array $p, array $stato, bool $ultimo, ?string $inizio): string
+    public function datiPromemoria(array $p, array $stato, bool $ultimo, ?string $inizio): array
     {
-        $h = static fn ($s): string => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
         $manca = [];
         if (!$stato['elenco']) {
-            $manca[] = "l'<strong>elenco degli studenti</strong>";
+            $manca[] = "l'elenco degli studenti";
         }
         if (!$stato['autorizzazione']) {
-            $manca[] = "l'<strong>autorizzazione della scuola</strong> (PDF)";
+            $manca[] = "l'autorizzazione della scuola (PDF)";
         }
-        $inizioTxt = $inizio !== null ? ' inizia il <strong>' . date('d/m/Y', (int) strtotime($inizio)) . '</strong>' : ' sta per iniziare';
-        $apertura = $ultimo
-            ? "<p><strong>Ultimo avviso.</strong> L'attività <strong>" . $h($p['titolo']) . "</strong>$inizioTxt e non risultano ancora caricati: " . implode(' e ', $manca) . '.</p>'
-              . '<p>I documenti andavano consegnati' . ($stato['scadenza'] !== null ? ' entro il <strong>' . date('d/m/Y', (int) strtotime($stato['scadenza'])) . '</strong>' : '') . ': caricali al più presto.</p>'
-            : '<p>per la prenotazione di <strong>' . $h($p['titolo']) . "</strong> (l'attività$inizioTxt) non abbiamo ancora ricevuto: " . implode(' e ', $manca) . '.</p>'
-              . ($stato['scadenza'] !== null ? '<p>Puoi caricarli entro il <strong>' . date('d/m/Y', (int) strtotime($stato['scadenza'])) . '</strong>.</p>' : '');
-        $inizioCorpo = '<p>Gentile <strong>' . $h(trim($p['nome'] . ' ' . $p['cognome'])) . '</strong>,</p>';
+        $entro = $stato['scadenza'] !== null ? '<strong>' . date('d/m/Y', (int) strtotime($stato['scadenza'])) . '</strong>' : '';
 
-        return $inizioCorpo . $apertura . '<p>🎟️ Codice della prenotazione: <strong>' . $h($p['codice_prenotazione']) . '</strong></p>'
-            . $this->bottone((string) $p['codice_prenotazione'], 'Carica i documenti', true);
+        return [
+            'nome' => trim($p['nome'] . ' ' . $p['cognome']),
+            'titolo' => (string) $p['titolo'],
+            'codice' => (string) $p['codice_prenotazione'],
+            'inizio_testo' => $inizio !== null ? 'inizia il ' . date('d/m/Y', (int) strtotime($inizio)) : 'sta per iniziare',
+            'manca' => implode(' e ', $manca),
+            'scadenza' => $entro !== '' ? '<p>Puoi caricarli entro il ' . $entro . '.</p>' : '',
+            'consegna' => '<p>I documenti andavano consegnati' . ($entro !== '' ? ' entro il ' . $entro : '') . ': caricali al più presto.</p>',
+        ];
     }
 
     private function bottone(string $codice, string $etichetta, bool $perEmail): string

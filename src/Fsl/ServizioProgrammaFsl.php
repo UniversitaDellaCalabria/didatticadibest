@@ -11,7 +11,7 @@ use App\Core\Orologio;
 use App\Core\Sito;
 use App\Eventi\EventoRepository;
 use App\Eventi\Turni;
-use App\Infrastructure\Mail\Mailer;
+use App\Email\InvioEmail;
 use App\Iscrizioni\CaptchaPrenotazione;
 use App\Iscrizioni\EsitoPrenotazione;
 use App\Iscrizioni\LimitiPartecipanti;
@@ -55,7 +55,7 @@ final class ServizioProgrammaFsl
         private RegoleFsl $fsl,
         private CaptchaPrenotazione $captcha,
         private LimiteRichieste $limite,
-        private Mailer $mailer,
+        private InvioEmail $invio,
         private Sito $sito,
         private Orologio $orologio,
     ) {
@@ -444,21 +444,21 @@ final class ServizioProgrammaFsl
                 . '<td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;">' . $h($etichette[$x['esito']] ?? $x['esito']) . ($x['messaggio'] ? '<br><span style="color:#b91c1c;">' . $h($x['messaggio']) . '</span>' : '') . '</td>'
                 . '<td style="padding:6px 10px;border-bottom:1px solid #e5e7eb;font-family:monospace;">' . $h($x['codice'] ?? '') . '</td></tr>';
         }
-        $corpo = '<p>Gentile docente,</p><p>ecco il riepilogo delle attività di Formazione Scuola Lavoro richieste per <strong>' . $h($scuola) . '</strong>:</p>'
-            . '<table style="border-collapse:collapse;width:100%;font-size:14px;"><tr><th align="left" style="padding:6px 10px;background:#f1f5f9;">Attività</th><th align="left" style="padding:6px 10px;background:#f1f5f9;">Stato</th><th align="left" style="padding:6px 10px;background:#f1f5f9;">Codice</th></tr>' . $righe . '</table>';
+        $tabella = '<table style="border-collapse:collapse;width:100%;font-size:14px;"><tr><th align="left" style="padding:6px 10px;background:#f1f5f9;">Attività</th><th align="left" style="padding:6px 10px;background:#f1f5f9;">Stato</th><th align="left" style="padding:6px 10px;background:#f1f5f9;">Codice</th></tr>' . $righe . '</table>';
+        $avvisi = '';
         if (array_filter($esiti, static fn (array $x): bool => $x['esito'] === 'attesa')) {
-            $corpo .= '<p><strong>Lista d\'attesa:</strong> per le attività indicate i posti erano esauriti. Se un posto si libera ti scriveremo per confermarlo.</p>';
+            $avvisi .= '<p><strong>Lista d\'attesa:</strong> per le attività indicate i posti erano esauriti. Se un posto si libera ti scriveremo per confermarlo.</p>';
         }
         if (array_filter($esiti, static fn (array $x): bool => $x['esito'] === 'errore')) {
-            $corpo .= '<p><strong>Attività non prenotate:</strong> restano nel tuo programma sul portale; puoi riprovare o toglierle.</p>';
+            $avvisi .= '<p><strong>Attività non prenotate:</strong> restano nel tuo programma sul portale; puoi riprovare o toglierle.</p>';
         }
+        $documenti = '';
+        $link = '';
         if ($token !== null) {
             $link = $this->sito->urlBase() . '/convenzione_online.php?t=' . $token;
-            $corpo .= "<p style='margin-top:18px;'>Abbiamo preparato l'<strong>Allegato A</strong> (PDF, con la scheda di ogni attività)"
-                . ($convenzione === 'si' ? '' : ' e la <strong>Convenzione</strong> (Word)') . ' con i dati che hai inserito:</p>'
-                . "<p style='margin:18px 0;'><a href='" . $h($link) . "' style='background:#B30000;color:#fff;padding:10px 18px;text-decoration:none;border-radius:6px;font-weight:bold;'>Scarica i documenti</a></p>"
+            $documenti = "<p>Abbiamo preparato l'<strong>Allegato A</strong> (PDF, con la scheda di ogni attività)" . ($convenzione === 'si' ? '' : ' e la <strong>Convenzione</strong> (Word)') . ' con i dati che hai inserito.</p>'
                 . '<p>Il Dirigente Scolastico li <strong>firma digitalmente in PAdES</strong> (PDF firmato, non .p7m) e la scuola li invia via PEC. Appena riceviamo la documentazione confermiamo le prenotazioni in attesa.</p>';
         }
-        $this->mailer->invia($email, 'Formazione Scuola Lavoro – riepilogo delle attività richieste', $corpo);
+        $this->invio->invia($email, 'fsl_riepilogo_programma', ['scuola' => $scuola, 'tabella' => $tabella, 'avvisi' => $avvisi, 'documenti' => $documenti], $link);
     }
 }

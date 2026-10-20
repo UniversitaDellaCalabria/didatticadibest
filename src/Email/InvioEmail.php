@@ -22,15 +22,16 @@ final class InvioEmail
      * @param string $link link del pulsante (vuoto = niente pulsante)
      * @param list<array{path: string, nome?: string}> $allegati
      * @param string $coda HTML preparato dal codice da mettere dopo il pulsante (es. l'invito al sondaggio)
+     * @param string|null $colore colore dell'email al posto di quello del modello (es. il colore dell'area dell'evento)
      */
-    public function invia(?string $a, string $chiave, array $dati, string $link = '', array $allegati = [], string $coda = ''): bool
+    public function invia(?string $a, string $chiave, array $dati, string $link = '', array $allegati = [], string $coda = '', ?string $colore = null): bool
     {
         $m = $this->modelli->modello($chiave);
         if ($m === null) {
             throw new \InvalidArgumentException("Modello di email sconosciuto: $chiave");
         }
         $r = $this->modelli->componi((string) $m['oggetto'], (string) $m['corpo'], $m['bottone'], $dati);
-        $colore = self::coloreDi($m);
+        $colore ??= self::coloreDi($m);
 
         return $this->mailer->invia((string) $a, $r['oggetto'], $r['corpo'] . ($link !== '' && $r['bottone'] !== null ? self::pulsante($link, $r['bottone'], $colore) : '') . $coda, $colore, $allegati);
     }
@@ -47,6 +48,16 @@ final class InvioEmail
         $h = static fn (string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
 
         return "<p style='margin-top:18px;'><a href='" . $h($link) . "' style='background:" . ($colore ?? '#0f172a') . ";color:#fff;padding:10px 18px;text-decoration:none;border-radius:6px;font-weight:bold;'>" . $h($testo) . '</a></p>';
+    }
+
+    /** Citazione evidenziata con un testo scritto da una persona (come «> » nei modelli); vuota se il testo è vuoto. */
+    public static function citazione(string $testo): string
+    {
+        if (trim($testo) === '') {
+            return '';
+        }
+
+        return "<blockquote style='" . ModelliEmail::STILE_CITAZIONE . "'>" . str_replace(["\r\n", "\n", "\r"], '<br>', htmlspecialchars($testo, ENT_QUOTES, 'UTF-8')) . '</blockquote>';
     }
 
     /** Riquadro grigio con un testo scritto da una persona (un messaggio, una nota); vuoto se il testo è vuoto. @param string $dopo HTML già pronto da mettere in fondo al riquadro */

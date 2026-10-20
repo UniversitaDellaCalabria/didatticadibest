@@ -6,7 +6,7 @@ namespace App\Fsl;
 
 use App\Anagrafi\ServizioScuole;
 use App\Core\Sito;
-use App\Infrastructure\Mail\Mailer;
+use App\Email\InvioEmail;
 use App\Infrastructure\Storage\Upload;
 
 /**
@@ -27,7 +27,7 @@ final class ServizioConvenzioneOnline
         private ModelliConvenzione $modelli,
         private ServizioScuole $scuole,
         private Upload $upload,
-        private Mailer $mailer,
+        private InvioEmail $invio,
         private Sito $sito,
         private AllegatoAPdf $allegatoPdf,
         private AllegatoAWord $allegatoWord
@@ -412,11 +412,6 @@ final class ServizioConvenzioneOnline
 
     private function inviaLink(string $token, string $email, string $denominazione, string $pec): void
     {
-        $h = static fn ($s): string => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
-        $link = $this->sito->urlBase() . '/convenzione_online.php?t=' . $token;
-        $corpo = "<p>Gentile docente,</p><p>la Convenzione e l'Allegato A per <strong>" . $h($denominazione) . '</strong> sono pronti. Da questo link puoi scaricarli o correggerli:</p>'
-            . "<p style='margin:18px 0;'><a href='" . $h($link) . "' style='background:#B30000;color:#fff;padding:10px 18px;text-decoration:none;border-radius:6px;font-weight:bold;'>Apri la convenzione</a></p>"
-            . '<p>Poi il Dirigente Scolastico li <strong>firma digitalmente in PAdES</strong> (PDF firmato, non .p7m) e la scuola li invia via PEC a <a href=\'mailto:' . $h($pec) . "'>" . $h($pec) . '</a>. Appena riceviamo la convenzione confermiamo le prenotazioni.</p>';
-        $this->mailer->invia($email, 'Convenzione Formazione Scuola Lavoro – documenti da firmare', $corpo);
+        $this->invio->invia($email, 'fsl_convenzione_pronta', ['scuola' => $denominazione, 'pec' => $pec], $this->sito->urlBase() . '/convenzione_online.php?t=' . $token);
     }
 }

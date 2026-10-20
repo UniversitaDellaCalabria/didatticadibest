@@ -205,6 +205,7 @@ $aiuto_fsl = ['riepilogo' => 'Il percorso delle scuole, dall\'iscrizione all\'at
               'valutazioni' => 'Le schede di valutazione della struttura ospitante compilate dai docenti.',
               'report' => 'Per ogni scuola: attività, classi, studenti e ore di formazione dell\'anno scolastico, con l\'Excel per le scuole e per il Ministero.',
               'scuole' => 'Convenzioni da seguire passo per passo (protocollo in entrata, firma del Direttore, protocollo definitivo), scuole da stipulare e registro delle convenzioni.'][$gruppo_fsl] ?? '';
+if ($puo_fsl_convenzioni) $azioni_fsl .= ' <a class="btn btn-sm btn-outline-secondary" href="email.php?p_id=' . (int)$filtro_p . '&amp;gruppo=Convenzioni%20FSL"><i class="fa fa-envelope-open-text me-1" aria-hidden="true"></i>Testi delle email</a>';
 echo pn_testata('Formazione Scuola Lavoro', 'fa-briefcase', $aiuto_fsl, $azioni_fsl);
 echo pn_schede($sezioni_fsl, $gruppo_fsl, 'Sezioni della Formazione Scuola Lavoro');
 if ($gruppo_fsl === 'scuole') {

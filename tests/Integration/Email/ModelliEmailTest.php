@@ -42,6 +42,14 @@ final class ModelliEmailTest extends DatabaseDiProva
         }
     }
 
+    public function testUnIndirizzoEmailDiventaUnCollegamento(): void
+    {
+        $r = $this->m()->render('fsl_convenzione_pronta', ['scuola' => 'Liceo', 'pec' => 'dibest@pec.unical.it']);
+        $this->assertStringContainsString("via PEC a <a href='mailto:dibest@pec.unical.it'>dibest@pec.unical.it</a>.", $r['corpo']);
+        $x = $this->m()->render('fsl_convenzione_pronta', ['scuola' => 'Liceo', 'pec' => "x'><script>"]);
+        $this->assertStringNotContainsString('<script>', $x['corpo']);
+    }
+
     public function testSenzaModificheValeIlTestoOriginale(): void
     {
         $r = $this->m()->render('tutorato_invito_studente', ['tutor' => 'Maria Verdi', 'bando' => 'Tutorato I semestre']);

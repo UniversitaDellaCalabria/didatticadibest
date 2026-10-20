@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace App\Fsl;
 
 use App\Core\Sito;
+use App\Email\InvioEmail;
 use App\Eventi\Turni;
 use App\Fsl\Vista\Istruzioni;
-use App\Infrastructure\Mail\Mailer;
 use App\Portale\ColoriAree;
 
-/** Email alla scuola sulla convenzione: richiesta (con i modelli e la PEC), promemoria e conferma di ricezione. */
+/**
+ * Email alla scuola sulla convenzione: richiesta (con i modelli e la PEC), promemoria, conferma di ricezione, firme e messaggi.
+ * I testi stanno nel catalogo (CatalogoConvenzioni) e si modificano dalla pagina «Testi delle email» del pannello.
+ */
 final class NotificheConvenzioni
 {
     public function __construct(
@@ -18,9 +21,30 @@ final class NotificheConvenzioni
         private PeriodiConvenzione $periodi,
         private Istruzioni $istruzioni,
         private ColoriAree $colori,
-        private Mailer $mailer,
+        private InvioEmail $invio,
         private Sito $sito
     ) {
+    }
+
+    private function h(string $s): string
+    {
+        return htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+    }
+
+    private function linkScuola(string $token): string
+    {
+        return $this->sito->urlBase() . '/convenzione_online.php?t=' . urlencode($token);
+    }
+
+    private function linkPannello(): string
+    {
+        return $this->sito->urlBase() . '/admin/fsl.php?tab=iter';
+    }
+
+    /** Email alla scuola da un indirizzo (non valido = non parte). @param array<string, scalar|null> $dati */
+    private function alla(string $email, string $chiave, array $dati, string $link = ''): bool
+    {
+        return filter_var($email, FILTER_VALIDATE_EMAIL) ? $this->invio->invia($email, $chiave, $dati, $link) : false;
     }
 
     /**
@@ -33,23 +57,31 @@ final class NotificheConvenzioni
         if (empty($p['email']) || !filter_var($p['email'], FILTER_VALIDATE_EMAIL)) {
             return false;
         }
-        $h = static fn ($s): string => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
         $inAttesa = in_array($p['stato'], ['da_approvare', 'in_attesa', 'richiesta_conferma'], true);
-        $att = $h($p['evento_titolo']) . (Turni::etichetta($p) !== '' ? ' (' . $h(Turni::etichetta($p)) . ')' : '');
+        $att = $p['evento_titolo'] . (Turni::etichetta($p) !== '' ? ' (' . Turni::etichetta($p) . ')' : '');
         [$dal, $al] = $this->periodi->prenotazione($p);
         $periodo = $dal === $al ? 'il ' . date('d/m/Y', (int) strtotime($dal)) : 'dal ' . date('d/m/Y', (int) strtotime($dal)) . ' al ' . date('d/m/Y', (int) strtotime($al));
         // Convenzione già registrata ma che non copre il periodo: va stipulata una nuova
         $ultima = !empty($p['scuola_codice']) ? ($this->convenzioni->dellaScuola($p['scuola_codice'])[0] ?? null) : null;
-        $nota = $ultima ? '<p>La convenzione della scuola che risulta al Dipartimento (valida ' . $h(PeriodiConvenzione::testoValidita($ultima)) . ") <strong>non copre il periodo dell'attività</strong> ($periodo): va stipulata una <strong>nuova convenzione</strong>.</p>" : '';
-        $intro = $tipo === 'promemoria'
-            ? "<p>ti ricordiamo che per la prenotazione di <strong>$att</strong> non abbiamo ancora ricevuto la convenzione della scuola con il Dipartimento.</p>"
-            : "<p>per la prenotazione di <strong>$att</strong> ($periodo) la scuola deve avere una convenzione con il Dipartimento per la Formazione Scuola Lavoro valida per tutto il periodo dell'attività.</p>";
-        $corpo = '<p>Gentile <strong>' . $h(trim($p['nome'] . ' ' . $p['cognome'])) . '</strong>,</p>' . $intro . $nota
-               . '<p>🎟️ Codice della prenotazione: <strong>' . $h($p['codice_prenotazione']) . '</strong></p>'
-               . $this->istruzioni->html($p, true, (string) $p['codice_prenotazione'], $inAttesa);
-        $oggetto = ($tipo === 'promemoria' ? 'Promemoria: convenzione da inviare - ' : 'Convenzione con il Dipartimento - ') . $p['evento_titolo'];
+        $nota = $ultima ? '<p>La convenzione della scuola che risulta al Dipartimento (valida ' . $this->h(PeriodiConvenzione::testoValidita($ultima)) . ") <strong>non copre il periodo dell'attività</strong> ($periodo): va stipulata una <strong>nuova convenzione</strong>.</p>" : '';
 
-        return $this->mailer->invia($p['email'], $oggetto, $corpo, $this->colori->delTurno((int) $p['turno_id']));
+        return $this->invio->invia(
+            $p['email'],
+            $tipo === 'promemoria' ? 'fsl_convenzione_promemoria' : 'fsl_convenzione_richiesta',
+            [
+                'nome' => trim($p['nome'] . ' ' . $p['cognome']),
+                'attivita' => $att,
+                'attivita_titolo' => (string) $p['evento_titolo'],
+                'periodo' => $periodo,
+                'codice' => (string) $p['codice_prenotazione'],
+                'nota' => $nota,
+                'istruzioni' => $this->istruzioni->html($p, true, (string) $p['codice_prenotazione'], $inAttesa),
+            ],
+            '',
+            [],
+            '',
+            $this->colori->delTurno((int) $p['turno_id'])
+        );
     }
 
     /**
@@ -60,15 +92,10 @@ final class NotificheConvenzioni
      */
     public function firmataCaricata(string $scuola, string $firmatario, bool $sostituita, array $destinatari): int
     {
-        $h = static fn ($s): string => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
-        $link = $this->sito->urlBase() . '/admin/fsl.php?tab=iter';
-        $corpo = '<p>La scuola <strong>' . $h($scuola) . '</strong> ha ' . ($sostituita ? 'caricato una <strong>nuova versione</strong> della' : 'caricato la') . ' convenzione firmata'
-               . ($firmatario !== '' ? ' (firma di <strong>' . $h($firmatario) . '</strong>)' : '') . '.</p>'
-               . '<p>Va <strong>protocollata in entrata</strong>: scarica il PDF, protocollalo e registra solo il numero nel portale (senza ricaricare il file). Subito dopo la convenzione va in automatico al Direttore per la firma.</p>'
-               . "<p style='margin-top:15px;'><a href='" . $h($link) . "' style='background:#B80000; color:#ffffff; padding:10px 18px; text-decoration:none; border-radius:6px; font-weight:bold;'>Apri le convenzioni</a></p>";
+        $dati = ['scuola' => $scuola, 'azione' => $sostituita ? 'caricato una nuova versione della' : 'caricato la', 'firmatario_testo' => $firmatario !== '' ? ' (firma di ' . $firmatario . ')' : ''];
         $inviate = 0;
         foreach ($destinatari as $a) {
-            if ($this->mailer->invia($a, 'Convenzione FSL da prendere in carico: ' . $scuola, $corpo)) {
+            if ($this->invio->invia($a, 'fsl_firmata_caricata', $dati, $this->linkPannello())) {
                 ++$inviate;
             }
         }
@@ -79,46 +106,27 @@ final class NotificheConvenzioni
     /** Ricevuta alla scuola: la convenzione firmata è arrivata e sarà presa in carico dal Dipartimento. */
     public function firmataRicevuta(string $email, string $scuola, string $tokenPagina): bool
     {
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            return false;
-        }
-        $h = static fn ($s): string => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
-        $link = $this->sito->urlBase() . '/convenzione_online.php?t=' . urlencode($tokenPagina);
-        $corpo = '<p>Gentile <strong>' . $h($scuola) . '</strong>,</p>'
-               . '<p>abbiamo ricevuto la <strong>convenzione firmata</strong> per la Formazione Scuola Lavoro. Il Dipartimento la prende in carico, la fa firmare dal Direttore e la protocolla: '
-               . 'appena è pronta ti scriviamo e la trovi nell\'Area personale. Le prenotazioni in attesa si confermano dopo la protocollazione.</p>'
-               . '<p>Hai caricato il file sbagliato? Fino alla presa in carico puoi sostituirlo da questa pagina.</p>'
-               . "<p style='margin-top:15px;'><a href='" . $h($link) . "' style='background:#B80000; color:#ffffff; padding:10px 18px; text-decoration:none; border-radius:6px; font-weight:bold;'>Apri la pagina della convenzione</a></p>";
-
-        return $this->mailer->invia($email, 'Convenzione ricevuta: ' . $scuola, $corpo);
+        return $this->alla($email, 'fsl_firmata_ricevuta', ['scuola' => $scuola], $this->linkScuola($tokenPagina));
     }
 
     /** Alla scuola: promemoria di caricare la convenzione firmata in PDF (o di caricarla di nuovo dopo il rifiuto). */
     public function promemoriaPdf(string $email, string $scuola, string $tokenPagina, string $motivoRifiuto, bool $rifiutata): bool
     {
-        $corpo = '<p>Gentile <strong>' . $this->h($scuola) . '</strong>,</p>';
-        if ($rifiutata) {
-            $corpo .= '<p>ti ricordiamo che la convenzione che avevi caricato <strong>non è stata accettata</strong>'
-                . ($motivoRifiuto !== '' ? ' per questo motivo:</p>' . "<blockquote style='margin:12px 0;padding:8px 14px;border-left:4px solid #B80000;background:#fef2f2;'>" . nl2br($this->h($motivoRifiuto)) . '</blockquote><p>' : '.</p><p>')
-                . 'Correggi il documento e <strong>caricalo di nuovo</strong> dalla pagina della convenzione.</p>';
-        } else {
-            $corpo .= '<p>ti ricordiamo di <strong>caricare la convenzione firmata digitalmente dal Dirigente Scolastico</strong> (PDF in formato PAdES) insieme all\'Allegato A: '
-                . 'senza la convenzione le prenotazioni della scuola restano in attesa.</p>'
-                . '<p>La carichi dalla pagina della convenzione, riquadro «Convenzione firmata». Se hai bisogno di aiuto scrivici dalla stessa pagina.</p>';
+        if (!$rifiutata) {
+            return $this->alla($email, 'fsl_promemoria_pdf', ['scuola' => $scuola], $this->linkScuola($tokenPagina));
         }
 
-        return $this->scrivi($email, 'Promemoria: carica la convenzione firmata - ' . $scuola, $corpo . $this->pulsante($tokenPagina, 'Apri la pagina della convenzione'));
+        return $this->alla($email, 'fsl_promemoria_pdf_rifiutata', [
+            'scuola' => $scuola,
+            'motivo_intro' => $motivoRifiuto !== '' ? ' per questo motivo:' : '.',
+            'motivo' => InvioEmail::citazione($motivoRifiuto),
+        ], $this->linkScuola($tokenPagina));
     }
 
     /** Alla scuola: un messaggio dell'ufficio, con il link alla pagina dove si può rispondere. */
     public function messaggioDallUfficio(string $email, string $scuola, string $tokenPagina, string $testo): bool
     {
-        $corpo = '<p>Gentile <strong>' . $this->h($scuola) . '</strong>,</p>'
-               . '<p>il Dipartimento ti scrive a proposito della convenzione per la Formazione Scuola Lavoro:</p>'
-               . "<blockquote style='margin:12px 0;padding:8px 14px;border-left:4px solid #B80000;background:#f8fafc;'>" . nl2br($this->h($testo)) . '</blockquote>'
-               . '<p>Puoi rispondere dalla pagina della convenzione.</p>' . $this->pulsante($tokenPagina, 'Apri la pagina e rispondi');
-
-        return $this->scrivi($email, 'Messaggio dal Dipartimento sulla convenzione: ' . $scuola, $corpo);
+        return $this->alla($email, 'fsl_messaggio_ufficio', ['scuola' => $scuola, 'testo' => $testo], $this->linkScuola($tokenPagina));
     }
 
     /**
@@ -128,13 +136,9 @@ final class NotificheConvenzioni
      */
     public function messaggioDallaScuola(array $destinatari, string $scuola, string $testo): int
     {
-        $link = $this->sito->urlBase() . '/admin/fsl.php?tab=iter';
-        $corpo = '<p>La scuola <strong>' . $this->h($scuola) . '</strong> ha scritto a proposito della convenzione:</p>'
-               . "<blockquote style='margin:12px 0;padding:8px 14px;border-left:4px solid #0056b3;background:#f8fafc;'>" . nl2br($this->h($testo)) . '</blockquote>'
-               . "<p style='margin-top:15px;'><a href='" . $this->h($link) . "' style='background:#B80000; color:#ffffff; padding:10px 18px; text-decoration:none; border-radius:6px; font-weight:bold;'>Apri le convenzioni e rispondi</a></p>";
         $inviate = 0;
         foreach ($destinatari as $a) {
-            if ($this->mailer->invia($a, 'Messaggio della scuola sulla convenzione: ' . $scuola, $corpo)) {
+            if ($this->invio->invia($a, 'fsl_messaggio_scuola', ['scuola' => $scuola, 'testo' => $testo], $this->linkPannello())) {
                 ++$inviate;
             }
         }
@@ -145,46 +149,33 @@ final class NotificheConvenzioni
     /** Alla scuola: l'ufficio ha preso in carico la convenzione firmata. */
     public function presaInCarico(string $email, string $scuola, string $tokenPagina, string $protocolloIngresso = ''): bool
     {
-        $corpo = '<p>Gentile <strong>' . $this->h($scuola) . '</strong>,</p>'
-               . '<p>il Dipartimento ha <strong>preso in carico</strong> la convenzione firmata' . ($protocolloIngresso !== '' ? ' e l\'ha protocollata in entrata (' . $this->h($protocolloIngresso) . ')' : '') . ': ora la fa firmare dal Direttore e la protocolla in via definitiva. '
-               . 'Ti scriviamo appena è pronta; le prenotazioni in attesa si confermano in quel momento.</p>' . $this->pulsante($tokenPagina, 'Apri la pagina della convenzione');
-
-        return $this->scrivi($email, 'Convenzione presa in carico: ' . $scuola, $corpo);
+        return $this->alla($email, 'fsl_presa_in_carico', ['scuola' => $scuola, 'protocollo_testo' => $protocolloIngresso !== '' ? " e l'ha protocollata in entrata (" . $protocolloIngresso . ')' : ''], $this->linkScuola($tokenPagina));
     }
 
     /** Alla scuola: il file non va bene, con il motivo; la scuola può caricarne un altro dalla stessa pagina. */
     public function rifiutata(string $email, string $scuola, string $motivo, string $tokenPagina): bool
     {
-        $corpo = '<p>Gentile <strong>' . $this->h($scuola) . '</strong>,</p>'
-               . '<p>la convenzione che hai caricato <strong>non può essere accettata</strong> per questo motivo:</p>'
-               . "<blockquote style='margin:12px 0;padding:8px 14px;border-left:4px solid #B80000;background:#fef2f2;'>" . nl2br($this->h($motivo)) . '</blockquote>'
-               . '<p>Correggi il documento e <strong>caricalo di nuovo</strong> dalla stessa pagina.</p>' . $this->pulsante($tokenPagina, 'Carica di nuovo la convenzione');
-
-        return $this->scrivi($email, 'Convenzione da correggere: ' . $scuola, $corpo);
+        return $this->alla($email, 'fsl_rifiutata', ['scuola' => $scuola, 'motivo' => $motivo], $this->linkScuola($tokenPagina));
     }
 
     /** Alla scuola: convenzione firmata dal Direttore, protocollata e registrata; le prenotazioni in attesa sono confermate. */
     public function attiva(string $email, string $scuola, string $tokenPagina, string $protocollo, ?string $dal, ?string $al, int $prenotazioni): bool
     {
         $validita = $dal && $al ? 'dal ' . date('d/m/Y', (int) strtotime($dal)) . ' al ' . date('d/m/Y', (int) strtotime($al)) : '';
-        $corpo = '<p>Gentile <strong>' . $this->h($scuola) . '</strong>,</p>'
-               . '<p>la convenzione è stata <strong>firmata dal Direttore e protocollata</strong>' . ($protocollo !== '' ? ' (' . $this->h($protocollo) . ')' : '') . ($validita !== '' ? ', valida ' . $validita : '') . '.</p>'
-               . ($prenotazioni > 0 ? '<p>Le tue <strong>' . $prenotazioni . ($prenotazioni === 1 ? ' prenotazione era' : ' prenotazioni erano') . ' in attesa</strong> della convenzione: ' . ($prenotazioni === 1 ? 'è stata confermata' : 'sono state confermate') . ' e riceverai le email di conferma.</p>' : '')
-               . '<p>Trovi la convenzione e l\'Allegato A nell\'Area personale, nella scheda «Programma FSL».</p>' . $this->pulsante($tokenPagina, 'Apri la pagina della convenzione');
+        $pren = $prenotazioni > 0 ? '<p>Le tue <strong>' . $prenotazioni . ($prenotazioni === 1 ? ' prenotazione era' : ' prenotazioni erano') . ' in attesa</strong> della convenzione: ' . ($prenotazioni === 1 ? 'è stata confermata' : 'sono state confermate') . ' e riceverai le email di conferma.</p>' : '';
 
-        return $this->scrivi($email, 'Convenzione attiva: ' . $scuola, $corpo);
+        return $this->alla($email, 'fsl_attiva', [
+            'scuola' => $scuola,
+            'protocollo_testo' => $protocollo !== '' ? ' (' . $protocollo . ')' : '',
+            'validita_testo' => $validita !== '' ? ', valida ' . $validita : '',
+            'prenotazioni' => $pren,
+        ], $this->linkScuola($tokenPagina));
     }
 
     /** Al Direttore: una convenzione da firmare, con il suo link personale (accesso al portale richiesto). */
     public function firmaRichiesta(string $email, string $nomeDirettore, string $scuola, string $tokenDirettore): bool
     {
-        $link = $this->sito->urlBase() . '/firma_convenzione.php?t=' . urlencode($tokenDirettore);
-        $corpo = '<p>Gentile ' . $this->h($nomeDirettore !== '' ? $nomeDirettore : 'Direttore') . ',</p>'
-               . '<p>la convenzione per la Formazione Scuola Lavoro con <strong>' . $this->h($scuola) . '</strong> è già firmata dal Dirigente Scolastico e attende la <strong>tua firma</strong>.</p>'
-               . '<p>Accedi al portale e firmala in PAdES: con la firma remota Aruba direttamente dal portale oppure scaricando il PDF, firmandolo e ricaricandolo.</p>'
-               . "<p style='margin-top:15px;'><a href='" . $this->h($link) . "' style='background:#B80000; color:#ffffff; padding:10px 18px; text-decoration:none; border-radius:6px; font-weight:bold;'>Apri e firma la convenzione</a></p>";
-
-        return $this->scrivi($email, 'Convenzione FSL da firmare: ' . $scuola, $corpo);
+        return $this->alla($email, 'fsl_firma_richiesta', ['direttore' => $nomeDirettore !== '' ? $nomeDirettore : 'Direttore', 'scuola' => $scuola], $this->sito->urlBase() . '/firma_convenzione.php?t=' . urlencode($tokenDirettore));
     }
 
     /**
@@ -194,35 +185,14 @@ final class NotificheConvenzioni
      */
     public function firmataDalDirettore(string $scuola, array $destinatari): int
     {
-        $link = $this->sito->urlBase() . '/admin/fsl.php?tab=iter';
-        $corpo = '<p>Il Direttore ha <strong>firmato</strong> la convenzione con <strong>' . $this->h($scuola) . '</strong>.</p>'
-               . '<p>Ora va <strong>protocollata in via definitiva</strong>: scarica il PDF firmato, protocollalo, poi nel portale registra numero e data e carica il PDF protocollato. Le prenotazioni in attesa della scuola si confermano alla registrazione.</p>'
-               . "<p style='margin-top:15px;'><a href='" . $this->h($link) . "' style='background:#B80000; color:#ffffff; padding:10px 18px; text-decoration:none; border-radius:6px; font-weight:bold;'>Apri le convenzioni</a></p>";
         $n = 0;
         foreach ($destinatari as $a) {
-            if ($this->scrivi($a, 'Convenzione FSL firmata dal Direttore: da protocollare - ' . $scuola, $corpo)) {
+            if ($this->alla($a, 'fsl_firmata_direttore', ['scuola' => $scuola], $this->linkPannello())) {
                 ++$n;
             }
         }
 
         return $n;
-    }
-
-    private function h(string $s): string
-    {
-        return htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
-    }
-
-    private function pulsante(string $token, string $testo): string
-    {
-        $link = $this->sito->urlBase() . '/convenzione_online.php?t=' . urlencode($token);
-
-        return "<p style='margin-top:15px;'><a href='" . $this->h($link) . "' style='background:#B80000; color:#ffffff; padding:10px 18px; text-decoration:none; border-radius:6px; font-weight:bold;'>" . $this->h($testo) . '</a></p>';
-    }
-
-    private function scrivi(string $email, string $oggetto, string $corpo): bool
-    {
-        return filter_var($email, FILTER_VALIDATE_EMAIL) ? $this->mailer->invia($email, $oggetto, $corpo) : false;
     }
 
     /**
@@ -232,15 +202,19 @@ final class NotificheConvenzioni
      */
     public function ricevuta(array $p, bool $confermata): void
     {
-        $h = static fn ($s): string => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
+        $h = fn (string $s): string => $this->h($s);
         $att = $h($p['evento_titolo']) . (Turni::etichetta($p) !== '' ? ' (' . $h(Turni::etichetta($p)) . ')' : '');
-        $link = $this->sito->urlBase() . '/stampa_ricevuta.php?code=' . urlencode((string) $p['codice_prenotazione']);
         $statoTxt = $confermata || $p['stato'] === 'confermata' ? "La prenotazione per <strong>$att</strong> è <strong>CONFERMATA</strong>."
                   : ($p['stato'] === 'da_approvare' ? "La richiesta per <strong>$att</strong> resta in valutazione degli organizzatori: riceverai l'esito per email."
                   : "La prenotazione per <strong>$att</strong> resta in lista d'attesa: se si libera un posto ti avvisiamo per email.");
-        $corpo = '<p>Gentile <strong>' . $h(trim($p['nome'] . ' ' . $p['cognome'])) . '</strong>,</p>'
-               . "<p>abbiamo ricevuto la <strong>convenzione</strong> della scuola con il Dipartimento. $statoTxt</p>"
-               . "<p style='margin-top:15px;'><a href='" . $h($link) . "' target='_blank' style='background:#B80000; color:#ffffff; padding:10px 18px; text-decoration:none; border-radius:6px; font-weight:bold;'>📄 Scarica Ricevuta PDF</a></p>";
-        $this->mailer->invia($p['email'], 'Convenzione ricevuta: ' . $p['evento_titolo'], $corpo, $this->colori->delTurno((int) $p['turno_id']));
+        $this->invio->invia(
+            $p['email'],
+            'fsl_ricevuta_convenzione',
+            ['nome' => trim($p['nome'] . ' ' . $p['cognome']), 'attivita' => (string) $p['evento_titolo'], 'attivita_titolo' => (string) $p['evento_titolo'], 'stato' => '<p>' . $statoTxt . '</p>'],
+            $this->sito->urlBase() . '/stampa_ricevuta.php?code=' . urlencode((string) $p['codice_prenotazione']),
+            [],
+            '',
+            $this->colori->delTurno((int) $p['turno_id'])
+        );
     }
 }

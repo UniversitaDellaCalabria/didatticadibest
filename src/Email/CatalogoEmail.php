@@ -17,7 +17,7 @@ final class CatalogoEmail
     /** @return array<string, array<string, mixed>> */
     public static function modelli(): array
     {
-        return self::$cache ??= self::tutorato() + CatalogoDidattica::modelli();
+        return self::$cache ??= self::tutorato() + CatalogoDidattica::modelli() + CatalogoConvenzioni::modelli();
     }
 
     /** @return list<string> i gruppi, nell'ordine del catalogo */
@@ -32,6 +32,7 @@ final class CatalogoEmail
         return match (true) {
             str_starts_with($gruppo, 'Tutorato'), str_starts_with($gruppo, 'Didattica · Pratiche') => '#047857',
             str_starts_with($gruppo, 'Didattica · Sedute') => '#0056B3',
+            str_starts_with($gruppo, 'Convenzioni') => '#B80000',
             default => null,
         };
     }

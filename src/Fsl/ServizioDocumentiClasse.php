@@ -7,7 +7,7 @@ namespace App\Fsl;
 use App\Core\Esito;
 use App\Core\Sito;
 use App\Fsl\Vista\AvvisoDocumenti;
-use App\Infrastructure\Mail\Mailer;
+use App\Email\InvioEmail;
 use App\Infrastructure\Storage\Upload;
 use App\Portale\ColoriAree;
 
@@ -22,7 +22,7 @@ final class ServizioDocumentiClasse
         private DocumentiClasseRepository $repo,
         private AvvisoDocumenti $avvisi,
         private Upload $upload,
-        private Mailer $mailer,
+        private InvioEmail $invio,
         private ColoriAree $colori,
         private Sito $sito
     ) {
@@ -184,9 +184,8 @@ final class ServizioDocumentiClasse
             }
             $ultimo = $avviso === 'ultimo';
             $stato = $this->regole->stato($p, (int) $p['studenti'], (int) ($p['num_posti'] ?? 0));
-            $oggetto = ($ultimo ? 'Ultimo avviso: ' : 'Promemoria: ') . 'elenco degli studenti e autorizzazione della scuola - ' . $p['titolo'];
-            $corpo = $this->avvisi->promemoria($p, $stato, $ultimo, $this->regole->inizio($p));
-            if ($this->mailer->invia((string) $p['email'], $oggetto, $corpo, $this->colori->delTurno((int) $p['turno_id']))) {
+            $dati = $this->avvisi->datiPromemoria($p, $stato, $ultimo, $this->regole->inizio($p));
+            if ($this->invio->invia((string) $p['email'], $ultimo ? 'fsl_documenti_ultimo_avviso' : 'fsl_documenti_promemoria', $dati, $this->avvisi->link((string) $p['codice_prenotazione']), [], '', $this->colori->delTurno((int) $p['turno_id']))) {
                 $ultimo ? $this->repo->segnaUltimoAvviso((int) $p['id']) : $this->repo->contaPromemoria((int) $p['id']);
                 $ultimo ? ++$ultimi : ++$promemoria;
             }

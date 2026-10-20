@@ -128,7 +128,7 @@ $nome_az = fn(array $c) => (string)($c['azienda'] ?: $c['email']);
 </style>
 <?php
 echo pn_testata('Convenzioni di tesi', 'fa-handshake', "Le convenzioni con enti e aziende che accolgono i nostri studenti per la tesi: l'azienda compila online (senza registrarsi), tu protocolli, il Direttore firma, poi va in archivio e nell'elenco pubblico.",
-    '<a class="btn btn-outline-secondary btn-sm" href="../aziende_convenzionate_tesi.php" target="_blank" rel="noopener"><i class="fa fa-list me-1" aria-hidden="true"></i>Elenco pubblico</a>');
+    '<a class="btn btn-outline-secondary btn-sm" href="../aziende_convenzionate_tesi.php" target="_blank" rel="noopener"><i class="fa fa-list me-1" aria-hidden="true"></i>Elenco pubblico</a> <a class="btn btn-outline-secondary btn-sm" href="email.php?p_id=' . (int)$filtro_p . '&amp;gruppo=Convenzioni%20di%20tesi"><i class="fa fa-envelope-open-text me-1" aria-hidden="true"></i>Testi delle email</a>');
 echo pn_schede([
     'iter' => ['href' => $url('iter'), 'testo' => 'Da seguire', 'icona' => 'fa-route', 'numero' => $n_da_fare, 'avviso' => true, 'titolo' => 'Convenzioni che aspettano te'],
     'archivio' => ['href' => $url('archivio'), 'testo' => 'Archivio e aziende convenzionate', 'icona' => 'fa-box-archive'],

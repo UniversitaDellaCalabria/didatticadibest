@@ -7,7 +7,7 @@ namespace App\Fsl;
 use App\Anagrafi\ServizioScuole;
 use App\Anagrafi\Testi;
 use App\Core\Sito;
-use App\Infrastructure\Mail\Mailer;
+use App\Email\InvioEmail;
 use App\Portale\ColoriAree;
 
 /**
@@ -21,7 +21,7 @@ final class ServizioValutazioniFsl
         private ValutazioneRepository $valutazioni,
         private ServizioScuole $scuole,
         private ColoriAree $colori,
-        private Mailer $mailer,
+        private InvioEmail $invio,
         private Sito $sito
     ) {
     }
@@ -52,16 +52,16 @@ final class ServizioValutazioniFsl
             $token = bin2hex(random_bytes(20));
             $this->prenotazioni->impostaTokenValutazione($prenotazioneId, $token);
         }
-        $h = static fn ($s): string => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
-        $link = $this->sito->urlBase() . '/valutazione_fsl.php?t=' . $token;
         $scuola = !empty($p['scuola_codice']) ? $this->scuole->perCodice($p['scuola_codice']) : null;
-        $corpo = '<p>Gentile <strong>' . $h(trim($p['nome'] . ' ' . $p['cognome'])) . '</strong>,</p>'
-               . ($promemoria
-                   ? '<p>ti ricordiamo che la scheda di valutazione non è ancora stata compilata.</p>'
-                   : "<p>grazie per aver partecipato con la tua classe all'attività di Formazione Scuola Lavoro <strong>" . $h($p['evento_titolo']) . '</strong>' . ($scuola ? ' (' . $h(Testi::etichettaScuola($scuola)) . ')' : '') . '.</p>')
-               . '<p>Come previsto dalla convenzione, ti chiediamo di compilare la breve <strong>scheda di valutazione della struttura ospitante</strong>: bastano 3 minuti e ci aiuta a migliorare i percorsi.</p>'
-               . "<p style='text-align:center; margin:26px 0;'><a href='" . $h($link) . "' style='background:#B30000; color:#fff; padding:12px 24px; text-decoration:none; border-radius:6px; font-weight:bold;'>Compila la scheda di valutazione</a></p>";
-        $ok = $this->mailer->invia($p['email'], ($promemoria ? 'Promemoria: ' : '') . 'Scheda di valutazione - ' . $p['evento_titolo'], $corpo, $this->colori->delTurno((int) $p['turno_id']));
+        $ok = $this->invio->invia(
+            $p['email'],
+            $promemoria ? 'fsl_valutazione_promemoria' : 'fsl_valutazione_invito',
+            ['nome' => trim($p['nome'] . ' ' . $p['cognome']), 'attivita_titolo' => (string) $p['evento_titolo'], 'scuola_testo' => $scuola ? ' (' . Testi::etichettaScuola($scuola) . ')' : ''],
+            $this->sito->urlBase() . '/valutazione_fsl.php?t=' . $token,
+            [],
+            '',
+            $this->colori->delTurno((int) $p['turno_id'])
+        );
         if ($ok) {
             $this->prenotazioni->segnaInvitoValutazione($prenotazioneId, $promemoria);
         }

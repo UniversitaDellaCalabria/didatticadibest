@@ -8,7 +8,7 @@ require_once 'admin_header.php';
 use App\Email\CatalogoEmail;
 use App\Email\ModelliEmail;
 
-if (!$is_full_admin && !$puo_tutorato && !$puo_didattica_tutto) nega_accesso();
+if (!$is_full_admin && !$puo_tutorato && !$puo_didattica_tutto && !$puo_fsl_convenzioni && !$puo_conv_tesi) nega_accesso();
 function admin_redirect($url) { echo "<script>window.location.replace(" . json_encode($url) . ");</script>"; exit; }
 $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
 $app_e = \App\Core\App::per($conn);
@@ -16,8 +16,9 @@ $modelli = $app_e->get(ModelliEmail::class);
 $autore = trim(($utente_admin['nome'] ?? '') . ' ' . ($utente_admin['cognome'] ?? ''));
 $url = 'email.php?p_id=' . (int)$filtro_p;
 
-// Chi può modificare quale gruppo: l'amministratore tutti; chi lavora in Didattica i gruppi «Didattica · …», chi gestisce il tutorato quelli «Tutorato · …»
-$puo_gruppo = fn(string $g): bool => $is_full_admin || ($puo_didattica_tutto && str_starts_with($g, 'Didattica')) || ($puo_tutorato && str_starts_with($g, 'Tutorato'));
+// Chi può modificare quale gruppo: l'amministratore tutti; chi lavora in Didattica i gruppi «Didattica · …», chi gestisce il tutorato quelli «Tutorato · …», chi segue le convenzioni quelli «Convenzioni FSL · …» e «Convenzioni di tesi · …»
+$puo_gruppo = fn(string $g): bool => $is_full_admin || ($puo_didattica_tutto && str_starts_with($g, 'Didattica')) || ($puo_tutorato && str_starts_with($g, 'Tutorato'))
+    || ($puo_fsl_convenzioni && str_starts_with($g, 'Convenzioni FSL')) || ($puo_conv_tesi && str_starts_with($g, 'Convenzioni di tesi'));
 $visibili = array_filter($modelli->catalogo(), fn($m) => $puo_gruppo((string)$m['gruppo']));
 // ?gruppo=Didattica (dal pulsante dei moduli) mostra solo i gruppi che iniziano così
 $solo_gruppo = trim((string)($_GET['gruppo'] ?? ''));

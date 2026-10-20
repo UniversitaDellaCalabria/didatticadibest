@@ -19,6 +19,7 @@ final class ModelliEmail
     public const OGGETTO_MAX = 250;
     public const CORPO_MAX = 8000;
     public const BOTTONE_MAX = 80;
+    public const STILE_CITAZIONE = 'margin:12px 0;padding:8px 14px;border-left:4px solid #b45309;background:#fffbeb;';
 
     /** @var array<string, array<string, mixed>>|null */
     private ?array $modifiche = null;
@@ -126,7 +127,7 @@ final class ModelliEmail
         }
         $ammessi = array_keys($m['segnaposto']);
         foreach ([$oggetto, $corpo, $bottone] as $testo) {
-            if (preg_match_all('/\{\{(!?)([a-z0-9_]*)\}\}/i', $testo, $mm, PREG_SET_ORDER)) {
+            if (preg_match_all('/\{\{([!@]?)([a-z0-9_]*)\}\}/i', $testo, $mm, PREG_SET_ORDER)) {
                 foreach ($mm as $x) {
                     if (!in_array($x[1] . $x[2], $ammessi, true)) {
                         $err[] = 'Il segnaposto {{' . $x[1] . $x[2] . '}} non esiste per questa email.';
@@ -145,7 +146,7 @@ final class ModelliEmail
                 }
             }
         }
-        if (preg_match('/\{\{|\}\}/', (string) preg_replace('/\{\{!?[a-z0-9_]*\}\}/i', '', $oggetto . "\n" . $corpo . "\n" . $bottone))) {
+        if (preg_match('/\{\{|\}\}/', (string) preg_replace('/\{\{[!@]?[a-z0-9_]*\}\}/i', '', $oggetto . "\n" . $corpo . "\n" . $bottone))) {
             $err[] = 'C\'è un segnaposto scritto male: deve essere {{nome}}, con due graffe per parte.';
         }
 
@@ -188,7 +189,7 @@ final class ModelliEmail
         $m = $this->originale($chiave);
         $d = [];
         foreach (($m['segnaposto'] ?? []) as $nome => $info) {
-            $d[ltrim($nome, '!')] = (string) ($info['esempio'] ?? '…');
+            $d[ltrim($nome, '!@')] = (string) ($info['esempio'] ?? '…');
         }
 
         return $d;
@@ -214,10 +215,16 @@ final class ModelliEmail
     /** @param array<string, scalar|null> $dati */
     private function sostituisci(string $testo, array $dati, bool $perHtml): string
     {
-        return (string) preg_replace_callback('/\{\{(!?)([a-z0-9_]+)\}\}/i', function (array $x) use ($dati, $perHtml): string {
+        return (string) preg_replace_callback('/\{\{([!@]?)([a-z0-9_]+)\}\}/i', function (array $x) use ($dati, $perHtml): string {
             $v = (string) ($dati[$x[2]] ?? '');
             if ($x[1] === '!') {
                 return $perHtml ? $v : '';
+            }
+            // {{@nome}}: un indirizzo email, che nel testo diventa un collegamento
+            if ($x[1] === '@' && $perHtml && $v !== '') {
+                $e = htmlspecialchars($v, ENT_QUOTES, 'UTF-8');
+
+                return "<a href='mailto:$e'>$e</a>";
             }
             if (!$perHtml) {
                 return trim(preg_replace('/\s+/', ' ', $v) ?? $v);
@@ -235,7 +242,7 @@ final class ModelliEmail
      */
     private function inHtml(string $corpo, array $dati): string
     {
-        $stile = "margin:12px 0;padding:8px 14px;border-left:4px solid #b45309;background:#fffbeb;";
+        $stile = self::STILE_CITAZIONE;
         $out = '';
         foreach (preg_split('/\n\s*\n/', trim(str_replace("\r\n", "\n", $corpo))) ?: [] as $blocco) {
             $blocco = trim($blocco);
@@ -266,7 +273,7 @@ final class ModelliEmail
     {
         $segnaposto = [];
         // i segnaposto si mettono da parte con un segno che il testo non può contenere, si formatta, poi si rimettono
-        $r = (string) preg_replace_callback('/\{\{(!?[a-z0-9_]+)\}\}/i', static function (array $m) use (&$segnaposto): string {
+        $r = (string) preg_replace_callback('/\{\{([!@]?[a-z0-9_]+)\}\}/i', static function (array $m) use (&$segnaposto): string {
             $segnaposto[] = $m[0];
 
             return "\x01" . (count($segnaposto) - 1) . "\x02";
