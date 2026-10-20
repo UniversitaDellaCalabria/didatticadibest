@@ -98,38 +98,73 @@ foreach ($lista_visibile as $k => $x) {
         <input type="search" id="cerca-email" class="form-control" placeholder="Cerca un'email: scrivi una parola del nome, di chi la riceve o di quando parte…" autocomplete="off">
     </div></div>
     <?php
-    $per_gruppo = [];
-    foreach ($lista_modificate as $k => $x) $per_gruppo[$x['gruppo']][$k] = $x;
-    foreach ($per_gruppo as $gruppo => $mm): ?>
-        <div class="card border-0 shadow-sm mb-3 gruppo-email">
-            <div class="card-header bg-white fw-bold"><?php echo $h($gruppo); ?> <span class="badge bg-light text-secondary border ms-1"><?php echo count($mm); ?></span></div>
-            <ul class="list-group list-group-flush">
-                <?php foreach ($mm as $k => $x): ?>
-                    <li class="list-group-item riga-email" data-testo="<?php echo $h(mb_strtolower($x['nome'] . ' ' . $x['quando'] . ' ' . $x['destinatario'] . ' ' . $x['oggetto'])); ?>">
-                        <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
-                            <div style="min-width:0;flex:1 1 360px;">
-                                <a class="fw-bold text-decoration-none" href="<?php echo $h($url . '&k=' . urlencode($k)); ?>"><?php echo $h($x['nome']); ?></a>
-                                <?php echo $x['modificato'] ? '<span class="badge bg-warning text-dark ms-1">modificata</span>' : '<span class="badge bg-light text-secondary border ms-1">originale</span>'; ?><?php echo !$x['attiva'] ? '<span class="badge bg-secondary ms-1">non attiva: non parte</span>' : ''; ?>
-                                <div class="small text-secondary"><i class="fa fa-clock me-1" aria-hidden="true"></i><?php echo $h($x['quando']); ?></div>
-                                <div class="small text-secondary"><i class="fa fa-user me-1" aria-hidden="true"></i><?php echo $h($x['destinatario']); ?></div>
-                                <div class="small mt-1"><span class="text-secondary">Oggetto:</span> <?php echo $h($x['oggetto']); ?></div>
-                                <?php if ($x['modificato'] && $x['aggiornato_il']): ?><div class="small text-secondary">Ultima modifica: <?php echo $h(date('d/m/Y H:i', strtotime($x['aggiornato_il']))); ?><?php echo $x['aggiornato_da'] !== '' ? ' · ' . $h($x['aggiornato_da']) : ''; ?></div><?php endif; ?>
-                            </div>
-                            <a class="btn btn-sm btn-outline-primary" href="<?php echo $h($url . '&k=' . urlencode($k)); ?>"><i class="fa fa-pen me-1" aria-hidden="true"></i>Modifica</a>
-                        </div>
-                    </li>
+    // Una scheda per modulo (la prima parte del gruppo, prima di « · »); dentro, le sezioni come intestazioni
+    $per_modulo = [];
+    foreach ($lista_modificate as $k => $x) {
+        [$mod_x] = explode(' · ', (string)$x['gruppo'], 2);
+        $per_modulo[$mod_x][(string)$x['gruppo']][$k] = $x;
+    }
+    $scheda_get = trim((string)($_GET['scheda'] ?? ''));
+    $scelta = isset($per_modulo[$scheda_get]) ? $scheda_get : (array_key_first($per_modulo) ?? '');
+    $slug = fn(string $t): string => 'sc-' . trim((string)preg_replace('/[^a-z0-9]+/', '-', mb_strtolower($t)), '-');
+    ?>
+    <?php if ($per_modulo): ?>
+    <ul class="nav nav-tabs mb-3 flex-nowrap overflow-auto" id="schede-email" role="tablist" aria-label="Moduli">
+        <?php foreach ($per_modulo as $mod_n => $sezioni):
+            $tot_m = 0; $mod_m = 0;
+            foreach ($sezioni as $righe_s) foreach ($righe_s as $x) { $tot_m++; if ($x['modificato']) $mod_m++; } ?>
+            <li class="nav-item" role="presentation">
+                <button type="button" class="nav-link text-nowrap<?php echo $mod_n === $scelta ? ' active' : ''; ?>" id="tab-<?php echo $h($slug($mod_n)); ?>" data-bs-toggle="tab" data-bs-target="#<?php echo $h($slug($mod_n)); ?>" data-modulo="<?php echo $h($mod_n); ?>" role="tab" aria-controls="<?php echo $h($slug($mod_n)); ?>" aria-selected="<?php echo $mod_n === $scelta ? 'true' : 'false'; ?>">
+                    <?php echo $h($mod_n); ?> <span class="badge bg-light text-secondary border ms-1"><?php echo $tot_m; ?></span><?php if ($mod_m): ?><span class="badge bg-warning text-dark ms-1" title="Email con il testo modificato"><?php echo $mod_m; ?></span><?php endif; ?>
+                </button>
+            </li>
+        <?php endforeach; ?>
+    </ul>
+    <p id="nota-ricerca" class="small text-secondary mb-2" style="display:none;"><i class="fa fa-magnifying-glass me-1" aria-hidden="true"></i>Risultati della ricerca in tutti i moduli.</p>
+    <div class="tab-content" id="contenuto-email">
+        <?php foreach ($per_modulo as $mod_n => $sezioni): ?>
+            <div class="tab-pane fade<?php echo $mod_n === $scelta ? ' show active' : ''; ?>" id="<?php echo $h($slug($mod_n)); ?>" role="tabpanel" aria-labelledby="tab-<?php echo $h($slug($mod_n)); ?>" tabindex="0">
+                <?php foreach ($sezioni as $gruppo => $mm):
+                    $titolo_s = str_contains($gruppo, ' · ') ? explode(' · ', $gruppo, 2)[1] : $gruppo; ?>
+                    <div class="card border-0 shadow-sm mb-3 gruppo-email">
+                        <div class="card-header bg-white fw-bold"><span class="modulo-in-ricerca text-secondary fw-normal" style="display:none;"><?php echo $h($mod_n); ?> · </span><?php echo $h($titolo_s); ?> <span class="badge bg-light text-secondary border ms-1"><?php echo count($mm); ?></span></div>
+                        <ul class="list-group list-group-flush">
+                            <?php foreach ($mm as $k => $x): $vai = $url . '&k=' . urlencode($k) . '&scheda=' . urlencode($mod_n) . ($solo_gruppo !== '' ? '&gruppo=' . urlencode($solo_gruppo) : ''); ?>
+                                <li class="list-group-item riga-email" data-testo="<?php echo $h(mb_strtolower($x['nome'] . ' ' . $x['quando'] . ' ' . $x['destinatario'] . ' ' . $x['oggetto'] . ' ' . $gruppo)); ?>">
+                                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+                                        <div style="min-width:0;flex:1 1 360px;">
+                                            <a class="fw-bold text-decoration-none" href="<?php echo $h($vai); ?>"><?php echo $h($x['nome']); ?></a>
+                                            <?php echo $x['modificato'] ? '<span class="badge bg-warning text-dark ms-1">modificata</span>' : '<span class="badge bg-light text-secondary border ms-1">originale</span>'; ?><?php echo !$x['attiva'] ? '<span class="badge bg-secondary ms-1">non attiva: non parte</span>' : ''; ?>
+                                            <div class="small text-secondary"><i class="fa fa-clock me-1" aria-hidden="true"></i><?php echo $h($x['quando']); ?></div>
+                                            <div class="small text-secondary"><i class="fa fa-user me-1" aria-hidden="true"></i><?php echo $h($x['destinatario']); ?></div>
+                                            <div class="small mt-1"><span class="text-secondary">Oggetto:</span> <?php echo $h($x['oggetto']); ?></div>
+                                            <?php if ($x['modificato'] && $x['aggiornato_il']): ?><div class="small text-secondary">Ultima modifica: <?php echo $h(date('d/m/Y H:i', strtotime($x['aggiornato_il']))); ?><?php echo $x['aggiornato_da'] !== '' ? ' · ' . $h($x['aggiornato_da']) : ''; ?></div><?php endif; ?>
+                                        </div>
+                                        <a class="btn btn-sm btn-outline-primary" href="<?php echo $h($vai); ?>"><i class="fa fa-pen me-1" aria-hidden="true"></i>Modifica</a>
+                                    </div>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    </div>
                 <?php endforeach; ?>
-            </ul>
-        </div>
-    <?php endforeach; ?>
+            </div>
+        <?php endforeach; ?>
+    </div>
+    <?php else: ?><p class="text-secondary">Nessuna email disponibile per te in questa sezione.</p><?php endif; ?>
     <p id="nessuna-email" class="text-secondary small" style="display:none;">Nessuna email corrisponde alla ricerca.</p>
+    <style>#contenuto-email.cerca-attiva > .tab-pane { display: block !important; opacity: 1 !important; }</style>
     <script>
     (function () {
-        var campo = document.getElementById('cerca-email');
+        var campo = document.getElementById('cerca-email'), cont = document.getElementById('contenuto-email'), nav = document.getElementById('schede-email');
+        if (!campo || !cont) return;
         campo.addEventListener('input', function () {
-            var q = campo.value.trim().toLowerCase(), visibili = 0;
+            var q = campo.value.trim().toLowerCase(), visibili = 0, cerca = q !== '';
+            cont.classList.toggle('cerca-attiva', cerca);
+            if (nav) nav.style.display = cerca ? 'none' : '';
+            document.getElementById('nota-ricerca').style.display = cerca ? '' : 'none';
+            document.querySelectorAll('.modulo-in-ricerca').forEach(function (m) { m.style.display = cerca ? '' : 'none'; });
             document.querySelectorAll('.riga-email').forEach(function (r) {
-                var ok = q === '' || r.getAttribute('data-testo').indexOf(q) !== -1;
+                var ok = !cerca || r.getAttribute('data-testo').indexOf(q) !== -1;
                 r.style.display = ok ? '' : 'none';
                 if (ok) visibili++;
             });
@@ -138,10 +173,20 @@ foreach ($lista_visibile as $k => $x) {
             });
             document.getElementById('nessuna-email').style.display = visibili ? 'none' : '';
         });
+        // la scheda aperta resta nell'indirizzo: tornando dall'editor si ritrova dov'era
+        document.querySelectorAll('#schede-email [data-bs-toggle="tab"]').forEach(function (b) {
+            b.addEventListener('shown.bs.tab', function () {
+                try {
+                    var u = new URL(window.location.href);
+                    u.searchParams.set('scheda', b.getAttribute('data-modulo'));
+                    window.history.replaceState(null, '', u.toString());
+                } catch (e) {}
+            });
+        });
     })();
     </script>
 <?php else: ?>
-    <p class="mb-2"><a href="<?php echo $h($url . ($solo_gruppo !== '' ? '&gruppo=' . urlencode($solo_gruppo) : '')); ?>" class="text-decoration-none"><i class="fa fa-arrow-left me-1" aria-hidden="true"></i>Tutte le email</a></p>
+    <p class="mb-2"><a href="<?php echo $h($url . ($solo_gruppo !== '' ? '&gruppo=' . urlencode($solo_gruppo) : '') . '&scheda=' . urlencode(explode(' · ', (string)$m['gruppo'], 2)[0])); ?>" class="text-decoration-none"><i class="fa fa-arrow-left me-1" aria-hidden="true"></i>Tutte le email</a></p>
     <div class="card border-0 shadow-sm mb-3"><div class="card-body">
         <h2 class="h5 fw-bold mb-1"><?php echo $h($m['nome']); ?></h2>
         <div class="small text-secondary"><span class="badge bg-light text-secondary border"><?php echo $h($m['gruppo']); ?></span></div>

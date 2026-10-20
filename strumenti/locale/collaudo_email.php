@@ -66,10 +66,11 @@ $db->query("DELETE FROM email_modelli");
 
 titolo('L\'elenco');
 $h = $admin->vai($P);
-prova('la pagina si apre e mostra le email del tutorato', $admin->codice === 200 && str_contains($h, 'Tutorato · Lettera di incarico') && str_contains($h, 'Invito al tutor a confermare la lettera'), 'HTTP ' . $admin->codice);
+prova('la pagina si apre e mostra le email del tutorato', $admin->codice === 200 && str_contains($h, 'id="tab-sc-tutorato"') && str_contains($h, 'Invito al tutor a confermare la lettera'), 'HTTP ' . $admin->codice);
 prova('ogni email dice quando parte e a chi arriva', str_contains($h, 'Il tutor vincitore') && str_contains($h, 'Il Direttore del Dipartimento'));
 prova('di partenza sono tutte «originale»', !str_contains($h, '>modificata<'));
 prova('c\'è la ricerca', str_contains($h, 'id="cerca-email"'));
+prova('i moduli sono schede e quella indicata nell\'indirizzo si apre', str_contains($h, 'id="schede-email"') && str_contains($h, 'data-bs-toggle="tab"') && str_contains($admin->vai($P . '?scheda=Risorse'), 'nav-link text-nowrap active" id="tab-sc-risorse"'));
 $studente->vai($P);
 prova('uno studente non entra', $studente->codice !== 200 || !str_contains($studente->vai($P), 'Testi delle email'));
 
@@ -97,7 +98,7 @@ prova('la modifica è nel registro attività', (int) q("SELECT COUNT(*) n FROM l
 
 titolo('Le email della Didattica');
 $h = $admin->vai($P);
-prova('l\'elenco ha anche i gruppi della Didattica', str_contains($h, 'Didattica · Pratiche · Allo studente') && str_contains($h, 'Didattica · Sedute e verbali') && str_contains($h, 'Pratica ricevuta'));
+prova('l\'elenco ha anche i gruppi della Didattica', str_contains($h, 'Pratiche · Allo studente') && str_contains($h, 'Sedute e verbali') && str_contains($h, 'Pratica ricevuta'));
 $h = $admin->vai($P . '?gruppo=Didattica');
 prova('con ?gruppo=Didattica si vedono solo quelle della Didattica', str_contains($h, 'Pratica ricevuta') && !str_contains($h, 'Invito al tutor a confermare la lettera') && str_contains($h, 'Mostra tutte'));
 $h = $admin->vai('/eventi/admin/didattica.php');
