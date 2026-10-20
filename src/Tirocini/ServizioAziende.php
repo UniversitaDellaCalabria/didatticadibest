@@ -28,11 +28,11 @@ final class ServizioAziende
      * chi non l'ha più perde la convenzione ma conserva l'indirizzo.
      *
      * @param list<array<string, string>> $righe
-     * @return array{nuove: int, aggiornate: int, senza_convenzione: int, indirizzi: int, scartate: int}
+     * @return array{nuove: int, aggiornate: int, senza_convenzione: int, indirizzi: int, siti: int, scartate: int}
      */
     public function importa(array $righe): array
     {
-        $r = ['nuove' => 0, 'aggiornate' => 0, 'senza_convenzione' => 0, 'indirizzi' => 0, 'scartate' => 0];
+        $r = ['nuove' => 0, 'aggiornate' => 0, 'senza_convenzione' => 0, 'indirizzi' => 0, 'siti' => 0, 'scartate' => 0];
         $this->db->transazione(function () use ($righe, &$r): void {
             foreach ($righe as $riga) {
                 $cod = $this->cella($riga, ['codice azienda', 'codice tsp', 'codice']);
@@ -79,6 +79,16 @@ final class ServizioAziende
                         // Colonna «Origine» = web: indirizzo cercato in rete, da confermare prima di pubblicarlo (non sostituisce uno scritto a mano)
                         $this->salvaIndirizzo((int) $esiste['id'], $this->cella($riga, ['indirizzo']), $this->cella($riga, ['cap']), $comune, $prov, $web ? self::ORIGINE_WEB : self::ORIGINE_MANUALE, !$web);
                         $r['indirizzi']++;
+                    }
+                }
+                // Sito web nel file: si scrive solo dove manca (non cancella né sostituisce uno scritto a mano)
+                $sito = $this->cella($riga, ['sito web', 'sito']);
+                if ($esiste && $sito !== '') {
+                    $sito = preg_match('#^https?://#i', $sito) ? $sito : 'https://' . $sito;
+                    if (filter_var($sito, FILTER_VALIDATE_URL)) {
+                        if ($this->db->esegui("UPDATE tirocini_aziende SET sito = ? WHERE id = ? AND sito = ''", [mb_substr($sito, 0, 255), $esiste['id']]) > 0) {
+                            $r['siti']++;
+                        }
                     }
                 }
             }
@@ -193,7 +203,7 @@ final class ServizioAziende
     {
         $righe = [];
         foreach ($this->elenco('senza_indirizzo') as $a) {
-            $righe[] = [$a['cod_tsp'], $a['nome'], $a['partita_iva'] !== '' ? $a['partita_iva'] : $a['codice_fiscale'], $a['settore'], '', '', '', ''];
+            $righe[] = [$a['cod_tsp'], $a['nome'], $a['partita_iva'] !== '' ? $a['partita_iva'] : $a['codice_fiscale'], $a['settore'], '', '', '', '', ''];
         }
 
         return $righe;

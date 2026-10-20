@@ -55,6 +55,12 @@ $r2 = $az_ti->importa([['codice azienda' => 'T9003', 'indirizzo' => 'Via Alimena
 $a3b = $conn->query("SELECT * FROM tirocini_aziende WHERE cod_tsp = 'T9003'")->fetch_assoc();
 prova($r2['indirizzi'] === 1 && $a3b['provincia'] === 'CS' && $a3b['regione'] === 'Calabria' && (int)$a3b['pubblica'] === 0 && !in_array('Antonio Giulio Cosentino', $nomi_pub(), true), "file con gli indirizzi: salvati, ma la ditta individuale resta non pubblica");
 
+// Sito web nel file: si scrive dove manca e non sostituisce uno già presente; non tocca l'indirizzo
+$r3 = $az_ti->importa([['codice azienda' => 'T9001', 'sito web' => 'www.altro-sito.it'], ['codice azienda' => 'T9002', 'sito web' => 'https://rugbyrende.example.it', 'comune' => 'Rende', 'provincia' => 'CS', 'origine' => 'web']]);
+$s1 = $conn->query("SELECT sito, indirizzo FROM tirocini_aziende WHERE cod_tsp = 'T9001'")->fetch_assoc();
+$s2 = $conn->query("SELECT sito FROM tirocini_aziende WHERE cod_tsp = 'T9002'")->fetch_assoc();
+prova($r3['siti'] === 1 && $s1['sito'] === 'https://www.3bgroup.it' && $s1['indirizzo'] === 'Via Roma 1' && $s2['sito'] === 'https://rugbyrende.example.it', "sito web nel file: scritto dove manca, uno già presente non si sostituisce, l'indirizzo non si tocca");
+
 // Lettura di un vero .xlsx con le stringhe nella cella (come il report del TSP) e di un CSV
 if (class_exists(ZipArchive::class)) {
     $x = \App\Infrastructure\Documenti\Excel::crea(['Foglio' => ['intestazioni' => ['Codice azienda', 'Descrizione', 'Esiste convenzione attiva'], 'righe' => [['T9005', 'Prova Excel Srl', 'x'], ['T9006', 'Altra', '']]]]);

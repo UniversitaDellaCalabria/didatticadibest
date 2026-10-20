@@ -22,8 +22,8 @@ $url = fn(string $t = 'esterni', string $extra = '') => 'tirocini.php?tab=' . $t
 // ── Elenco da completare in Excel ──
 if (isset($_GET['da_completare'])) {
     $file = \App\Infrastructure\Documenti\Excel::crea(['Da completare' => [
-        'intestazioni' => ['Codice azienda', 'Descrizione', 'Partita IVA / Codice fiscale', 'Settore', 'Indirizzo', 'CAP', 'Comune', 'Provincia'],
-        'righe' => $az->righeDaCompletare(), 'larghezze' => [16, 50, 22, 40, 36, 8, 24, 10],
+        'intestazioni' => ['Codice azienda', 'Descrizione', 'Partita IVA / Codice fiscale', 'Settore', 'Indirizzo', 'CAP', 'Comune', 'Provincia', 'Sito web'],
+        'righe' => $az->righeDaCompletare(), 'larghezze' => [16, 50, 22, 40, 36, 8, 24, 10, 36],
     ]]);
     if (!$file) { flash_set('Su questo server non si possono creare file Excel.', 'danger'); admin_redirect($url()); }
     while (ob_get_level() > 0) ob_end_clean();
@@ -44,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $r = $az->importa($righe);
             registra_log_audit($conn, "Tirocini: caricato il file delle aziende", $r);
-            flash_set("File letto: {$r['nuove']} aziende nuove, {$r['aggiornate']} aggiornate" . ($r['senza_convenzione'] ? ", {$r['senza_convenzione']} senza più la convenzione" : '') . ($r['indirizzi'] ? ", {$r['indirizzi']} indirizzi inseriti" : '') . ($r['scartate'] ? ", {$r['scartate']} righe scartate perché senza codice azienda" : '') . '.', $r['scartate'] ? 'warning' : 'success');
+            flash_set("File letto: {$r['nuove']} aziende nuove, {$r['aggiornate']} aggiornate" . ($r['senza_convenzione'] ? ", {$r['senza_convenzione']} senza più la convenzione" : '') . ($r['indirizzi'] ? ", {$r['indirizzi']} indirizzi inseriti" : '') . ($r['siti'] ? ", {$r['siti']} siti web" : '') . ($r['scartate'] ? ", {$r['scartate']} righe scartate perché senza codice azienda" : '') . '.', $r['scartate'] ? 'warning' : 'success');
         }
         admin_redirect($url() . '&r=' . time());
     } elseif (isset($_POST['salva_azienda'])) {
@@ -115,7 +115,7 @@ echo pn_schede([
         </form></div>
         <div class="col-lg-6"><div class="border rounded p-3 bg-white h-100">
             <h2 class="h6 fw-bold"><i class="fa fa-pen-to-square me-1 text-secondary" aria-hidden="true"></i>Indirizzi</h2>
-            <p class="small text-secondary mb-2">Scrivili qui sotto, riga per riga, oppure scarica l'elenco delle aziende senza indirizzo, completalo in Excel (indirizzo, CAP, comune, provincia) e ricaricalo a sinistra.</p>
+            <p class="small text-secondary mb-2">Scrivili qui sotto, riga per riga, oppure scarica l'elenco delle aziende senza indirizzo, completalo in Excel (indirizzo, CAP, comune, provincia, sito web) e ricaricalo a sinistra.</p>
             <a class="btn btn-outline-secondary btn-sm" href="<?php echo $h($url('esterni', '&da_completare=1')); ?>"><i class="fa fa-download me-1" aria-hidden="true"></i>Elenco da completare (<?php echo (int)$cont['senza_indirizzo']; ?>)</a>
             <?php if ($cont['da_confermare']): ?>
             <form method="POST" class="d-inline"><?php csrf_field(); ?><button class="btn btn-outline-success btn-sm" name="conferma" value="1" type="submit" data-confirm="Confermare tutti gli indirizzi trovati sul web? Da quel momento le aziende si pubblicano.">Conferma i <?php echo (int)$cont['da_confermare']; ?> trovati sul web</button></form>
