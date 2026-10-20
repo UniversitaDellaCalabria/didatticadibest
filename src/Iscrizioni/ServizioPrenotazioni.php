@@ -12,10 +12,9 @@ use App\Core\Orologio;
 use App\Core\Sito;
 use App\Eventi\EventoRepository;
 use App\Eventi\Turni;
-use App\Infrastructure\Mail\Mailer;
+use App\Email\InvioEmail;
 use App\Infrastructure\Storage\Upload;
 use App\Portale\ColoriAree;
-use App\Sistema\ImpostazioniSistemaRepository;
 use Throwable;
 
 /**
@@ -42,8 +41,7 @@ final class ServizioPrenotazioni
         private ServizioScuole $scuole,
         private NotifichePrenotazione $notifiche,
         private ServizioAbilitazioni $abilitazioni,
-        private ImpostazioniSistemaRepository $impostazioni,
-        private Mailer $mailer,
+        private InvioEmail $invio,
         private ColoriAree $colori,
         private Upload $upload,
         private Sito $sito,
@@ -333,40 +331,38 @@ final class ServizioPrenotazioni
         $bottoniCalendario = empty($t['data_turno']) ? '' : "<p style='margin-top:15px;'><a href='$gcal' target='_blank' style='background:#4285F4; color:#fff; padding:8px 14px; text-decoration:none; border-radius:4px; font-weight:bold;'>📅 Aggiungi a Google Calendar</a> <a href='$icsLink' style='background:#334155; color:#fff; padding:8px 14px; text-decoration:none; border-radius:4px; font-weight:bold;'>📥 Scarica File .ics</a></p>";
         $cerca = ['{NOME}', '{COGNOME}', '{MATRICOLA}', '{TITOLO_EVENTO}', '{DATA_TURNO}', '{ORARIO_TURNO}', '{LUOGO}', '{CODICE_PRENOTAZIONE}', '{LINK_RICEVUTA}'];
         $sostituisci = [$r->nome, $r->cognome, $r->matricola, $t['evento_titolo'], $dataFormattata, $oraFormattata, $t['luogo'], $codice, $btnRicevuta];
-        $sistema = $this->impostazioni->riga() ?? [];
-
+        $token = array_combine($cerca, array_map('strval', $sostituisci)) + ['{NUM_POSTI}' => (string) $numPosti, '{AVVISO_CONVENZIONE}' => ''];
+        $dopo = '';
         if ($stato === 'da_approvare' && $conv === 'no') {
-            $oggetto = 'Prenotazione in attesa della convenzione: ' . $t['evento_titolo'];
-            $corpo = '<p>Gentile <strong>{NOME} {COGNOME}</strong>,</p><p>abbiamo ricevuto la prenotazione per <strong>{TITOLO_EVENTO}</strong>.</p><p>📅 {DATA_TURNO} | 🕒 {ORARIO_TURNO}<br>🎟️ Codice: <strong>{CODICE_PRENOTAZIONE}</strong></p>'
-                . ($convRinnovo ? "<p style='margin:0 0 8px;'><strong>La convenzione della scuola registrata al Dipartimento non copre tutto il periodo dell'attività: va stipulata una nuova convenzione.</strong></p>" : '') . $this->fsl->istruzioniConvenzione($r->pagina, true, $codice) . '{LINK_RICEVUTA}';
+            $chiave = 'evento_attesa_convenzione';
+            $token['{AVVISO_CONVENZIONE}'] = ($convRinnovo ? "<p style='margin:0 0 8px;'><strong>La convenzione della scuola registrata al Dipartimento non copre tutto il periodo dell'attività: va stipulata una nuova convenzione.</strong></p>" : '') . $this->fsl->istruzioniConvenzione($r->pagina, true, $codice);
         } elseif ($stato === 'da_approvare') {
-            $oggetto = 'Richiesta Ricevuta (In valutazione): ' . $t['evento_titolo'];
-            $corpo = "<p>Gentile <strong>{NOME} {COGNOME}</strong>,</p><p>La tua richiesta per <strong>$numPosti posti</strong> all'evento <strong>{TITOLO_EVENTO}</strong> è in fase di valutazione.</p><p>📅 {DATA_TURNO} | 🕒 {ORARIO_TURNO}<br>🎟️ Codice: <strong>{CODICE_PRENOTAZIONE}</strong></p>{LINK_RICEVUTA}";
+            $chiave = 'evento_in_valutazione';
         } elseif ($stato === 'in_attesa') {
-            $oggetto = "Lista d'Attesa: " . $t['evento_titolo'];
-            $corpo = "<p>Gentile <strong>{NOME} {COGNOME}</strong>,</p><p>Sei stato inserito in <strong>lista d'attesa</strong> per l'evento <strong>{TITOLO_EVENTO}</strong>.</p><p>📅 {DATA_TURNO} | 🕒 {ORARIO_TURNO}<br>🎟️ Codice: <strong>{CODICE_PRENOTAZIONE}</strong></p>{LINK_RICEVUTA}" . $bottoniCalendario;
+            $chiave = 'evento_lista_attesa';
+            $dopo = $bottoniCalendario;
             // Senza convenzione: meglio avviarla subito, così se il posto si libera la prenotazione è confermabile
             if ($conv === 'no') {
-                $corpo .= "<p style='margin-top:16px;'><strong>Convenzione:</strong> la scuola non l'ha ancora stipulata. Ti consigliamo di avviarla già ora.</p>" . $this->fsl->istruzioniConvenzione($r->pagina, true, $codice);
+                $dopo .= "<p style='margin-top:16px;'><strong>Convenzione:</strong> la scuola non l'ha ancora stipulata. Ti consigliamo di avviarla già ora.</p>" . $this->fsl->istruzioniConvenzione($r->pagina, true, $codice);
             }
         } else {
-            $oggetto = $sistema['email_conferma_oggetto'] ?: 'Conferma Prenotazione Eventi';
-            $corpo = ($sistema['email_conferma_corpo'] ?: "<p>Gentile <strong>{NOME} {COGNOME}</strong>,</p><p>Prenotazione confermata per <strong>{TITOLO_EVENTO}</strong>.</p><p>📅 {DATA_TURNO} | 🕒 {ORARIO_TURNO}<br>🎟️ Codice: <strong>{CODICE_PRENOTAZIONE}</strong></p>{LINK_RICEVUTA}") . $bottoniCalendario;
+            $chiave = 'evento_conferma';
+            $dopo = $bottoniCalendario;
         }
 
         // Attività FSL: oltre alla convenzione, l'elenco degli studenti e l'autorizzazione della scuola vanno caricati prima dell'inizio
-        $corpo .= $this->fsl->avvisoDocumentiClasse($dett, ($t['evento_tipo'] ?? '') === 'progetto', $codice, $t['data_turno'] ?? null);
+        $dopo .= $this->fsl->avvisoDocumentiClasse($dett, ($t['evento_tipo'] ?? '') === 'progetto', $codice, $t['data_turno'] ?? null);
 
         // Attestati per la classe: chi ha prenotato inserisce l'elenco degli studenti dall'Area personale
         if ($stato === 'confermata' && $this->fsl->attestatiDiClasse(['evento_tipo' => $t['evento_tipo'] ?? '', 'attestati' => $dett['attestati'] ?? 0, 'per_scuole' => $dett['per_scuole'] ?? 1])) {
             $linkElenco = $this->sito->urlBase() . '/elenco_studenti.php?code=' . urlencode($codice);
-            $corpo .= "<p style='margin-top:18px;'>Per gli <strong>attestati di partecipazione degli studenti</strong> inserisci il loro elenco (cognome e nome) dalla tua Area personale, accedendo con SPID, CIE o credenziali Unical con questo stesso indirizzo email.</p>"
+            $dopo .= "<p style='margin-top:18px;'>Per gli <strong>attestati di partecipazione degli studenti</strong> inserisci il loro elenco (cognome e nome) dalla tua Area personale, accedendo con SPID, CIE o credenziali Unical con questo stesso indirizzo email.</p>"
                     . "<p><a href='" . htmlspecialchars($linkElenco) . "' style='background:#198754; color:#fff; padding:10px 18px; text-decoration:none; border-radius:6px; font-weight:bold;'>Inserisci l'elenco degli studenti</a></p>";
         }
         $colore = $this->colori->delTurno($turnoId);
         // Programma FSL: una sola email riepilogativa per tutte le attività, mandata da chi le ha raccolte
         if (!$r->senzaEmailPersona) {
-            $this->mailer->invia($r->email, str_replace($cerca, $sostituisci, (string) $oggetto), str_replace($cerca, $sostituisci, $corpo), $colore);
+            $this->invio->inviaHtml($r->email, $chiave, $token, $colore, $dopo);
         }
 
         // Gestori dell'area/evento con notifiche attive + indirizzi aggiuntivi dell'evento:
@@ -374,11 +370,9 @@ final class ServizioPrenotazioni
         $destinatari = $this->notifiche->destinatari((int) $t['evento_id']);
         $riepilogo = $destinatari ? $this->notifiche->riepilogo($nuovoId) : null;
         if ($riepilogo) {
-            $oggettoGestori = "Nuova prenotazione ($numPosti " . ($numPosti === 1 ? 'posto' : 'posti') . '): ' . $t['evento_titolo'];
-            $intro = "<p>È stata registrata una nuova prenotazione per l'evento <strong>" . htmlspecialchars((string) $t['evento_titolo']) . '</strong>.</p>';
             $gestori = $this->abilitazioni->emailGestoriEvento((int) $t['evento_id']);
             foreach ($destinatari as $emailGestore) {
-                $this->mailer->invia($emailGestore, $oggettoGestori, NotifichePrenotazione::corpoPer($emailGestore, $intro, $riepilogo, $gestori), $colore);
+                $this->invio->invia($emailGestore, 'evento_gestori_nuova', ['posti' => "$numPosti " . ($numPosti === 1 ? 'posto' : 'posti'), 'evento' => (string) $t['evento_titolo'], 'riepilogo' => NotifichePrenotazione::riepilogoPer($emailGestore, $riepilogo, $gestori)], '', [], '', $colore);
             }
         }
     }

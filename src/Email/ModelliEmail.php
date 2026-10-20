@@ -12,7 +12,11 @@ use App\Core\Database;
  * Il catalogo (CatalogoEmail) contiene i testi originali; la tabella email_modelli solo le modifiche: senza riga vale il testo originale.
  * Il testo si scrive in un formato semplice, non in HTML: righe vuote = paragrafi, «- » a inizio riga = elenco, «> » = citazione,
  * **così** = grassetto. I dati si inseriscono con i segnaposto {{nome}} (sempre «ripuliti»: non possono introdurre HTML); i segnaposto
- * {{!nome}} sono pezzi di HTML preparati dal portale (tabelle, elenchi) e si usano da soli su una riga.
+ * {{!nome}} sono pezzi di HTML preparati dal portale (tabelle, elenchi) e si usano da soli su una riga; {{@nome}} è un indirizzo email che diventa un collegamento.
+ *
+ * Le email degli eventi hanno un formato a parte («html»): il testo è HTML scritto con l'editor, con i segnaposto {NOME} a graffa singola che il
+ * portale sostituisce (come nelle impostazioni di sistema di prima, da cui i testi già scritti vengono importati la prima volta). Alcune sono
+ * «facoltative»: se il testo è vuoto l'email non parte.
  */
 final class ModelliEmail
 {
@@ -52,6 +56,8 @@ final class ModelliEmail
             return null;
         }
         $r = $this->tutteLeModifiche()[$chiave] ?? null;
+        $m['formato'] ??= 'testo';
+        $m['attiva'] = true;
         $m['modificato'] = $r !== null;
         $m['aggiornato_il'] = $r['aggiornato_il'] ?? null;
         $m['aggiornato_da'] = (string) ($r['aggiornato_da'] ?? '');
@@ -59,9 +65,45 @@ final class ModelliEmail
             $m['oggetto'] = (string) $r['oggetto'];
             $m['corpo'] = (string) $r['corpo'];
             $m['bottone'] = $m['bottone'] === null ? null : (string) $r['bottone'];
+            if (!empty($m['facoltativa']) && trim((string) $m['corpo']) === '') {
+                $m['attiva'] = false;
+            }
+        } elseif (!empty($m['facoltativa'])) {
+            $m['attiva'] = false; // mai attivata: il testo del catalogo è solo un suggerimento
         }
 
         return $m;
+    }
+
+    /**
+     * Email in formato HTML (eventi): oggetto e corpo con i segnaposto {NOME} già sostituiti. Null se l'email è facoltativa e non è attiva.
+     *
+     * @param array<string, scalar|null> $token valori dei segnaposto, con la graffa: ['{NOME}' => 'Maria']
+     * @return array{oggetto: string, corpo: string}|null
+     */
+    public function renderHtml(string $chiave, array $token): ?array
+    {
+        $m = $this->modello($chiave);
+        if ($m === null) {
+            throw new \InvalidArgumentException("Modello di email sconosciuto: $chiave");
+        }
+        if (!$m['attiva']) {
+            return null;
+        }
+
+        return $this->componiHtml((string) $m['oggetto'], (string) $m['corpo'], $token);
+    }
+
+    /**
+     * @param array<string, scalar|null> $token
+     * @return array{oggetto: string, corpo: string}
+     */
+    public function componiHtml(string $oggetto, string $corpo, array $token): array
+    {
+        $da = array_keys($token);
+        $a = array_map('strval', array_values($token));
+
+        return ['oggetto' => str_replace($da, $a, $oggetto), 'corpo' => str_replace($da, $a, $corpo)];
     }
 
     /**
@@ -108,6 +150,9 @@ final class ModelliEmail
         }
         $err = [];
         $oggetto = trim($oggetto);
+        if (($m['formato'] ?? 'testo') === 'html') {
+            return $this->controllaHtml($m, $oggetto, $corpo);
+        }
         if ($oggetto === '') {
             $err[] = "L'oggetto non può essere vuoto.";
         } elseif (mb_strlen($oggetto) > self::OGGETTO_MAX) {
@@ -153,16 +198,64 @@ final class ModelliEmail
         return array_values(array_unique($err));
     }
 
-    /** Salva il testo modificato. Ritorna i problemi (vuoto = salvato). @return list<string> */
-    public function salva(string $chiave, string $oggetto, string $corpo, string $bottone, string $autore): array
+    /** @param array<string, mixed> $m @return list<string> */
+    private function controllaHtml(array $m, string $oggetto, string $corpo): array
     {
+        $err = [];
+        $facoltativa = !empty($m['facoltativa']);
+        if ($oggetto === '' && !($facoltativa && trim($corpo) === '')) {
+            $err[] = "L'oggetto non può essere vuoto.";
+        } elseif (mb_strlen($oggetto) > self::OGGETTO_MAX) {
+            $err[] = "L'oggetto è troppo lungo (massimo " . self::OGGETTO_MAX . ' caratteri).';
+        }
+        if (trim($corpo) === '' && !$facoltativa) {
+            $err[] = 'Il testo non può essere vuoto.';
+        } elseif (mb_strlen($corpo) > 20000) {
+            $err[] = 'Il testo è troppo lungo.';
+        }
+        $ammessi = array_keys($m['segnaposto']);
+        if (preg_match_all('/\{[A-Z][A-Z_]*\}/', $oggetto . "\n" . $corpo, $mm)) {
+            foreach (array_unique($mm[0]) as $t) {
+                if (!in_array($t, $ammessi, true)) {
+                    $err[] = 'Il segnaposto ' . $t . ' non esiste per questa email.';
+                }
+            }
+        }
+
+        return $err;
+    }
+
+    /** Toglie dall'HTML scritto da un amministratore ciò che non serve in un'email: script, gestori di eventi, javascript:. */
+    public static function ripulisciHtml(string $html): string
+    {
+        $html = (string) preg_replace('#<\s*(script|iframe|object|embed)\b.*?<\s*/\s*\1\s*>#is', '', $html);
+        $html = (string) preg_replace('#<\s*(script|iframe|object|embed)\b[^>]*>#i', '', $html);
+        $html = (string) preg_replace('/\s+on[a-z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $html);
+
+        return (string) preg_replace('/(href|src)\s*=\s*(["\'])\s*javascript:[^"\']*\2/i', '$1=$2#$2', $html);
+    }
+
+    /**
+     * Salva il testo modificato. Ritorna i problemi (vuoto = salvato). $attiva vale solo per le email facoltative: false = non parte.
+     *
+     * @return list<string>
+     */
+    public function salva(string $chiave, string $oggetto, string $corpo, string $bottone, string $autore, bool $attiva = true): array
+    {
+        $m = $this->originale($chiave);
+        $html = ($m['formato'] ?? 'testo') === 'html';
         $oggetto = trim(preg_replace('/\s+/', ' ', $oggetto) ?? $oggetto);
         $corpo = trim(str_replace("\r\n", "\n", $corpo));
+        if ($html) {
+            $corpo = trim(self::ripulisciHtml($corpo));
+            if (!$attiva && !empty($m['facoltativa'])) {
+                $corpo = '';
+            }
+        }
         $bottone = trim($bottone);
         if ($err = $this->controlla($chiave, $oggetto, $corpo, $bottone)) {
             return $err;
         }
-        $m = $this->originale($chiave);
         if ($m['bottone'] === null) {
             $bottone = '';
         }
@@ -189,7 +282,7 @@ final class ModelliEmail
         $m = $this->originale($chiave);
         $d = [];
         foreach (($m['segnaposto'] ?? []) as $nome => $info) {
-            $d[ltrim($nome, '!@')] = (string) ($info['esempio'] ?? '…');
+            $d[($m['formato'] ?? 'testo') === 'html' ? $nome : ltrim($nome, '!@')] = (string) ($info['esempio'] ?? '…');
         }
 
         return $d;
@@ -207,9 +300,51 @@ final class ModelliEmail
             } catch (\Throwable) {
                 // tabella non ancora creata: valgono i testi originali
             }
+            try {
+                $this->importaDalSistema();
+            } catch (\Throwable) {
+                // niente impostazioni di sistema da importare
+            }
         }
 
         return $this->modifiche;
+    }
+
+    /**
+     * Una volta sola: i testi delle email degli eventi già scritti nelle impostazioni di sistema (colonne email_*) diventano modelli, così non restano
+     * due posti dove cambiarli. Dopo l'importazione le colonne non si leggono più (il marcatore «_sistema» evita di rifarlo dopo un ripristino).
+     */
+    private function importaDalSistema(): void
+    {
+        if (isset($this->modifiche['_sistema'])) {
+            return;
+        }
+        $s = $this->db->riga('SELECT * FROM impostazioni_sistema WHERE id = 1');
+        if (!is_array($s)) {
+            return; // tabella o riga non ancora presenti: si riprova
+        }
+        foreach (CatalogoEmail::modelli() as $k => $m) {
+            $leg = $m['legacy'] ?? null;
+            if (!$leg || isset($this->modifiche[$k])) {
+                continue;
+            }
+            $corpo = trim((string) ($s[$leg['corpo']] ?? ''));
+            if ($corpo === '') {
+                continue;
+            }
+            $oggetto = trim((string) ($s[$leg['oggetto']] ?? '')) ?: (string) $m['oggetto'];
+            try {
+                $this->db->esegui("INSERT IGNORE INTO email_modelli (chiave, oggetto, corpo, bottone, aggiornato_il, aggiornato_da) VALUES (?, ?, ?, '', NOW(), 'Impostazioni di sistema (testo precedente)')", [$k, $oggetto, $corpo]);
+            } catch (\Throwable) {
+                // tabella dei modelli mancante: il testo vale comunque in questa richiesta
+            }
+            $this->modifiche[$k] = ['chiave' => $k, 'oggetto' => $oggetto, 'corpo' => $corpo, 'bottone' => '', 'aggiornato_il' => date('Y-m-d H:i:s'), 'aggiornato_da' => 'Impostazioni di sistema (testo precedente)'];
+        }
+        try {
+            $this->db->esegui("INSERT IGNORE INTO email_modelli (chiave, oggetto, corpo, bottone, aggiornato_il, aggiornato_da) VALUES ('_sistema', '', '', '', NOW(), 'importazione')");
+        } catch (\Throwable) {
+        }
+        $this->modifiche['_sistema'] = ['chiave' => '_sistema'];
     }
 
     /** @param array<string, scalar|null> $dati */

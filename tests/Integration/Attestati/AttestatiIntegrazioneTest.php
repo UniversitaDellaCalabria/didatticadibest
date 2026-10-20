@@ -74,7 +74,7 @@ final class AttestatiIntegrazioneTest extends DatabaseDiProva
             $this->repo,
             new RegoleClasseFinte($oggi),
             $regoleIscrizioni,
-            $this->mailer,
+            $this->invio(),
             new ColoriAree($this->db),
             new Sito(sys_get_temp_dir(), 'https://portale.test/eventi'),
             new OrologioFisso($oggi . ' 12:00:00')
@@ -221,7 +221,7 @@ final class AttestatiIntegrazioneTest extends DatabaseDiProva
         self::assertStringContainsString('al progetto <strong>Progetto &quot;Scuole&quot; &amp; Co</strong>', $m['corpo']);
         self::assertStringContainsString('attestati di partecipazione di 2 studenti</strong>', $m['corpo']);
         self::assertStringContainsString("href='https://portale.test/eventi/attestati_gruppo.php?code=COD+A%2FB'", $m['corpo']);
-        self::assertStringContainsString("href='https://portale.test/eventi/area_personale.php'", $m['corpo']);
+        self::assertStringContainsString('nella tua Area Personale', $m['corpo']);
         self::assertSame(1, (int) $this->db->valore('SELECT attestato_inviato FROM prenotazioni WHERE id = ?', [$pr]));
         $codici = array_column($this->servizio->partecipanti($pr), 'codice');
         self::assertCount(3, array_filter($codici), 'i codici sono assegnati a tutti, anche all\'escluso (la lista è unica)');
@@ -234,7 +234,7 @@ final class AttestatiIntegrazioneTest extends DatabaseDiProva
         $p2 = $this->prenotazione($this->turno($ev, '2026-09-01'));
         $this->studente($p2, 'Neri', 'Ugo');
         self::assertTrue($this->servizio->inviaGruppo($p2));
-        self::assertStringContainsString("all'attività <strong>Giornata</strong>", $this->mailer->inviate[2]['corpo']);
+        self::assertStringContainsString("all&#039;attività <strong>Giornata</strong>", $this->mailer->inviate[2]['corpo']);
         self::assertStringContainsString('attestati di partecipazione di 1 studente</strong>', $this->mailer->inviate[2]['corpo']);
     }
 
@@ -261,7 +261,7 @@ final class AttestatiIntegrazioneTest extends DatabaseDiProva
         self::assertStringContainsString('<strong>Anna Verdi &lt;b&gt;</strong>', $m['corpo']);
         self::assertStringContainsString("all'evento <strong>Seminario</strong> del 10/09/2026.", $m['corpo']);
         self::assertStringContainsString("href='https://portale.test/eventi/stampa_attestato.php?code=XYZ+1'", $m['corpo']);
-        self::assertStringEndsWith('<p>Cordiali saluti,<br>Il team Didattica DiBEST</p>', $m['corpo']);
+        self::assertStringContainsString('Cordiali saluti,<br>Il team Didattica DiBEST', $m['corpo']);
         self::assertFalse($this->servizio->inviaSeConcluso($pr), 'una sola volta');
 
         $s = $this->prenotazione($senzaData);
@@ -387,7 +387,7 @@ final class AttestatiIntegrazioneTest extends DatabaseDiProva
         $this->studente($classe, 'Rossi', 'Mario');
         $classeVuota = $this->prenotazione($this->turno($this->evento('P scuole 2', 2, 'progetto', ['attestati' => 1, 'data_fine' => '2026-03-01'])), ['email' => 'm@scuola.it']);
 
-        $cron = new ServizioCronAttestati($this->repo, $this->servizio, $this->mailer, new ColoriAree($this->db), new OrologioFisso('2026-10-05 12:00:00'));
+        $cron = new ServizioCronAttestati($this->repo, $this->servizio, $this->invio(), new ColoriAree($this->db), new OrologioFisso('2026-10-05 12:00:00'));
         self::assertSame(4, $cron->invia('https://sito.test/eventi'), 'a, b e senza data (personali) + la classe con elenco (gruppo)');
         $destinatari = array_column($this->mailer->inviate, 'a');
         sort($destinatari);
@@ -400,12 +400,16 @@ final class AttestatiIntegrazioneTest extends DatabaseDiProva
         }
         $mailA = $this->mailer->inviate[0];
         self::assertSame('Il tuo Attestato è pronto: Seminario', $mailA['oggetto']);
-        self::assertStringContainsString('<strong>A <i> Uno</strong>', $mailA['corpo'], 'il nome non viene protetto nel cron (come prima)');
+        self::assertStringContainsString('<strong>A &lt;i&gt; Uno</strong>', $mailA['corpo'], 'il nome è sempre protetto, anche nel cron');
         self::assertStringContainsString("href='https://sito.test/eventi/stampa_attestato.php?code=", $mailA['corpo']);
-        self::assertStringContainsString("<p style='text-align: center; margin: 30px 0;'>\n                    <a href=", $mailA['corpo']);
-        self::assertStringContainsString("</a>\n                  </p><p>In alternativa, puoi sempre", $mailA['corpo']);
+        self::assertStringContainsString('In alternativa, puoi sempre recuperarlo accedendo alla tua Area Personale.', $mailA['corpo']);
         self::assertStringContainsString('è stato generato ed è ora disponibile per il download', $mailA['corpo']);
         self::assertSame(0, $cron->invia('https://sito.test/eventi'), 'la seconda esecuzione non invia più nulla');
         self::assertCount(4, $this->mailer->inviate);
+    }
+
+    private function invio(): \App\Email\InvioEmail
+    {
+        return new \App\Email\InvioEmail($this->mailer, new \App\Email\ModelliEmail($this->db));
     }
 }

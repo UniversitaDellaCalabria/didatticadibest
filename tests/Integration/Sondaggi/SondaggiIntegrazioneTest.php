@@ -35,7 +35,7 @@ final class SondaggiIntegrazioneTest extends DatabaseDiProva
     {
         parent::setUp();
         $this->mailer = new MailerFinto();
-        $this->servizio = new ServizioSondaggi(new SondaggioRepository($this->db), $this->mailer, new ColoriAree($this->db));
+        $this->servizio = new ServizioSondaggi(new SondaggioRepository($this->db), $this->invio(), new ColoriAree($this->db));
         $this->db->esegui("INSERT INTO pagine_eventi (id, titolo, colore_primario) VALUES (1, 'Area', '#112233'), (2, 'Altra', '#445566')");
         $this->db->esegui('INSERT INTO impostazioni_sistema (id) VALUES (1)');
     }
@@ -305,5 +305,10 @@ final class SondaggiIntegrazioneTest extends DatabaseDiProva
         self::assertStringStartsWith('<p>Anna Verdi 777 10/09/2026 10:00–12:00 Aula 1</p><a href=', $m['corpo']);
         $this->db->esegui('UPDATE impostazioni_sistema SET email_sondaggio_oggetto = \'\', email_sondaggio_corpo = NULL');
         self::assertSame(0, $this->servizio->inviaLink($this->evento('Vuoto'), 'https://s.test'));
+    }
+
+    private function invio(): \App\Email\InvioEmail
+    {
+        return new \App\Email\InvioEmail($this->mailer, new \App\Email\ModelliEmail($this->db));
     }
 }

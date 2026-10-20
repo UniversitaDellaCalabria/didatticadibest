@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Eventi;
 
 use App\Core\Sito;
-use App\Infrastructure\Mail\Mailer;
+use App\Email\InvioEmail;
 
 /** Turni degli eventi e edizioni dei progetti: salvataggio dalla scheda, posti liberati dalla lista d'attesa. */
 final class ServizioTurni
@@ -17,7 +17,7 @@ final class ServizioTurni
         private RegoleIscrizioni $regole,
         private AuleTurni $aule,
         private PresentazioneComune $presentazione,
-        private Mailer $mailer,
+        private InvioEmail $invio,
         private Sito $sito,
     ) {
     }
@@ -44,9 +44,7 @@ final class ServizioTurni
             $postiLiberi -= $postiRichiesti;
             ++$promossi;
             $link = $this->sito->urlBase() . '/stampa_ricevuta.php?code=' . urlencode((string) $pren['codice_prenotazione']);
-            $body = '<p>Gentile ' . htmlspecialchars((string) $pren['nome']) . ", la tua prenotazione in lista d'attesa è stata <strong>confermata</strong> per l'evento <strong>" . htmlspecialchars((string) $pren['evento_titolo']) . '</strong>.</p>'
-                . "<p><a href='" . htmlspecialchars($link) . "' style='background:#B80000; color:#fff; padding:10px; border-radius:6px; text-decoration:none;'>Scarica la ricevuta</a></p>";
-            $this->mailer->invia((string) $pren['email'], 'Posto Confermato: ' . $pren['evento_titolo'], $body, $this->presentazione->coloreAreaTurno($turnoId));
+            $this->invio->invia((string) $pren['email'], 'evento_posto_confermato_attesa', ['nome' => (string) $pren['nome'], 'evento' => (string) $pren['evento_titolo']], $link, [], '', $this->presentazione->coloreAreaTurno($turnoId));
         }
 
         return $promossi;

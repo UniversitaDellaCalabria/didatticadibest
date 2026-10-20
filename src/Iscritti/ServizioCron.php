@@ -13,7 +13,7 @@ use App\Auth\ServizioUtenti;
 use App\Core\Orologio;
 use App\Core\Sito;
 use App\Eventi\Turni;
-use App\Infrastructure\Mail\Mailer;
+use App\Email\InvioEmail;
 use App\Portale\ColoriAree;
 use App\Sistema\ControlloSito;
 use App\Sistema\ImpostazioniSistemaRepository;
@@ -28,7 +28,7 @@ final class ServizioCron
     public function __construct(
         private CronRepository $cron,
         private ImpostazioniSistemaRepository $impostazioni,
-        private Mailer $mailer,
+        private InvioEmail $invio,
         private ColoriAree $colori,
         private Sito $sito,
         private Orologio $orologio,
@@ -62,25 +62,24 @@ final class ServizioCron
         $righe = $this->cron->daEmailPostEvento($adesso);
         $n = 0;
         if ($righe) {
-            $sys = $this->impostazioni->riga() ?? [];
             $linkArea = "<a href='$urlBase/area_personale.php' style='color:#B30000; font-weight:bold;'>Area Personale</a>";
             foreach ($righe as $p) {
-                $trova = ['{NOME}', '{COGNOME}', '{MATRICOLA}', '{TITOLO_EVENTO}', '{DATA_TURNO}', '{ORARIO_TURNO}', '{LUOGO}', '{LINK_AREA_PERSONALE}'];
                 $ora = Turni::orario($p) ?: 'da definire';
                 $data = implode(' · ', array_filter([$p['nome_turno'] ?? '', !empty($p['data_turno']) ? date('d/m/Y', (int) strtotime((string) $p['data_turno'])) : '']));
-                $sostituisci = array_map('strval', [$p['nome'], $p['cognome'], $p['matricola'], $p['evento_titolo'], $data, $ora, $p['luogo'], $linkArea]);
+                $token = array_combine(
+                    ['{NOME}', '{COGNOME}', '{MATRICOLA}', '{TITOLO_EVENTO}', '{DATA_TURNO}', '{ORARIO_TURNO}', '{LUOGO}', '{LINK_AREA_PERSONALE}'],
+                    array_map('strval', [$p['nome'], $p['cognome'], $p['matricola'], $p['evento_titolo'], $data, $ora, $p['luogo'], $linkArea])
+                );
                 $colore = $this->colori->delTurno((int) $p['turno_id']);
 
                 // Avviso dell'attestato (se configurato e se l'attestato personale esiste: non nei progetti senza attestati né in
                 // quelli per le scuole, dove li riceve il docente per la classe)
                 $regola = $this->attestati->regolaEvento((int) $p['evento_id']);
-                if (!empty($sys['email_attestato_corpo']) && in_array($regola, ['evento', 'singolo'], true)) {
-                    $this->mailer->invia((string) $p['email'], str_replace($trova, $sostituisci, (string) ($sys['email_attestato_oggetto'] ?? '')), str_replace($trova, $sostituisci, (string) $sys['email_attestato_corpo']), $colore);
+                if (in_array($regola, ['evento', 'singolo'], true)) {
+                    $this->invio->inviaHtml((string) $p['email'], 'evento_attestato', $token, $colore);
                 }
                 // Sondaggio (se configurato)
-                if (!empty($sys['email_sondaggio_corpo'])) {
-                    $this->mailer->invia((string) $p['email'], str_replace($trova, $sostituisci, (string) ($sys['email_sondaggio_oggetto'] ?? '')), str_replace($trova, $sostituisci, (string) $sys['email_sondaggio_corpo']), $colore);
-                }
+                $this->invio->inviaHtml((string) $p['email'], 'evento_sondaggio', $token, $colore);
                 // Segna come inviata per non ripetere l'invio al prossimo giro
                 $this->cron->segnaPostEventoInviata((int) $p['id']);
                 ++$n;
@@ -99,13 +98,16 @@ final class ServizioCron
                 continue;
             }
             $link = $this->sito->urlBase() . '/elenco_studenti.php?code=' . urlencode((string) $pm['codice_prenotazione']);
-            $corpo = '<p>Gentile <strong>' . htmlspecialchars($pm['nome'] . ' ' . $pm['cognome']) . '</strong>,</p>'
-                . ($pm['tipo'] === 'progetto'
-                    ? '<p>il progetto <strong>' . htmlspecialchars((string) $pm['titolo']) . '</strong> si conclude il <strong>' . date('d/m/Y', (int) strtotime((string) $pm['data_fine'])) . '</strong>.</p>'
-                    : "<p>l'attività <strong>" . htmlspecialchars((string) $pm['titolo']) . '</strong> ' . ($pm['data_turno'] < date('Y-m-d') ? 'si è svolta' : 'si svolge') . ' il <strong>' . date('d/m/Y', (int) strtotime((string) $pm['data_turno'])) . '</strong>.</p>')
-                . '<p>Per ricevere gli <strong>attestati di partecipazione</strong> dei tuoi studenti inserisci il loro elenco (cognome e nome): puoi scriverlo, incollarlo da Excel o caricare il modello compilato.</p>'
-                . "<p style='text-align:center; margin:28px 0;'><a href='" . htmlspecialchars($link) . "' style='background-color:#198754; color:white; padding:12px 24px; text-decoration:none; border-radius:6px; font-weight:bold;'>Inserisci l'elenco degli studenti</a></p>";
-            $this->mailer->invia((string) $pm['email'], 'Promemoria: elenco degli studenti per gli attestati - ' . $pm['titolo'], $corpo, $this->colori->delTurno((int) $pm['turno_id']));
+            $progetto = $pm['tipo'] === 'progetto';
+            $this->invio->invia(
+                (string) $pm['email'],
+                $progetto ? 'evento_elenco_promemoria_progetto' : 'evento_elenco_promemoria_attivita',
+                ['nome' => $pm['nome'] . ' ' . $pm['cognome'], 'titolo' => (string) $pm['titolo'], 'data' => date('d/m/Y', (int) strtotime((string) ($progetto ? $pm['data_fine'] : $pm['data_turno']))), 'quando' => $pm['data_turno'] < date('Y-m-d') ? 'si è svolta' : 'si svolge'],
+                $link,
+                [],
+                '',
+                $this->colori->delTurno((int) $pm['turno_id'])
+            );
             $this->cron->segnaPromemoriaElencoInviato((int) $pm['id']);
             ++$n;
         }
@@ -174,12 +176,10 @@ final class ServizioCron
                     . "<td style='padding:5px 8px;border-bottom:1px solid #e5e7eb;'>" . self::h(Turni::etichetta($x)) . "</td><td style='padding:5px 8px;border-bottom:1px solid #e5e7eb;font-family:monospace;'>" . self::h($x['codice_prenotazione']) . '</td></tr>';
             }
             $link = $this->sito->urlBase() . '/admin/iscritti.php?p_id=' . (int) $righe[0]['pagina_id'];
-            $corpo = "<p>L'attività <strong>" . self::h($righe[0]['titolo']) . '</strong> inizia il <strong>' . date('d/m/Y', (int) strtotime((string) $righe[0]['inizio'])) . '</strong> e queste scuole non hanno ancora inviato la <strong>convenzione</strong>:</p>'
-                . "<table style='border-collapse:collapse;font-size:13px;width:100%;'><tr style='background:#f3f4f6;'><th style='padding:5px 8px;text-align:left;'>Scuola</th><th style='padding:5px 8px;text-align:left;'>Docente</th><th style='padding:5px 8px;text-align:left;'>Turno</th><th style='padding:5px 8px;text-align:left;'>Codice</th></tr>$tabella</table>"
-                . '<p>Quando arriva la convenzione segnala come ricevuta da Iscrizioni: la prenotazione si conferma e la scuola riceve l\'email.</p>'
-                . "<p><a href='" . self::h($link) . "' style='background:#c2410c;color:#fff;padding:9px 16px;text-decoration:none;border-radius:6px;font-weight:bold;'>Apri Iscrizioni</a></p>";
+            $tabellaHtml = "<table style='border-collapse:collapse;font-size:13px;width:100%;'><tr style='background:#f3f4f6;'><th style='padding:5px 8px;text-align:left;'>Scuola</th><th style='padding:5px 8px;text-align:left;'>Docente</th><th style='padding:5px 8px;text-align:left;'>Turno</th><th style='padding:5px 8px;text-align:left;'>Codice</th></tr>$tabella</table>";
+            $dati = ['titolo' => (string) $righe[0]['titolo'], 'data' => date('d/m/Y', (int) strtotime((string) $righe[0]['inizio'])), 'tabella' => $tabellaHtml];
             foreach ($destinatari as $email) {
-                $this->mailer->invia($email, 'Convenzioni mancanti: ' . $righe[0]['titolo'], $corpo);
+                $this->invio->invia($email, 'fsl_convenzioni_mancanti', $dati, $link);
             }
             $this->cron->segnaAvvisoGestori(array_map(static fn (array $x): int => (int) $x['id'], $righe));
         }
@@ -198,10 +198,8 @@ final class ServizioCron
                 $lista .= '<li><strong>' . self::h($s ? Testi::etichettaScuola($s) : $x['scuola_codice']) . '</strong> (' . self::h($x['scuola_codice']) . '): scade il <strong>' . date('d/m/Y', (int) strtotime((string) $x['scadenza'])) . '</strong>'
                     . ($x['protocollo'] !== '' ? ' · prot. ' . self::h($x['protocollo']) : '') . '</li>';
             }
-            $corpo = "<p>Queste convenzioni con le scuole scadono nei prossimi 60 giorni:</p><ul>$lista</ul>"
-                . "<p>Dopo la scadenza, alle nuove iscrizioni di queste scuole verrà chiesta di nuovo la convenzione. Il rinnovo si registra in <a href='" . self::h($this->sito->urlBase() . '/admin/fsl.php?tab=convenzioni') . "'>Formazione Scuola Lavoro → Convenzioni</a>.</p>";
             foreach ($this->utenti->emailAmministratori() as $email) {
-                $this->mailer->invia($email, 'Convenzioni con le scuole in scadenza (' . count($righe) . ')', $corpo);
+                $this->invio->invia($email, 'fsl_convenzioni_in_scadenza', ['quante' => (string) count($righe), 'elenco' => "<ul>$lista</ul>"], $this->sito->urlBase() . '/admin/fsl.php?tab=convenzioni');
             }
             $this->cron->segnaAvvisoScadenza(array_map(static fn (array $x): int => (int) $x['id'], $righe));
         }

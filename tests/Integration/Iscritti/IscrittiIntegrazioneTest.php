@@ -230,7 +230,7 @@ final class IscrittiIntegrazioneTest extends DatabaseDiProva
             $iscrizioni,
             $convenzioni,
             $attestati,
-            $this->mailer,
+            $this->invio(),
             new ColoriAree($this->db),
             new Sito('/tmp', 'https://portale.test/eventi'),
             $this->servizioAbilitazioni(),
@@ -357,7 +357,7 @@ final class IscrittiIntegrazioneTest extends DatabaseDiProva
         self::assertSame(['promuovi:100'], $this->chiamate);
         self::assertCount(2, $this->mailer->inviate);
         self::assertSame('Prenotazione Annullata: Genetica', $this->mailer->inviate[0]['oggetto']);
-        self::assertSame('La tua prenotazione per <strong>Genetica</strong> è stata annullata dall\'amministrazione.', $this->mailer->inviate[0]['corpo']);
+        self::assertStringContainsString("<strong>Genetica</strong> è stata annullata dall'amministrazione.", $this->mailer->inviate[0]['corpo']);
         self::assertSame('#112233', $this->mailer->inviate[0]['colore']);
     }
 
@@ -499,7 +499,7 @@ final class IscrittiIntegrazioneTest extends DatabaseDiProva
             }
         };
 
-        return new ServizioMessaggi(new MessaggiRepository($this->db), $this->repo, new AreeRepository($this->db), $this->mailer, new ColoriAree($this->db), new Sito('/tmp', 'https://portale.test/eventi'), $orologio);
+        return new ServizioMessaggi(new MessaggiRepository($this->db), $this->repo, new AreeRepository($this->db), $this->invio(), new ColoriAree($this->db), new Sito('/tmp', 'https://portale.test/eventi'), $orologio);
     }
 
     public function testMessaggiDaIscritti(): void
@@ -514,9 +514,8 @@ final class IscrittiIntegrazioneTest extends DatabaseDiProva
         self::assertSame('anna@x.it', $mail['a']);
         self::assertSame('Nuovo messaggio da Ada Admin – Stem Day [05/10 09:07]', $mail['oggetto']);
         self::assertNull($mail['colore']);
-        // stessi byte del vecchio corpo: righe rientrate di 20 spazi
-        self::assertStringStartsWith("\n" . str_repeat(' ', 20) . '<p>Hai ricevuto un nuovo messaggio da <strong>Ada Admin</strong>' . "\n" . str_repeat(' ', 20) . "riguardante l'evento <strong>Stem Day</strong>:</p>\n", $mail['corpo']);
-        self::assertStringContainsString("\n" . str_repeat(' ', 24) . "<p>Ciao</p>\n" . str_repeat(' ', 20) . "</div>\n", $mail['corpo']);
+        self::assertStringContainsString("Hai ricevuto un nuovo messaggio da <strong>Ada Admin</strong> riguardante l'evento <strong>Stem Day</strong>:", $mail['corpo']);
+        self::assertStringContainsString('<p>Ciao</p></div>', $mail['corpo']);
         self::assertStringContainsString("<a href='https://portale.test/eventi/area_personale.php'", $mail['corpo']);
     }
 
@@ -530,7 +529,7 @@ final class IscrittiIntegrazioneTest extends DatabaseDiProva
         self::assertSame('<p>Ok <b>si</b>x() l</p>', $this->db->valore("SELECT messaggio FROM messaggi_prenotazioni WHERE mittente_tipo = 'admin'"));
         self::assertSame(1, (int) $this->db->valore("SELECT letto FROM messaggi_prenotazioni WHERE mittente_tipo = 'admin'"));
         self::assertSame('#112233', $this->mailer->inviate[0]['colore']);
-        self::assertStringStartsWith("\n" . str_repeat(' ', 16) . '<p>Hai ricevuto', $this->mailer->inviate[0]['corpo']);
+        self::assertStringContainsString('Hai ricevuto un nuovo messaggio da', $this->mailer->inviate[0]['corpo']);
         $conv = $m->conversazioni(1, '');
         self::assertCount(1, $conv);
         self::assertSame('0', $conv[0]['messaggi_da_leggere']);
@@ -733,5 +732,10 @@ final class IscrittiIntegrazioneTest extends DatabaseDiProva
         self::assertNull($this->db->valore('SELECT utente_id FROM prenotazioni WHERE id = 1'), 'la prenotazione resta, senza il legame con l\'account');
         $this->db->esegui("INSERT INTO log_accessi (created_at) VALUES ('2000-01-01'), (NOW())");
         self::assertSame(1, $cron->eliminaAccessiVecchi(12));
+    }
+
+    private function invio(): \App\Email\InvioEmail
+    {
+        return new \App\Email\InvioEmail($this->mailer, new \App\Email\ModelliEmail($this->db));
     }
 }

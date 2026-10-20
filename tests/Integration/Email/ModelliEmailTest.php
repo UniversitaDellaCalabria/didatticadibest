@@ -14,6 +14,7 @@ final class ModelliEmailTest extends DatabaseDiProva
     protected function tabelle(): array
     {
         return [
+            'impostazioni_sistema' => "CREATE TABLE impostazioni_sistema (id INT PRIMARY KEY, email_conferma_oggetto VARCHAR(255) DEFAULT '', email_conferma_corpo TEXT NULL, email_attestato_oggetto VARCHAR(255) DEFAULT '', email_attestato_corpo TEXT NULL)",
             'email_modelli' => "CREATE TABLE email_modelli (chiave VARCHAR(80) NOT NULL PRIMARY KEY, oggetto VARCHAR(300) NOT NULL DEFAULT '', corpo MEDIUMTEXT DEFAULT NULL, bottone VARCHAR(120) DEFAULT '', aggiornato_il DATETIME DEFAULT NULL, aggiornato_da VARCHAR(150) DEFAULT '')",
         ];
     }
@@ -48,6 +49,42 @@ final class ModelliEmailTest extends DatabaseDiProva
         $this->assertStringContainsString("via PEC a <a href='mailto:dibest@pec.unical.it'>dibest@pec.unical.it</a>.", $r['corpo']);
         $x = $this->m()->render('fsl_convenzione_pronta', ['scuola' => 'Liceo', 'pec' => "x'><script>"]);
         $this->assertStringNotContainsString('<script>', $x['corpo']);
+    }
+
+    public function testIlTestoDegliEventiGiaScrittoInSistemaVieneImportatoUnaVolta(): void
+    {
+        $this->db->esegui("INSERT INTO impostazioni_sistema (id, email_conferma_oggetto, email_conferma_corpo) VALUES (1, 'Ok {TITOLO_EVENTO}', '<p>Ciao {NOME}!</p>')");
+        $r = $this->m()->renderHtml('evento_conferma', ['{NOME}' => 'Maria', '{TITOLO_EVENTO}' => 'Giornata']);
+        $this->assertSame(['oggetto' => 'Ok Giornata', 'corpo' => '<p>Ciao Maria!</p>'], $r);
+        $mod = $this->m()->modello('evento_conferma');
+        $this->assertTrue($mod['modificato']);
+        $this->assertStringContainsString('Impostazioni di sistema', $mod['aggiornato_da']);
+        // dopo il ripristino torna il testo del catalogo, non quello vecchio di Sistema
+        $this->m()->ripristina('evento_conferma');
+        $r = $this->m()->renderHtml('evento_conferma', ['{NOME}' => 'Maria', '{COGNOME}' => 'Verdi', '{TITOLO_EVENTO}' => 'Giornata']);
+        $this->assertStringContainsString('Prenotazione confermata per <strong>Giornata</strong>', $r['corpo']);
+        $this->assertSame('Conferma Prenotazione Eventi', $r['oggetto']);
+    }
+
+    public function testUnEmailFacoltativaParteSoloSeAttivata(): void
+    {
+        $this->assertNull($this->m()->renderHtml('evento_attestato', ['{NOME}' => 'Maria']), 'mai attivata: non parte');
+        $this->assertFalse($this->m()->modello('evento_attestato')['attiva']);
+        $this->assertSame([], $this->m()->salva('evento_attestato', 'Attestato pronto', '<p>Ciao {NOME}</p>', '', 'Admin', true));
+        $this->assertSame('<p>Ciao Maria</p>', $this->m()->renderHtml('evento_attestato', ['{NOME}' => 'Maria'])['corpo']);
+        $this->assertSame([], $this->m()->salva('evento_attestato', 'Attestato pronto', '<p>Ciao {NOME}</p>', '', 'Admin', false));
+        $this->assertNull($this->m()->renderHtml('evento_attestato', ['{NOME}' => 'Maria']), 'tolta la spunta: non parte più');
+    }
+
+    public function testControlliSulTestoHtml(): void
+    {
+        $this->assertStringContainsString('{INVENTATO}', implode(' ', $this->m()->controlla('evento_conferma', 'o', '<p>{INVENTATO}</p>', '')));
+        $this->assertSame([], $this->m()->controlla('evento_conferma', 'o', '<p>{NOME} {LINK_RICEVUTA}</p>', ''));
+        $this->m()->salva('evento_conferma', 'o', "<p>Ciao</p><script>alert(1)</script><a href=\"javascript:x()\" onclick=\"y()\">z</a>", '', 'A');
+        $c = $this->m()->modello('evento_conferma')['corpo'];
+        $this->assertStringNotContainsString('<script', $c);
+        $this->assertStringNotContainsString('javascript:', $c);
+        $this->assertStringNotContainsString('onclick', $c);
     }
 
     public function testSenzaModificheValeIlTestoOriginale(): void

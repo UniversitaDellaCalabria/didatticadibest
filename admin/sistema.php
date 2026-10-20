@@ -29,7 +29,8 @@ if (isset($_POST['run_reminders_manual'])) {
 if (isset($_POST['invia_email_test'])) {
     csrf_verify($_POST['csrf_token'] ?? '');
     $dest_test = trim($_POST['email_test'] ?? '');
-    $ok_test = inviaNotificaEmail($dest_test, "Email di prova - Didattica DiBEST", "<p>Questa è un'email di prova inviata dal pannello <strong>Sistema Email</strong> il " . date('d/m/Y H:i') . ".</p><p>Se la ricevi, la configurazione SMTP funziona.</p>", $conn);
+    $pr_test = \App\Core\App::get(\App\Email\InvioEmail::class)->prepara('sistema_email_prova', ['data_ora' => date('d/m/Y H:i')]);
+    $ok_test = inviaNotificaEmail($dest_test, $pr_test['oggetto'], $pr_test['corpo'], $conn, $pr_test['colore']);
     if ($ok_test) flash_set("Email di prova accettata dal server per " . $dest_test . ". Se non arriva entro qualche minuto controlla lo spam.");
     else flash_set("Invio fallito: " . ($GLOBALS['ultimo_errore_email'] ?: 'errore sconosciuto'), 'danger');
     admin_redirect("sistema.php?p_id=$filtro_p&r=" . time() . "#log-email");
@@ -66,7 +67,7 @@ if (isset($_POST['sospendi_promemoria'])) {
 if (isset($_POST['save_system_settings'])) {
     csrf_verify($_POST['csrf_token'] ?? '');
     $modelli = [];
-    foreach (\App\Sistema\ImpostazioniSistemaRepository::CAMPI_TESTO as $campo_t) $modelli[$campo_t] = (string)($_POST[$campo_t] ?? '');
+    foreach (\App\Sistema\ImpostazioniSistemaRepository::CAMPI_TESTO as $campo_t) if (isset($_POST[$campo_t])) $modelli[$campo_t] = (string)$_POST[$campo_t]; // i testi delle email non sono più in questa pagina
     $from_e = $conn->real_escape_string($_POST['smtp_from_email'] ?? '');
     \App\Core\App::get(\App\Sistema\ImpostazioniSistemaRepository::class)->salva(
         (string)($_POST['smtp_host'] ?? ''), (int)($_POST['smtp_port'] ?? 587), (string)($_POST['smtp_username'] ?? ''),
@@ -75,7 +76,7 @@ if (isset($_POST['save_system_settings'])) {
 
     if (function_exists('registra_log_audit')) registra_log_audit($conn, "Aggiornamento Impostazioni Sistema/SMTP e Template", ["Mittente" => $from_e]);
     
-    flash_set("Impostazioni SMTP e Template Email salvati con successo!");
+    flash_set("Impostazioni SMTP salvate con successo!");
     admin_redirect("sistema.php?p_id=$filtro_p");
 }
 ?>
@@ -154,115 +155,14 @@ if (isset($_POST['save_system_settings'])) {
             </div>
         </div>
 
-        <div class="alert alert-info border-info mb-4 shadow-sm">
-            <h6 class="fw-bold m-0 mb-2"><i class="fa fa-code me-1"></i> Segnaposto Dinamici Utilizzabili nei Template Email:</h6>
-            <span class="badge bg-white text-dark border font-monospace me-1 mb-1">{NOME}</span>
-            <span class="badge bg-white text-dark border font-monospace me-1 mb-1">{COGNOME}</span>
-            <span class="badge bg-white text-dark border font-monospace me-1 mb-1">{MATRICOLA}</span>
-            <span class="badge bg-white text-dark border font-monospace me-1 mb-1">{TITOLO_EVENTO}</span>
-            <span class="badge bg-white text-dark border font-monospace me-1 mb-1">{DATA_TURNO}</span>
-            <span class="badge bg-white text-dark border font-monospace me-1 mb-1">{ORARIO_TURNO}</span>
-            <span class="badge bg-white text-dark border font-monospace me-1 mb-1">{LUOGO}</span>
-            <span class="badge bg-white text-dark border font-monospace me-1 mb-1">{CODICE_PRENOTAZIONE}</span>
-            <span class="badge bg-white text-dark border font-monospace me-1 mb-1">{LINK_RICEVUTA}</span>
-            <span class="badge bg-white text-dark border font-monospace me-1 mb-1">{LINK_AREA_PERSONALE}</span>
-        </div>
-
-        <div class="row g-4">
-            <!-- 1. Email Conferma -->
-            <div class="col-md-6">
-                <div class="border p-4 rounded bg-white h-100 shadow-sm border-success" style="border-top-width: 4px !important;">
-                    <h6 class="fw-bold text-success border-bottom pb-2 mb-3">📩 1. Conferma Prenotazione Utente</h6>
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold">Oggetto Email</label>
-                        <input type="text" name="email_conferma_oggetto" class="form-control form-control-sm fw-bold" value="<?php echo htmlspecialchars($sys['email_conferma_oggetto'] ?? 'Conferma Prenotazione Eventi'); ?>" required>
-                    </div>
-                    <div class="mb-2">
-                        <label class="form-label small fw-bold">Corpo Email (HTML)</label>
-                        <textarea name="email_conferma_corpo" class="form-control editor-html" rows="4"><?php echo htmlspecialchars($sys['email_conferma_corpo'] ?? "<p>Gentile <strong>{NOME} {COGNOME}</strong>,</p><p>La tua prenotazione per l'evento <strong>{TITOLO_EVENTO}</strong> è stata confermata con successo!</p><p><strong>Dettagli:</strong><br>📅 Data: {DATA_TURNO}<br>🕒 Orario: {ORARIO_TURNO}<br>📍 Luogo: {LUOGO}<br>🎟️ Codice Prenotazione: <strong>{CODICE_PRENOTAZIONE}</strong></p><p>Ti aspettiamo!</p>"); ?></textarea>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- 2. Email Annullamento Admin -->
-            <div class="col-md-6">
-                <div class="border p-4 rounded bg-white h-100 shadow-sm border-danger" style="border-top-width: 4px !important;">
-                    <h6 class="fw-bold text-danger border-bottom pb-2 mb-3">🚫 2. Annullamento da Amministrazione</h6>
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold">Oggetto Email</label>
-                        <input type="text" name="email_canc_admin_oggetto" class="form-control form-control-sm fw-bold" value="<?php echo htmlspecialchars($sys['email_canc_admin_oggetto'] ?? 'Annullamento Prenotazione Evento'); ?>" required>
-                    </div>
-                    <div class="mb-2">
-                        <label class="form-label small fw-bold">Corpo Email (HTML)</label>
-                        <textarea name="email_canc_admin_corpo" class="form-control editor-html" rows="4"><?php echo htmlspecialchars($sys['email_canc_admin_corpo'] ?? "<p>Gentile <strong>{NOME} {COGNOME}</strong>,</p><p>Ti informiamo che la tua prenotazione per l'evento <strong>{TITOLO_EVENTO}</strong> del {DATA_TURNO} è stata annullata dall'amministrazione.</p>"); ?></textarea>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- 3. Email Annullamento Utente -->
-            <div class="col-md-6">
-                <div class="border p-4 rounded bg-white h-100 shadow-sm border-warning" style="border-top-width: 4px !important;">
-                    <h6 class="fw-bold text-warning border-bottom pb-2 mb-3 text-dark">🗑️ 3. Conferma Cancellazione (da Utente)</h6>
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold">Oggetto Email</label>
-                        <input type="text" name="email_canc_utente_oggetto" class="form-control form-control-sm fw-bold" value="<?php echo htmlspecialchars($sys['email_canc_utente_oggetto'] ?? 'Cancellazione Prenotazione Evento'); ?>" required>
-                    </div>
-                    <div class="mb-2">
-                        <label class="form-label small fw-bold">Corpo Email (HTML)</label>
-                        <textarea name="email_canc_utente_corpo" class="form-control editor-html" rows="4"><?php echo htmlspecialchars($sys['email_canc_utente_corpo'] ?? "<p>Gentile <strong>{NOME} {COGNOME}</strong>,</p><p>La tua prenotazione per l'evento <strong>{TITOLO_EVENTO}</strong> è stata cancellata correttamente come richiesto.</p>"); ?></textarea>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- 4. Email Promemoria -->
-            <div class="col-md-6">
-                <div class="border p-4 rounded bg-white h-100 shadow-sm border-primary" style="border-top-width: 4px !important;">
-                    <h6 class="fw-bold text-primary border-bottom pb-2 mb-3">⏰ 4. Promemoria / Reminder Automatico</h6>
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold">Oggetto Email</label>
-                        <input type="text" name="email_reminder_oggetto" class="form-control form-control-sm fw-bold" value="<?php echo htmlspecialchars($sys['email_reminder_oggetto'] ?? 'Promemoria Evento Imminente'); ?>" required>
-                    </div>
-                    <div class="mb-2">
-                        <label class="form-label small fw-bold">Corpo Email (HTML)</label>
-                        <textarea name="email_reminder_corpo" class="form-control editor-html" rows="4"><?php echo htmlspecialchars($sys['email_reminder_corpo'] ?? "<p>Gentile <strong>{NOME} {COGNOME}</strong>,</p><p>Ti ricordiamo che l'evento <strong>{TITOLO_EVENTO}</strong> si terrà a breve il {DATA_TURNO} alle {ORARIO_TURNO}.</p><p style='color:red;'>Se non potrai partecipare, annulla la prenotazione dall'Area Personale per cedere il posto ad altri.</p>"); ?></textarea>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 5. Email Attestato Disponibile (NUOVO) -->
-            <div class="col-md-6">
-                <div class="border p-4 rounded bg-white h-100 shadow-sm border-info" style="border-top-width: 4px !important;">
-                    <h6 class="fw-bold text-info border-bottom pb-2 mb-3">🎓 5. Attestato Disponibile (Post-Evento)</h6>
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold">Oggetto Email</label>
-                        <input type="text" name="email_attestato_oggetto" class="form-control form-control-sm fw-bold" value="<?php echo htmlspecialchars($sys['email_attestato_oggetto'] ?? 'Il tuo Attestato di Partecipazione è pronto'); ?>" required>
-                    </div>
-                    <div class="mb-2">
-                        <label class="form-label small fw-bold">Corpo Email (HTML)</label>
-                        <textarea name="email_attestato_corpo" class="form-control editor-html" rows="4"><?php echo htmlspecialchars($sys['email_attestato_corpo'] ?? "<p>Gentile <strong>{NOME} {COGNOME}</strong>,</p><p>Grazie per aver partecipato all'evento <strong>{TITOLO_EVENTO}</strong>.</p><p>Ti informiamo che il tuo Attestato di Partecipazione è stato generato ed è ora disponibile per il download.</p><p>Puoi scaricarlo accedendo alla tua {LINK_AREA_PERSONALE}.</p>"); ?></textarea>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 6. Email Sondaggio (NUOVO) -->
-            <div class="col-md-6">
-                <div class="border p-4 rounded bg-white h-100 shadow-sm border-secondary" style="border-top-width: 4px !important;">
-                    <h6 class="fw-bold text-secondary border-bottom pb-2 mb-3">📊 6. Richiesta Feedback / Sondaggio (Post-Evento)</h6>
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold">Oggetto Email</label>
-                        <input type="text" name="email_sondaggio_oggetto" class="form-control form-control-sm fw-bold" value="<?php echo htmlspecialchars($sys['email_sondaggio_oggetto'] ?? 'Aiutaci a migliorare: lascia il tuo feedback'); ?>" required>
-                    </div>
-                    <div class="mb-2">
-                        <label class="form-label small fw-bold">Corpo Email (HTML)</label>
-                        <textarea name="email_sondaggio_corpo" class="form-control editor-html" rows="4"><?php echo htmlspecialchars($sys['email_sondaggio_corpo'] ?? "<p>Gentile <strong>{NOME} {COGNOME}</strong>,</p><p>Speriamo che l'evento <strong>{TITOLO_EVENTO}</strong> sia stato di tuo gradimento.</p><p>Per aiutarci a migliorare la qualità delle nostre iniziative, ti chiediamo di dedicare 2 minuti per compilare il nostro questionario di valutazione anonimo.</p><p>Clicca sul link seguente per accedere al sondaggio: <br><a href='#'>[INSERISCI QUI IL LINK AL TUO MODULO GOOGLE O MS FORMS]</a></p>"); ?></textarea>
-                    </div>
-                </div>
-            </div>
+        <div class="alert alert-info border-info shadow-sm mb-0">
+            <i class="fa fa-envelope-open-text me-1" aria-hidden="true"></i> <strong>I testi delle email</strong> (conferma e cancellazione delle prenotazioni, promemoria, attestato, sondaggio e tutte le altre email del portale) si cambiano ora dalla pagina
+            <a href="email.php?p_id=<?php echo (int)$filtro_p; ?>" class="fw-bold">Gestione del portale → Testi delle email</a>, con anteprima, email di prova e ritorno al testo originale. I testi che avevi scritto qui ci sono già.
         </div>
 
         <div class="text-end mt-4 pt-3 border-top">
             <button type="submit" name="save_system_settings" onclick="tinymce.triggerSave();" class="btn btn-primary fw-bold px-4 py-3 shadow-sm">
-                <i class="fa fa-save me-1"></i> Salva Impostazioni SMTP e Template
+                <i class="fa fa-save me-1"></i> Salva impostazioni SMTP
             </button>
         </div>
     </form>

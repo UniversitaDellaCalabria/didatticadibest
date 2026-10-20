@@ -8,7 +8,7 @@ use App\Uffici\Direzione;
 use App\Core\Database;
 use App\Core\Orologio;
 use App\Core\Sito;
-use App\Infrastructure\Mail\Mailer;
+use App\Email\InvioEmail;
 use App\Sistema\FileEnv;
 
 /**
@@ -26,7 +26,7 @@ final class RiepilogoPersone
         private Database $db,
         private DaFarePersona $daFare,
         private CruscottoDirettore $cruscotto,
-        private Mailer $mailer,
+        private InvioEmail $invio,
         private Sito $sito,
         private Orologio $orologio,
         private FileEnv $env,
@@ -104,26 +104,25 @@ final class RiepilogoPersone
 
             return $o . '</ul>';
         };
-        $corpo = '<p>Buongiorno,</p><p>questa settimana ti aspettano <strong>' . $n . ($n === 1 ? ' cosa' : ' cose') . '</strong> nel portale Didattica DiBEST.</p>';
+        $elenco = '';
         foreach ($gruppi as $g) {
-            $corpo .= $blocco($g);
+            $elenco .= $blocco($g);
         }
         if ($cru) {
-            $corpo .= '<h2 style="margin:26px 0 0;font-size:16px;border-top:1px solid #e2e8f0;padding-top:14px;">Il cruscotto del Direttore</h2>';
+            $elenco .= '<h2 style="margin:26px 0 0;font-size:16px;border-top:1px solid #e2e8f0;padding-top:14px;">Il cruscotto del Direttore</h2>';
             foreach ($cru as $g) {
-                $corpo .= $blocco($g);
+                $elenco .= $blocco($g);
             }
         }
-        $corpo .= $this->bottone($base . '/area_personale.php', 'Apri la tua Area personale');
-        $corpo .= '<p style="margin-top:22px;font-size:12px;color:#64748b;">Ricevi questa email una volta a settimana, solo quando c\'è qualcosa da fare. '
-            . '<a href="' . $h($base . '/riepilogo_persone.php?t=' . $token) . '">Non voglio più riceverla</a>.</p>';
+        $p = $this->invio->prepara('riepilogo_persone', [
+            'quante' => ($n + $nCru) === 1 ? '1 cosa' : ($n + $nCru) . ' cose',
+            'quante_testo' => $n . ($n === 1 ? ' cosa' : ' cose'),
+            'elenco' => $elenco,
+            'disiscrizione' => '<p style="margin-top:22px;font-size:12px;color:#64748b;">Ricevi questa email una volta a settimana, solo quando c\'è qualcosa da fare. '
+                . '<a href="' . $h($base . '/riepilogo_persone.php?t=' . $token) . '">Non voglio più riceverla</a>.</p>',
+        ], $base . '/area_personale.php');
 
-        return [($n + $nCru) === 1 ? 'Da fare questa settimana: 1 cosa' : 'Da fare questa settimana: ' . ($n + $nCru) . ' cose', $corpo];
-    }
-
-    private function bottone(string $url, string $testo): string
-    {
-        return "<p style='margin-top:18px;'><a href='" . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . "' style='background:#047857;color:#fff;padding:10px 18px;text-decoration:none;border-radius:6px;font-weight:bold;'>" . $testo . '</a></p>';
+        return [$p['oggetto'], $p['corpo']];
     }
 
     /**
@@ -166,7 +165,7 @@ final class RiepilogoPersone
                 ++$saltati;
                 continue;
             }
-            if ($this->mailer->invia($email, $m[0], $m[1])) {
+            if ($this->invio->spedisci($email, 'riepilogo_persone', $m[0], $m[1])) {
                 $this->db->esegui('UPDATE riepilogo_persone SET ultimo_invio = NOW(), settimana = ? WHERE email = ?', [$settimana, $email]);
                 ++$inviati;
             }

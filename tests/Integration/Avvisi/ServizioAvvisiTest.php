@@ -41,7 +41,7 @@ final class ServizioAvvisiTest extends DatabaseDiProva
                 return $this->t->agenda();
             }
         };
-        $this->avvisi = new ServizioAvvisi(new IscrizioneRepository($this->db), $this->mailer, $fonte, new Sito('/srv/sito', 'https://portale.test/didattica'));
+        $this->avvisi = new ServizioAvvisi(new IscrizioneRepository($this->db), $this->invio(), $fonte, new Sito('/srv/sito', 'https://portale.test/didattica'));
     }
 
     /** @return list<array<string, mixed>> */
@@ -107,5 +107,10 @@ final class ServizioAvvisiTest extends DatabaseDiProva
 
         self::assertTrue($this->avvisi->cancella($tok));
         self::assertNull($this->avvisi->rigaPerToken($tok));
+    }
+
+    private function invio(): \App\Email\InvioEmail
+    {
+        return new \App\Email\InvioEmail($this->mailer, new \App\Email\ModelliEmail($this->db));
     }
 }

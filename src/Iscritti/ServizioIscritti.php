@@ -10,7 +10,7 @@ use App\Core\Sito;
 use App\Eventi\EventoRepository;
 use App\Eventi\Turni;
 use App\Infrastructure\Audit\AuditLog;
-use App\Infrastructure\Mail\Mailer;
+use App\Email\InvioEmail;
 use App\Portale\ColoriAree;
 
 /**
@@ -38,7 +38,7 @@ final class ServizioIscritti
         private Iscrizioni $iscrizioni,
         private Convenzioni $convenzioni,
         private Attestati $attestati,
-        private Mailer $mailer,
+        private InvioEmail $invio,
         private ColoriAree $colori,
         private Sito $sito,
         private ServizioAbilitazioni $abilitazioni,
@@ -151,12 +151,7 @@ final class ServizioIscritti
                     if (in_array($st, self::STATI_ATTIVI, true)) {
                         $this->iscritti->annulla($prId);
                         if (!empty($p['email'])) {
-                            $this->mailer->invia(
-                                (string) $p['email'],
-                                'Prenotazione Annullata: ' . $p['evento_titolo'],
-                                'La tua prenotazione per <strong>' . htmlspecialchars((string) $p['evento_titolo']) . "</strong> è stata annullata dall'amministrazione.",
-                                $this->colori->delTurno((int) $p['turno_id'])
-                            );
+                            $this->invio->invia((string) $p['email'], 'evento_annullata_admin', ['evento' => (string) $p['evento_titolo']], '', [], '', $this->colori->delTurno((int) $p['turno_id']));
                         }
                         if ($st !== 'in_attesa') {
                             $turniLiberati[(int) $p['turno_id']] = true;
@@ -187,14 +182,15 @@ final class ServizioIscritti
             return;
         }
         $link = $this->sito->urlBase() . '/stampa_ricevuta.php?code=' . urlencode((string) $p['codice_prenotazione']);
-        $btn = sprintf(self::BOTTONE_RICEVUTA, $link);
-        $titolo = htmlspecialchars((string) $p['evento_titolo']);
-        $turno = htmlspecialchars(Turni::etichetta($p));
-        $testo = $motivo === 'promossa'
-            ? "Si è liberato un posto: la tua prenotazione in lista d'attesa per <strong>$titolo</strong> ($turno) è stata <strong>CONFERMATA</strong>."
-            : "La tua richiesta per l'evento <strong>$titolo</strong> ($turno) è stata <strong>APPROVATA</strong>!";
-        $oggetto = ($motivo === 'promossa' ? 'Posto Confermato: ' : 'Prenotazione Approvata: ') . $p['evento_titolo'];
-        $this->mailer->invia((string) $p['email'], $oggetto, "<p>$testo</p>$btn", $this->colori->delTurno((int) $p['turno_id']));
+        $this->invio->invia(
+            (string) $p['email'],
+            $motivo === 'promossa' ? 'evento_promossa_admin' : 'evento_approvata',
+            ['evento' => (string) $p['evento_titolo'], 'turno' => ' (' . Turni::etichetta($p) . ')'],
+            $link,
+            [],
+            '',
+            $this->colori->delTurno((int) $p['turno_id'])
+        );
     }
 
     // ------------------------------------------------------------------ convenzioni
@@ -270,8 +266,7 @@ final class ServizioIscritti
             $this->iscritti->conferma($prenotazioneId);
             $this->iscrizioni->decadiAtteseVincolate($prenotazioneId);
             $link = $urlBase . '/stampa_ricevuta.php?code=' . urlencode((string) $p['codice_prenotazione']);
-            $corpo = "<p>La tua richiesta per l'evento <strong>{$p['evento_titolo']}</strong> è stata <strong>APPROVATA</strong>!</p>" . sprintf(self::BOTTONE_RICEVUTA, $link);
-            $this->mailer->invia((string) $p['email'], 'Prenotazione Approvata: ' . $p['evento_titolo'], $corpo, $this->colori->delTurno((int) $p['turno_id']));
+            $this->invio->invia((string) $p['email'], 'evento_approvata', ['evento' => (string) $p['evento_titolo'], 'turno' => ''], $link, [], '', $this->colori->delTurno((int) $p['turno_id']));
         }
 
         return false;
@@ -285,8 +280,7 @@ final class ServizioIscritti
             return;
         }
         $this->iscritti->rifiuta($prenotazioneId);
-        $corpo = "<p>Siamo spiacenti di informarti che la tua richiesta per l'evento <strong>{$p['evento_titolo']}</strong> non è stata accolta.</p>";
-        $this->mailer->invia((string) $p['email'], 'Aggiornamento Prenotazione: ' . $p['evento_titolo'], $corpo, $this->colori->delTurno((int) $p['turno_id']));
+        $this->invio->invia((string) $p['email'], 'evento_rifiutata', ['evento' => (string) $p['evento_titolo']], '', [], '', $this->colori->delTurno((int) $p['turno_id']));
         if (in_array($p['stato'], ['da_approvare', 'confermata', 'richiesta_conferma'], true)) {
             $this->iscrizioni->promuoviListaAttesa((int) $p['turno_id']);
         }
@@ -310,7 +304,7 @@ final class ServizioIscritti
             return ['esito' => 'errore', 'errno' => $r['errno'], 'errore' => $r['errore']];
         }
         if (!empty($p['email'])) {
-            $this->mailer->invia((string) $p['email'], 'Prenotazione Annullata: ' . $p['evento_titolo'], "La tua prenotazione è stata annullata dall'amministrazione.", $this->colori->delTurno((int) $p['turno_id']));
+            $this->invio->invia((string) $p['email'], 'evento_annullata_singola', ['evento' => (string) $p['evento_titolo']], '', [], '', $this->colori->delTurno((int) $p['turno_id']));
         }
         if (in_array($p['stato'], ['confermata', 'richiesta_conferma', 'da_approvare'], true)) {
             $this->iscrizioni->promuoviListaAttesa((int) $p['turno_id']);
@@ -332,7 +326,7 @@ final class ServizioIscritti
         }
         $this->iscritti->elimina($prenotazioneId);
         if (!empty($p['email'])) {
-            $this->mailer->invia((string) $p['email'], 'Cancellazione Prenotazione', "La tua prenotazione per <strong>{$p['evento_titolo']}</strong> è stata cancellata.", $this->colori->delTurno((int) $p['turno_id']));
+            $this->invio->invia((string) $p['email'], 'evento_cancellata_admin', ['evento' => (string) $p['evento_titolo']], '', [], '', $this->colori->delTurno((int) $p['turno_id']));
         }
         if (in_array($p['stato'], ['confermata', 'richiesta_conferma', 'da_approvare'], true)) {
             $this->iscrizioni->promuoviListaAttesa((int) $p['turno_id']);
@@ -394,12 +388,7 @@ final class ServizioIscritti
             ? new EsitoAzione("Prenotazione manuale inserita. Codice: $codice", 'success')
             : new EsitoAzione("Edizione al completo: prenotazione inserita in lista d'attesa. Codice: $codice", 'warning');
         if (!empty($email)) {
-            $corpo = '<p>Gentile <strong>' . htmlspecialchars($nome . ' ' . $cognome) . '</strong>,</p>'
-                . '<p>La tua ' . ($stato === 'confermata' ? 'prenotazione' : "richiesta, in <strong>lista d'attesa</strong>,") . ' per <strong>' . htmlspecialchars((string) $turno['evento_titolo']) . '</strong> è stata inserita dalla segreteria.</p>'
-                . "<p><strong>Codice prenotazione:</strong> <span style='font-family:monospace;font-size:1.2em;color:#B80000;'>$codice</span></p>"
-                . '<p>Conserva questo codice: ti servirà per il check-in.</p>'
-                . '<p>Cordiali saluti,<br>Segreteria DiBEST</p>';
-            $this->mailer->invia($email, ($stato === 'confermata' ? 'Conferma Prenotazione: ' : "Lista d'attesa: ") . $turno['evento_titolo'], $corpo, $this->colori->delTurno($turnoId));
+            $this->invio->invia($email, $stato === 'confermata' ? 'evento_inserita_segreteria_confermata' : 'evento_inserita_segreteria_attesa', ['nome' => $nome . ' ' . $cognome, 'evento' => (string) $turno['evento_titolo'], 'codice' => $codice], '', [], '', $this->colori->delTurno($turnoId));
         }
 
         return $esito;

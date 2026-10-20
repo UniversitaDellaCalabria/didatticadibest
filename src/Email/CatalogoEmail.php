@@ -17,7 +17,7 @@ final class CatalogoEmail
     /** @return array<string, array<string, mixed>> */
     public static function modelli(): array
     {
-        return self::$cache ??= self::tutorato() + CatalogoDidattica::modelli() + CatalogoConvenzioni::modelli();
+        return self::$cache ??= self::tutorato() + CatalogoDidattica::modelli() + CatalogoConvenzioni::modelli() + CatalogoRisorse::modelli() + CatalogoEventi::modelli() + CatalogoSistema::modelli();
     }
 
     /** @return list<string> i gruppi, nell'ordine del catalogo */
@@ -85,6 +85,19 @@ final class CatalogoEmail
     public static function m(string $gruppo, string $nome, string $quando, string $a, array $segnaposto, string $oggetto, string $corpo, ?string $bottone = null, ?string $colore = null): array
     {
         return ['colore' => $colore, 'gruppo' => $gruppo, 'nome' => $nome, 'quando' => $quando, 'destinatario' => $a, 'segnaposto' => self::sp($segnaposto), 'oggetto' => $oggetto, 'corpo' => $corpo, 'bottone' => $bottone];
+    }
+
+    /**
+     * Modello in formato HTML (eventi): testo scritto con l'editor e segnaposto {NOME}. $legacy = colonne di impostazioni_sistema da cui importare il testo già scritto;
+     * $facoltativa = senza testo l'email non parte.
+     *
+     * @param array<string, array{d: string, esempio: string}> $token
+     * @param array{oggetto: string, corpo: string}|null $legacy
+     * @return array<string, mixed>
+     */
+    public static function h(string $gruppo, string $nome, string $quando, string $a, array $token, string $oggetto, string $corpo, ?array $legacy = null, bool $facoltativa = false, ?string $colore = null): array
+    {
+        return ['colore' => $colore, 'gruppo' => $gruppo, 'nome' => $nome, 'quando' => $quando, 'destinatario' => $a, 'segnaposto' => $token, 'oggetto' => $oggetto, 'corpo' => $corpo, 'bottone' => null, 'formato' => 'html', 'legacy' => $legacy, 'facoltativa' => $facoltativa];
     }
 
     /** @return array<string, array<string, mixed>> */

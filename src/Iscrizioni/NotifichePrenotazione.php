@@ -59,6 +59,17 @@ final class NotifichePrenotazione
     }
 
     /**
+     * Il riepilogo adatto a chi lo riceve (con il link all'admin solo per i gestori), da mettere nei modelli delle email ai gestori.
+     *
+     * @param array{html: string, html_senza_admin: string} $riepilogo
+     * @param list<string> $emailGestori
+     */
+    public static function riepilogoPer(string $email, array $riepilogo, array $emailGestori): string
+    {
+        return self::corpoPer($email, '', $riepilogo, $emailGestori);
+    }
+
+    /**
      * Riepilogo completo di una prenotazione per le email: tabella con i dati e tutti i campi aggiuntivi.
      *
      * @return array{oggetto_evento: string|null, html: string, html_senza_admin: string, dati: array<string, string|null>}|null null se la prenotazione non esiste

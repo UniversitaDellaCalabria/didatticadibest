@@ -6,7 +6,7 @@ namespace App\Iscrizioni;
 
 use App\Core\Orologio;
 use App\Core\Sito;
-use App\Infrastructure\Mail\Mailer;
+use App\Email\InvioEmail;
 use App\Portale\ColoriAree;
 
 /**
@@ -18,7 +18,7 @@ final class ServizioListaAttesa
     public function __construct(
         private ListaAttesaRepository $coda,
         private PrenotazioneRepository $prenotazioni,
-        private Mailer $mailer,
+        private InvioEmail $invio,
         private Sito $sito,
         private ColoriAree $colori,
         private Orologio $orologio,
@@ -86,14 +86,14 @@ final class ServizioListaAttesa
     private function avvisa(array $promosso, int $turnoId, string $scadenza): void
     {
         $link = $this->sito->urlBase() . '/area_personale.php?conferma_posto=' . $promosso['id'];
-        $oggetto = 'Azione Richiesta: Si è liberato un posto per ' . $promosso['evento_titolo'];
-        $corpo = '<p>Ottime notizie <strong>' . htmlspecialchars((string) $promosso['nome']) . "</strong>!</p>
-                                     <p>Si è appena liberato un posto per l'evento <strong>" . htmlspecialchars((string) $promosso['evento_titolo']) . "</strong>.</p>
-                                     <div style='background-color:#fff3cd; color:#856404; padding:15px; border-left:5px solid #ffeeba; margin:20px 0;'>
-                                       <strong>ATTENZIONE:</strong> Hai esattamente <strong>24 ore</strong> di tempo per confermare la tua presenza. Se non confermi entro il " . date('d/m/Y H:i', (int) strtotime($scadenza)) . ", il posto verrà riassegnato allo studente successivo.
-                                     </div>
-                                     <p><a href='$link' style='background-color:#198754; color:white; padding:12px 25px; text-decoration:none; border-radius:6px; font-weight:bold; display:inline-block;'>CONFERMA IL MIO POSTO</a></p>";
-
-        $this->mailer->invia((string) $promosso['email'], $oggetto, $corpo, $this->colori->delTurno($turnoId));
+        $this->invio->invia(
+            (string) $promosso['email'],
+            'evento_posto_offerto',
+            ['nome' => (string) $promosso['nome'], 'evento' => (string) $promosso['evento_titolo'], 'scadenza' => date('d/m/Y H:i', (int) strtotime($scadenza))],
+            $link,
+            [],
+            '',
+            $this->colori->delTurno($turnoId)
+        );
     }
 }

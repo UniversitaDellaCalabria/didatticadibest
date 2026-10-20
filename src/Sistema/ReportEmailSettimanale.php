@@ -6,7 +6,7 @@ namespace App\Sistema;
 
 use App\Auth\ServizioUtenti;
 use App\Core\Sito;
-use App\Infrastructure\Mail\Mailer;
+use App\Email\InvioEmail;
 use App\Sistema\Backup\StatoBackup;
 
 /**
@@ -20,7 +20,7 @@ final class ReportEmailSettimanale
         private StatoBackup $backup,
         private LogEmailRepository $logEmail,
         private ServizioUtenti $utenti,
-        private Mailer $mailer,
+        private InvioEmail $invio,
     ) {
     }
 
@@ -42,8 +42,7 @@ final class ReportEmailSettimanale
         $tot = $this->logEmail->totaliSettimana() ?? ['ok' => 0, 'ko' => 0, 'mail' => 0];
         $errori = $this->logEmail->erroriSettimana();
         $h = static fn ($s): string => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
-        $corpo = '<p>Riepilogo delle email inviate dal portale negli ultimi 7 giorni (fino al ' . date('d/m/Y H:i') . ').</p>'
-               . "<table style='border-collapse:collapse;margin:10px 0;'>"
+        $corpo = "<table style='border-collapse:collapse;margin:10px 0;'>"
                . "<tr><td style='padding:4px 14px 4px 0;'>✅ Accettate dal server</td><td><strong>{$tot['ok']}</strong></td></tr>"
                . "<tr><td style='padding:4px 14px 4px 0;'>❌ Fallite</td><td><strong style='color:" . ($tot['ko'] ? '#b91c1c' : 'inherit') . ";'>{$tot['ko']}</strong></td></tr>"
                . ($tot['mail'] ? "<tr><td style='padding:4px 14px 4px 0;'>⚠️ Inviate con il ripiego mail() (SMTP non raggiungibile)</td><td><strong>{$tot['mail']}</strong></td></tr>" : '')
@@ -69,16 +68,16 @@ final class ReportEmailSettimanale
         } else {
             $corpo .= "<p style='color:#b91c1c;'><strong>Backup: nessuna esecuzione registrata.</strong> Controlla che il cron di admin/cron_backup.php sia attivo.</p>";
         }
-        $corpo .= "<p><a href='" . $h($this->sito->urlBase() . '/admin/sistema.php#log-email') . "'>Apri il registro completo nel pannello</a></p>";
-        $oggetto = ($tot['ko'] || ($b && empty($b['ok'])) || !$b ? '⚠️ ' : '✅ ') . "Riepilogo settimanale email Didattica DiBEST: {$tot['ok']} inviate, {$tot['ko']} fallite";
+        $dati = ['simbolo' => $tot['ko'] || ($b && empty($b['ok'])) || !$b ? '⚠️' : '✅', 'ok' => (string) $tot['ok'], 'ko' => (string) $tot['ko'], 'data' => date('d/m/Y H:i'), 'dettaglio' => $corpo];
+        $link = $this->sito->urlBase() . '/admin/sistema.php#log-email';
         $inviati = 0;
         foreach ($dest as $em) {
-            if ($this->mailer->invia($em, $oggetto, $corpo)) {
+            if ($this->invio->invia($em, 'sistema_report_settimanale', $dati, $link)) {
                 $inviati++;
             }
         }
         if (!$inviati) {
-            return 'invio non riuscito: ' . $this->mailer->ultimoErrore();
+            return 'invio non riuscito: ' . $this->invio->ultimoErrore();
         }
         if (!is_dir($cartella)) {
             @mkdir($cartella, 0755, true);

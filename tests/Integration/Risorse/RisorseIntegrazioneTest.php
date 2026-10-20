@@ -65,7 +65,7 @@ final class RisorseIntegrazioneTest extends DatabaseDiProva
         parent::setUp();
         $this->repo = new RisorsaRepository($this->db);
         $this->mailer = new MailerFinto();
-        $this->notifiche = new NotificheRisorse($this->repo, new ServizioUtenti(new UtenteRepository($this->db)), $this->mailer, new Sito(sys_get_temp_dir(), 'https://portale.test/eventi'), new ResponsabileRisorsaRepository($this->db), new ContatoreRisorsaRepository($this->db));
+        $this->notifiche = new NotificheRisorse($this->repo, new ServizioUtenti(new UtenteRepository($this->db)), new \App\Email\InvioEmail($this->mailer, new \App\Email\ModelliEmail($this->db)), new Sito(sys_get_temp_dir(), 'https://portale.test/eventi'), new ResponsabileRisorsaRepository($this->db), new ContatoreRisorsaRepository($this->db));
         $this->servizio = new ServizioRisorse($this->repo, $this->notifiche, new OrologioFisso('2026-10-05 08:00:00'), new ServizioContatoriRisorse(new ContatoreRisorsaRepository($this->db)), new DiarioBordoRepository($this->db));
         $this->db->esegui("INSERT INTO pagine_eventi (id, slug, titolo, colore_primario, gestore_utente_id) VALUES (1, 'aule', 'AULE', '#112233', 2)");
         $this->db->esegui("INSERT INTO ruoli (id, nome) VALUES (1, 'Super Amministratore'), (2, 'Gestore'), (3, 'Studente'), (4, 'Docente/Dipendente'), (5, 'Ospite'), (6, 'Docenti'), (7, 'Personale tecnico amministrativo'), (8, 'Altro personale di Ateneo')");

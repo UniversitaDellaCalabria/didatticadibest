@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Sondaggi;
 
 use App\Eventi\Turni;
-use App\Infrastructure\Mail\Mailer;
+use App\Email\InvioEmail;
 use App\Portale\ColoriAree;
 
 /**
@@ -14,10 +14,8 @@ use App\Portale\ColoriAree;
  */
 final class ServizioSondaggi
 {
-    private const OGGETTO_PREDEFINITO = 'La tua opinione è importante! Sondaggio Evento: {TITOLO_EVENTO}';
-    private const CORPO_PREDEFINITO = '<p>Gentile <strong>{NOME} {COGNOME}</strong>,</p><p>Ti ringraziamo per aver partecipato all\'evento <strong>{TITOLO_EVENTO}</strong>.</p><p>La tua opinione per noi è fondamentale. Ti invitiamo a compilare il questionario di gradimento in forma <strong>totalmente anonima</strong>.</p><div style="text-align:center;margin:35px 0;">{LINK_SONDAGGIO}</div>';
 
-    public function __construct(private SondaggioRepository $repo, private Mailer $mailer, private ColoriAree $colori)
+    public function __construct(private SondaggioRepository $repo, private InvioEmail $invio, private ColoriAree $colori)
     {
     }
 
@@ -212,9 +210,6 @@ final class ServizioSondaggi
      */
     public function inviaLink(int $eventoId, string $dominio): int
     {
-        $sys = $this->repo->impostazioniEmail();
-        $oggettoBase = ($sys['email_sondaggio_oggetto'] ?? '') ?: self::OGGETTO_PREDEFINITO;
-        $corpoBase = ($sys['email_sondaggio_corpo'] ?? '') ?: self::CORPO_PREDEFINITO;
         $inviate = 0;
         foreach ($this->repo->prenotazioniPerInvio($eventoId) as $p) {
             if (empty($p['email'])) {
@@ -236,12 +231,8 @@ final class ServizioSondaggi
             $cerca = ['{NOME}', '{COGNOME}', '{MATRICOLA}', '{TITOLO_EVENTO}', '{DATA_TURNO}', '{ORARIO_TURNO}', '{LUOGO}', '{LINK_SONDAGGIO}'];
             $dataTurno = !empty($p['data_turno']) ? date('d/m/Y', (int) strtotime((string) $p['data_turno'])) : '';
             $sostituisci = [(string) $p['nome'], (string) $p['cognome'], (string) $p['matricola'], (string) $p['evento_titolo'], $dataTurno, Turni::orario($p), (string) $p['evento_luogo'], $bottone];
-            $this->mailer->invia(
-                (string) $p['email'],
-                str_replace($cerca, $sostituisci, $oggettoBase),
-                str_replace($cerca, $sostituisci, $corpoBase),
-                $this->colori->delTurno((int) $p['turno_id'])
-            );
+            // il testo è quello di «Testi delle email» (o, se non è stato mai attivato, quello di partenza)
+            $this->invio->inviaHtml((string) $p['email'], 'evento_sondaggio', array_combine($cerca, $sostituisci), $this->colori->delTurno((int) $p['turno_id']), '', true);
             $inviate++;
         }
 

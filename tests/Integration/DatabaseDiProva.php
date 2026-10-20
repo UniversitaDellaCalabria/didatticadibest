@@ -39,6 +39,9 @@ abstract class DatabaseDiProva extends TestCase
             self::markTestSkipped('Database di prova non raggiungibile');
         }
         $this->db = Database::per(self::$conn);
+        // i testi delle email (modificati dal pannello) non devono passare da un test all'altro
+        self::$conn->query('DROP TABLE IF EXISTS `email_modelli`');
+        self::$conn->query("CREATE TABLE email_modelli (chiave VARCHAR(80) NOT NULL PRIMARY KEY, oggetto VARCHAR(300) NOT NULL DEFAULT '', corpo MEDIUMTEXT DEFAULT NULL, bottone VARCHAR(120) DEFAULT '', aggiornato_il DATETIME DEFAULT NULL, aggiornato_da VARCHAR(150) DEFAULT '')");
         foreach ($this->tabelle() as $nome => $sql) {
             self::$conn->query("DROP TABLE IF EXISTS `$nome`");
             self::$conn->query($sql);

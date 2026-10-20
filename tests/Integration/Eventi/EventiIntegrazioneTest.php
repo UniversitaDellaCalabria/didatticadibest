@@ -163,7 +163,7 @@ final class EventiIntegrazioneTest extends DatabaseDiProva
             }
         };
 
-        return new ServizioTurni($this->turni, $this->eventi, $this->servizioEventi(), $this->regole, $aule, $presentazione, $this->mailer, new Sito(sys_get_temp_dir(), 'https://portale.test/eventi'));
+        return new ServizioTurni($this->turni, $this->eventi, $this->servizioEventi(), $this->regole, $aule, $presentazione, $this->invio(), new Sito(sys_get_temp_dir(), 'https://portale.test/eventi'));
     }
 
     public function registraAula(string $voce): void
@@ -694,5 +694,10 @@ final class EventiIntegrazioneTest extends DatabaseDiProva
         $this->eventi->impostaSezioneInAlto($id, 1, 0);
         self::assertSame(0, (int) $this->db->valore('SELECT affiancata_in_alto FROM sottocategorie'));
         self::assertSame([['id' => (string) $id, 'pagina_id' => '1', 'nome' => 'Prima', 'ordine' => '2', 'affiancata_in_alto' => '0']], $this->eventi->sottocategorie(1));
+    }
+
+    private function invio(): \App\Email\InvioEmail
+    {
+        return new \App\Email\InvioEmail($this->mailer, new \App\Email\ModelliEmail($this->db));
     }
 }

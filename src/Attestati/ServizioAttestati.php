@@ -8,7 +8,7 @@ use App\Core\Orologio;
 use App\Core\Sito;
 use App\Eventi\RegoleIscrizioni;
 use App\Eventi\Turni;
-use App\Infrastructure\Mail\Mailer;
+use App\Email\InvioEmail;
 use App\Portale\ColoriAree;
 
 /**
@@ -22,7 +22,7 @@ final class ServizioAttestati
         private AttestatoRepository $repo,
         private RegoleClasse $classi,
         private RegoleIscrizioni $iscrizioni,
-        private Mailer $mailer,
+        private InvioEmail $invio,
         private ColoriAree $colori,
         private Sito $sito,
         private Orologio $orologio,
@@ -186,12 +186,15 @@ final class ServizioAttestati
         $this->assegnaCodici($prenotazioneId);
         $url = $this->sito->urlBase();
         $link = $url . '/attestati_gruppo.php?code=' . urlencode((string) $p['codice_prenotazione']);
-        $corpo = '<p>Gentile <strong>' . htmlspecialchars($p['nome'] . ' ' . $p['cognome']) . '</strong>,</p>'
-               . '<p>grazie per aver partecipato con la tua classe ' . ($isProgetto ? 'al progetto' : "all'attività") . ' <strong>' . htmlspecialchars((string) $p['evento_titolo']) . '</strong>.</p>'
-               . "<p>Sono pronti gli <strong>attestati di partecipazione di $n " . ($n === 1 ? 'studente' : 'studenti') . "</strong>: li trovi tutti in un'unica pagina, uno per foglio, pronti da stampare o salvare in PDF. Ogni attestato ha un codice e un QR per verificarne l'autenticità.</p>"
-               . "<p style='text-align:center; margin:30px 0;'><a href='" . htmlspecialchars($link) . "' style='background-color:#198754; color:white; padding:12px 24px; text-decoration:none; border-radius:6px; font-weight:bold; font-size:16px;'>📄 Apri gli attestati</a></p>"
-               . "<p>Per aprirli accedi con le stesse credenziali usate per l'iscrizione. Li ritrovi anche nella tua <a href='" . htmlspecialchars($url . '/area_personale.php') . "'>Area Personale</a>.</p>";
-        $this->mailer->invia((string) $p['email'], 'Attestati degli studenti: ' . $p['evento_titolo'], $corpo, $this->colori->delTurno((int) $p['turno_id']));
+        $this->invio->invia(
+            (string) $p['email'],
+            'evento_attestati_classe',
+            ['nome' => $p['nome'] . ' ' . $p['cognome'], 'tipo' => $isProgetto ? 'al progetto' : "all'attività", 'titolo' => (string) $p['evento_titolo'], 'studenti' => "$n " . ($n === 1 ? 'studente' : 'studenti'), 'area_personale' => $url . '/area_personale.php'],
+            $link,
+            [],
+            '',
+            $this->colori->delTurno((int) $p['turno_id'])
+        );
         $this->repo->segnaAttestatoInviato($prenotazioneId);
 
         return true;
@@ -232,18 +235,15 @@ final class ServizioAttestati
         $domain = $this->sito->urlBase();
 
         $linkAttestato = $domain . '/stampa_attestato.php?code=' . urlencode((string) $row['codice_prenotazione']);
-        $linkArea = $domain . '/area_personale.php';
-        $oggetto = 'Il tuo Attestato è pronto: ' . $row['titolo'];
-        $corpo = '<p>Gentile <strong>' . htmlspecialchars((string) $row['nome']) . ' ' . htmlspecialchars((string) $row['cognome']) . '</strong>,</p>'
-               . "<p>Grazie per aver partecipato all'evento <strong>" . htmlspecialchars((string) $row['titolo']) . '</strong>' . (!empty($row['data_turno']) ? ' del ' . date('d/m/Y', (int) strtotime((string) $row['data_turno'])) : '') . '.</p>'
-               . '<p>Il tuo <strong>Attestato di Partecipazione</strong> è disponibile per il download.</p>'
-               . "<p style='text-align:center; margin:30px 0;'>"
-               . "<a href='" . $linkAttestato . "' style='background-color:#198754; color:white; padding:12px 24px; text-decoration:none; border-radius:6px; font-weight:bold; font-size:16px;'>📄 Scarica il tuo Attestato</a>"
-               . '</p>'
-               . "<p>In alternativa puoi recuperarlo dalla tua <a href='" . $linkArea . "'>Area Personale</a>.</p>"
-               . '<p>Cordiali saluti,<br>Il team Didattica DiBEST</p>';
-
-        $this->mailer->invia((string) $row['email'], $oggetto, $corpo, $this->colori->delTurno((int) $row['turno_id']));
+        $this->invio->invia(
+            (string) $row['email'],
+            'evento_attestato_presenza',
+            ['nome' => $row['nome'] . ' ' . $row['cognome'], 'titolo' => (string) $row['titolo'], 'data_testo' => !empty($row['data_turno']) ? ' del ' . date('d/m/Y', (int) strtotime((string) $row['data_turno'])) : ''],
+            $linkAttestato,
+            [],
+            '',
+            $this->colori->delTurno((int) $row['turno_id'])
+        );
         $this->repo->segnaAttestatoInviato($prenotazioneId);
 
         return true;

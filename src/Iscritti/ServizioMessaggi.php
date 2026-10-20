@@ -6,7 +6,7 @@ namespace App\Iscritti;
 
 use App\Core\Orologio;
 use App\Core\Sito;
-use App\Infrastructure\Mail\Mailer;
+use App\Email\InvioEmail;
 use App\Portale\AreeRepository;
 use App\Portale\ColoriAree;
 
@@ -20,7 +20,7 @@ final class ServizioMessaggi
         private MessaggiRepository $messaggi,
         private IscrittiRepository $iscritti,
         private AreeRepository $aree,
-        private Mailer $mailer,
+        private InvioEmail $invio,
         private ColoriAree $colori,
         private Sito $sito,
         private Orologio $orologio,
@@ -79,7 +79,7 @@ final class ServizioMessaggi
         $this->messaggi->inserisciDellAdmin($prenotazioneId, $op->id, $messaggio, false);
         if (!empty($emailDest)) {
             $nome = $this->messaggi->nomeOperatore($op->id) ?? 'Segreteria DiBEST';
-            $this->mailer->invia($emailDest, $this->oggetto($nome, $titolo), $this->corpo($nome, $titolo, $messaggio, 20));
+            $this->invia($emailDest, $nome, $titolo, $messaggio);
         }
 
         return true;
@@ -104,37 +104,24 @@ final class ServizioMessaggi
         $this->messaggi->inserisciDellAdmin($prenotazioneId, $op->id, $messaggio, true);
         if (!empty($emailDest)) {
             $nome = $this->messaggi->nomeOperatore($op->id) ?? 'Segreteria DiBEST';
-            $this->mailer->invia($emailDest, $this->oggetto($nome, $titolo), $this->corpo($nome, $titolo, $messaggio, 16), $this->colori->delTurno((int) ($p['turno_id'] ?? 0)));
+            $this->invia($emailDest, $nome, $titolo, $messaggio, $this->colori->delTurno((int) ($p['turno_id'] ?? 0)));
         }
 
         return true;
     }
 
-    private function oggetto(string $nomeOperatore, string $titolo): string
+    /** Email all'iscritto con il messaggio della segreteria, dal modello «evento_messaggio_segreteria». */
+    private function invia(string $emailDest, string $nomeOperatore, string $titolo, string $messaggioHtml, ?string $colore = null): void
     {
-        return 'Nuovo messaggio da ' . $nomeOperatore . ' – ' . $titolo . ' [' . $this->orologio->adesso()->format('d/m H:i') . ']';
-    }
-
-    /** Corpo dell'email; $rientro = spazi davanti a ogni riga, come nelle due pagine di prima (i byte dell'email restano gli stessi). */
-    private function corpo(string $nomeOperatore, string $titolo, string $messaggioHtml, int $rientro): string
-    {
-        $n = str_repeat(' ', $rientro);
-        $urlArea = $this->sito->urlBase() . '/area_personale.php';
-
-        return "\n"
-            . $n . '<p>Hai ricevuto un nuovo messaggio da <strong>' . htmlspecialchars($nomeOperatore) . "</strong>\n"
-            . $n . "riguardante l'evento <strong>" . htmlspecialchars($titolo) . "</strong>:</p>\n"
-            . $n . "<div style='background:#f8fafc; padding:15px; border-left:4px solid #B80000; margin:15px 0; font-style:italic;'>\n"
-            . $n . "    $messaggioHtml\n"
-            . $n . "</div>\n"
-            . $n . "<p>Accedi alla tua Area Personale per leggere il messaggio completo e rispondere:</p>\n"
-            . $n . "<p>\n"
-            . $n . "    <a href='$urlArea' style='background-color:#B80000; color:#ffffff; padding:12px 25px;\n"
-            . $n . "       text-decoration:none; border-radius:6px; display:inline-block;\n"
-            . $n . "       font-weight:bold; font-family:sans-serif;'>\n"
-            . $n . "        Vai all'Area Personale per rispondere\n"
-            . $n . "    </a>\n"
-            . $n . "</p>\n"
-            . $n . "<p style='color:#6c757d; font-size:0.9em;'>Cordiali saluti,<br>" . htmlspecialchars($nomeOperatore) . '<br>Segreteria DiBEST</p>';
+        $box = "<div style='background:#f8fafc; padding:15px; border-left:4px solid #B80000; margin:15px 0; font-style:italic;'>$messaggioHtml</div>";
+        $this->invio->invia(
+            $emailDest,
+            'evento_messaggio_segreteria',
+            ['operatore' => $nomeOperatore, 'evento' => $titolo, 'ora' => $this->orologio->adesso()->format('d/m H:i'), 'messaggio' => $box],
+            $this->sito->urlBase() . '/area_personale.php',
+            [],
+            '',
+            $colore
+        );
     }
 }

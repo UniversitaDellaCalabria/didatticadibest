@@ -7,7 +7,7 @@ namespace App\Sistema;
 use App\Auth\ServizioUtenti;
 use App\Core\Database;
 use App\Core\Sito;
-use App\Infrastructure\Mail\Mailer;
+use App\Email\InvioEmail;
 use App\Sistema\Backup\StatoBackup;
 
 /**
@@ -23,7 +23,7 @@ final class ControlloSito
         private StatoBackup $backup,
         private LogEmailRepository $logEmail,
         private ServizioUtenti $utenti,
-        private Mailer $mailer,
+        private InvioEmail $invio,
         private bool $ambienteLocale,
     ) {
     }
@@ -135,18 +135,17 @@ final class ControlloSito
             'ultimo_avviso' => $prec['ultimo_avviso'] ?? null, 'firma_avviso' => $prec['firma_avviso'] ?? ''];
         if ($avvisa) {
             $h = static fn ($s): string => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
-            $link = $h($this->sito->urlBase() . '/admin/sistema.php#controllo');
+            $linkGrezzo = $this->sito->urlBase() . '/admin/sistema.php#controllo';
             if ($problemi && ($firma !== $stato['firma_avviso'] || strtotime((string) $stato['ultimo_avviso']) < time() - 86400)) {
-                $corpo = '<p>Il controllo automatico del portale ha trovato <strong>' . count($problemi) . ' problemi</strong>:</p><ul><li>' . implode('</li><li>', array_map($h, $problemi)) . '</li></ul>'
-                       . "<p>Dettagli e nuovo controllo: <a href='$link'>Sistema → Controllo del sito</a>.</p>";
+                $elenco = '<ul><li>' . implode('</li><li>', array_map($h, $problemi)) . '</li></ul>';
                 foreach ($this->utenti->emailAmministratori() as $em) {
-                    $this->mailer->invia($em, 'Portale Didattica DiBEST: ' . count($problemi) . ' problemi rilevati', $corpo);
+                    $this->invio->invia($em, 'sistema_controllo_problemi', ['quanti' => (string) count($problemi), 'elenco' => $elenco], $linkGrezzo);
                 }
                 $stato['ultimo_avviso'] = date('Y-m-d H:i:s');
                 $stato['firma_avviso'] = $firma;
             } elseif (!$problemi && ($prec['problemi'] ?? 0) > 0) {
                 foreach ($this->utenti->emailAmministratori() as $em) {
-                    $this->mailer->invia($em, 'Portale Didattica DiBEST: tutto di nuovo a posto', "<p>Il controllo automatico non trova più problemi. Dettagli: <a href='$link'>Sistema → Controllo del sito</a>.</p>");
+                    $this->invio->invia($em, 'sistema_controllo_ok', [], $linkGrezzo);
                 }
                 $stato['firma_avviso'] = '';
             }

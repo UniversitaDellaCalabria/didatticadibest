@@ -11,10 +11,9 @@ use App\Core\Orologio;
 use App\Core\Sito;
 use App\Eventi\EventoRepository;
 use App\Eventi\Turni;
-use App\Infrastructure\Mail\Mailer;
+use App\Email\InvioEmail;
 use App\Iscrizioni\Vista\MessaggiAreaPersonale;
 use App\Portale\ColoriAree;
-use App\Sistema\ImpostazioniSistemaRepository;
 use Throwable;
 
 /**
@@ -33,10 +32,9 @@ final class ServizioAreaPersonale
         private ServizioListaAttesa $listaAttesa,
         private NotifichePrenotazione $notifiche,
         private ServizioAbilitazioni $abilitazioni,
-        private ImpostazioniSistemaRepository $impostazioni,
         private RegoleFsl $fsl,
         private ServizioScuole $scuole,
-        private Mailer $mailer,
+        private InvioEmail $invio,
         private ColoriAree $colori,
         private Sito $sito,
         private Orologio $orologio,
@@ -182,14 +180,10 @@ final class ServizioAreaPersonale
         // Notifica email ai gestori dell'evento
         $dati = $this->repo->personaEEvento($prenotazioneId);
         if ($dati !== null) {
-            $oggetto = 'Nuovo messaggio assistenza – ' . $dati['evento_titolo'];
-            $corpoEmail = '<p>Gentile Gestore,</p>'
-                    . '<p><strong>' . htmlspecialchars($dati['nome'] . ' ' . $dati['cognome']) . "</strong> ha inviato un messaggio riguardante l'evento <strong>" . htmlspecialchars((string) $dati['evento_titolo']) . '</strong>.</p>'
-                    . '<p>Accedi al pannello di amministrazione &gt; Messaggi per rispondere.</p>'
-                    . '<p>Cordiali saluti,<br>Sistema Didattica DiBEST</p>';
+            $d = ['persona' => $dati['nome'] . ' ' . $dati['cognome'], 'evento' => (string) $dati['evento_titolo']];
             // I messaggi di assistenza vanno a tutti i gestori, indipendentemente dall'interruttore notifiche prenotazioni
             foreach ($this->abilitazioni->emailGestoriEvento((int) $dati['evento_id'], false) as $gestore) {
-                $this->mailer->invia($gestore, $oggetto, $corpoEmail);
+                $this->invio->invia($gestore, 'evento_gestori_messaggio', $d);
             }
         }
 
@@ -309,10 +303,7 @@ final class ServizioAreaPersonale
 
             $link = $baseLink . '/stampa_ricevuta.php?code=' . urlencode((string) $promosso['codice_prenotazione']);
             $bottone = "<p style='margin-top:15px;'><a href='$link' target='_blank' style='background:#B80000; color:#ffffff; padding:10px 18px; text-decoration:none; border-radius:6px; font-weight:bold;'>📄 Scarica / Stampa Ricevuta PDF</a></p>";
-
-            $oggetto = 'Posto Disponibile! Prenotazione CONFERMATA';
-            $corpo = '<p>Ottime notizie <strong>' . htmlspecialchars((string) $promosso['nome']) . "</strong>!</p><p>Si è appena liberato un posto e la tua prenotazione in lista d'attesa è passata a <strong>CONFERMATA UFFICIALMENTE</strong>.</p>$bottone";
-            $this->mailer->invia((string) $promosso['email'], $oggetto, $corpo, $this->colori->delTurno($turnoAttuale));
+            $this->invio->inviaHtml((string) $promosso['email'], 'evento_promosso_cambio_turno', ['{NOME}' => (string) $promosso['nome'], '{LINK_RICEVUTA}' => $bottone], $this->colori->delTurno($turnoAttuale));
         }
 
         return MessaggiAreaPersonale::modificaSalvata($nuovoStato === 'in_attesa');
@@ -346,22 +337,16 @@ final class ServizioAreaPersonale
         $cerca = ['{NOME}', '{COGNOME}', '{MATRICOLA}', '{TITOLO_EVENTO}', '{DATA_TURNO}', '{ORARIO_TURNO}', '{LUOGO}', '{CODICE_PRENOTAZIONE}', '{LINK_RICEVUTA}'];
         $sostituisci = [$p['nome'], $p['cognome'], $p['matricola'], $p['evento_titolo'], $dataFormattata, $oraFormattata, $p['luogo'], $p['codice_prenotazione'], ''];
 
-        $sistema = $this->impostazioni->riga() ?? [];
-
-        $oggetto = $sistema['email_canc_utente_oggetto'] ?: 'Cancellazione Prenotazione Confermata';
-        $corpo = $sistema['email_canc_utente_corpo'] ?: "<p>Gentile <strong>{NOME} {COGNOME}</strong>,</p><p>La tua prenotazione per l'evento <strong>{TITOLO_EVENTO}</strong> è stata cancellata con successo.</p>";
         $colore = $this->colori->delTurno((int) $p['turno_id']);
-        $this->mailer->invia((string) $p['email'], str_replace($cerca, $sostituisci, (string) $oggetto), str_replace($cerca, $sostituisci, (string) $corpo), $colore);
+        $this->invio->inviaHtml((string) $p['email'], 'evento_cancellazione_utente', array_combine($cerca, array_map('strval', $sostituisci)), $colore);
 
         // Gestori con notifiche attive + indirizzi aggiuntivi dell'evento, con il riepilogo completo
         $destinatari = $this->notifiche->destinatari((int) $p['evento_id']);
         $riepilogo = $destinatari ? $this->notifiche->riepilogo($prenotazioneId) : null;
         if ($riepilogo) {
-            $oggettoGestori = 'Disdetta: ' . $p['evento_titolo'];
-            $intro = '<p><strong>' . htmlspecialchars($p['nome'] . ' ' . $p['cognome']) . "</strong> ha appena <strong>annullato</strong> la prenotazione per l'evento <strong>" . htmlspecialchars((string) $p['evento_titolo']) . '</strong>.</p>';
             $gestori = $this->abilitazioni->emailGestoriEvento((int) $p['evento_id']);
             foreach ($destinatari as $emailGestore) {
-                $this->mailer->invia($emailGestore, $oggettoGestori, NotifichePrenotazione::corpoPer($emailGestore, $intro, $riepilogo, $gestori), $colore);
+                $this->invio->invia($emailGestore, 'evento_gestori_disdetta', ['persona' => $p['nome'] . ' ' . $p['cognome'], 'evento' => (string) $p['evento_titolo'], 'riepilogo' => NotifichePrenotazione::riepilogoPer($emailGestore, $riepilogo, $gestori)], '', [], '', $colore);
             }
         }
 
@@ -374,12 +359,8 @@ final class ServizioAreaPersonale
 
                 $link = $baseLink . '/stampa_ricevuta.php?code=' . urlencode((string) $promosso['codice_prenotazione']);
                 $bottone = "<p style='margin-top:15px;'><a href='$link' target='_blank' style='background:#B80000; color:#ffffff; padding:10px 18px; text-decoration:none; border-radius:6px; font-weight:bold;'>📄 Scarica / Stampa Ricevuta PDF</a></p>";
-
-                $oggettoPromosso = 'Posto Disponibile! Prenotazione CONFERMATA: ' . $p['evento_titolo'];
-                $corpoPromosso = "<p>Ottime notizie <strong>{NOME} {COGNOME}</strong>!</p><p>Si è appena liberato un posto e la tua prenotazione in lista d'attesa per l'evento <strong>{TITOLO_EVENTO}</strong> è passata a <strong>CONFERMATA UFFICIALMENTE</strong>.</p>{LINK_RICEVUTA}";
-
                 $sostituisciPromosso = array_map('strval', [$promosso['nome'], $promosso['cognome'], $promosso['matricola'], $p['evento_titolo'], $dataFormattata, $oraFormattata, $p['luogo'], $promosso['codice_prenotazione'], $bottone]);
-                $this->mailer->invia((string) $promosso['email'], str_replace($cerca, $sostituisciPromosso, $oggettoPromosso), str_replace($cerca, $sostituisciPromosso, $corpoPromosso), $this->colori->delTurno($turnoId));
+                $this->invio->inviaHtml((string) $promosso['email'], 'evento_promosso_annullo', array_combine($cerca, $sostituisciPromosso), $this->colori->delTurno($turnoId));
             }
         }
 
@@ -424,20 +405,22 @@ final class ServizioAreaPersonale
         $colore = $this->colori->delTurno((int) $p['turno_id']);
         if ($conferma && $senzaConvenzione) {
             $cfg = $this->repo->areaDelTurno((int) $p['turno_id']);
-            $corpo = '<p>Gentile <strong>' . htmlspecialchars($p['nome'] . ' ' . $p['cognome']) . '</strong>,</p>'
-                   . '<p>hai accettato il posto per <strong>' . htmlspecialchars((string) $p['evento_titolo']) . '</strong> (' . htmlspecialchars(Turni::etichetta($p)) . ').</p>'
-                   . $this->fsl->istruzioniConvenzione($cfg, true, (string) $p['codice_prenotazione']);
-            $this->mailer->invia((string) $p['email'], 'Posto accettato, in attesa della convenzione: ' . $p['evento_titolo'], $corpo, $colore);
+            $this->invio->invia(
+                (string) $p['email'],
+                'evento_posto_accettato_convenzione',
+                ['nome' => $p['nome'] . ' ' . $p['cognome'], 'evento' => (string) $p['evento_titolo'], 'turno' => ' (' . Turni::etichetta($p) . ')', 'istruzioni' => $this->fsl->istruzioniConvenzione($cfg, true, (string) $p['codice_prenotazione'])],
+                '',
+                [],
+                '',
+                $colore
+            );
 
             return MessaggiAreaPersonale::postoAccettatoInAttesaConvenzione($this->fsl->istruzioniConvenzione($cfg, false, (string) $p['codice_prenotazione']));
         }
         if ($conferma) {
             $this->vincoli->decadiAttese($prenotazioneId);
             $link = $this->sito->urlBase() . '/stampa_ricevuta.php?code=' . urlencode((string) $p['codice_prenotazione']);
-            $corpo = '<p>Gentile <strong>' . htmlspecialchars($p['nome'] . ' ' . $p['cognome']) . '</strong>,</p>'
-                   . '<p>hai confermato il tuo posto per <strong>' . htmlspecialchars((string) $p['evento_titolo']) . '</strong> (' . htmlspecialchars(Turni::etichetta($p)) . '). La prenotazione è <strong>CONFERMATA</strong>.</p>'
-                   . "<p style='margin-top:15px;'><a href='$link' target='_blank' style='background:#B80000; color:#ffffff; padding:10px 18px; text-decoration:none; border-radius:6px; font-weight:bold;'>📄 Scarica / Stampa Ricevuta PDF</a></p>";
-            $this->mailer->invia((string) $p['email'], 'Prenotazione CONFERMATA: ' . $p['evento_titolo'], $corpo, $colore);
+            $this->invio->invia((string) $p['email'], 'evento_posto_confermato_risposta', ['nome' => $p['nome'] . ' ' . $p['cognome'], 'evento' => (string) $p['evento_titolo'], 'turno' => ' (' . Turni::etichetta($p) . ')'], $link, [], '', $colore);
 
             return MessaggiAreaPersonale::postoConfermato();
         }

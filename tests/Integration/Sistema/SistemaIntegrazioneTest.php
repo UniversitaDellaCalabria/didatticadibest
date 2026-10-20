@@ -66,7 +66,7 @@ final class SistemaIntegrazioneTest extends DatabaseDiProva
 
     private function controllo(): ControlloSito
     {
-        return new ControlloSito($this->db, $this->sito, $this->backup, $this->logEmail, $this->utenti, $this->mailer, true);
+        return new ControlloSito($this->db, $this->sito, $this->backup, $this->logEmail, $this->utenti, $this->invio(), true);
     }
 
     public function testControlloDeiFileSulNas(): void
@@ -131,7 +131,7 @@ final class SistemaIntegrazioneTest extends DatabaseDiProva
     public function testReportSettimanale(): void
     {
         $this->db->esegui("INSERT INTO log_email (destinatario, esito, errore, canale) VALUES ('a@x.it', 1, '', 'smtp'), ('b@x.it', 0, 'Destinatario rifiutato', 'smtp'), ('c@x.it', 1, '', 'mail()')");
-        $report = new ReportEmailSettimanale($this->sito, $this->backup, $this->logEmail, $this->utenti, $this->mailer);
+        $report = new ReportEmailSettimanale($this->sito, $this->backup, $this->logEmail, $this->utenti, $this->invio());
         self::assertTrue($report->invia());
         self::assertCount(1, $this->mailer->inviate);
         self::assertStringContainsString('2 inviate, 1 fallite', $this->mailer->inviate[0]['oggetto']);
@@ -144,7 +144,7 @@ final class SistemaIntegrazioneTest extends DatabaseDiProva
     public function testReportSenzaAmministratori(): void
     {
         $this->db->esegui('UPDATE utenti SET ruolo_id = 5');
-        $report = new ReportEmailSettimanale($this->sito, $this->backup, $this->logEmail, $this->utenti, $this->mailer);
+        $report = new ReportEmailSettimanale($this->sito, $this->backup, $this->logEmail, $this->utenti, $this->invio());
         self::assertSame('nessun amministratore con email', $report->invia());
     }
 
@@ -158,5 +158,10 @@ final class SistemaIntegrazioneTest extends DatabaseDiProva
         $this->db->esegui("INSERT INTO log_attivita (utente_id, azione, indirizzo_ip) VALUES (1, 'Prova', '::1')");
         $ultime = (new RegistroAuditRepository($this->db))->ultime(10);
         self::assertSame(['Prova', 'Ada', 'CF1'], [$ultime[0]['azione'], $ultime[0]['nome'], $ultime[0]['codice_fiscale']]);
+    }
+
+    private function invio(): \App\Email\InvioEmail
+    {
+        return new \App\Email\InvioEmail($this->mailer, new \App\Email\ModelliEmail($this->db));
     }
 }

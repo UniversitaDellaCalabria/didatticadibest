@@ -84,10 +84,10 @@ prova('una chiave inventata è rifiutata', $admin->codice !== 200 || !str_contai
 
 titolo('Modifica con errore, anteprima, salvataggio');
 $h = $admin->invia($P . '?k=tutorato_attivita_completate', ['chiave' => 'tutorato_attivita_completate', 'oggetto' => 'Finito!', 'corpo' => 'Ciao {{inventato}}', 'bottone' => '', 'salva' => 1]);
-prova('un segnaposto che non esiste è respinto', str_contains($h, 'non esiste per questa email') && !q("SELECT chiave FROM email_modelli"));
+prova('un segnaposto che non esiste è respinto', str_contains($h, 'non esiste per questa email') && !q("SELECT chiave FROM email_modelli WHERE chiave <> '_sistema'"));
 $h = $admin->invia($P . '?k=tutorato_attivita_completate', ['chiave' => 'tutorato_attivita_completate', 'oggetto' => 'Hai finito, {{tutor}}', 'corpo' => "Ciao {{tutor}},\n\nhai fatto **{{ore}} ore** <b>davvero</b>.", 'bottone' => '', 'anteprima' => 1]);
 prova('l\'anteprima mostra il testo con i dati d\'esempio', str_contains($h, 'Hai finito, Maria Verdi') && str_contains($h, '<strong>38 ore</strong>') && str_contains($h, '&lt;b&gt;davvero&lt;/b&gt;'), 'HTTP ' . $admin->codice);
-prova('l\'anteprima non salva niente', !q("SELECT chiave FROM email_modelli"));
+prova('l\'anteprima non salva niente', !q("SELECT chiave FROM email_modelli WHERE chiave <> '_sistema'"));
 $admin->invia($P . '?k=tutorato_attivita_completate', ['chiave' => 'tutorato_attivita_completate', 'oggetto' => 'Hai finito, {{tutor}}', 'corpo' => "Ciao {{tutor}},\n\nhai fatto **{{ore}} ore**.", 'bottone' => '', 'salva' => 1]);
 $r = q("SELECT oggetto, corpo, aggiornato_da FROM email_modelli WHERE chiave = 'tutorato_attivita_completate'");
 prova('il testo è salvato con chi l\'ha modificato', ($r['oggetto'] ?? '') === 'Hai finito, {{tutor}}' && ($r['aggiornato_da'] ?? '') !== '', json_encode($r));
@@ -106,6 +106,30 @@ $h = $admin->invia($P . '?k=pratica_stato', ['chiave' => 'pratica_stato', 'ogget
 prova('l\'anteprima di un\'email con riquadro funziona', str_contains($h, 'Stato P-2027-001: Accolta') || str_contains($h, 'Accolta'), 'HTTP ' . $admin->codice);
 $h = $admin->invia($P . '?k=pratica_stato', ['chiave' => 'pratica_stato', 'oggetto' => 'Stato', 'corpo' => 'Ciao {{nome}}. {{!nota}}', 'bottone' => 'Guarda', 'salva' => 1]);
 prova('un pezzo di HTML del portale non può stare dentro una frase', str_contains($h, 'da solo su una riga') && !q("SELECT chiave FROM email_modelli WHERE chiave = 'pratica_stato'"));
+$db->query("DELETE FROM email_modelli");
+titolo('Tutte le email del catalogo');
+require_once 'src/autoload.php';
+$tutte = array_keys(\App\Email\CatalogoEmail::modelli());
+$aperte = 0;
+$senza = [];
+foreach ($tutte as $k) {
+    $h = $admin->vai($P . '?k=' . $k);
+    if ($admin->codice === 200 && str_contains($h, 'name="oggetto"') && !str_contains($h, 'Fatal error')) { $aperte++; } else { $senza[] = $k; }
+}
+prova('la scheda di ognuna delle ' . count($tutte) . ' email si apre', $aperte === count($tutte), implode(', ', array_slice($senza, 0, 5)));
+$h = $admin->vai($P);
+prova('l\'elenco ha i gruppi di tutti i moduli', str_contains($h, 'Convenzioni FSL') && str_contains($h, 'Convenzioni di tesi') && str_contains($h, 'Risorse') && str_contains($h, 'Eventi e iscrizioni') && str_contains($h, 'Direzione e sistema') && str_contains($h, 'Tutorato') && str_contains($h, 'Didattica'));
+$h = $admin->vai($P . '?k=evento_conferma');
+prova('un\'email con l\'editor ha il campo del testo come editor HTML e i segnaposto a graffa singola', str_contains($h, 'editor-html') && str_contains($h, '{NOME}') && !str_contains($h, '{{NOME}}'));
+$h = $admin->vai($P . '?k=evento_attestato');
+prova('un\'email facoltativa ha la spunta «Invia questa email»', str_contains($h, 'name="attiva"'));
+$admin->invia($P . '?k=evento_attestato', ['chiave' => 'evento_attestato', 'oggetto' => 'Attestato pronto', 'corpo' => '<p>Ciao {NOME}, scarica da {LINK_AREA_PERSONALE}</p>', 'attiva' => 1, 'salva' => 1]);
+$r = q("SELECT corpo FROM email_modelli WHERE chiave = 'evento_attestato'");
+prova('l\'email facoltativa attivata si salva', str_contains($r['corpo'] ?? '', 'Ciao {NOME}'));
+$h = $admin->invia($P . '?k=evento_conferma', ['chiave' => 'evento_conferma', 'oggetto' => 'Ok', 'corpo' => '<p>{INVENTATO}</p>', 'salva' => 1]);
+prova('un segnaposto HTML inventato è respinto', str_contains($h, '{INVENTATO}') && str_contains($h, 'non esiste'));
+$h = $admin->vai('/eventi/admin/sistema.php');
+prova('la pagina Sistema si apre e rimanda ai testi delle email', $admin->codice === 200 && str_contains($h, 'Testi delle email') && !str_contains($h, 'email_conferma_corpo'), 'HTTP ' . $admin->codice);
 $db->query("DELETE FROM email_modelli");
 titolo('La prova');
 foreach (glob('cache/email_locali/*') ?: [] as $f) { @unlink($f); }

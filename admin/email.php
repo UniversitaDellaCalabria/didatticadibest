@@ -27,6 +27,8 @@ $lista_visibile = $solo_gruppo === '' ? $visibili : array_filter($visibili, fn($
 $chiave = (string)($_GET['k'] ?? $_POST['chiave'] ?? '');
 $m = $chiave !== '' ? ($visibili[$chiave] ?? null) : null;
 if ($chiave !== '' && !$m) nega_accesso();
+$html = $m && ($m['formato'] ?? 'testo') === 'html';       // testo scritto con l'editor, segnaposto {NOME}
+$facoltativa = $m && !empty($m['facoltativa']);       // senza testo (o senza la spunta) l'email non parte
 $anteprima = null;
 $errori = [];
 $oggetto = $corpo = $bottone = '';
@@ -36,6 +38,7 @@ if ($m) {
     $oggetto = (string)$att['oggetto'];
     $corpo = (string)$att['corpo'];
     $bottone = (string)($att['bottone'] ?? '');
+    $attiva = (bool)$att['attiva'];
 }
 
 if ($m && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -43,6 +46,7 @@ if ($m && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $oggetto = (string)($_POST['oggetto'] ?? '');
     $corpo = str_replace("\r\n", "\n", (string)($_POST['corpo'] ?? ''));
     $bottone = (string)($_POST['bottone'] ?? '');
+    $attiva = !$facoltativa || isset($_POST['attiva']);
     if (isset($_POST['ripristina'])) {
         $modelli->ripristina($chiave);
         registra_log_audit($conn, 'Testo di un\'email ripristinato', ['Email' => $m['nome'], 'Chiave' => $chiave]);
@@ -50,20 +54,26 @@ if ($m && $_SERVER['REQUEST_METHOD'] === 'POST') {
         admin_redirect($url . '&k=' . urlencode($chiave));
     }
     $errori = $modelli->controlla($chiave, $oggetto, $corpo, $bottone);
+    if ($facoltativa && $attiva && trim($corpo) === '') $errori[] = 'Scrivi il testo, oppure togli la spunta «Invia questa email».';
     if (!$errori && isset($_POST['salva'])) {
-        $errori = $modelli->salva($chiave, $oggetto, $corpo, $bottone, $autore);
+        $errori = $modelli->salva($chiave, $oggetto, $corpo, $bottone, $autore, $attiva);
         if (!$errori) {
             registra_log_audit($conn, 'Testo di un\'email modificato', ['Email' => $m['nome'], 'Chiave' => $chiave, 'Oggetto' => $oggetto]);
             flash_set('Testo salvato: da ora le email partono così.', 'success');
             admin_redirect($url . '&k=' . urlencode($chiave));
         }
     } elseif (!$errori && (isset($_POST['anteprima']) || isset($_POST['prova']))) {
-        $anteprima = $modelli->componi(trim($oggetto), $corpo, $m['bottone'] === null ? null : $bottone, $modelli->datiDEsempio($chiave));
+        if ($html) {
+            $ph = $modelli->componiHtml(trim($oggetto), ModelliEmail::ripulisciHtml($corpo), $modelli->datiDEsempio($chiave));
+            $anteprima = ['oggetto' => $ph['oggetto'], 'corpo' => $ph['corpo'], 'bottone' => null];
+        } else {
+            $anteprima = $modelli->componi(trim($oggetto), $corpo, $m['bottone'] === null ? null : $bottone, $modelli->datiDEsempio($chiave));
+        }
         if (isset($_POST['prova'])) {
             $a = trim((string)($utente_admin['email'] ?? ''));
             $link = $app_e->get(\App\Core\Sito::class)->urlBase() . '/';
-            $col = CatalogoEmail::colore((string)$m['gruppo']);
-            $html = $anteprima['corpo'] . ($anteprima['bottone'] !== null ? "<p style='margin-top:18px;'><a href='" . $h($link) . "' style='background:" . ($col ?? '#0f172a') . ";color:#fff;padding:10px 18px;text-decoration:none;border-radius:6px;font-weight:bold;'>" . $h($anteprima['bottone']) . "</a></p>" : '');
+            $col = \App\Email\InvioEmail::coloreDi($m);
+            $html = $anteprima['corpo'] . ($anteprima['bottone'] !== null ? "<p style='margin-top:18px;'><a href='" . $h($link) . "' style='background:" . ($col ?? '#B80000') . ";color:#fff;padding:10px 18px;text-decoration:none;border-radius:6px;font-weight:bold;'>" . $h($anteprima['bottone']) . "</a></p>" : '');
             if ($a === '') flash_set('Il tuo profilo non ha un indirizzo email: non posso inviare la prova.', 'danger');
             elseif ($app_e->get(\App\Infrastructure\Mail\Mailer::class)->invia($a, '[PROVA] ' . $anteprima['oggetto'], $html, $col)) flash_set('Prova inviata a ' . $a . ' (con dati d\'esempio, il pulsante porta alla home).', 'success');
             else flash_set('La prova non è partita: controlla le impostazioni di posta in Sistema.', 'danger');
@@ -99,7 +109,7 @@ foreach ($lista_visibile as $k => $x) {
                         <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
                             <div style="min-width:0;flex:1 1 360px;">
                                 <a class="fw-bold text-decoration-none" href="<?php echo $h($url . '&k=' . urlencode($k)); ?>"><?php echo $h($x['nome']); ?></a>
-                                <?php echo $x['modificato'] ? '<span class="badge bg-warning text-dark ms-1">modificata</span>' : '<span class="badge bg-light text-secondary border ms-1">originale</span>'; ?>
+                                <?php echo $x['modificato'] ? '<span class="badge bg-warning text-dark ms-1">modificata</span>' : '<span class="badge bg-light text-secondary border ms-1">originale</span>'; ?><?php echo !$x['attiva'] ? '<span class="badge bg-secondary ms-1">non attiva: non parte</span>' : ''; ?>
                                 <div class="small text-secondary"><i class="fa fa-clock me-1" aria-hidden="true"></i><?php echo $h($x['quando']); ?></div>
                                 <div class="small text-secondary"><i class="fa fa-user me-1" aria-hidden="true"></i><?php echo $h($x['destinatario']); ?></div>
                                 <div class="small mt-1"><span class="text-secondary">Oggetto:</span> <?php echo $h($x['oggetto']); ?></div>
@@ -144,9 +154,12 @@ foreach ($lista_visibile as $k => $x) {
 
     <div class="row g-3">
         <div class="col-lg-8">
-            <form method="POST" class="card border-0 shadow-sm" id="form-email"><div class="card-body">
+            <form method="POST" class="card border-0 shadow-sm" id="form-email"<?php echo $html ? ' onsubmit="if (window.tinymce) tinymce.triggerSave();"' : ''; ?>><div class="card-body">
                 <?php csrf_field(); ?>
                 <input type="hidden" name="chiave" value="<?php echo $h($chiave); ?>">
+                <?php if ($facoltativa): ?>
+                    <div class="form-check mb-3"><input class="form-check-input" type="checkbox" name="attiva" id="attiva" value="1"<?php echo !empty($attiva) ? ' checked' : ''; ?>><label class="form-check-label fw-bold" for="attiva">Invia questa email</label><div class="form-text">Senza la spunta (o con il testo vuoto) l'email non parte. Il testo di partenza è solo un suggerimento.</div></div>
+                <?php endif; ?>
                 <div class="mb-3">
                     <label for="oggetto" class="form-label fw-bold">Oggetto</label>
                     <input type="text" class="form-control" id="oggetto" name="oggetto" maxlength="<?php echo ModelliEmail::OGGETTO_MAX; ?>" value="<?php echo $h($oggetto); ?>" required>
@@ -154,14 +167,14 @@ foreach ($lista_visibile as $k => $x) {
                 <div class="mb-3">
                     <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-1">
                         <label for="corpo" class="form-label fw-bold mb-0">Testo</label>
-                        <span class="btn-group btn-group-sm" role="group" aria-label="Formattazione">
+                        <?php if (!$html): ?><span class="btn-group btn-group-sm" role="group" aria-label="Formattazione">
                             <button type="button" class="btn btn-outline-secondary" data-inserisci="****" data-dentro="2" title="Grassetto"><i class="fa fa-bold" aria-hidden="true"></i><span class="visually-hidden">Grassetto</span></button>
                             <button type="button" class="btn btn-outline-secondary" data-riga="- " title="Elenco puntato"><i class="fa fa-list-ul" aria-hidden="true"></i><span class="visually-hidden">Elenco puntato</span></button>
                             <button type="button" class="btn btn-outline-secondary" data-riga="> " title="Citazione evidenziata"><i class="fa fa-quote-left" aria-hidden="true"></i><span class="visually-hidden">Citazione</span></button>
-                        </span>
+                        </span><?php endif; ?>
                     </div>
-                    <textarea class="form-control" id="corpo" name="corpo" rows="14" maxlength="<?php echo ModelliEmail::CORPO_MAX; ?>" required style="font-family:inherit;"><?php echo $h($corpo); ?></textarea>
-                    <div class="form-text">Una riga vuota separa i paragrafi. <code>**così**</code> = grassetto; righe che iniziano con <code>- </code> = elenco; con <code>&gt; </code> = citazione evidenziata. Il testo non è HTML: i simboli restano come li scrivi.</div>
+                    <textarea class="form-control<?php echo $html ? ' editor-html' : ''; ?>" id="corpo" name="corpo" rows="14"<?php echo $html ? '' : ' maxlength="' . ModelliEmail::CORPO_MAX . '" required'; ?> style="font-family:inherit;"><?php echo $h($corpo); ?></textarea>
+                    <?php if ($html): ?><div class="form-text">Testo scritto con l'editor. I dati si inseriscono con i segnaposto a graffa singola, per esempio <code>{NOME}</code> (clicca un segnaposto qui a destra).</div><?php else: ?><div class="form-text">Una riga vuota separa i paragrafi. <code>**così**</code> = grassetto; righe che iniziano con <code>- </code> = elenco; con <code>&gt; </code> = citazione evidenziata. Il testo non è HTML: i simboli restano come li scrivi.</div><?php endif; ?>
                 </div>
                 <?php if ($m['bottone'] !== null): ?>
                     <div class="mb-3">
@@ -185,7 +198,7 @@ foreach ($lista_visibile as $k => $x) {
                         <div class="fw-bold mb-3"><?php echo $h($anteprima['oggetto']); ?></div>
                         <div class="border rounded p-3 bg-white" style="max-width:640px;">
                             <?php echo $anteprima['corpo']; ?>
-                            <?php if ($anteprima['bottone'] !== null): ?><p style="margin-top:18px;"><span style="background:<?php echo $h(CatalogoEmail::colore((string)$m['gruppo']) ?? '#0f172a'); ?>;color:#fff;padding:10px 18px;border-radius:6px;font-weight:bold;display:inline-block;"><?php echo $h($anteprima['bottone']); ?></span></p><p style="font-size:12px;color:#64748b;">Il link è personale: non inoltrarlo.</p><?php endif; ?>
+                            <?php if ($anteprima['bottone'] !== null): ?><p style="margin-top:18px;"><span style="background:<?php echo $h(\App\Email\InvioEmail::coloreDi($m) ?? '#B80000'); ?>;color:#fff;padding:10px 18px;border-radius:6px;font-weight:bold;display:inline-block;"><?php echo $h($anteprima['bottone']); ?></span></p><p style="font-size:12px;color:#64748b;">Il link è personale: non inoltrarlo.</p><?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -206,9 +219,9 @@ foreach ($lista_visibile as $k => $x) {
                 <ul class="list-group list-group-flush small">
                     <?php foreach ($m['segnaposto'] as $nome => $info): ?>
                         <li class="list-group-item">
-                            <button type="button" class="btn btn-sm btn-outline-secondary font-monospace py-0" data-segnaposto="{{<?php echo $h($nome); ?>}}" title="Inserisci nel testo">{{<?php echo $h($nome); ?>}}</button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary font-monospace py-0" data-segnaposto="<?php echo $html ? $h($nome) : '{{' . $h($nome) . '}}'; ?>" title="Inserisci nel testo"><?php echo $html ? $h($nome) : '{{' . $h($nome) . '}}'; ?></button>
                             <div class="mt-1"><?php echo $h($info['d']); ?></div>
-                            <?php if ($nome[0] !== '!'): ?><div class="text-secondary">Esempio: <?php echo $h($info['esempio'] !== '' ? $info['esempio'] : '(vuoto)'); ?></div><?php else: ?><div class="text-secondary">Pezzo preparato dal portale: va scritto da solo su una riga.</div><?php endif; ?>
+                            <?php if ($html || $nome[0] !== '!'): ?><div class="text-secondary">Esempio: <?php echo $h($info['esempio'] !== '' ? $info['esempio'] : '(vuoto)'); ?></div><?php else: ?><div class="text-secondary">Pezzo preparato dal portale: va scritto da solo su una riga.</div><?php endif; ?>
                         </li>
                     <?php endforeach; ?>
                 </ul>
@@ -224,6 +237,8 @@ foreach ($lista_visibile as $k => $x) {
             if (el) el.addEventListener('focus', function () { attivo = el; });
         });
         function inserisci(testo, dentro) {
+            var ed = window.tinymce && tinymce.get('corpo');
+            if (ed && attivo && attivo.id !== 'oggetto' && attivo.id !== 'bottone') { ed.insertContent(testo); return; }
             var el = attivo, a = el.selectionStart, b = el.selectionEnd, v = el.value;
             var sel = v.substring(a, b);
             if (dentro && sel) testo = testo.substring(0, dentro) + sel + testo.substring(dentro);

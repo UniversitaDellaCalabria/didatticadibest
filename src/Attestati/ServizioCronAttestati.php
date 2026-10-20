@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Attestati;
 
 use App\Core\Orologio;
-use App\Infrastructure\Mail\Mailer;
+use App\Email\InvioEmail;
 use App\Portale\ColoriAree;
 
 /**
@@ -17,7 +17,7 @@ final class ServizioCronAttestati
     public function __construct(
         private AttestatoRepository $repo,
         private ServizioAttestati $attestati,
-        private Mailer $mailer,
+        private InvioEmail $invio,
         private ColoriAree $colori,
         private Orologio $orologio,
     ) {
@@ -45,20 +45,16 @@ final class ServizioCronAttestati
                 continue;
             }
 
-            $oggetto = 'Il tuo Attestato è pronto: ' . $row['titolo'];
             $linkAttestato = $dominio . '/stampa_attestato.php?code=' . urlencode((string) $row['codice_prenotazione']);
-            $linkArea = $dominio . '/area_personale.php';
-
-            $corpo = "<p>Gentile <strong>{$row['nome']} {$row['cognome']}</strong>,</p>";
-            $corpo .= "<p>Grazie per aver partecipato all'evento <strong>" . htmlspecialchars((string) $row['titolo']) . '</strong>' . (!empty($row['data_turno']) ? ' del ' . date('d/m/Y', (int) strtotime((string) $row['data_turno'])) : '') . '.</p>';
-            $corpo .= '<p>Il tuo <strong>Attestato di Partecipazione</strong> è stato generato ed è ora disponibile per il download.</p>';
-            $corpo .= "<p style='text-align: center; margin: 30px 0;'>\n"
-                    . "                    <a href='$linkAttestato' style='background-color: #198754; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;'>📄 Scarica il tuo Attestato</a>\n"
-                    . "                  </p>";
-            $corpo .= "<p>In alternativa, puoi sempre recuperarlo accedendo alla tua <a href='$linkArea'>Area Personale</a>.</p>";
-            $corpo .= '<p>Cordiali saluti,<br>Il team Didattica DiBEST</p>';
-
-            $this->mailer->invia((string) $row['email'], $oggetto, $corpo, $this->colori->delTurno((int) $row['turno_id']));
+            $this->invio->invia(
+                (string) $row['email'],
+                'evento_attestato_cron',
+                ['nome' => $row['nome'] . ' ' . $row['cognome'], 'titolo' => (string) $row['titolo'], 'data_testo' => !empty($row['data_turno']) ? ' del ' . date('d/m/Y', (int) strtotime((string) $row['data_turno'])) : ''],
+                $linkAttestato,
+                [],
+                '',
+                $this->colori->delTurno((int) $row['turno_id'])
+            );
             $this->repo->segnaAttestatoInviato((int) $row['id']);
             $inviate++;
         }

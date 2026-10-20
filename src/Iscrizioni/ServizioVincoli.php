@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Iscrizioni;
 
 use App\Eventi\Turni;
-use App\Infrastructure\Mail\Mailer;
+use App\Email\InvioEmail;
 use App\Portale\ColoriAree;
 
 /**
@@ -20,7 +20,7 @@ final class ServizioVincoli
     public function __construct(
         private PrenotazioneRepository $prenotazioni,
         private ServizioListaAttesa $listaAttesa,
-        private Mailer $mailer,
+        private InvioEmail $invio,
         private ColoriAree $colori,
         private RegistroOperazioni $registro,
     ) {
@@ -114,11 +114,7 @@ final class ServizioVincoli
             foreach ($annullate as $a) {
                 $voci .= '<li><strong>' . htmlspecialchars((string) $a['evento_titolo']) . '</strong> — ' . htmlspecialchars(Turni::etichetta($a)) . '</li>';
             }
-            $corpo = '<p>Gentile <strong>' . htmlspecialchars((string) $c['nome']) . '</strong>,</p>'
-                   . '<p>la tua prenotazione per <strong>' . htmlspecialchars((string) $c['evento_titolo']) . '</strong> è <strong>confermata</strong>.</p>'
-                   . "<p>Poiché in quest'area è consentita una sola iscrizione, le tue altre richieste in lista d'attesa sono state annullate automaticamente:</p>"
-                   . "<ul>$voci</ul>";
-            $this->mailer->invia($email, "Liste d'attesa annullate: iscrizione confermata a " . $c['evento_titolo'], $corpo, $this->colori->delTurno((int) $c['turno_id']));
+            $this->invio->invia($email, 'evento_liste_attesa_annullate', ['nome' => (string) $c['nome'], 'evento' => (string) $c['evento_titolo'], 'elenco' => "<ul>$voci</ul>"], '', [], '', $this->colori->delTurno((int) $c['turno_id']));
         }
 
         return count($annullate);

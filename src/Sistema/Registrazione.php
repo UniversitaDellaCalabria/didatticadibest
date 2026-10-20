@@ -8,7 +8,7 @@ use App\Auth\ServizioUtenti;
 use App\Core\Container;
 use App\Core\Database;
 use App\Core\Sito;
-use App\Infrastructure\Mail\Mailer;
+use App\Email\InvioEmail;
 use App\Sistema\Backup\StatoBackup;
 
 /** Servizi del modulo Sistema che ricevono valori non di classe (ambiente locale). */
@@ -23,7 +23,7 @@ final class Registrazione
             $c->get(StatoBackup::class),
             $c->get(LogEmailRepository::class),
             $c->get(ServizioUtenti::class),
-            $c->get(Mailer::class),
+            $c->get(InvioEmail::class),
             defined('AMBIENTE_LOCALE') && AMBIENTE_LOCALE,
         ));
     }

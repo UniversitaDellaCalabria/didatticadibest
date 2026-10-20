@@ -177,15 +177,14 @@ if (!$dest_email || $freq === 'no') {
                 : "<p>In allegato il database compresso e <strong>cifrato AES-256 con OpenSSL</strong> (" . $mb($dim) . ", file <code>" . htmlspecialchars($nome_f) . "</code>). Per aprirlo, da <strong>Git Bash</strong> nella cartella del file:</p>"
                   . "<p style='font-family:monospace;background:#f1f5f9;padding:10px;border-radius:6px;'>openssl enc -d -aes-256-cbc -pbkdf2 -iter 100000 -md sha256 -in " . htmlspecialchars($nome_f) . " -out " . htmlspecialchars(preg_replace('/\.enc$/', '', $nome_f)) . "</p>"
                   . "<p>La password richiesta è <code>BACKUP_PASSWORD</code> del file <code>.env</code> del server (non è scritta in questa email). Si ottiene il file <code>.sql.gz</code>, che si apre con 7-Zip.</p>";
-            $corpo = "<p>Backup del database del portale Didattica DiBEST del <strong>" . date('d/m/Y H:i') . "</strong>.</p>"
-                   . ($sopra
-                       ? "<p><strong>Il file cifrato pesa " . $mb($dim) . ", troppo per un'email</strong>: non è allegato. La copia completa è sul NAS" . ($stato_nas['ok'] ? " ({$stato_nas['cartella']})" : '') . ".</p>"
-                       : $istruzioni)
-                   . "<p style='color:#64748b;font-size:13px;'>Esito del backup di oggi:<br>" . implode('<br>', array_map(fn($x) => ($x[0] === false ? '❌ ' : ($x[0] ? '✅ ' : 'ℹ️ ')) . htmlspecialchars($x[1]), $righe)) . "</p>"
-                   . "<p style='color:#64748b;font-size:13px;'>Conserva questa email in una casella sicura: contiene dati personali (cifrati).</p>";
+            $esito_html = "<p style='color:#64748b;font-size:13px;'>Esito del backup di oggi:<br>" . implode('<br>', array_map(fn($x) => ($x[0] === false ? '❌ ' : ($x[0] ? '✅ ' : 'ℹ️ ')) . htmlspecialchars($x[1]), $righe)) . "</p>";
+            $istr_html = $sopra
+                ? "<p><strong>Il file cifrato pesa " . $mb($dim) . ", troppo per un'email</strong>: non è allegato. La copia completa è sul NAS" . ($stato_nas['ok'] ? " ({$stato_nas['cartella']})" : '') . ".</p>"
+                : $istruzioni;
+            $pr_bk = \App\Core\App::get(\App\Email\InvioEmail::class)->prepara('sistema_backup', ['data' => date('d/m/Y'), 'data_ora' => date('d/m/Y H:i'), 'istruzioni' => $istr_html, 'esito' => $esito_html]);
             $inviati = 0;
             foreach ($dest_email as $em) {
-                if (inviaNotificaEmail($em, "Backup database Didattica DiBEST - " . date('d/m/Y'), $corpo, $conn, null, $sopra ? [] : [['path' => $file_cif, 'nome' => $nome_f]])) $inviati++;
+                if (inviaNotificaEmail($em, $pr_bk['oggetto'], $pr_bk['corpo'], $conn, $pr_bk['colore'], $sopra ? [] : [['path' => $file_cif, 'nome' => $nome_f]])) $inviati++;
             }
             @unlink($file_cif);
             $tipo_cif = $metodo === 'zip' ? 'ZIP AES-256' : "OpenSSL AES-256 (lo ZIP cifrato non è disponibile: $errore_zip)";
@@ -215,10 +214,11 @@ $stato['ultima_email'] = ($stato_email['ok'] === true) ? $stato['data'] : ($prec
 registra_log_audit($conn, "Backup " . ($problemi ? "con problemi" : "completato"), ["Problemi" => count($problemi)]);
 
 if ($problemi) {
-    $corpo_av = "<p>Il backup del portale Didattica DiBEST del <strong>" . date('d/m/Y H:i') . "</strong> ha avuto dei problemi:</p><ul>"
-              . implode('', array_map(fn($m) => "<li>" . htmlspecialchars($m) . "</li>", $problemi)) . "</ul>"
-              . "<p>Dettagli e stato nel pannello: <a href='" . htmlspecialchars(url_base_sito() . '/admin/sistema.php#backup') . "'>Sistema Email &amp; Backup</a>.</p>";
-    foreach (email_amministratori($conn) as $em) inviaNotificaEmail($em, "⚠️ Backup Didattica DiBEST: problemi da controllare", $corpo_av, $conn);
+    $pr_av = \App\Core\App::get(\App\Email\InvioEmail::class)->prepara('sistema_backup_problemi', [
+        'data_ora' => date('d/m/Y H:i'),
+        'elenco' => '<ul>' . implode('', array_map(fn($m) => "<li>" . htmlspecialchars($m) . "</li>", $problemi)) . '</ul>',
+    ], url_base_sito() . '/admin/sistema.php#backup');
+    foreach (email_amministratori($conn) as $em) inviaNotificaEmail($em, $pr_av['oggetto'], $pr_av['corpo'], $conn, $pr_av['colore']);
 }
 
 // ---------------------------------------------------------------------

@@ -7,7 +7,7 @@ namespace App\Avvisi;
 use App\Core\Esito;
 use App\Core\Sito;
 use App\Eventi\FonteEventiAgenda;
-use App\Infrastructure\Mail\Mailer;
+use App\Email\InvioEmail;
 
 /**
  * Avvisi per email dei nuovi eventi per ambito: iscrizione scegliendo gli ambiti (e/o le attività per le scuole),
@@ -22,7 +22,7 @@ final class ServizioAvvisi
 
     public function __construct(
         private IscrizioneRepository $iscrizioni,
-        private Mailer $mailer,
+        private InvioEmail $invio,
         private FonteEventiAgenda $eventi,
         private Sito $sito,
     ) {
@@ -55,14 +55,7 @@ final class ServizioAvvisi
             return Esito::ok("Preferenze salvate: riceverai un'email quando escono nuovi eventi dei tuoi argomenti.");
         }
         $link = $this->sito->urlBase() . '/avvisi.php?conferma=' . $token;
-        $this->mailer->invia(
-            $email,
-            "Conferma l'iscrizione agli avvisi degli eventi",
-            "<p>Hai chiesto di ricevere un'email quando il Dipartimento pubblica nuovi eventi di: <strong>" . self::h(self::testoArgomenti(implode(',', $ambiti), $scuole)) . '</strong>.</p>'
-            . "<p style='margin-top:18px;'><a href='" . self::h($link) . "' style='background:#0056B3;color:#fff;padding:10px 18px;text-decoration:none;border-radius:6px;font-weight:bold;'>Conferma l'iscrizione</a></p>"
-            . "<p style='font-size:12px;color:#64748b;'>Se non sei stato tu, ignora questa email: senza conferma non riceverai nulla e i dati si cancellano dopo 30 giorni.</p>",
-            self::COLORE
-        );
+        $this->invio->invia($email, 'avvisi_conferma_iscrizione', ['argomenti' => self::testoArgomenti(implode(',', $ambiti), $scuole)], $link);
 
         return Esito::ok("Ti abbiamo mandato un'email: clicca sul link per confermare l'iscrizione.");
     }
@@ -156,13 +149,16 @@ final class ServizioAvvisi
                 $perEvento[(int) $e['id']] = ($perEvento[(int) $e['id']] ?? 0) + 1;
             }
             $gestisci = $this->sito->urlBase() . '/avvisi.php?t=' . $isc->token;
-            $this->mailer->invia(
+            $this->invio->invia(
                 $isc->email,
-                count($suoi) === 1 ? 'Nuovo evento: ' . $suoi[0]['titolo'] : count($suoi) . ' nuovi eventi del Dipartimento',
-                '<p>Nuovi appuntamenti su: <strong>' . self::h(self::testoArgomenti(implode(',', $isc->ambiti), $isc->scuole)) . "</strong>.</p><table style='width:100%;border-collapse:collapse;font-size:14px;'>$righe</table>"
-                . "<p style='margin-top:16px;'><a href='" . self::h($this->sito->urlBase() . '/agenda.php') . "'>Tutta l'agenda</a></p>"
-                . "<p style='font-size:12px;color:#64748b;margin-top:18px;'>Ricevi questa email perché ti sei iscritto agli avvisi. <a href='" . self::h($gestisci) . "'>Cambia argomenti o cancellati</a>.</p>",
-                self::COLORE
+                'avvisi_nuovi_eventi',
+                [
+                    'argomenti' => self::testoArgomenti(implode(',', $isc->ambiti), $isc->scuole),
+                    'quanti_testo' => count($suoi) === 1 ? 'Nuovo evento: ' . $suoi[0]['titolo'] : count($suoi) . ' nuovi eventi del Dipartimento',
+                    'eventi' => "<table style='width:100%;border-collapse:collapse;font-size:14px;'>$righe</table>",
+                    'gestisci' => "<p style='font-size:12px;color:#64748b;margin-top:18px;'>Ricevi questa email perché ti sei iscritto agli avvisi. <a href='" . self::h($gestisci) . "'>Cambia argomenti o cancellati</a>.</p>",
+                ],
+                $this->sito->urlBase() . '/agenda.php'
             );
             $this->iscrizioni->segnaInvio($isc->id);
             $inviate++;
