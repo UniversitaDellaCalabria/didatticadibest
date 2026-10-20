@@ -1341,12 +1341,83 @@ var PACCHETTI = [
     ],
     nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
     commit: "Email modificabili (5): le email della Didattica dal catalogo"
+  },
+  {
+    id: "email-tutte",
+    titolo: "Pacchetto 30 · Testi delle email: tutte le altre email del portale",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare",
+    schema: "nessuna modifica (resta la v82)",
+    riassunto: "Nella pagina <strong>Gestione del portale → Testi delle email</strong> ci sono ora <strong>tutte le email del portale</strong> (142 modelli): oltre a tutorato e Didattica, le <strong>convenzioni FSL e di tesi</strong>, le <strong>prenotazioni di risorse</strong> (a chi prenota, ai gestori, scadenze, diario di bordo, slot liberi), gli <strong>eventi e le iscrizioni</strong> (conferma, in valutazione, lista d'attesa, cancellazione, promemoria, attestato, sondaggio, messaggi di assistenza, avvisi sui nuovi eventi…) e i <strong>riepiloghi e controlli</strong> (Da fare per te, riepilogo settimanale delle email, controllo del sito, backup via email, email di prova). <strong>I testi che prima si scrivevano in Sistema</strong> (conferma, cancellazione, promemoria, attestato, sondaggio) <strong>sono stati portati qui in automatico</strong>, con le tue modifiche: la pagina Sistema ora ha solo la configurazione SMTP. Le email degli eventi si scrivono con l'editor e i segnaposto <code>{NOME}</code> come prima; l'attestato e il sondaggio hanno la spunta «Invia questa email» (senza spunta non partono, come prima senza testo). Dalle pagine Didattica, Tutorato, Formazione Scuola Lavoro e Convenzioni di tesi il pulsante «Testi delle email» apre l'elenco del modulo. La guida dell'amministratore ha la sezione «Cambiare il testo di un'email». Restano scritte a mano per scelta solo la convocazione delle sedute e l'email massiva (le scrive chi le manda). <strong>Piccole differenze:</strong> i nomi nelle email dell'attestato automatico sono ora «ripuliti»; in alcune email il pulsante sta in fondo (il testo che stava dopo è ora prima).",
+    passi: [["Gestione del portale", "Testi delle email"], ["Gestione del portale", "Sistema (solo SMTP)"]],
+    cartelle: [
+      { cartella: "admin/", file: [
+        ["admin/email.php", "mod", "Testi delle email", "email in formato HTML con l'editor, spunta «Invia questa email», tutti i gruppi"],
+        ["admin/sistema.php", "mod", "Sistema", "via i sei blocchi dei testi (ora nella pagina Email), email di prova dal modello"],
+        ["admin/cron_backup.php", "mod", "Sistema", "email del backup dal modello"],
+        ["admin/fsl.php", "mod", "Formazione Scuola Lavoro", "pulsante «Testi delle email»"],
+        ["admin/convenzioni_tesi.php", "mod", "Convenzioni di tesi", "pulsante «Testi delle email»"]
+      ]},
+      { cartella: "src/Email/", file: [
+        ["src/Email/InvioEmail.php", "mod", "Testi delle email", "invio HTML, prepara/spedisci, colore dell'area dell'evento"],
+        ["src/Email/ModelliEmail.php", "mod", "Testi delle email", "formato HTML, email facoltative, importazione dei testi di Sistema, indirizzi email come collegamenti"],
+        ["src/Email/CatalogoEmail.php", "mod", "Testi delle email", "colori dei gruppi, modelli HTML, elenco dei cataloghi"],
+        ["src/Email/CatalogoConvenzioni.php", "nuovo", "Testi delle email", "email delle convenzioni FSL e di tesi"],
+        ["src/Email/CatalogoRisorse.php", "nuovo", "Testi delle email", "email delle prenotazioni di risorse"],
+        ["src/Email/CatalogoEventi.php", "nuovo", "Testi delle email", "email degli eventi e delle iscrizioni, attestati, sondaggi, avvisi"],
+        ["src/Email/CatalogoSistema.php", "nuovo", "Testi delle email", "riepiloghi, controlli e backup"]
+      ]},
+      { cartella: "src/Fsl/ e src/ConvenzioniTesi/", file: [
+        ["src/Fsl/NotificheConvenzioni.php", "mod", "Convenzioni FSL", "email dai modelli"],
+        ["src/Fsl/ServizioConvenzioneOnline.php", "mod", "Convenzioni FSL", "email dei documenti pronti"],
+        ["src/Fsl/ServizioDocumentiClasse.php", "mod", "Convenzioni FSL", "promemoria dei documenti della classe"],
+        ["src/Fsl/ServizioProgrammaFsl.php", "mod", "Convenzioni FSL", "riepilogo del programma"],
+        ["src/Fsl/ServizioValutazioniFsl.php", "mod", "Convenzioni FSL", "scheda di valutazione"],
+        ["src/Fsl/Vista/AvvisoDocumenti.php", "mod", "Convenzioni FSL", "dati del promemoria"],
+        ["src/ConvenzioniTesi/NotificheConvenzioniTesi.php", "mod", "Convenzioni di tesi", "email dai modelli"]
+      ]},
+      { cartella: "src/Risorse/, src/Eventi/, src/Iscrizioni/", file: [
+        ["src/Risorse/NotificheRisorse.php", "mod", "Risorse", "email dai modelli"],
+        ["src/Eventi/ServizioTurni.php", "mod", "Eventi", "posto confermato dalla lista d'attesa"],
+        ["src/Iscrizioni/NotifichePrenotazione.php", "mod", "Iscrizioni", "riepilogo per i gestori"],
+        ["src/Iscrizioni/ServizioAreaPersonale.php", "mod", "Iscrizioni", "email dell'Area personale"],
+        ["src/Iscrizioni/ServizioListaAttesa.php", "mod", "Iscrizioni", "posto liberato"],
+        ["src/Iscrizioni/ServizioPrenotazioni.php", "mod", "Iscrizioni", "conferma e riepilogo ai gestori"],
+        ["src/Iscrizioni/ServizioVincoli.php", "mod", "Iscrizioni", "liste d'attesa annullate"]
+      ]},
+      { cartella: "src/Iscritti/, src/Attestati/, src/Sondaggi/, src/Avvisi/", file: [
+        ["src/Iscritti/ServizioCron.php", "mod", "Iscritti", "email dopo l'evento, elenco studenti, convenzioni"],
+        ["src/Iscritti/ServizioIscritti.php", "mod", "Iscritti", "email del gestore agli iscritti"],
+        ["src/Iscritti/ServizioMessaggi.php", "mod", "Iscritti", "messaggi della segreteria"],
+        ["src/Iscritti/ServizioPromemoria.php", "mod", "Iscritti", "promemoria degli eventi"],
+        ["src/Attestati/ServizioAttestati.php", "mod", "Attestati", "email degli attestati"],
+        ["src/Attestati/ServizioCronAttestati.php", "mod", "Attestati", "email degli attestati dal cron"],
+        ["src/Sondaggi/ServizioSondaggi.php", "mod", "Sondaggi", "invio del link del questionario"],
+        ["src/Avvisi/ServizioAvvisi.php", "mod", "Avvisi", "conferma iscrizione e nuovi eventi"]
+      ]},
+      { cartella: "src/Portale/ e src/Sistema/", file: [
+        ["src/Portale/RiepilogoPersone.php", "mod", "Direzione", "riepilogo «Da fare per te»"],
+        ["src/Portale/GuidePerRuolo.php", "mod", "Guide", "sezione «Cambiare il testo di un'email»"],
+        ["src/Sistema/ControlloSito.php", "mod", "Sistema", "avvisi del controllo"],
+        ["src/Sistema/ReportEmailSettimanale.php", "mod", "Sistema", "riepilogo settimanale"],
+        ["src/Sistema/ImpostazioniSistemaRepository.php", "mod", "Sistema", "il salvataggio non tocca più i testi delle email"],
+        ["src/Sistema/Registrazione.php", "mod", "Sistema", "collegamento delle classi"]
+      ]}
+    ],
+    dopo: [
+      "Apri una pagina del pannello (nessuna modifica allo schema, ma l'importazione dei testi di Sistema avviene alla prima apertura di «Testi delle email» o al primo invio).",
+      "Gestione del portale → <strong>Testi delle email</strong>: controlla in «Eventi e iscrizioni» che i testi della conferma, della cancellazione e del promemoria siano quelli che avevi scritto in Sistema (sono «modificata» da «Impostazioni di sistema»).",
+      "Per l'<strong>attestato</strong> e il <strong>sondaggio</strong> controlla la spunta «Invia questa email»: se in Sistema avevi scritto il testo risultano già attive.",
+      "Gestione del portale → Sistema: ora ci sono solo i dati SMTP e un rimando alla nuova pagina.",
+      "Il PDF della guida dell'amministratore (<code>documentazione/guide/Guida_Amministratore.pdf</code>) è da rifare con la solita procedura: il testo nuovo è già in <code>guida.php?r=amministratore</code>."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Email modificabili (6-8): tutte le email del portale nel catalogo, testi di Sistema importati, email facoltative, test che vieta le email scritte nel codice"
   }
 ];
 
 var PROSSIMI = [
-  ["F15 · Email modificabili: step 6-8", "restano convenzioni (FSL e tesi), risorse, iscrizioni e eventi (con i testi di Sistema), attestati, sondaggi, avvisi, direzione e la guida (piano §F15)"],
-  ["F11 · Verbali pubblici: sola visualizzazione e download con le credenziali di Ateneo", "fatto in locale (schema v80): vedi il piano (F11). File: verbali.php, admin/didattica_accessi.php, admin/didattica_sedute.php, src/Didattica/ServizioVerbaliPubblici.php, src/Didattica/AccessoVerbaliRepository.php, src/Uffici/*, src/Core/Schema/*, assets/vendor/cdnjs/ajax/libs/pdf.js/ (nuova cartella: 2 file)"],
+    ["F11 · Verbali pubblici: sola visualizzazione e download con le credenziali di Ateneo", "fatto in locale (schema v80): vedi il piano (F11). File: verbali.php, admin/didattica_accessi.php, admin/didattica_sedute.php, src/Didattica/ServizioVerbaliPubblici.php, src/Didattica/AccessoVerbaliRepository.php, src/Uffici/*, src/Core/Schema/*, assets/vendor/cdnjs/ajax/libs/pdf.js/ (nuova cartella: 2 file)"],
   ["F10 · Convenzioni di tesi con enti e aziende esterne", "fatto in locale: vedi Pacchetto 20 (link all'azienda senza registrazione, modifiche agli articoli, firma del Direttore, archivio ed elenco pubblico)"],
   ["F8 · Uffici di Dipartimento e di Ateneo in un'unica anagrafe, Direttore e vice, «Direttore assente»", "fatto in locale: vedi Pacchetto 19 (restano da decidere la pagina pubblica «Organigramma» e un selettore unico per gli eventi)"],
   ["FSL · Promemoria e messaggi alle scuole sulla convenzione", "fatto in locale: vedi Pacchetto 19"],
