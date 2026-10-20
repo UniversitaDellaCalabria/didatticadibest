@@ -1302,11 +1302,50 @@ var PACCHETTI = [
     ],
     nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
     commit: "Email modificabili: modelli con segnaposto, pagina «Testi delle email» e le email del tutorato; pulsanti manuali del tutorato"
+  },
+  {
+    id: "email-didattica",
+    titolo: "Pacchetto 29 · Testi delle email: pratiche, firme, conferme e verbali della Didattica",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare",
+    schema: "nessuna modifica (resta la v82)",
+    riassunto: "Nella pagina <strong>Gestione del portale → Testi delle email</strong> (e dal pulsante «Testi delle email» nella pagina della Didattica) compaiono anche le <strong>email della Didattica</strong>: 25 modelli in quattro gruppi — <em>Pratiche · Allo studente</em> (ricevuta, cambio di stato, messaggio dell'ufficio, passaggio, marche da bollo, documento pronto), <em>Pratiche · Agli uffici e agli operatori</em> (nuova pratica, messaggio dello studente, assegnazioni, integrazioni, riepilogo alla segreteria, pratica ferma, iter concluso, firma rifiutata), <em>Pratiche · Firme e conferme</em> (firma richiesta e promemoria, conferma al docente e promemoria) e <em>Sedute e verbali</em> (verbale da firmare, sollecito, verbale firmato). Senza modifiche le email partono come prima. Chi lavora in Didattica modifica i gruppi della Didattica. <strong>Piccole differenze:</strong> l'avviso «integrazione aggiunta» ha un pulsante al posto del link; il nome del corso nell'avviso «pratica arrivata all'ufficio» non è più in grassetto; la frase «Il link è personale» delle email dei verbali sta prima del pulsante. La convocazione delle sedute resta com'è (si scrive già per ogni seduta).",
+    passi: [["Gestione del portale", "Testi delle email"], ["Didattica", "Testi delle email"]],
+    cartelle: [
+      { cartella: "admin/", file: [
+        ["admin/email.php", "mod", "Testi delle email", "gruppi della Didattica, filtro per modulo, permessi"],
+        ["admin/didattica.php", "mod", "Didattica", "pulsante «Testi delle email»"],
+        ["admin/tutorato.php", "mod", "Tutorato", "il pulsante apre la pagina già filtrata sul tutorato"]
+      ]},
+      { cartella: "src/Email/", file: [
+        ["src/Email/InvioEmail.php", "nuovo", "Testi delle email", "invio di un modello con colore, pulsante e allegati"],
+        ["src/Email/CatalogoDidattica.php", "nuovo", "Testi delle email", "i 25 modelli della Didattica"],
+        ["src/Email/CatalogoEmail.php", "mod", "Testi delle email", "colori dei gruppi e segnaposto comuni"]
+      ]},
+      { cartella: "src/Didattica/", file: [
+        ["src/Didattica/NotifichePratiche.php", "mod", "Didattica", "le email delle pratiche dai modelli"],
+        ["src/Didattica/ServizioPratiche.php", "mod", "Didattica", "avviso «integrazione aggiunta»"],
+        ["src/Didattica/ServizioIter.php", "mod", "Didattica", "assegnazione e richiesta di integrazione"],
+        ["src/Didattica/ServizioFlussoConvalide.php", "mod", "Didattica", "pratica arrivata all'ufficio, riepilogo alla segreteria, iter concluso"],
+        ["src/Didattica/FirmaPratica.php", "mod", "Didattica", "firma richiesta, promemoria, firma rifiutata"],
+        ["src/Didattica/ServizioConfermeDocenti.php", "mod", "Didattica", "conferma richiesta al docente"],
+        ["src/Didattica/PromemoriaPratiche.php", "mod", "Didattica", "pratica ferma"],
+        ["src/Didattica/VerbaleFirmato.php", "mod", "Didattica", "verbale da firmare, sollecito e firmato"],
+        ["src/Didattica/Registrazione.php", "mod", "Didattica", "collegamento delle classi"]
+      ]}
+    ],
+    dopo: [
+      "Gestione del portale → <strong>Testi delle email</strong>: ora ci sono anche i gruppi «Didattica · …». Prova «Inviami una prova» su un paio.",
+      "Nella pagina Didattica il pulsante <strong>Testi delle email</strong> apre l'elenco già limitato alla Didattica.",
+      "Non serve aprire altre pagine: lo schema è sempre la v82."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Email modificabili (5): le email della Didattica dal catalogo"
   }
 ];
 
 var PROSSIMI = [
-  ["F15 · Email modificabili: step 5-8", "restano le email di pratiche e didattica, convenzioni (FSL e tesi), risorse, iscrizioni, attestati, sondaggi, direzione e la guida (piano §F15)"],
+  ["F15 · Email modificabili: step 6-8", "restano convenzioni (FSL e tesi), risorse, iscrizioni e eventi (con i testi di Sistema), attestati, sondaggi, avvisi, direzione e la guida (piano §F15)"],
   ["F11 · Verbali pubblici: sola visualizzazione e download con le credenziali di Ateneo", "fatto in locale (schema v80): vedi il piano (F11). File: verbali.php, admin/didattica_accessi.php, admin/didattica_sedute.php, src/Didattica/ServizioVerbaliPubblici.php, src/Didattica/AccessoVerbaliRepository.php, src/Uffici/*, src/Core/Schema/*, assets/vendor/cdnjs/ajax/libs/pdf.js/ (nuova cartella: 2 file)"],
   ["F10 · Convenzioni di tesi con enti e aziende esterne", "fatto in locale: vedi Pacchetto 20 (link all'azienda senza registrazione, modifiche agli articoli, firma del Direttore, archivio ed elenco pubblico)"],
   ["F8 · Uffici di Dipartimento e di Ateneo in un'unica anagrafe, Direttore e vice, «Direttore assente»", "fatto in locale: vedi Pacchetto 19 (restano da decidere la pagina pubblica «Organigramma» e un selettore unico per gli eventi)"],
