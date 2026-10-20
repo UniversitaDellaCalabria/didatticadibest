@@ -66,3 +66,31 @@ if (!function_exists('pn_percorso')) {
         return \App\Portale\Vista\Pannello::percorso($tappe, $etichetta);
     }
 }
+
+if (!function_exists('pn_compiti')) {
+    // «Cosa devo fare»: schede con numero e un solo pulsante
+    function pn_compiti(array $compiti, string $etichetta = 'Cosa devo fare'): string {
+        return \App\Portale\Vista\Pannello::compiti($compiti, $etichetta);
+    }
+}
+
+if (!function_exists('pn_altro')) {
+    // Menu «Altro» per le azioni rare (voci HTML già pronte)
+    function pn_altro(array $voci, string $testo = 'Altro'): string {
+        return \App\Portale\Vista\Pannello::altro($voci, $testo);
+    }
+}
+
+if (!function_exists('pn_scarica')) {
+    // Menu «Scarica» (Excel, PDF, CSV): aggiunge scarica=xlsx|pdf|csv all'indirizzo
+    function pn_scarica(string $href, string $testo = 'Scarica'): string {
+        return \App\Portale\Vista\Pannello::scarica($href, $testo);
+    }
+}
+
+if (!function_exists('pn_indietro')) {
+    // Riga «← torna a…»
+    function pn_indietro(string $href, string $testo): string {
+        return \App\Portale\Vista\Pannello::indietro($href, $testo);
+    }
+}

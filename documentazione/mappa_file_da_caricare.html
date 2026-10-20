@@ -1413,6 +1413,38 @@ var PACCHETTI = [
     ],
     nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
     commit: "Email modificabili (6-8): tutte le email del portale nel catalogo, testi di Sistema importati, email facoltative, test che vieta le email scritte nel codice"
+  },
+  {
+    id: "pannello-guidato-1",
+    titolo: "Pacchetto 31 · Pannello guidato: convenzioni FSL (F16.1) ed esportazioni in Excel, PDF e CSV (X1)",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare",
+    schema: "nessuna modifica (resta la v82)",
+    riassunto: "Le <strong>convenzioni con le scuole</strong> (Formazione Scuola Lavoro) hanno una prima schermata che mostra solo <strong>quello che devi fare</strong>: PDF da prendere in carico, convenzioni da protocollare, convenzioni dal Direttore, scuole senza convenzione, con un numero e un solo pulsante. La <strong>scheda della scuola</strong> mostra i cinque passi della convenzione e l'unica cosa da fare adesso. Le azioni rare sono nel menu <strong>«Altro»</strong>. Il <strong>registro</strong> ha l'interruttore In vigore / Scadute, la ricerca, il pulsante «Rinnova» sulle convenzioni in scadenza e il menu <strong>«Scarica»</strong> con Excel, PDF e CSV (anche le tabelle di attività, scuole e valutazioni).",
+    passi: [["Formazione Scuola Lavoro", "Scuole e convenzioni"]],
+    cartelle: [
+      { cartella: "admin/", file: [
+        ["admin/fsl.php", "mod", "Formazione Scuola Lavoro", "prima schermata «cosa devo fare», scheda della scuola a passi, registro con «Scarica», menu «Altro», scuole senza convenzione in un solo elenco"]
+      ]},
+      { cartella: "inc/ e src/Portale/Vista/", file: [
+        ["inc/pannello.php", "mod", "Pannello", "pn_compiti, pn_altro, pn_scarica, pn_indietro"],
+        ["src/Portale/Vista/Pannello.php", "mod", "Pannello", "schede «cosa devo fare», menu «Altro» e «Scarica», riga «torna a»"]
+      ]},
+      { cartella: "src/Infrastructure/Documenti/", file: [
+        ["src/Infrastructure/Documenti/TabellaEsportabile.php", "nuovo", "Esportazioni", "una tabella → Excel, PDF e CSV"]
+      ]},
+      { cartella: "assets/css/", file: [
+        ["assets/css/pannello.css", "mod", "Pannello", "aspetto delle schede «cosa devo fare», dei menu e dell'interruttore"]
+      ]}
+    ],
+    dopo: [
+      "Apri <strong>Formazione Scuola Lavoro</strong>: la prima schermata è «Scuole e convenzioni» con le schede-numero. Se c'è una convenzione caricata da una scuola, la scheda «Da prendere in carico» è rossa.",
+      "Apri il <strong>registro delle convenzioni</strong> e prova «Scarica → Excel / PDF / CSV».",
+      "Nel menu <strong>Altro</strong> trovi: registra una convenzione già firmata fuori dal portale, ricorda a tutte le scuole di caricare il PDF, controlla le iscrizioni senza convenzione, testi delle email.",
+      "I vecchi indirizzi (<code>fsl.php?tab=iter</code>, <code>stipulare</code>, <code>convenzioni</code>, <code>verifica</code>, <code>scuola</code>) funzionano ancora."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Pannello guidato (1): convenzioni FSL con «cosa devo fare», scheda scuola a passi e registro; esportazioni in Excel, PDF e CSV"
   }
 ];
 

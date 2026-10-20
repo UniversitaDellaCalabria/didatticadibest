@@ -251,3 +251,31 @@ body { background-color: var(--pn-sfondo); color: var(--pn-testo); }
 .dd-uffici summary { cursor: pointer; list-style: none; }
 .dd-uffici summary::-webkit-details-marker { display: none; }
 .dd-uffici-lista { position: absolute; z-index: 20; left: 0; right: 0; margin-top: 2px; max-height: 260px; overflow: auto; padding: 8px 10px; background: var(--pn-carta); border: 1px solid var(--pn-bordo); border-radius: 8px; box-shadow: 0 8px 20px rgba(15, 23, 42, .18); display: grid; gap: 6px; min-width: 280px; }
+
+/* Cosa devo fare: schede grandi con un numero e un solo pulsante (F16) */
+.pn-compiti { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; margin-bottom: 1.25rem; }
+.pn-compito { display: flex; flex-direction: column; gap: 4px; padding: 16px 18px; border-radius: var(--pn-raggio); border: 1px solid var(--pn-bordo); background: var(--pn-carta); box-shadow: var(--pn-ombra); }
+.pn-compito-num { font-size: 2.4rem; font-weight: 800; line-height: 1; color: var(--pn-testo); }
+.pn-compito-titolo { font-size: 1.05rem; font-weight: 700; margin-top: 4px; }
+.pn-compito-testo { color: var(--pn-tenue); font-size: .92rem; margin: 0 0 10px; flex: 1; }
+.pn-compito-bottone { align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; padding: .55rem 1.1rem; border-radius: 10px; font-weight: 700; text-decoration: none; background: var(--pn-carta); color: var(--pn-testo); border: 1px solid #94a3b8; }
+.pn-compito-bottone:hover, .pn-compito-bottone:focus-visible { border-color: var(--pn-testo); color: var(--pn-testo); background: var(--pn-morbido); }
+.pn-compito-tuo { border-color: #fca5a5; background: #fef2f2; border-left: 6px solid #b30000; }
+.pn-compito-tuo .pn-compito-num, .pn-compito-tuo .pn-compito-titolo { color: #991b1b; }
+.pn-compito-tuo .pn-compito-bottone { background: #b30000; border-color: #b30000; color: #fff; }
+.pn-compito-tuo .pn-compito-bottone:hover { background: #8f0000; color: #fff; }
+.pn-compito-attesa { border-color: #fcd34d; background: #fffbeb; border-left: 6px solid #d97706; }
+.pn-compito-attesa .pn-compito-num { color: #92400e; }
+.pn-compito-zero { background: var(--pn-carta); border-left: 6px solid #86efac; }
+.pn-compito-zero .pn-compito-num { color: #16a34a; }
+.pn-altro .dropdown-menu, .pn-scarica .dropdown-menu { min-width: 250px; }
+.pn-altro form { margin: 0; }
+.pn-altro .dropdown-item { white-space: normal; }
+.pn-indietro { margin: 0 0 .75rem; }
+.pn-indietro a { font-weight: 700; text-decoration: none; }
+.pn-segmenti { display: inline-flex; border: 1px solid #94a3b8; border-radius: 10px; overflow: hidden; background: var(--pn-carta); flex-wrap: wrap; }
+.pn-segmenti a { padding: .45rem 1rem; text-decoration: none; font-weight: 600; font-size: .92rem; color: var(--pn-testo); border-left: 1px solid var(--pn-bordo); }
+.pn-segmenti a:first-child { border-left: 0; }
+.pn-segmenti a.attivo { background: var(--pn-testo); color: var(--pn-carta); }
+.pn-linea { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 12px; }
+.pn-linea .pn-spazio { margin-left: auto; }

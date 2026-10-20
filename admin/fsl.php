@@ -1,5 +1,6 @@
 <?php
-// fsl.php - Formazione Scuola Lavoro (solo amministratori): pannello unico con quattro schede
+// fsl.php - Formazione Scuola Lavoro (solo amministratori): pannello unico
+//   Convenzioni (prima schermata «Convenzioni con le scuole»: cosa devo fare adesso; da lì: iter, scuole senza convenzione, registro, scheda scuola)
 //   Riepilogo    anno scolastico di tutte le attività con "Attività di Formazione Scuola Lavoro" (qualunque area)
 //   Da stipulare scuole con prenotazioni in essere e convenzione da stipulare; Allegato A e Convenzione già precompilati da scaricare
 //   Convenzioni  registro per scuola: file firmati, validità, docenti dell'Allegato A; registrazione e modifica
@@ -13,10 +14,10 @@ if (!$puo_fsl_convenzioni) nega_accesso();
 
 function admin_redirect($url) { echo "<script>window.location.replace(" . json_encode($url) . ");</script>"; exit; }
 
-$SCHEDE = ['riepilogo' => ['Riepilogo', 'fa-chart-column'], 'iter' => ['Convenzioni da seguire', 'fa-route'], 'stipulare' => ['Da stipulare', 'fa-file-circle-exclamation'], 'convenzioni' => ['Convenzioni', 'fa-file-signature'],
+$SCHEDE = ['home' => ['Convenzioni con le scuole', 'fa-file-signature'], 'riepilogo' => ['Riepilogo', 'fa-chart-column'], 'iter' => ['Convenzioni da seguire', 'fa-route'], 'stipulare' => ['Da stipulare', 'fa-file-circle-exclamation'], 'convenzioni' => ['Convenzioni', 'fa-file-signature'],
            'verifica' => ['Verifica iscrizioni', 'fa-list-check'], 'valutazioni' => ['Valutazioni', 'fa-star'], 'report' => ['Report FSL', 'fa-file-excel'], 'scuola' => ['Scheda scuola', 'fa-school']];
 // Abilitati alle sole convenzioni: solo quella scheda
-if (!$puo_fsl) $SCHEDE = array_intersect_key($SCHEDE, ['iter' => 1, 'stipulare' => 1, 'convenzioni' => 1, 'scuola' => 1]);
+if (!$puo_fsl) $SCHEDE = array_intersect_key($SCHEDE, ['home' => 1, 'iter' => 1, 'stipulare' => 1, 'convenzioni' => 1, 'scuola' => 1]);
 $tab = isset($SCHEDE[$_GET['tab'] ?? '']) ? $_GET['tab'] : array_key_first($SCHEDE);
 
 // ── Azioni: registro delle convenzioni e verifica delle iscrizioni ──
@@ -173,6 +174,65 @@ $oggi_cv = date('Y-m-d'); $tra60_cv = date('Y-m-d', strtotime('+60 days'));
 // Convenzioni compilate online dalle scuole (convenzione_online.php), con la fase in cui si trovano (scheda «Convenzioni da seguire»)
 $cv_online = \App\Core\App::per($conn)->get(\App\Fsl\ServizioConvenzioneOnline::class)->recenti();
 $n_conv_seguire = count(array_filter($cv_online, fn($c) => in_array($c['stato_iter'] ?? '', [\App\Fsl\Costanti::ITER_CARICATA, \App\Fsl\Costanti::ITER_IN_CARICO, \App\Fsl\Costanti::ITER_FIRMATA], true)));
+// Dove si trova ogni convenzione caricata dalle scuole: ognuna è in una di queste fasi (la fase dipende da stato_iter)
+$fasi_cv = ['attesa' => [], 'caricata' => [], 'dirfirma' => [], 'firmata' => [], 'rifiutata' => [], 'fatte' => []];
+foreach ($cv_online as $co) {
+    $it = (string)($co['stato_iter'] ?? '');
+    $fasi_cv[match (true) {
+        $it === 'caricata_scuola' => 'caricata',
+        in_array($it, ['in_carico', 'da_firmare'], true) => 'dirfirma',
+        $it === 'firmata_direttore' => 'firmata',
+        $it === 'rifiutata' => 'rifiutata',
+        $it === 'protocollata' => 'fatte',
+        default => 'attesa',
+    }][] = $co;
+}
+$n_compiti_tuoi = count($fasi_cv['caricata']) + count($fasi_cv['firmata']) + $n_scuole_da_stipulare;
+// Stato di una convenzione del registro: [sfondo, testo, etichetta]
+$stato_cv = fn(array $c): array => ($c['scadenza'] !== null && $c['scadenza'] < $oggi_cv) ? ['#fee2e2', '#991b1b', 'Scaduta']
+    : (($c['data_stipula'] !== null && $c['data_stipula'] > $oggi_cv) ? ['#e0f2fe', '#0c4a6e', 'Non ancora valida']
+    : (($c['scadenza'] !== null && $c['scadenza'] <= $tra60_cv) ? ['#fef3c7', '#92400e', 'In scadenza'] : ['#f0fdf4', '#166534', 'Valida']));
+// Tabelle del riepilogo e delle valutazioni scaricabili in Excel, PDF e CSV (menu «Scarica»)
+if (isset($_GET['scarica']) && in_array($tab, ['riepilogo', 'valutazioni'], true) && $puo_fsl) {
+    $anno_txt = $anno . '/' . ($anno + 1);
+    $tabelle_fsl = [
+        'attivita' => fn() => ['Attività FSL ' . $anno_txt, ['Attività', 'Area', 'Dal', 'Al', 'Scuole', 'Confermate', 'Studenti', 'Presenze', 'Senza convenzione', 'Valutazioni ricevute', 'Media'],
+            array_map(fn($a) => [$a['titolo'], $a['area'], $d($a['dal']), $d($a['al']), count($a['scuole']), (int)($a['confermate'] ?? 0), (int)($a['studenti'] ?? 0), (int)($a['presenze'] ?? 0), (int)($a['conv_mancanti'] ?? 0), count($a['voti'] ?? []) . '/' . (int)($a['val_inviate'] ?? 0), $media($a['voti'] ?? [])], $per_att), [4, 2.5, 1.3, 1.3, 1, 1.2, 1.1, 1.1, 1.4, 1.4, 1]],
+        'scuole' => fn() => ['Scuole FSL ' . $anno_txt, ['Scuola', 'Codice', 'Attività', 'Iscrizioni', 'Studenti', 'Presenze', 'Convenzione in registro', 'Da stipulare', 'Valutazione'],
+            array_map(function ($sc) use ($conn, $media) {
+                $ult = !empty($sc['codice']) ? (convenzioni_della_scuola($conn, $sc['codice'])[0] ?? null) : null;
+                return [$sc['nome'], $sc['codice'] ?? '', implode(', ', array_keys($sc['attivita'])), (int)$sc['iscrizioni'], (int)($sc['studenti'] ?? 0), (int)($sc['presenze'] ?? 0), $ult ? testo_validita_convenzione($ult) : 'nessuna', !empty($sc['conv_mancanti']) ? 'Sì' : 'No', $media($sc['voti'] ?? [])];
+            }, $per_scuola), [4, 1.8, 4, 1.1, 1.1, 1.1, 3, 1.2, 1.2]],
+        'valutazioni' => fn() => ['Valutazioni della struttura ospitante ' . $anno_txt, array_merge(['Data', 'Attività', 'Scuola', 'Compilata da', 'Media', 'Riproporrebbe'], array_values(VALUTAZIONE_FSL_ASPETTI), array_values(VALUTAZIONE_FSL_APERTE)),
+            array_map(function ($v) use ($conn, $d) {
+                $s_v = !empty($v['scuola_codice']) ? scuola_per_codice($conn, $v['scuola_codice']) : null;
+                return array_merge([$d($v['created_at']), $v['titolo'], $s_v ? etichetta_scuola($s_v) : '', $v['compilata_da'], number_format((float)$v['media'], 1, ',', ''), ['si' => 'Sì', 'forse' => 'Forse', 'no' => 'No'][$v['ripeterebbe']] ?? ''],
+                    array_map(fn($k) => (int)($v['risposte']['voti'][$k] ?? 0), array_keys(VALUTAZIONE_FSL_ASPETTI)), array_map(fn($k) => (string)($v['risposte']['testi'][$k] ?? ''), array_keys(VALUTAZIONE_FSL_APERTE)));
+            }, $valutazioni), []],
+    ];
+    $quale_fsl = (string)($_GET['tabella'] ?? '');
+    if (isset($tabelle_fsl[$quale_fsl])) {
+        [$tit_t, $int_t, $righe_t, $larg_t] = $tabelle_fsl[$quale_fsl]();
+        (new \App\Infrastructure\Documenti\TabellaEsportabile($tit_t, $int_t, $righe_t, 'Formazione Scuola Lavoro, anno scolastico ' . $anno_txt . ', stampato il ' . date('d/m/Y'), $larg_t))
+            ->scarica((string)$_GET['scarica'], 'FSL_' . $quale_fsl . '_' . $anno . '_' . ($anno + 1));
+    }
+}
+// Registro scaricabile in Excel, PDF e CSV (la vista scelta: in vigore o scadute)
+if ($tab === 'convenzioni' && isset($_GET['scarica'])) {
+    $righe_reg = [];
+    foreach ($conv_per_scuola as $cod_r => $lista_r) {
+        $s_r = scuola_per_codice($conn, $cod_r);
+        foreach ($lista_r as $c_r) {
+            $docs_r = array_map(fn($x) => trim(($x['nome'] ?? '') . (!empty($x['email']) ? ' <' . $x['email'] . '>' : '')), json_decode((string)($c_r['docenti_json'] ?? ''), true) ?: []);
+            $righe_reg[] = [$s_r ? etichetta_scuola($s_r) : $cod_r, $cod_r, $d($c_r['data_stipula']), $d($c_r['scadenza']), $stato_cv($c_r)[2], implode('; ', $docs_r), (string)$c_r['protocollo'], (string)$c_r['note']];
+        }
+    }
+    (new \App\Infrastructure\Documenti\TabellaEsportabile(
+        $vista_cv === 'archivio' ? 'Convenzioni FSL scadute' : 'Convenzioni FSL in vigore',
+        ['Scuola', 'Codice', 'Valida dal', 'Valida fino al', 'Stato', 'Docenti di riferimento', 'Protocollo', 'Note'],
+        $righe_reg, 'Registro delle convenzioni per la Formazione Scuola Lavoro, stampato il ' . date('d/m/Y'), [4, 2, 1.4, 1.4, 1.4, 4, 2, 3]
+    ))->scarica((string)$_GET['scarica'], 'Convenzioni_FSL_' . ($vista_cv === 'archivio' ? 'scadute' : 'in_vigore') . '_' . date('Y-m-d'));
+}
 ?>
 <style>
 .fsl-sez { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:1.25rem; margin-bottom:1rem; box-shadow:0 1px 4px rgba(0,0,0,.04); }
@@ -187,47 +247,96 @@ $n_conv_seguire = count(array_filter($cv_online, fn($c) => in_array($c['stato_it
 </style>
 
 <?php
-// Intestazione: tre sezioni (Panoramica · Scuole e convenzioni · Valutazioni); le vecchie schede Da stipulare, Convenzioni e
-// Verifica iscrizioni sono i filtri di «Scuole e convenzioni» e i loro indirizzi continuano a funzionare
+// Intestazione: sezioni (Scuole e convenzioni · Panoramica · Valutazioni · Report). Le vecchie schede (Da stipulare, Convenzioni,
+// Verifica iscrizioni) sono schermate di «Scuole e convenzioni» e i loro indirizzi continuano a funzionare
 $url_fsl = fn(string $t, string $extra = '') => 'fsl.php?p_id=' . (int)$filtro_p . '&tab=' . $t . $extra;
-$gruppo_fsl = in_array($tab, ['iter', 'stipulare', 'convenzioni', 'verifica', 'scuola'], true) ? 'scuole' : $tab;
+$gruppo_fsl = in_array($tab, ['home', 'iter', 'stipulare', 'convenzioni', 'verifica', 'scuola'], true) ? 'scuole' : $tab;
 $sezioni_fsl = [];
+$sezioni_fsl['scuole'] = ['href' => $url_fsl('home'), 'testo' => 'Scuole e convenzioni', 'icona' => 'fa-file-signature', 'numero' => $n_compiti_tuoi, 'avviso' => true, 'titolo' => 'Cosa devo fare con le convenzioni delle scuole'];
 if ($puo_fsl) $sezioni_fsl['riepilogo'] = ['href' => $url_fsl('riepilogo', '&anno=' . $anno), 'testo' => 'Panoramica', 'icona' => 'fa-chart-column'];
-$sezioni_fsl['scuole'] = ['href' => $url_fsl('iter'), 'testo' => 'Scuole e convenzioni', 'icona' => 'fa-file-signature', 'numero' => $n_scuole_da_stipulare + $n_conv_seguire, 'avviso' => true, 'titolo' => 'Convenzioni da seguire e scuole da stipulare'];
 if ($puo_fsl) $sezioni_fsl['valutazioni'] = ['href' => $url_fsl('valutazioni', '&anno=' . $anno), 'testo' => 'Valutazioni', 'icona' => 'fa-star'];
 if ($puo_fsl) $sezioni_fsl['report'] = ['href' => $url_fsl('report', '&anno=' . $anno), 'testo' => 'Report FSL', 'icona' => 'fa-file-excel'];
-ob_start();
-if ($tab === 'convenzioni'): ?>
-    <a href="<?php echo $h($url_fsl('convenzioni', '&nuova=1') . '#convForm'); ?>" class="btn btn-danger fw-bold"><i class="fa fa-plus me-1" aria-hidden="true"></i>Registra una convenzione</a>
-<?php endif;
-$azioni_fsl = ob_get_clean();
+// Azioni rare: nel menu «Altro» (le scuole) o come pulsante (le altre sezioni)
+$voce_post = function (string $nome, string $testo, string $icona, string $conferma = '') use ($h): string {
+    ob_start(); csrf_field(); $c = ob_get_clean();
+    return '<form method="POST">' . $c . '<button type="submit" name="' . $nome . '" value="1" class="dropdown-item"' . ($conferma !== '' ? ' data-confirm="' . $h($conferma) . '"' : '') . '><i class="fa ' . $icona . ' me-2" aria-hidden="true"></i>' . $testo . '</button></form>';
+};
+$azioni_fsl = '';
+$url_email_fsl = 'email.php?p_id=' . (int)$filtro_p . '&amp;gruppo=Convenzioni%20FSL';
+if ($gruppo_fsl === 'scuole' && $puo_fsl_convenzioni) {
+    $voci_altro = [
+        '<a class="dropdown-item" href="' . $h($url_fsl('convenzioni', '&nuova=1') . '#convForm') . '"><i class="fa fa-file-signature me-2" aria-hidden="true"></i>Registra una convenzione già firmata fuori dal portale</a>',
+        $voce_post('cv_ricorda_tutte', 'Ricorda a tutte le scuole di caricare il PDF firmato', 'fa-bell', 'Mandare il promemoria «carica il PDF firmato» a tutte le scuole che lo stanno aspettando (saltando chi è stato avvisato nelle ultime 24 ore)?'),
+    ];
+    if ($puo_fsl) $voci_altro[] = $voce_post('conv_verifica', 'Controlla ora le iscrizioni senza convenzione', 'fa-rotate');
+    $voci_altro[] = '<a class="dropdown-item" href="' . $url_email_fsl . '"><i class="fa fa-envelope-open-text me-2" aria-hidden="true"></i>Testi delle email</a>';
+    $azioni_fsl = pn_altro($voci_altro);
+} elseif ($puo_fsl_convenzioni) {
+    $azioni_fsl = '<a class="btn btn-sm btn-outline-secondary" href="' . $url_email_fsl . '"><i class="fa fa-envelope-open-text me-1" aria-hidden="true"></i>Testi delle email</a>';
+}
 $aiuto_fsl = ['riepilogo' => 'Il percorso delle scuole, dall\'iscrizione all\'attestato, con i numeri dell\'anno scolastico. Clicca una tappa per vedere chi c\'è dentro.',
               'valutazioni' => 'Le schede di valutazione della struttura ospitante compilate dai docenti.',
-              'report' => 'Per ogni scuola: attività, classi, studenti e ore di formazione dell\'anno scolastico, con l\'Excel per le scuole e per il Ministero.',
-              'scuole' => 'Convenzioni da seguire passo per passo (protocollo in entrata, firma del Direttore, protocollo definitivo), scuole da stipulare e registro delle convenzioni.'][$gruppo_fsl] ?? '';
-if ($puo_fsl_convenzioni) $azioni_fsl .= ' <a class="btn btn-sm btn-outline-secondary" href="email.php?p_id=' . (int)$filtro_p . '&amp;gruppo=Convenzioni%20FSL"><i class="fa fa-envelope-open-text me-1" aria-hidden="true"></i>Testi delle email</a>';
+              'report' => 'Per ogni scuola: attività, classi, studenti e ore di formazione dell\'anno scolastico, con il file per le scuole e per il Ministero.',
+              'scuole' => $tab === 'home' ? 'Qui vedi solo quello che devi fare con le convenzioni delle scuole. Il resto lo trovi nel registro.' : ''][$gruppo_fsl] ?? '';
 echo pn_testata('Formazione Scuola Lavoro', 'fa-briefcase', $aiuto_fsl, $azioni_fsl);
 echo pn_schede($sezioni_fsl, $gruppo_fsl, 'Sezioni della Formazione Scuola Lavoro');
+// Scelta tra elenchi vicini: un'unica riga di pulsanti con il numero
+$seg = function (array $voci, string $attivo) use ($h): string {
+    $o = '<nav class="pn-segmenti" aria-label="Quali scuole vedere">';
+    foreach ($voci as $k => $v) $o .= '<a href="' . $h($v['href']) . '"' . ((string)$k === $attivo ? ' class="attivo" aria-current="true"' : '') . '>' . $h($v['testo']) . (isset($v['numero']) ? ' (' . (int)$v['numero'] . ')' : '') . '</a>';
+    return $o . '</nav>';
+};
 if ($gruppo_fsl === 'scuole') {
-    $filtro_att = $tab === 'iter' ? 'iter' : ($tab === 'stipulare' ? (($_GET['mostra'] ?? '') === 'tutte' ? 'tutte' : 'stipulare')
-        : ($tab === 'convenzioni' ? (($_GET['vista'] ?? '') === 'archivio' ? 'archivio' : 'vigore') : ($tab === 'verifica' ? 'verifica' : '')));
-    $filtri_fsl = [
-        'iter'      => ['href' => $url_fsl('iter'), 'testo' => 'Convenzioni da seguire', 'numero' => $n_conv_seguire, 'colore' => '#b30000'],
-        'stipulare' => ['href' => $url_fsl('stipulare'), 'testo' => 'Da stipulare', 'numero' => $n_scuole_da_stipulare, 'colore' => '#b91c1c'],
-        'tutte'     => ['href' => $url_fsl('stipulare', '&mostra=tutte'), 'testo' => 'Tutte le scuole con prenotazioni', 'numero' => count($scuole_fsl), 'colore' => '#334155'],
-        'vigore'    => ['href' => $url_fsl('convenzioni') . '#registro', 'testo' => 'Convenzioni in vigore', 'numero' => count($conv_vigore), 'colore' => '#166534'],
-        'archivio'  => ['href' => $url_fsl('convenzioni', '&vista=archivio') . '#registro', 'testo' => 'Convenzioni scadute', 'numero' => count($conv_archivio), 'colore' => '#475569'],
-    ];
-    if ($puo_fsl) $filtri_fsl['verifica'] = ['href' => $url_fsl('verifica'), 'testo' => 'Iscrizioni senza convenzione', 'numero' => count($iscr_da_stipulare), 'colore' => '#b45309'];
-    echo pn_fasi($filtri_fsl, $filtro_att, 'Quali scuole e convenzioni vedere');
     if ($puo_fsl_convenzioni && \App\Core\App::per($conn)->get(\App\Fsl\ServizioFirmaDirettore::class)->direttore()['email'] === '') {
         echo '<div class="alert alert-warning small py-2"><i class="fa fa-user-tie me-1" aria-hidden="true"></i><strong>Manca il Direttore che firma le convenzioni.</strong> <a href="uffici.php?u=direzione" class="fw-bold">Indicalo nella Direzione</a> (Gestione del portale → Uffici): a lui arriva il link per firmare.</div>';
+    }
+    $titoli_sez = ['iter' => ['Convenzioni da seguire', 'Le convenzioni caricate dalle scuole, passo per passo: protocollo in entrata, firma del Direttore, protocollo definitivo.'],
+                   'stipulare' => ['Scuole senza convenzione', 'Scuole con prenotazioni ma senza una convenzione valida.'],
+                   'verifica' => ['Scuole senza convenzione', 'Iscrizioni alle attività FSL che non sono coperte da una convenzione valida.'],
+                   'convenzioni' => ['Registro delle convenzioni', 'Tutte le convenzioni firmate, con i file, la validità e i docenti di riferimento.']];
+    if (isset($titoli_sez[$tab])) {
+        echo pn_indietro($url_fsl('home'), 'Torna a «Convenzioni con le scuole»');
+        echo '<h2 class="fw-bold mb-1" style="font-size:1.35rem;text-transform:none;letter-spacing:0;">' . $h($titoli_sez[$tab][0]) . '</h2><p class="text-secondary mb-3">' . $h($titoli_sez[$tab][1]) . '</p>';
+    }
+    if (in_array($tab, ['stipulare', 'verifica'], true)) {
+        $voci_seg = ['da_stipulare' => ['href' => $url_fsl('stipulare'), 'testo' => 'Da stipulare', 'numero' => $n_scuole_da_stipulare],
+                     'tutte' => ['href' => $url_fsl('stipulare', '&mostra=tutte'), 'testo' => 'Tutte le scuole con prenotazioni', 'numero' => count($scuole_fsl)]];
+        if ($puo_fsl) $voci_seg['verifica'] = ['href' => $url_fsl('verifica'), 'testo' => 'Iscrizioni senza convenzione', 'numero' => count($iscr_da_stipulare)];
+        echo '<div class="pn-linea">' . $seg($voci_seg, $tab === 'verifica' ? 'verifica' : (($_GET['mostra'] ?? '') === 'tutte' ? 'tutte' : 'da_stipulare')) . '</div>';
     }
 }
 ?>
 
-<?php if ($tab === 'riepilogo'): ?>
-<p class="text-secondary small">Tutte le attività con <strong>Attività di Formazione Scuola Lavoro</strong> attivo, di ogni area, che iniziano tra il <?php echo $d($dal_a); ?> e il <?php echo $d($al_a); ?>. Studenti = numero dichiarato nelle iscrizioni confermate. Ogni tabella si scarica in CSV (separatore ;, per Excel).</p>
+<?php if ($tab === 'home'):
+$n_msg_h = array_sum(\App\Core\App::per($conn)->get(\App\Fsl\MessaggiConvenzioneRepository::class)->nonLetteDallUfficio());
+$n_scad_h = 0;
+foreach ($conv_vigore as $lista_h) foreach ($lista_h as $c_h) if ($c_h['scadenza'] !== null && $c_h['scadenza'] <= $tra60_cv && $c_h['scadenza'] >= $oggi_cv) $n_scad_h++;
+$compiti_h = [
+    ['numero' => count($fasi_cv['caricata']), 'titolo' => 'Da prendere in carico', 'testo' => 'La scuola ha caricato il PDF firmato: devi protocollarlo.', 'href' => $url_fsl('iter') . '#fase-caricata', 'bottone' => 'Apri e gestisci', 'tono' => 'tuo', 'vuoto' => 'Nessun PDF da prendere in carico.'],
+    ['numero' => count($fasi_cv['firmata']), 'titolo' => 'Da protocollare', 'testo' => 'Il Direttore ha firmato: registra il protocollo definitivo.', 'href' => $url_fsl('iter') . '#fase-firmata', 'bottone' => 'Apri e gestisci', 'tono' => 'tuo', 'vuoto' => 'Nessuna convenzione da protocollare.'],
+    ['numero' => count($fasi_cv['dirfirma']), 'titolo' => 'Dal Direttore per la firma', 'testo' => 'Aspettano la firma del Direttore. Non devi fare altro.', 'href' => $url_fsl('iter') . '#fase-dirfirma', 'bottone' => 'Vedi', 'tono' => 'attesa', 'vuoto' => 'Il Direttore non ha convenzioni da firmare.'],
+    ['numero' => $n_scuole_da_stipulare, 'titolo' => 'Scuole senza convenzione', 'testo' => 'Hanno prenotazioni ma non una convenzione valida.', 'href' => $url_fsl('stipulare'), 'bottone' => 'Vedi l\'elenco', 'tono' => 'tuo', 'vuoto' => 'Tutte le scuole con prenotazioni sono a posto.'],
+];
+if ($n_msg_h) array_splice($compiti_h, 2, 0, [['numero' => $n_msg_h, 'titolo' => $n_msg_h === 1 ? 'Messaggio da una scuola' : 'Messaggi dalle scuole', 'testo' => 'Una scuola ti ha risposto: apri «Scrivi alla scuola».', 'href' => $url_fsl('iter'), 'bottone' => 'Leggi', 'tono' => 'tuo']]);
+echo pn_compiti($compiti_h, 'Cosa devo fare con le convenzioni delle scuole');
+$opz_scuole = [];
+foreach ($scuole_fsl as $g_h) $opz_scuole[$g_h['nome'] . ($g_h['comune'] !== '' ? ' – ' . $g_h['comune'] : '')] = $url_fsl('scuola', '&k=' . urlencode($g_h['chiave']));
+?>
+<?php if ($n_scad_h): ?><div class="alert alert-warning py-2"><i class="fa fa-hourglass-half me-1" aria-hidden="true"></i><strong><?php echo $n_scad_h === 1 ? 'Una convenzione scade' : $n_scad_h . ' convenzioni scadono'; ?> entro 60 giorni.</strong> <a class="fw-bold" href="<?php echo $h($url_fsl('convenzioni') . '#registro'); ?>">Apri il registro</a> e premi «Rinnova».</div><?php endif; ?>
+<div class="pn-linea">
+    <input type="search" id="cercaScuolaFsl" list="elencoScuoleFsl" class="form-control" style="max-width:360px;" placeholder="Cerca una scuola con prenotazioni" aria-label="Cerca una scuola con prenotazioni" autocomplete="off">
+    <datalist id="elencoScuoleFsl"><?php foreach (array_keys($opz_scuole) as $nome_h): ?><option value="<?php echo $h($nome_h); ?>"><?php endforeach; ?></datalist>
+    <a class="btn btn-outline-secondary fw-bold pn-spazio" href="<?php echo $h($url_fsl('convenzioni') . '#registro'); ?>"><i class="fa fa-folder-open me-1" aria-hidden="true"></i>Registro delle convenzioni (<?php echo count($conv_vigore); ?> in vigore)</a>
+</div>
+<script>
+(function () {
+    var mappa = <?php echo json_encode($opz_scuole, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
+    document.getElementById('cercaScuolaFsl').addEventListener('change', function () { if (mappa[this.value]) window.location.href = mappa[this.value]; });
+})();
+</script>
+
+<?php elseif ($tab === 'riepilogo'): ?>
+<p class="text-secondary small">Tutte le attività con <strong>Attività di Formazione Scuola Lavoro</strong> attivo, di ogni area, che iniziano tra il <?php echo $d($dal_a); ?> e il <?php echo $d($al_a); ?>. Studenti = numero dichiarato nelle iscrizioni confermate. Ogni tabella si scarica in Excel, PDF o CSV (menu «Scarica»).</p>
 
 <?php
 $n_el_mancanti = count($perc['elenchi_mancanti']);
@@ -264,7 +373,7 @@ echo pn_percorso([
 <section class="fsl-sez">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
         <h2 class="mb-0"><i class="fa fa-list me-1" aria-hidden="true"></i>Attività (<?php echo count($per_att); ?>)</h2>
-        <button type="button" class="btn btn-sm btn-outline-secondary fw-bold fsl-csv" data-tab="tabAtt" data-nome="fsl_attivita_<?php echo $anno; ?>.csv"><i class="fa fa-file-csv me-1" aria-hidden="true"></i>CSV</button>
+        <?php if ($per_att) echo pn_scarica($url_fsl('riepilogo', '&anno=' . $anno . '&tabella=attivita')); ?>
     </div>
     <?php if (!$per_att): ?><p class="text-muted small mb-0">Nessuna attività FSL con iscrizioni in questo anno scolastico.</p><?php else: ?>
     <div class="table-responsive"><table class="table table-sm align-middle small" id="tabAtt">
@@ -288,7 +397,7 @@ echo pn_percorso([
 <section class="fsl-sez">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
         <h2 class="mb-0"><i class="fa fa-school me-1" aria-hidden="true"></i>Scuole (<?php echo count($per_scuola); ?>)</h2>
-        <button type="button" class="btn btn-sm btn-outline-secondary fw-bold fsl-csv" data-tab="tabScu" data-nome="fsl_scuole_<?php echo $anno; ?>.csv"><i class="fa fa-file-csv me-1" aria-hidden="true"></i>CSV</button>
+        <?php if ($per_scuola) echo pn_scarica($url_fsl('riepilogo', '&anno=' . $anno . '&tabella=scuole')); ?>
     </div>
     <?php if (!$per_scuola): ?><p class="text-muted small mb-0">Nessuna scuola in questo anno scolastico.</p><?php else: ?>
     <div class="table-responsive"><table class="table table-sm align-middle small" id="tabScu">
@@ -336,20 +445,7 @@ echo pn_percorso([
 
 <?php elseif ($tab === 'iter'): ?>
 <?php
-// Convenzioni compilate dalle scuole: ognuna è in una di queste fasi (la fase dipende da stato_iter)
 $dir_cv = \App\Core\App::per($conn)->get(\App\Fsl\ServizioFirmaDirettore::class)->direttore();
-$fasi_cv = ['attesa' => [], 'caricata' => [], 'dirfirma' => [], 'firmata' => [], 'rifiutata' => [], 'fatte' => []];
-foreach ($cv_online as $co) {
-    $it = (string)($co['stato_iter'] ?? '');
-    $fasi_cv[match (true) {
-        $it === 'caricata_scuola' => 'caricata',
-        in_array($it, ['in_carico', 'da_firmare'], true) => 'dirfirma',
-        $it === 'firmata_direttore' => 'firmata',
-        $it === 'rifiutata' => 'rifiutata',
-        $it === 'protocollata' => 'fatte',
-        default => 'attesa',
-    }][] = $co;
-}
 $nome_scuola_cv = fn(array $co) => (string)((json_decode((string)$co['dati_json'], true) ?: [])['scuola']['denominazione'] ?? '') ?: 'Scuola';
 // Intestazione della scheda: scuola, dirigente, quando, quante attività, documenti precompilati
 $testa_cv = function (array $co) use ($h, $d, $nome_scuola_cv): void {
@@ -541,13 +637,11 @@ $n_iter = count($fasi_cv['caricata']) + count($fasi_cv['firmata']) + count(array
 
 <?php elseif ($tab === 'convenzioni'): ?>
 <section class="scu-sez" id="convenzioni">
-    <p class="small text-secondary">Registro delle convenzioni per la Formazione Scuola Lavoro, con i file firmati (convenzione e Allegato A), il periodo di validità e i docenti di riferimento. Nelle attività con l'interruttore <strong>Attività di Formazione Scuola Lavoro</strong> la convenzione deve coprire <strong>tutto il periodo</strong> del progetto (Dal/Al) o il giorno del turno dell'evento: se lo copre, la scuola non deve inviare nulla; se non lo copre, ne va stipulata una nuova. Registrando o modificando una convenzione, le prenotazioni della scuola in attesa si confermano da sole (se il turno non chiede anche l'approvazione) e la scuola riceve l'email. Gli amministratori ricevono un avviso 60 giorni prima della scadenza.</p>
-
-    <div class="alert alert-light border small py-2"><i class="fa fa-route me-1" aria-hidden="true"></i>Le convenzioni caricate dalle scuole (protocollo in entrata, firma del Direttore, protocollo definitivo) e il <strong>Direttore che firma</strong> si seguono ora in <a class="fw-bold" href="<?php echo $h($url_fsl('iter')); ?>">Convenzioni da seguire</a>.<?php echo $n_conv_seguire ? ' <span class="badge bg-danger">' . $n_conv_seguire . ' da seguire</span>' : ''; ?></div>
+    <p class="small text-secondary">La convenzione deve coprire <strong>tutto il periodo</strong> dell'attività: se lo copre la scuola non deve inviare nulla. Registrando una nuova convenzione le prenotazioni in attesa si confermano da sole e la scuola riceve l'email. Ti avvisiamo 60 giorni prima della scadenza.</p>
 
     <!-- REGISTRA / MODIFICA -->
-    <details class="mb-3" id="convFormBox"<?php echo ($conv_mod || $conv_rinnova || !empty($conv_nuova_s) || !empty($_GET['nuova'])) ? ' open' : ''; ?>>
-    <summary class="btn btn-outline-danger fw-bold mb-2"><i class="fa fa-file-signature me-1" aria-hidden="true"></i>Registra, modifica o rinnova una convenzione</summary>
+    <?php $form_aperto = $conv_mod || $conv_rinnova || !empty($conv_nuova_s) || !empty($_GET['nuova']); if ($form_aperto): ?>
+    <details class="mb-3" id="convFormBox" open>
     <h3 class="h6 fw-bold mt-3" id="convForm"><?php echo $conv_mod ? 'Modifica la convenzione' : ($conv_rinnova ? 'Rinnova la convenzione' : 'Registra una convenzione'); ?></h3>
     <?php if ($conv_rinnova): ?><p class="small text-secondary mb-2">Nuova convenzione per la stessa scuola, con i docenti di riferimento della precedente (<?php echo $h(testo_validita_convenzione($conv_rinnova)); ?><?php echo $conv_rinnova['protocollo'] !== '' ? (preg_match('/^prot/i', $conv_rinnova['protocollo']) ? ', ' : ', protocollo ') . $h($conv_rinnova['protocollo']) : ''; ?>): controlla le date e carica i nuovi file firmati. La convenzione scaduta resta in archivio.</p><?php endif; ?>
     <?php $cm = $conv_mod ?: []; $cm_doc = json_decode((string)($cm['docenti_json'] ?? ($conv_rinnova['docenti_json'] ?? '')), true) ?: [['nome' => '', 'email' => '']];
@@ -584,19 +678,19 @@ $n_iter = count($fasi_cv['caricata']) + count($fasi_cv['firmata']) + count(array
         <div class="col-6 col-lg-3"><label class="form-label small fw-bold mb-1" for="cvProt">Protocollo</label><input type="text" name="protocollo" id="cvProt" class="form-control form-control-sm" maxlength="100" value="<?php echo $h($cm['protocollo'] ?? ''); ?>" placeholder="es. n. 1234 del 01/10/2026"></div>
         <div class="col-6 col-lg-6"><label class="form-label small fw-bold mb-1" for="cvNote">Note</label><input type="text" name="note" id="cvNote" class="form-control form-control-sm" maxlength="500" value="<?php echo $h($cm['note'] ?? ''); ?>"></div>
         <div class="col-12 col-lg-3 d-flex gap-2">
-            <button type="submit" name="conv_salva" value="1" class="btn btn-sm btn-primary fw-bold flex-grow-1"><i class="fa fa-save me-1" aria-hidden="true"></i><?php echo $conv_mod ? 'Salva le modifiche' : 'Registra'; ?></button>
-            <?php if ($conv_mod || !empty($conv_nuova_s)): ?><a href="fsl.php?p_id=<?php echo $filtro_p; ?>&tab=convenzioni<?php echo $vista_cv === 'archivio' ? '&vista=archivio' : ''; ?>" class="btn btn-sm btn-outline-secondary fw-bold">Annulla</a><?php endif; ?>
+            <button type="submit" name="conv_salva" value="1" class="btn btn-sm btn-danger fw-bold flex-grow-1"><i class="fa fa-save me-1" aria-hidden="true"></i><?php echo $conv_mod ? 'Salva le modifiche' : 'Registra'; ?></button>
+            <a href="fsl.php?p_id=<?php echo $filtro_p; ?>&tab=convenzioni<?php echo $vista_cv === 'archivio' ? '&vista=archivio' : ''; ?>#registro" class="btn btn-sm btn-outline-secondary fw-bold">Annulla</a>
         </div>
     </form>
 </details>
+<?php endif; ?>
 
-    <!-- REGISTRO PER SCUOLA: in vigore / archivio delle scadute -->
-    <div class="d-flex flex-wrap gap-2 align-items-center mb-2" id="registro">
-        <?php if ($conv_per_scuola): ?><input type="search" id="cercaConv" class="form-control form-control-sm" style="max-width:320px;" placeholder="Cerca scuola, docente o protocollo" aria-label="Cerca nel registro delle convenzioni"><?php endif; ?>
+    <!-- REGISTRO PER SCUOLA: in vigore / scadute -->
+    <div class="pn-linea" id="registro">
+        <?php echo $seg(['vigore' => ['href' => $url_fsl('convenzioni') . '#registro', 'testo' => 'In vigore', 'numero' => count($conv_vigore)], 'archivio' => ['href' => $url_fsl('convenzioni', '&vista=archivio') . '#registro', 'testo' => 'Scadute', 'numero' => count($conv_archivio)]], $vista_cv); ?>
+        <?php if ($conv_per_scuola): ?><input type="search" id="cercaConv" class="form-control" style="max-width:300px;" placeholder="Cerca scuola, docente o protocollo" aria-label="Cerca nel registro delle convenzioni"><span class="pn-spazio"><?php echo pn_scarica($url_fsl('convenzioni', $vista_cv === 'archivio' ? '&vista=archivio' : '')); ?></span><?php endif; ?>
     </div>
-    <p class="small text-secondary mb-2"><?php echo $vista_cv === 'archivio'
-        ? "Convenzioni scadute: ci finiscono da sole il giorno dopo la scadenza e restano consultabili con i loro file. <strong>Rinnova</strong> prepara una nuova convenzione per la stessa scuola; l'eliminazione cancella anche i file."
-        : "Convenzioni valide, in scadenza (entro 60 giorni) o non ancora valide. Il numero sulla scheda conta le scuole."; ?></p>
+    <?php if ($vista_cv === 'archivio'): ?><p class="small text-secondary mb-2">Convenzioni scadute: ci finiscono da sole il giorno dopo la scadenza e restano consultabili con i loro file. <strong>Rinnova</strong> prepara una nuova convenzione per la stessa scuola.</p><?php endif; ?>
     <?php if ($conv_per_scuola): ?>
         <div class="table-responsive">
             <table class="table table-sm align-middle small" id="tabConv">
@@ -604,10 +698,8 @@ $n_iter = count($fasi_cv['caricata']) + count($fasi_cv['firmata']) + count(array
                 <?php foreach ($conv_per_scuola as $cod => $lista): $s_c = scuola_per_codice($conn, $cod); ?>
                     <tbody class="conv-scuola border-top">
                     <?php foreach ($lista as $i => $c):
-                        $dal_c = $c['data_stipula']; $al_c = $c['scadenza'];
-                        [$bg_c, $fg_c, $lbl_c] = ($al_c !== null && $al_c < $oggi_cv) ? ['#fee2e2', '#991b1b', 'Scaduta']
-                            : (($dal_c !== null && $dal_c > $oggi_cv) ? ['#e0f2fe', '#0c4a6e', 'Non ancora valida']
-                            : (($al_c !== null && $al_c <= $tra60_cv) ? ['#fef3c7', '#92400e', 'In scadenza'] : ['#f0fdf4', '#166534', 'Valida']));
+                        [$bg_c, $fg_c, $lbl_c] = $stato_cv($c); $al_c = $c['scadenza'];
+                        if ($lbl_c === 'In scadenza') $lbl_c = 'Scade tra ' . max(0, (int)ceil((strtotime($al_c) - strtotime($oggi_cv)) / 86400)) . ' giorni';
                         $docs = json_decode((string)($c['docenti_json'] ?? ''), true) ?: []; ?>
                         <tr>
                             <?php if ($i === 0): ?><td rowspan="<?php echo count($lista); ?>" class="align-top"><div class="fw-semibold"><?php echo $h($s_c ? etichetta_scuola($s_c) : $cod); ?></div><div class="text-secondary font-monospace"><?php echo $h($cod); ?></div><div class="text-secondary"><?php echo (int)$c['n_iscr']; ?> iscrizioni</div></td><?php endif; ?>
@@ -623,8 +715,10 @@ $n_iter = count($fasi_cv['caricata']) + count($fasi_cv['firmata']) + count(array
                                     <a href="fsl.php?p_id=<?php echo $filtro_p; ?>&tab=convenzioni&vista=archivio&conv_rinnova=<?php echo (int)$c['id']; ?>#convForm" class="btn btn-sm btn-success fw-bold py-0" title="Rinnova: nuova convenzione per questa scuola"><i class="fa fa-rotate me-1" aria-hidden="true"></i>Rinnova</a>
                                 <?php elseif ($vista_cv === 'archivio' && $i === 0): ?>
                                     <span class="badge bg-light text-success border" title="La scuola ha già una convenzione in vigore">rinnovata</span>
+                                <?php elseif ($i === 0 && str_starts_with($lbl_c, 'Scade')): ?>
+                                    <a href="fsl.php?p_id=<?php echo $filtro_p; ?>&tab=convenzioni&conv_rinnova=<?php echo (int)$c['id']; ?>#convForm" class="btn btn-sm btn-success fw-bold py-0" title="Rinnova: nuova convenzione per questa scuola"><i class="fa fa-rotate me-1" aria-hidden="true"></i>Rinnova</a>
                                 <?php endif; ?>
-                                <a href="fsl.php?p_id=<?php echo $filtro_p; ?>&tab=convenzioni<?php echo $vista_cv === 'archivio' ? '&vista=archivio' : ''; ?>&conv_mod=<?php echo (int)$c['id']; ?>#convForm" class="btn btn-sm btn-outline-primary py-0" title="Modifica" aria-label="Modifica la convenzione"><i class="fa fa-pen"></i></a>
+                                <a href="fsl.php?p_id=<?php echo $filtro_p; ?>&tab=convenzioni<?php echo $vista_cv === 'archivio' ? '&vista=archivio' : ''; ?>&conv_mod=<?php echo (int)$c['id']; ?>#convForm" class="btn btn-sm btn-outline-secondary fw-bold py-0" aria-label="Modifica la convenzione"><i class="fa fa-pen me-1" aria-hidden="true"></i>Modifica</a>
                                 <form method="POST" class="d-inline">
                                     <?php csrf_field(); ?>
                                     <button type="submit" name="conv_elimina" value="<?php echo (int)$c['id']; ?>" class="btn btn-sm btn-outline-danger py-0" data-confirm="Eliminare questa convenzione dal registro, con i suoi file?" title="Elimina" aria-label="Elimina la convenzione"><i class="fa fa-trash"></i></button>
@@ -665,15 +759,7 @@ $stati_conv_st = ['da_stipulare' => ['Da stipulare', '#991b1b', '#fee2e2'], 'cop
 .st-chip { display:inline-block; font-size:.72rem; font-weight:700; padding:.15rem .55rem; border-radius:999px; white-space:nowrap; }
 </style>
 <section class="scu-sez">
-    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-        <h3 class="h5 fw-bold mb-0"><i class="fa fa-file-circle-exclamation me-1 text-danger" aria-hidden="true"></i>Convenzioni da stipulare</h3>
-    </div>
-    <p class="small text-secondary mb-3">Scuole con prenotazioni in corso alle attività FSL. Per ognuna scarichi già <strong>precompilati</strong> l'<strong>Allegato A</strong> (PDF con la scheda completa di ogni attività, o Word) e la <strong>Convenzione</strong> (Word), con i dati dell'anagrafe e delle prenotazioni. Vale anche per le prenotazioni <strong>già confermate</strong> e anche se la scuola non ha usato il modulo online. Il <strong>logo</strong> della scuola non è incluso, a meno che la scuola lo abbia caricato: lo aggiungi tu al documento. Restano da completare a mano i dati del Dirigente non ancora indicati.</p>
-    <div class="row g-2 mb-3 text-center">
-        <div class="col-4"><div class="fsl-sez py-2 mb-0"><div class="fsl-num <?php echo $n_scuole_da_stipulare ? 'text-danger' : 'text-success'; ?>"><?php echo $n_scuole_da_stipulare; ?></div><div class="small text-secondary"><?php echo $n_scuole_da_stipulare === 1 ? 'scuola con convenzione da stipulare' : 'scuole con convenzione da stipulare'; ?></div></div></div>
-        <div class="col-4"><div class="fsl-sez py-2 mb-0"><div class="fsl-num <?php echo $n_pren_st ? 'text-danger' : ''; ?>"><?php echo $n_pren_st; ?></div><div class="small text-secondary"><?php echo $n_pren_st === 1 ? 'prenotazione in attesa di convenzione' : 'prenotazioni in attesa di convenzione'; ?></div></div></div>
-        <div class="col-4"><div class="fsl-sez py-2 mb-0"><div class="fsl-num"><?php echo count($scuole_fsl) - $n_scuole_da_stipulare; ?></div><div class="small text-secondary"><?php echo count($scuole_fsl) - $n_scuole_da_stipulare === 1 ? 'scuola già a posto' : 'scuole già a posto'; ?></div></div></div>
-    </div>
+    <p class="small text-secondary mb-3">Per ogni scuola scarichi già <strong>precompilati</strong> l'Allegato A e la Convenzione, con i dati dell'anagrafe e delle prenotazioni. Il logo della scuola non c'è: lo aggiungi tu al documento. I dati del Dirigente non ancora indicati restano da completare a mano.</p>
 
     <?php if (!$elenco_st): ?>
         <div class="alert alert-success mb-0"><i class="fa fa-circle-check me-1" aria-hidden="true"></i><?php echo $mostra_st === 'tutte' ? 'Nessuna scuola ha prenotazioni in corso alle attività FSL.' : 'Nessuna convenzione da stipulare: tutte le scuole con prenotazioni in corso sono a posto.'; ?></div>
@@ -713,12 +799,18 @@ $stati_conv_st = ['da_stipulare' => ['Da stipulare', '#991b1b', '#fee2e2'], 'cop
             </div>
         </div>
         <div class="st-piede d-flex flex-wrap align-items-center gap-2">
-            <a href="<?php echo $h($url_doc('allegato_pdf')); ?>" class="btn btn-danger fw-bold"><i class="fa fa-file-pdf me-1" aria-hidden="true"></i>Allegato A precompilato (PDF)</a>
-            <a href="<?php echo $h($url_doc('allegato')); ?>" class="btn btn-outline-primary fw-bold"><i class="fa fa-file-word me-1" aria-hidden="true"></i>Allegato A (Word)</a>
-            <a href="<?php echo $h($url_doc('convenzione')); ?>" class="btn btn-outline-primary fw-bold"><i class="fa fa-file-word me-1" aria-hidden="true"></i>Convenzione (Word)</a>
             <?php if ($g['codice'] !== '' && preg_match('/^[A-Z0-9]{10}$/', $g['codice'])): ?>
-                <a href="fsl.php?p_id=<?php echo (int)$filtro_p; ?>&tab=convenzioni&conv_nuova=<?php echo urlencode($g['codice']); ?>&dal=<?php echo $h($g['dal']); ?>&al=<?php echo $h($g['al']); ?>#convForm" class="btn btn-success fw-bold ms-auto"><i class="fa fa-file-signature me-1" aria-hidden="true"></i>Registra la convenzione ricevuta</a>
+                <a href="fsl.php?p_id=<?php echo (int)$filtro_p; ?>&tab=convenzioni&conv_nuova=<?php echo urlencode($g['codice']); ?>&dal=<?php echo $h($g['dal']); ?>&al=<?php echo $h($g['al']); ?>#convForm" class="btn btn-success fw-bold"><i class="fa fa-file-signature me-1" aria-hidden="true"></i>Registra la convenzione ricevuta</a>
             <?php endif; ?>
+            <div class="dropdown">
+                <button type="button" class="btn btn-outline-secondary fw-bold dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false"><i class="fa fa-file-lines me-1" aria-hidden="true"></i>Documenti già compilati</button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="<?php echo $h($url_doc('allegato_pdf')); ?>"><i class="fa fa-file-pdf me-2" aria-hidden="true"></i>Allegato A (PDF)</a></li>
+                    <li><a class="dropdown-item" href="<?php echo $h($url_doc('allegato')); ?>"><i class="fa fa-file-word me-2" aria-hidden="true"></i>Allegato A (Word)</a></li>
+                    <li><a class="dropdown-item" href="<?php echo $h($url_doc('convenzione')); ?>"><i class="fa fa-file-word me-2" aria-hidden="true"></i>Convenzione (Word)</a></li>
+                </ul>
+            </div>
+            <a href="<?php echo $h($url_fsl('scuola', '&k=' . urlencode($g['chiave']))); ?>" class="btn btn-outline-secondary fw-bold ms-auto">Apri la scheda della scuola</a>
         </div>
     </article>
     <?php endforeach; ?>
@@ -772,8 +864,44 @@ $indietro_s = '<a href="' . $h($url_fsl('stipulare', '&mostra=tutte')) . '" clas
         <?php echo $g_s['da_stipulare'] ? pn_stato('Convenzione da stipulare', 'blocco') : pn_stato('Convenzione a posto' . ($g_s['validita'] ? ' fino al ' . $d($g_s['validita']) : ''), 'ok'); ?>
     </div>
 
+    <?php
+    // La convenzione della scuola: finché non è a posto si vedono solo i suoi cinque passi e l'unica cosa da fare adesso
+    $co_s = null;
+    if ($g_s['codice'] !== '') foreach ($cv_online as $co_x) if (($co_x['scuola_codice'] ?? '') === $g_s['codice']) { $co_s = $co_x; break; }
+    $it_s = (string)($co_s['stato_iter'] ?? '');
+    $fase_s = !$g_s['da_stipulare'] ? 5 : match (true) { $it_s === 'caricata_scuola' => 2, in_array($it_s, ['in_carico', 'da_firmare'], true) => 3, $it_s === 'firmata_direttore' => 4, default => 1 };
+    if ($fase_s < 5):
+        $passi_cv = [];
+        foreach (['La scuola compila e carica il PDF', 'Tu protocolli', 'Il Direttore firma', 'Tu registri', 'Fatto'] as $i_f => $n_f) $passi_cv[] = ['nome' => $n_f, 'stato' => $i_f + 1 < $fase_s ? 'fatto' : ($i_f + 1 === $fase_s ? 'qui' : '')];
+        $form_s = function (string $nome, int $id, string $testo, string $classe, string $icona): string { ob_start(); csrf_field(); $c_f = ob_get_clean(); return '<form method="POST" class="d-inline">' . $c_f . '<button type="submit" name="' . $nome . '" value="' . $id . '" class="btn ' . $classe . ' fw-bold" formnovalidate><i class="fa ' . $icona . ' me-1" aria-hidden="true"></i>' . $testo . '</button></form>'; };
+        $id_s = (int)($co_s['id'] ?? 0);
+        $btn_doc_s = '<a href="#documentiScuola" class="btn btn-outline-secondary fw-bold"><i class="fa fa-file-lines me-1" aria-hidden="true"></i>Documenti da inviare alla scuola</a>';
+        $btn_reg_s = str_replace(['btn-danger', 'Registra la convenzione firmata'], ['btn-outline-secondary', "Ce l'ho già firmata: registrala"], $btn_reg);
+        if ($fase_s === 1) {
+            $attende_s = $co_s && \App\Fsl\ServizioMessaggiConvenzione::attendeIlPdf($co_s);
+            echo pn_iter($passi_cv, 'Convenzione della scuola');
+            echo pn_prossima($it_s === 'rifiutata' ? 'Ora si aspetta il nuovo file della scuola' : 'Ora si aspetta la scuola',
+                'La scuola deve compilare la convenzione online e caricare il PDF firmato. Non devi fare altro: se vuoi, le mandi un promemoria.',
+                ($id_s && $attende_s ? $form_s('cv_ricorda', $id_s, 'Ricorda di caricare il PDF', 'btn-danger', 'fa-bell') : '') . $btn_doc_s . $btn_reg_s, 'attesa');
+        } elseif ($fase_s === 2) {
+            echo pn_iter($passi_cv, 'Convenzione della scuola');
+            echo pn_prossima('Tocca a te: prendi in carico il PDF', 'La scuola ha caricato la convenzione firmata. Scaricala, protocollala e scrivi il numero di protocollo.',
+                '<a class="btn btn-danger fw-bold" href="' . $h($url_fsl('iter')) . '#fase-caricata"><i class="fa fa-arrow-right me-1" aria-hidden="true"></i>Apri e protocolla</a>');
+        } elseif ($fase_s === 3) {
+            echo pn_iter($passi_cv, 'Convenzione della scuola');
+            $da_inviare_s = $it_s === 'in_carico';
+            echo $da_inviare_s
+                ? pn_prossima('Manda il link al Direttore', 'La convenzione è protocollata in entrata ma il Direttore non ha ancora il link per firmare.', $form_s('cv_invia_direttore', $id_s, 'Manda il link al Direttore', 'btn-danger', 'fa-paper-plane'))
+                : pn_prossima('Ora si aspetta il Direttore', 'Il link per firmare è già partito. Non devi fare altro: quando firma, il PDF torna qui.', $form_s('cv_invia_direttore', $id_s, 'Rimanda il link al Direttore', 'btn-outline-secondary', 'fa-paper-plane'), 'attesa');
+        } else {
+            echo pn_iter($passi_cv, 'Convenzione della scuola');
+            echo pn_prossima('Tocca a te: registra il protocollo definitivo', 'Il Direttore ha firmato. Scarica il PDF firmato, protocollalo e scrivi il numero di protocollo.',
+                '<a class="btn btn-danger fw-bold" href="' . $h($url_fsl('iter')) . '#fase-firmata"><i class="fa fa-arrow-right me-1" aria-hidden="true"></i>Apri e registra</a>');
+        }
+    else: ?>
     <?php echo pn_iter($passi_s, 'Percorso della scuola'); ?>
     <?php if ($qui_s !== ''): [$t_p, $x_p, $a_p, $tono_p] = $prossimi[$qui_s]; echo pn_prossima($t_p, $x_p, $a_p, $tono_p); else: echo pn_prossima('Percorso completato', 'Convenzione, elenco, attestati e valutazione sono a posto per queste prenotazioni.', '', 'ok'); endif; ?>
+    <?php endif; ?>
 
     <div class="row g-3">
         <div class="col-lg-8">
@@ -799,7 +927,7 @@ $indietro_s = '<a href="' . $h($url_fsl('stipulare', '&mostra=tutte')) . '" clas
             </div></div>
         </div>
         <div class="col-lg-4">
-            <div class="card border-0 shadow-sm mb-3"><div class="card-body">
+            <div class="card border-0 shadow-sm mb-3" id="documentiScuola"><div class="card-body">
                 <h3 class="h6 fw-bold mb-2"><i class="fa fa-file-lines me-1" aria-hidden="true"></i>Documenti già compilati</h3>
                 <p class="small text-secondary">Con i dati dell'anagrafe e delle prenotazioni. Il logo della scuola non è incluso, a meno che l'abbia caricato la scuola.</p>
                 <div class="d-grid gap-2">
@@ -871,12 +999,12 @@ $indietro_s = '<a href="' . $h($url_fsl('stipulare', '&mostra=tutte')) . '" clas
 </section>
 
 <?php else: ?>
-<p class="text-secondary small">Tutte le attività con <strong>Attività di Formazione Scuola Lavoro</strong> attivo, di ogni area, che iniziano tra il <?php echo $d($dal_a); ?> e il <?php echo $d($al_a); ?>. Studenti = numero dichiarato nelle iscrizioni confermate. Ogni tabella si scarica in CSV (separatore ;, per Excel).</p>
+<p class="text-secondary small">Tutte le attività con <strong>Attività di Formazione Scuola Lavoro</strong> attivo, di ogni area, che iniziano tra il <?php echo $d($dal_a); ?> e il <?php echo $d($al_a); ?>. Studenti = numero dichiarato nelle iscrizioni confermate. Ogni tabella si scarica in Excel, PDF o CSV (menu «Scarica»).</p>
 
 <section class="fsl-sez" id="valutazioni">
     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
         <h2 class="mb-0"><i class="fa fa-star me-1" aria-hidden="true"></i>Schede di valutazione della struttura ospitante (<?php echo count($valutazioni); ?>)</h2>
-        <?php if ($valutazioni): ?><button type="button" class="btn btn-sm btn-outline-secondary fw-bold fsl-csv" data-tab="tabVal" data-nome="fsl_valutazioni_<?php echo $anno; ?>.csv"><i class="fa fa-file-csv me-1" aria-hidden="true"></i>CSV</button><?php endif; ?>
+        <?php if ($valutazioni) echo pn_scarica($url_fsl('valutazioni', '&anno=' . $anno . '&tabella=valutazioni')); ?>
     </div>
     <p class="small text-secondary">A fine attività (presenza registrata) il docente riceve per email il link alla scheda, con un promemoria dopo 7 giorni. Voti da 1 a 5.</p>
     <?php if (!$valutazioni): ?><p class="text-muted small mb-0">Nessuna scheda compilata in questo anno scolastico.</p><?php else: ?>
@@ -913,17 +1041,4 @@ $indietro_s = '<a href="' . $h($url_fsl('stipulare', '&mostra=tutte')) . '" clas
 </section>
 <?php endif; ?>
 
-<script>
-// CSV di una tabella (anche le colonne nascoste, separatore ; per Excel in italiano)
-document.querySelectorAll('.fsl-csv').forEach(function (b) {
-    b.addEventListener('click', function () {
-        var tab = document.getElementById(b.dataset.tab), righe = [];
-        tab.querySelectorAll('tr').forEach(function (tr) { righe.push(Array.prototype.map.call(tr.children, function (c) { return c.textContent.replace(/\s+/g, ' ').trim(); })); });
-        var csv = '﻿' + righe.map(function (r) { return r.map(function (v) { return '"' + v.replace(/"/g, '""') + '"'; }).join(';'); }).join('\r\n');
-        var a = document.createElement('a');
-        a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-        a.download = b.dataset.nome; document.body.appendChild(a); a.click(); a.remove();
-    });
-});
-</script>
 <?php require_once 'admin_footer.php'; ?>

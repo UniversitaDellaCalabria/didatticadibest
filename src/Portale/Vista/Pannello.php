@@ -148,6 +148,61 @@ final class Pannello
             . ($azioni !== '' ? '<div>' . $azioni . '</div>' : '') . '</div>';
     }
 
+    /**
+     * «Cosa devo fare»: schede grandi con un numero e un solo pulsante. Tono: tuo (tocca a te, rosso), attesa (si aspetta qualcun altro,
+     * giallo), altro (neutro). Con numero 0 la scheda dice «Niente da fare» e non ha pulsante.
+     *
+     * @param list<array{numero: int, titolo: string, testo: string, href: string, bottone?: string, tono?: string, vuoto?: string}> $compiti
+     */
+    public static function compiti(array $compiti, string $etichetta = 'Cosa devo fare'): string
+    {
+        $o = '<div class="pn-compiti" role="list" aria-label="' . self::h($etichetta) . '">';
+        foreach ($compiti as $c) {
+            $n = (int) $c['numero'];
+            $tono = in_array($c['tono'] ?? '', ['tuo', 'attesa'], true) ? $c['tono'] : 'altro';
+            $o .= '<div class="pn-compito pn-compito-' . ($n > 0 ? $tono : 'zero') . '" role="listitem">'
+                . '<div class="pn-compito-num">' . $n . '</div>'
+                . '<div class="pn-compito-titolo">' . self::h($c['titolo']) . '</div>'
+                . '<p class="pn-compito-testo">' . self::h($n > 0 ? $c['testo'] : ($c['vuoto'] ?? 'Niente da fare.')) . '</p>'
+                . ($n > 0 ? '<a class="pn-compito-bottone" href="' . self::h($c['href']) . '">' . self::h($c['bottone'] ?? 'Apri') . ' <i class="fa fa-arrow-right" aria-hidden="true"></i></a>' : '')
+                . '</div>';
+        }
+
+        return $o . '</div>';
+    }
+
+    /** Menu «Altro» per le azioni che servono di rado: voci HTML già pronte (link <a> o form con un solo pulsante). */
+    public static function altro(array $voci, string $testo = 'Altro'): string
+    {
+        if (!$voci) {
+            return '';
+        }
+
+        return '<div class="dropdown pn-altro"><button type="button" class="btn btn-outline-secondary dropdown-toggle fw-bold" data-bs-toggle="dropdown" aria-expanded="false">'
+            . '<i class="fa fa-ellipsis me-1" aria-hidden="true"></i>' . self::h($testo) . '</button>'
+            . '<ul class="dropdown-menu dropdown-menu-end">' . implode('', array_map(fn (string $v) => '<li>' . $v . '</li>', $voci)) . '</ul></div>';
+    }
+
+    /** Menu «Scarica» con Excel, PDF e CSV: aggiunge il parametro scarica= all'indirizzo della pagina. */
+    public static function scarica(string $href, string $testo = 'Scarica'): string
+    {
+        $sep = str_contains($href, '?') ? '&' : '?';
+        $voci = ['xlsx' => ['Excel', 'fa-file-excel'], 'pdf' => ['PDF', 'fa-file-pdf'], 'csv' => ['CSV', 'fa-file-csv']];
+        $o = '<div class="dropdown pn-scarica"><button type="button" class="btn btn-outline-secondary dropdown-toggle fw-bold" data-bs-toggle="dropdown" aria-expanded="false">'
+            . '<i class="fa fa-download me-1" aria-hidden="true"></i>' . self::h($testo) . '</button><ul class="dropdown-menu dropdown-menu-end">';
+        foreach ($voci as $k => [$nome, $ico]) {
+            $o .= '<li><a class="dropdown-item" href="' . self::h($href . $sep . 'scarica=' . $k) . '"><i class="fa ' . $ico . ' me-2" aria-hidden="true"></i>' . $nome . '</a></li>';
+        }
+
+        return $o . '</ul></div>';
+    }
+
+    /** Riga «← torna a…» sopra le schermate di dettaglio. */
+    public static function indietro(string $href, string $testo): string
+    {
+        return '<p class="pn-indietro"><a href="' . self::h($href) . '"><i class="fa fa-arrow-left me-1" aria-hidden="true"></i>' . self::h($testo) . '</a></p>';
+    }
+
     private static function h(string $s): string
     {
         return htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
