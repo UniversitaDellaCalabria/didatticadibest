@@ -182,6 +182,13 @@ if (!$is_full_admin && !$pagine_disponibili && in_array(basename($_SERVER['PHP_S
     exit;
 }
 
+// La Didattica non ha una pagina di ingresso a parte: il modulo si apre direttamente su «Cosa devo fare» (didattica.php)
+if ($puo_didattica && basename($_SERVER['PHP_SELF']) === 'inizio.php' && ($_GET['sezione'] ?? '') === 'didattica') {
+    while (ob_get_level() > 0) ob_end_clean();
+    header('Location: didattica.php?p_id=' . (int)($_GET['p_id'] ?? 0));
+    exit;
+}
+
 // ==============================================================================
 // 4. MODULI: quelli a cui l'utente ha accesso e quello su cui sta lavorando
 // Il modulo corrente decide il menu: le pagine di un modulo senza aree (PAGINE_MODULO) lo indicano da sole,
