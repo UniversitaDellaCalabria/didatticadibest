@@ -28,7 +28,7 @@ final class PannelloRepository
                     v.media AS val_media, v.id AS val_id, pr.valutazione_inviata, pr.attestato_inviato, pd.attestati AS pd_attestati, pd.per_scuole AS pd_per_scuole
              FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id JOIN pagine_eventi pe ON e.pagina_id = pe.id
              JOIN progetti_dettagli pd ON pd.evento_id = e.id LEFT JOIN valutazioni_fsl v ON v.prenotazione_id = pr.id
-             WHERE pd.convenzione = 1 AND IFNULL(pr.stato, 'confermata') IN ('confermata', 'da_approvare', 'in_attesa', 'richiesta_conferma')
+             WHERE pd.convenzione = 1 AND pr.solo_orientamento = 0 AND IFNULL(pr.stato, 'confermata') IN ('confermata', 'da_approvare', 'in_attesa', 'richiesta_conferma')
                AND COALESCE(IF(e.tipo = 'progetto', pd.data_inizio, t.data_turno), t.data_turno, pd.data_fine, DATE(pr.data_prenotazione)) BETWEEN ? AND ?
              ORDER BY e.titolo, t.data_turno",
             [$dal, $al]
@@ -76,7 +76,7 @@ final class PannelloRepository
                     t.data_turno, t.nome_turno, pd.data_inizio AS pd_inizio, pd.data_fine AS pd_fine, e.titolo, e.tipo AS evento_tipo, e.pagina_id, pe.titolo AS area
              FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id JOIN pagine_eventi pe ON e.pagina_id = pe.id
              JOIN progetti_dettagli pd ON pd.evento_id = e.id
-             WHERE e.archiviato = 0 AND pd.convenzione = 1 AND IFNULL(pr.stato, 'confermata') IN ('confermata', 'in_attesa', 'da_approvare', 'richiesta_conferma')
+             WHERE e.archiviato = 0 AND pd.convenzione = 1 AND pr.solo_orientamento = 0 AND IFNULL(pr.stato, 'confermata') IN ('confermata', 'in_attesa', 'da_approvare', 'richiesta_conferma')
                AND COALESCE(pd.data_fine, t.data_turno, CURDATE()) >= CURDATE()
              ORDER BY COALESCE(pd.data_inizio, t.data_turno), pr.data_prenotazione, pr.id"
         ));
@@ -94,7 +94,7 @@ final class PannelloRepository
                     t.data_turno, pd.data_inizio AS pd_inizio, pd.data_fine AS pd_fine, e.titolo, e.pagina_id, pe.titolo AS area
              FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id JOIN pagine_eventi pe ON e.pagina_id = pe.id
              LEFT JOIN progetti_dettagli pd ON pd.evento_id = e.id
-             WHERE e.archiviato = 0 AND IFNULL(pr.stato, 'confermata') IN ('confermata', 'in_attesa', 'da_approvare', 'richiesta_conferma')
+             WHERE e.archiviato = 0 AND pr.solo_orientamento = 0 AND IFNULL(pr.stato, 'confermata') IN ('confermata', 'in_attesa', 'da_approvare', 'richiesta_conferma')
                AND COALESCE(pd.data_fine, t.data_turno, CURDATE()) >= CURDATE()
                AND (pr.convenzione = 'no' OR (pd.convenzione = 1 AND pr.scuola_codice IS NULL AND IFNULL(pr.convenzione, '') <> 'ricevuta'))
              ORDER BY COALESCE(pd.data_inizio, t.data_turno), pr.data_prenotazione"

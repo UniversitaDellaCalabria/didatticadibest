@@ -201,7 +201,7 @@ final class CronRepository
         return array_map(static fn (array $r): int => (int) $r['id'], $this->db->righe(
             "SELECT pr.id FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id
              JOIN progetti_dettagli pd ON pd.evento_id = e.id
-             WHERE pd.convenzione = 1 AND IFNULL(pr.stato, 'confermata') = 'confermata' AND pr.presente = 1 AND pr.valutazione_inviata IS NULL
+             WHERE pd.convenzione = 1 AND pr.solo_orientamento = 0 AND IFNULL(pr.stato, 'confermata') = 'confermata' AND pr.presente = 1 AND pr.valutazione_inviata IS NULL
                AND COALESCE(IF(e.tipo = 'progetto', pd.data_fine, t.data_turno), t.data_turno) < CURDATE()
                AND COALESCE(IF(e.tipo = 'progetto', pd.data_fine, t.data_turno), t.data_turno) >= CURDATE() - INTERVAL 30 DAY"
         ));

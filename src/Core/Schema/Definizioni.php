@@ -772,6 +772,8 @@ final class Definizioni
             'doc_promemoria'       => "ADD COLUMN doc_promemoria INT NOT NULL DEFAULT 0",
             'doc_promemoria_il'    => "ADD COLUMN doc_promemoria_il DATETIME DEFAULT NULL",
             'doc_ultimo_avviso'    => "ADD COLUMN doc_ultimo_avviso TINYINT(1) NOT NULL DEFAULT 0",
+            // v84: la scuola fa l'attività FSL solo come orientamento (senza convenzione, elenco e autorizzazione)
+            'solo_orientamento'    => "ADD COLUMN solo_orientamento TINYINT(1) NOT NULL DEFAULT 0",
         ],
         'eventi' => [
             // v40: ambiti dell'evento (orientamento, ricerca, terza_missione, didattica), separati da virgola; '' = quello dell'area

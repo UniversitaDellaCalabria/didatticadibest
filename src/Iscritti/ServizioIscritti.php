@@ -202,6 +202,13 @@ final class ServizioIscritti
         $this->audit->registra($op->id, 'Convenzione ricevuta', ['ID Prenotazione' => $prenotazioneId], $op->ip);
     }
 
+    /** Segna (o toglie) che la scuola fa l'attività solo come orientamento: il sistema non chiede più convenzione, elenco e autorizzazione. */
+    public function soloOrientamento(int $prenotazioneId, bool $solo, Operatore $op): void
+    {
+        $this->iscritti->impostaSoloOrientamento($prenotazioneId, $solo);
+        $this->audit->registra($op->id, $solo ? 'Attività segnata come solo orientamento' : 'Attività di nuovo come Formazione Scuola Lavoro', ['ID Prenotazione' => $prenotazioneId], $op->ip);
+    }
+
     /** Email con la richiesta della convenzione; se parte, la prenotazione risulta «da stipulare». */
     public function richiediConvenzione(int $prenotazioneId): bool
     {

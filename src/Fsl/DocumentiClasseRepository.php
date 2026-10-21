@@ -62,7 +62,7 @@ final class DocumentiClasseRepository
              JOIN turni t ON pr.turno_id = t.id
              JOIN eventi e ON t.evento_id = e.id
              JOIN progetti_dettagli pd ON pd.evento_id = e.id
-             WHERE e.archiviato = 0 AND pd.convenzione = 1 AND (IFNULL(e.tipo, 'evento') <> 'progetto' OR pd.per_scuole = 1)
+             WHERE e.archiviato = 0 AND pd.convenzione = 1 AND pr.solo_orientamento = 0 AND (IFNULL(e.tipo, 'evento') <> 'progetto' OR pd.per_scuole = 1)
                AND IFNULL(pr.stato, 'confermata') IN ($stati)
                AND COALESCE(t.data_turno, pd.data_inizio) >= CURDATE()
                AND (pr.autorizzazione_file IS NULL OR pr.autorizzazione_file = ''
@@ -79,7 +79,7 @@ final class DocumentiClasseRepository
     public function perCodice(string $codice): ?array
     {
         return Righe::riga($this->db->riga(
-            "SELECT pr.id, pr.stato, pr.data_prenotazione, pr.autorizzazione_file, t.data_turno, e.tipo AS evento_tipo, pd.data_inizio, pd.per_scuole, IFNULL(pd.convenzione, 0) AS fsl
+            "SELECT pr.id, pr.stato, pr.data_prenotazione, pr.autorizzazione_file, t.data_turno, e.tipo AS evento_tipo, pd.data_inizio, pd.per_scuole, IF(pr.solo_orientamento = 1, 0, IFNULL(pd.convenzione, 0)) AS fsl
              FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id
              LEFT JOIN progetti_dettagli pd ON pd.evento_id = e.id
              WHERE pr.codice_prenotazione = ? LIMIT 1",

@@ -180,12 +180,24 @@ final class IscrittiRepository
         return Righe::testo($this->db->righe(
             "SELECT pr.*, COALESCE(NULLIF(pr.matricola, ''), u.matricola_studente, u.matricola_dipendente, u.matricola) as matricola_effettiva,
                     t.nome_turno, t.data_turno, t.orario_inizio, t.orario_fine, t.evento_id, e.titolo as evento_titolo, e.luogo as evento_luogo, e.abilita_presenze,
-                    e.tipo AS evento_tipo, pd.per_scuole, pd.attestati AS progetto_attestati, pd.data_inizio AS pd_inizio, pd.data_fine AS pd_fine, IFNULL(pd.convenzione, 0) AS fsl,
+                    e.tipo AS evento_tipo, pd.per_scuole, pd.attestati AS progetto_attestati, pd.data_inizio AS pd_inizio, pd.data_fine AS pd_fine, IF(pr.solo_orientamento = 1, 0, IFNULL(pd.convenzione, 0)) AS fsl, IFNULL(pd.convenzione, 0) AS fsl_attivita,
                     (SELECT COUNT(*) FROM partecipanti_prenotazione pp WHERE pp.prenotazione_id = pr.id) AS n_studenti
              FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id LEFT JOIN utenti u ON pr.utente_id = u.id LEFT JOIN progetti_dettagli pd ON pd.evento_id = e.id
              $where ORDER BY pr.data_prenotazione DESC LIMIT ? OFFSET ?",
             $par
         ));
+    }
+
+    /**
+     * La scuola fa l'attività solo come orientamento: niente convenzione, elenco degli studenti e autorizzazione. Le richieste di
+     * convenzione già aperte (da stipulare o dichiarate) si chiudono.
+     */
+    public function impostaSoloOrientamento(int $prenotazioneId, bool $solo): void
+    {
+        $this->db->esegui('UPDATE prenotazioni SET solo_orientamento = ? WHERE id = ?', [$solo ? 1 : 0, $prenotazioneId]);
+        if ($solo) {
+            $this->db->esegui("UPDATE prenotazioni SET convenzione = NULL, conv_promemoria = 0, conv_promemoria_il = NULL WHERE id = ? AND convenzione IN ('no', 'si')", [$prenotazioneId]);
+        }
     }
 
     /** Iscrizioni dei filtri che non hanno ancora la convenzione (conteggio per l'avviso sopra la tabella). */
@@ -197,7 +209,7 @@ final class IscrittiRepository
             "SELECT COUNT(*) AS n FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id
              LEFT JOIN progetti_dettagli pd ON pd.evento_id = e.id
              $where AND IFNULL(pr.stato, 'confermata') IN (" . self::STATI_ATTIVI . ")
-               AND (pr.convenzione = 'no' OR (pr.convenzione IS NULL AND pd.convenzione = 1))",
+               AND pr.solo_orientamento = 0 AND (pr.convenzione = 'no' OR (pr.convenzione IS NULL AND pd.convenzione = 1))",
             $par
         );
     }
@@ -215,7 +227,7 @@ final class IscrittiRepository
             "SELECT pr.id, pr.scuola_codice, t.data_turno, pd.data_inizio AS pd_inizio, pd.data_fine AS pd_fine FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id
              LEFT JOIN progetti_dettagli pd ON pd.evento_id = e.id
              $where AND IFNULL(pr.stato, 'confermata') IN (" . self::STATI_ATTIVI . ")
-               AND (pr.convenzione = 'no' OR (pr.convenzione IS NULL AND pd.convenzione = 1))",
+               AND pr.solo_orientamento = 0 AND (pr.convenzione = 'no' OR (pr.convenzione IS NULL AND pd.convenzione = 1))",
             $par
         ));
     }

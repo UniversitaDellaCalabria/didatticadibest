@@ -24,7 +24,7 @@ final class PrenotazioneFslRepository
         return Righe::riga($this->db->riga(
             "SELECT pr.*, t.nome_turno, t.data_turno, t.orario_inizio, t.orario_fine, t.richiede_approvazione, t.evento_id,
                     e.titolo AS evento_titolo, e.pagina_id, pe.conv_url_modello, pe.conv_url_allegato, pe.conv_pec,
-                    pd.data_inizio AS pd_inizio, pd.data_fine AS pd_fine, IFNULL(pd.convenzione, 0) AS fsl
+                    pd.data_inizio AS pd_inizio, pd.data_fine AS pd_fine, IF(pr.solo_orientamento = 1, 0, IFNULL(pd.convenzione, 0)) AS fsl
              FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id
              JOIN pagine_eventi pe ON e.pagina_id = pe.id LEFT JOIN progetti_dettagli pd ON pd.evento_id = e.id
              WHERE pr.id = ? LIMIT 1",
@@ -61,7 +61,7 @@ final class PrenotazioneFslRepository
     {
         return $this->db->riga(
             "SELECT pr.id, pr.scuola_codice, pr.email FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN progetti_dettagli pd ON pd.evento_id = t.evento_id
-             WHERE pr.codice_prenotazione = ? AND pd.convenzione = 1 AND IFNULL(pr.stato, 'confermata') NOT IN ('annullata', 'rifiutata', 'scaduta') LIMIT 1",
+             WHERE pr.codice_prenotazione = ? AND pd.convenzione = 1 AND pr.solo_orientamento = 0 AND IFNULL(pr.stato, 'confermata') NOT IN ('annullata', 'rifiutata', 'scaduta') LIMIT 1",
             [$codice]
         );
     }
@@ -102,10 +102,10 @@ final class PrenotazioneFslRepository
     public function daVerificare(): array
     {
         return Righe::testo($this->db->righe(
-            "SELECT pr.id, pr.scuola_codice, pr.convenzione, t.data_turno, pd.data_inizio AS pd_inizio, pd.data_fine AS pd_fine, IFNULL(pd.convenzione, 0) AS fsl
+            "SELECT pr.id, pr.scuola_codice, pr.convenzione, t.data_turno, pd.data_inizio AS pd_inizio, pd.data_fine AS pd_fine, IF(pr.solo_orientamento = 1, 0, IFNULL(pd.convenzione, 0)) AS fsl
              FROM prenotazioni pr JOIN turni t ON pr.turno_id = t.id JOIN eventi e ON t.evento_id = e.id
              LEFT JOIN progetti_dettagli pd ON pd.evento_id = e.id
-             WHERE (pd.convenzione = 1 OR pr.convenzione IN ('no', 'si')) AND e.archiviato = 0
+             WHERE (pd.convenzione = 1 OR pr.convenzione IN ('no', 'si')) AND pr.solo_orientamento = 0 AND e.archiviato = 0
                AND IFNULL(pr.stato, 'confermata') IN ('confermata', 'da_approvare', 'in_attesa', 'richiesta_conferma')
                AND COALESCE(pd.data_fine, t.data_turno, CURDATE()) >= CURDATE()"
         ));
@@ -130,7 +130,7 @@ final class PrenotazioneFslRepository
         $parametri = $anagrafe ? [$prenotazioneId, $codiceScuola, $prenotazioneId] : [$prenotazioneId, $prenotazioneId];
         $righe = $this->db->righe(
             "SELECT pr.id FROM prenotazioni pr JOIN turni t ON t.id = pr.turno_id JOIN progetti_dettagli pd ON pd.evento_id = t.evento_id
-             WHERE $per AND pd.convenzione = 1 AND IFNULL(pr.stato, 'confermata') NOT IN ('annullata', 'rifiutata', 'scaduta')
+             WHERE $per AND pd.convenzione = 1 AND pr.solo_orientamento = 0 AND IFNULL(pr.stato, 'confermata') NOT IN ('annullata', 'rifiutata', 'scaduta')
                AND (pr.id = ? OR COALESCE(pd.data_fine, t.data_turno, CURDATE()) >= CURDATE() - INTERVAL 30 DAY) ORDER BY t.data_turno, pr.id",
             $parametri
         );

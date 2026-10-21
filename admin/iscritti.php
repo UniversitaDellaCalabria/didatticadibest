@@ -158,6 +158,16 @@ if (!$is_archivio) {
         admin_redirect("iscritti.php?p_id=$filtro_p&f_turno=$filtro_turno&f_stato=$filtro_stato$url_suffix");
     }
 
+    if (isset($_POST['solo_orientamento_pren'])) {
+        csrf_verify($_POST['csrf_token'] ?? '');
+        $pr_id = (int)$_POST['solo_orientamento_pren'];
+        if (!pren_autorizzata($conn, $pr_id, $filtro_p, $sql_filtro_eventi_rbac)) nega_accesso_isc();
+        $solo_or = (int)($_POST['val'] ?? 0) === 1;
+        $iscritti_srv->soloOrientamento($pr_id, $solo_or, $operatore);
+        flash_set($solo_or ? "✅ Segnata come attività di solo orientamento: non servono convenzione, elenco degli studenti né autorizzazione." : "✅ Di nuovo Formazione Scuola Lavoro: tornano la convenzione e i documenti.");
+        admin_redirect("iscritti.php?p_id=$filtro_p&f_turno=$filtro_turno&f_stato=$filtro_stato$url_suffix");
+    }
+
     if (isset($_POST['conv_ricevuta_pren']) || isset($_POST['chiedi_conv_pren'])) {
         csrf_verify($_POST['csrf_token'] ?? '');
         $pr_id = (int)($_POST['conv_ricevuta_pren'] ?? $_POST['chiedi_conv_pren']);
@@ -571,7 +581,9 @@ echo '</nav>';
                     <td>
                         <span class="stato-badge" style="background:<?php echo $st_bg; ?>;color:<?php echo $st_tc; ?>;"><i class="fa <?php echo $st_icon; ?>"></i><?php echo $st_lbl; ?></span>
                         <?php $cv_pr = (string)($pr['convenzione'] ?? ''); $cv_attiva = !in_array($st_val, ['annullata', 'rifiutata', 'scaduta'], true); ?>
-                        <?php if ($cv_pr === 'no' && $cv_attiva): ?>
+                        <?php if ((int)($pr['solo_orientamento'] ?? 0) === 1): ?>
+                            <span class="stato-badge mt-1" style="background:#eff6ff;color:#1d4ed8;" title="La scuola fa l'attività solo come orientamento: non servono convenzione, elenco degli studenti né autorizzazione"><i class="fa fa-compass"></i>Solo orientamento</span>
+                        <?php elseif ($cv_pr === 'no' && $cv_attiva): ?>
                             <span class="stato-badge mt-1" style="background:#fff7ed;color:#9a3412;" title="Convenzione non ancora arrivata<?php echo (int)($pr['conv_promemoria'] ?? 0) > 0 ? ' · promemoria inviati: ' . (int)$pr['conv_promemoria'] : ''; ?>"><i class="fa fa-file-signature"></i>Convenzione da stipulare</span>
                         <?php elseif ($cv_pr === 'ricevuta'): ?>
                             <span class="stato-badge mt-1" style="background:#f0fdf4;color:#166534;" title="Convenzione ricevuta o valida nel registro"><i class="fa fa-file-circle-check"></i>Convenzione ricevuta</span>
@@ -655,6 +667,9 @@ echo '</nav>';
                                             <li><form method="POST" class="m-0"><?php csrf_field(); ?><button type="submit" name="conv_ricevuta_pren" value="<?php echo (int)$pr['id']; ?>" class="dropdown-item" data-confirm="La convenzione della scuola è arrivata? Viene registrata per la scuola e vale anche per le sue altre iscrizioni."><i class="fa fa-file-circle-check me-2" aria-hidden="true"></i>Convenzione ricevuta</button></form></li>
                                             <?php endif; ?>
                                             <li><form method="POST" class="m-0"><?php csrf_field(); ?><button type="submit" name="chiedi_conv_pren" value="<?php echo (int)$pr['id']; ?>" class="dropdown-item" data-confirm="Inviare di nuovo alla scuola l'email con i modelli della convenzione e la PEC?"><i class="fa fa-envelope me-2" aria-hidden="true"></i>Chiedi di nuovo la convenzione</button></form></li>
+                                        <?php endif; ?>
+                                        <?php if ((int)($pr['fsl_attivita'] ?? 0) === 1 && $cv_attiva): $solo_or_riga = (int)($pr['solo_orientamento'] ?? 0) === 1; ?>
+                                            <li><form method="POST" class="m-0"><?php csrf_field(); ?><input type="hidden" name="val" value="<?php echo $solo_or_riga ? 0 : 1; ?>"><button type="submit" name="solo_orientamento_pren" value="<?php echo (int)$pr['id']; ?>" class="dropdown-item" data-confirm="<?php echo $solo_or_riga ? 'Tornare a Formazione Scuola Lavoro? Tornano convenzione, elenco degli studenti e autorizzazione.' : 'La scuola fa questa attività solo come orientamento? Non verranno più chiesti convenzione, elenco degli studenti e autorizzazione.'; ?>"><i class="fa fa-compass me-2" aria-hidden="true"></i><?php echo $solo_or_riga ? 'Riporta a Formazione Scuola Lavoro' : 'Segna come solo orientamento'; ?></button></form></li>
                                         <?php endif; ?>
                                         <li><hr class="dropdown-divider"></li>
                                         <?php if ($st_val === 'da_approvare'): ?>

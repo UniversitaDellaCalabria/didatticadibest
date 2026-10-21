@@ -33,7 +33,7 @@ final class ReportFsl
                     (SELECT COUNT(*) FROM partecipanti_prenotazione pp WHERE pp.prenotazione_id = pr.id AND pp.escluso = 0) AS n_elenco
              FROM prenotazioni pr JOIN turni t ON t.id = pr.turno_id JOIN eventi e ON e.id = t.evento_id JOIN progetti_dettagli pd ON pd.evento_id = e.id
              LEFT JOIN pagine_eventi pe ON pe.id = e.pagina_id LEFT JOIN scuole sc ON sc.codice = pr.scuola_codice
-             WHERE pd.convenzione = 1 AND IFNULL(pr.stato, 'confermata') = 'confermata'
+             WHERE pd.convenzione = 1 AND pr.solo_orientamento = 0 AND IFNULL(pr.stato, 'confermata') = 'confermata'
                AND COALESCE(IF(e.tipo = 'progetto', pd.data_inizio, t.data_turno), t.data_turno, pd.data_fine) BETWEEN ? AND ?
              ORDER BY e.titolo, t.data_turno",
             [$dal, $al]
