@@ -650,6 +650,8 @@ final class Definizioni
             'cfu' => "ADD COLUMN cfu DECIMAL(5,1) DEFAULT NULL",
         ],
         'convenzioni_compilate' => [
+            // v85: conversazione con la scuola archiviata dalla casella dei messaggi (torna da sola se la scuola riscrive)
+            'msg_archiviata_il' => "ADD COLUMN msg_archiviata_il DATETIME DEFAULT NULL",
             // v37: protocollo della convenzione compilata online, riportato nei documenti
             'protocollo'      => "ADD COLUMN protocollo VARCHAR(100) NOT NULL DEFAULT ''",
             'protocollo_data' => "ADD COLUMN protocollo_data DATE DEFAULT NULL",
@@ -774,6 +776,8 @@ final class Definizioni
             'doc_ultimo_avviso'    => "ADD COLUMN doc_ultimo_avviso TINYINT(1) NOT NULL DEFAULT 0",
             // v84: la scuola fa l'attività FSL solo come orientamento (senza convenzione, elenco e autorizzazione)
             'solo_orientamento'    => "ADD COLUMN solo_orientamento TINYINT(1) NOT NULL DEFAULT 0",
+            // v85: conversazione archiviata dalla casella dei messaggi (torna da sola se l'iscritto riscrive)
+            'msg_archiviata_il'    => "ADD COLUMN msg_archiviata_il DATETIME DEFAULT NULL",
         ],
         'eventi' => [
             // v40: ambiti dell'evento (orientamento, ricerca, terza_missione, didattica), separati da virgola; '' = quello dell'area

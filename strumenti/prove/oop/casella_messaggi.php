@@ -33,5 +33,28 @@ prova(count($mie_g) === 1 && $mie_g[0]['id'] === 98813, "gestore di un'area: nel
 prova($cas_cm->nonLetti(98801, false, false) === 1 && $cas_cm->nonLetti(98899, false, false) === 0, "contatore del pulsante: solo le conversazioni dell'utente");
 prova($cas_cm->nonLetti(1, true, true) >= 3, "contatore dell'amministratore: somma di tutte le aree e delle convenzioni");
 
+// Archivia: sparisce dalla casella e dal contatore, non si cancella, torna da sola se l'altra parte riscrive
+$msg_cm = AppCm::per($conn)->get(\App\Iscritti\ServizioMessaggi::class);
+$conv_rep_cm = AppCm::per($conn)->get(\App\Fsl\MessaggiConvenzioneRepository::class);
+$stato_cm = fn() => array_column(array_filter($cas_cm->conversazioni(1, true, true), fn($c) => in_array($c['id'], [98813, 98830], true)), 'archiviata', 'id');
+prova($stato_cm() === [98813 => false, 98830 => false], "prima di archiviare le due conversazioni sono in casella");
+$da_leggere_prima = $cas_cm->nonLetti(1, true, true);
+$msg_cm->archivia(98813, true);
+$conv_rep_cm->archivia(98830, true);
+prova($stato_cm() === [98813 => true, 98830 => true] && $cas_cm->nonLetti(1, true, true) === $da_leggere_prima - 2, "archiviate: segnate come lette, fuori dal contatore");
+prova((int) $conn->query("SELECT COUNT(*) FROM messaggi_prenotazioni WHERE prenotazione_id = 98813")->fetch_row()[0] === 1 && count($conv_rep_cm->della(98830)) === 2, "archiviare non cancella i messaggi");
+$q("UPDATE prenotazioni SET msg_archiviata_il = DATE_SUB(NOW(), INTERVAL 1 HOUR) WHERE id = 98813");
+$q("INSERT INTO messaggi_prenotazioni (prenotazione_id, mittente_tipo, mittente_id, messaggio, letto, data_invio) VALUES (98813, 'utente', NULL, 'Nuova domanda', 0, NOW())");
+$q("UPDATE convenzioni_compilate SET msg_archiviata_il = DATE_SUB(NOW(), INTERVAL 1 HOUR) WHERE id = 98830");
+$q("INSERT INTO convenzioni_messaggi (compilazione_id, da, tipo, testo) VALUES (98830, 'scuola', 'messaggio', 'Altro messaggio')");
+prova($stato_cm() === [98813 => false, 98830 => false], "un nuovo messaggio dell'altra parte rimette la conversazione in casella");
+$msg_cm->archivia(98813, true);
+$msg_cm->archivia(98813, false);
+$q("INSERT INTO messaggi_prenotazioni (prenotazione_id, mittente_tipo, mittente_id, messaggio, letto, data_invio) VALUES (98813, 'admin', 1, 'Risposta nostra', 1, NOW())");
+prova($stato_cm()[98813] === false, "ripristina: la conversazione torna in casella");
+$msg_cm->archivia(98813, true);
+$q("INSERT INTO messaggi_prenotazioni (prenotazione_id, mittente_tipo, mittente_id, messaggio, letto, data_invio) VALUES (98813, 'admin', 1, 'Altra risposta nostra', 1, NOW())");
+prova($stato_cm()[98813] === true, "una risposta nostra non rimette in casella una conversazione archiviata");
+
 foreach (["DELETE FROM convenzioni_messaggi WHERE compilazione_id = 98830", "DELETE FROM convenzioni_compilate WHERE id = 98830", "DELETE FROM messaggi_prenotazioni WHERE prenotazione_id IN (98813, 98823)",
           "DELETE FROM prenotazioni WHERE id IN (98813, 98823)", "DELETE FROM turni WHERE id IN (98812, 98822)", "DELETE FROM eventi WHERE id IN (98811, 98821)", "DELETE FROM pagine_eventi WHERE id IN (98810, 98820)"] as $sql) $q($sql);

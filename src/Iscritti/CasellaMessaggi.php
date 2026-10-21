@@ -103,7 +103,7 @@ final class CasellaMessaggi
      * Tutte le conversazioni, prima quelle con messaggi da leggere, poi le più recenti.
      *
      * @return list<array{tipo: string, id: int, titolo: string, rif: string, nome: string, email: string, modulo: string, modulo_nome: string, area: string,
-     *     pagina_id: int, ultimo: string, totale: int, da_leggere: int}>
+     *     pagina_id: int, ultimo: string, totale: int, da_leggere: int, archiviata: bool}>
      */
     public function conversazioni(int $uid, bool $amministratore, bool $convenzioniFsl): array
     {
@@ -115,7 +115,7 @@ final class CasellaMessaggi
                     'tipo' => self::PRENOTAZIONE, 'id' => (int) $c['prenotazione_id'], 'titolo' => (string) $c['evento_titolo'], 'rif' => (string) $c['codice_prenotazione'],
                     'nome' => trim($c['nome'] . ' ' . $c['cognome']), 'email' => (string) $c['email'], 'modulo' => $modulo, 'modulo_nome' => self::nomeModulo($modulo),
                     'area' => (string) ($a['area']['titolo'] ?? ''), 'pagina_id' => (int) $a['area']['id'], 'ultimo' => (string) $c['ultimo_messaggio_data'],
-                    'totale' => (int) $c['totale_messaggi'], 'da_leggere' => (int) $c['messaggi_da_leggere'],
+                    'totale' => (int) $c['totale_messaggi'], 'da_leggere' => (int) $c['messaggi_da_leggere'], 'archiviata' => (bool) $c['archiviata'],
                 ];
             }
         }
@@ -125,7 +125,7 @@ final class CasellaMessaggi
                 $out[] = [
                     'tipo' => self::CONVENZIONE, 'id' => (int) $c['compilazione_id'], 'titolo' => 'Convenzione con la scuola', 'rif' => (string) ($c['scuola_codice'] ?? ''),
                     'nome' => (string) ($dati['scuola']['denominazione'] ?? '') ?: 'Scuola', 'email' => (string) ($c['email'] ?? ''), 'modulo' => 'fsl', 'modulo_nome' => self::nomeModulo('fsl'),
-                    'area' => '', 'pagina_id' => 0, 'ultimo' => (string) $c['ultimo'], 'totale' => (int) $c['totale'], 'da_leggere' => (int) $c['da_leggere'],
+                    'area' => '', 'pagina_id' => 0, 'ultimo' => (string) $c['ultimo'], 'totale' => (int) $c['totale'], 'da_leggere' => (int) $c['da_leggere'], 'archiviata' => (bool) $c['archiviata'],
                 ];
             }
         }

@@ -82,11 +82,21 @@ final class MessaggiConvenzioneRepository
     {
         return Righe::testo($this->db->righe(
             "SELECT m.compilazione_id, c.scuola_codice, c.dati_json, c.email, MAX(m.creato_il) AS ultimo, COUNT(*) AS totale,
-                    SUM(m.da = 'scuola' AND m.letto_il IS NULL) AS da_leggere
+                    SUM(m.da = 'scuola' AND m.letto_il IS NULL) AS da_leggere,
+                    (c.msg_archiviata_il IS NOT NULL AND c.msg_archiviata_il >= IFNULL(MAX(CASE WHEN m.da = 'scuola' THEN m.creato_il END), '1970-01-01')) AS archiviata
              FROM convenzioni_messaggi m JOIN convenzioni_compilate c ON c.id = m.compilazione_id
-             GROUP BY m.compilazione_id, c.scuola_codice, c.dati_json, c.email
+             GROUP BY m.compilazione_id, c.scuola_codice, c.dati_json, c.email, c.msg_archiviata_il
              HAVING SUM(m.da = 'scuola') > 0"
         ));
+    }
+
+    /** Archivia la conversazione con la scuola (e la segna letta) oppure la rimette in casella: se la scuola riscrive, torna da sola. */
+    public function archivia(int $compilazioneId, bool $archiviata): void
+    {
+        if ($archiviata) {
+            $this->segnaLetti($compilazioneId, self::UFFICIO);
+        }
+        $this->db->esegui('UPDATE convenzioni_compilate SET msg_archiviata_il = ' . ($archiviata ? 'NOW()' : 'NULL') . ' WHERE id = ?', [$compilazioneId]);
     }
 
     /** Conversazioni con almeno una risposta della scuola da leggere. */

@@ -63,6 +63,15 @@ final class ServizioMessaggi
         $this->messaggi->segnaLettiDellUtente($prenotazioneId);
     }
 
+    /** Archivia la conversazione (e la segna letta) oppure la rimette in casella. */
+    public function archivia(int $prenotazioneId, bool $archiviata): void
+    {
+        if ($archiviata) {
+            $this->messaggi->segnaLettiDellUtente($prenotazioneId);
+        }
+        $this->messaggi->impostaArchiviata($prenotazioneId, $archiviata);
+    }
+
     /**
      * Messaggio scritto dal pannello Iscritti: si salva e, se la prenotazione ha un'email, si avvisa l'iscritto.
      * Il testo non si pulisce (lo scrive la segreteria). Ritorna false se non c'è nulla da inviare.

@@ -26,7 +26,8 @@ final class MessaggiRepository
                e.titolo as evento_titolo, e.pagina_id,
                MAX(m.data_invio) as ultimo_messaggio_data,
                COUNT(m.id) as totale_messaggi,
-               SUM(CASE WHEN m.letto = 0 AND m.mittente_tipo = 'utente' THEN 1 ELSE 0 END) as messaggi_da_leggere
+               SUM(CASE WHEN m.letto = 0 AND m.mittente_tipo = 'utente' THEN 1 ELSE 0 END) as messaggi_da_leggere,
+               (p.msg_archiviata_il IS NOT NULL AND p.msg_archiviata_il >= IFNULL(MAX(CASE WHEN m.mittente_tipo = 'utente' THEN m.data_invio END), '1970-01-01')) AS archiviata
              FROM messaggi_prenotazioni m
              JOIN prenotazioni p ON m.prenotazione_id = p.id
              JOIN turni t ON p.turno_id = t.id
@@ -36,6 +37,12 @@ final class MessaggiRepository
              ORDER BY messaggi_da_leggere DESC, ultimo_messaggio_data DESC",
             [$paginaId]
         ));
+    }
+
+    /** Archivia la conversazione (o la rimette in casella): se l'iscritto scrive ancora, torna in casella da sola. */
+    public function impostaArchiviata(int $prenotazioneId, bool $archiviata): void
+    {
+        $this->db->esegui('UPDATE prenotazioni SET msg_archiviata_il = ' . ($archiviata ? 'NOW()' : 'NULL') . ' WHERE id = ?', [$prenotazioneId]);
     }
 
     /**

@@ -23,7 +23,8 @@ $msg_conv_rep = \App\Core\App::get(\App\Fsl\MessaggiConvenzioneRepository::class
 $operatore = new \App\Iscritti\Operatore((int)($_SESSION['utente_id'] ?? 0), (string)($_SESSION['utente_email'] ?? ''), (string)($_SERVER['REMOTE_ADDR'] ?? 'Sconosciuto'));
 $filtro_modulo_in = (string)($_GET['modulo'] ?? '');
 $solo_da_leggere = isset($_GET['da_leggere']);
-$ritorno_msg = 'messaggi.php?p_id=' . (int)$filtro_p . ($filtro_modulo_in !== '' ? '&modulo=' . urlencode($filtro_modulo_in) : '') . ($solo_da_leggere ? '&da_leggere=1' : '');
+$vedi_archiviate = isset($_GET['archiviate']);
+$ritorno_msg = 'messaggi.php?p_id=' . (int)$filtro_p . ($filtro_modulo_in !== '' ? '&modulo=' . urlencode($filtro_modulo_in) : '') . ($solo_da_leggere ? '&da_leggere=1' : '') . ($vedi_archiviate ? '&archiviate=1' : '');
 
 // L'utente può gestire le conversazioni di questa prenotazione? Il filtro è quello dell'area dell'attività, non dell'area aperta nel pannello
 $pren_gestibile = function (int $pr_id) use ($conn, $casella, $u_id_curr, $is_full_admin): bool {
@@ -61,6 +62,23 @@ if (isset($_POST['invia_risposta_conv'])) {
     admin_redirect($ritorno_msg);
 }
 
+// 1c. ARCHIVIA (o rimette in casella) UNA CONVERSAZIONE: non si cancella nulla, e se l'altra parte riscrive torna da sola in casella
+if (isset($_POST['archivia_conv']) || isset($_POST['ripristina_conv'])) {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    $archivia_cv = isset($_POST['archivia_conv']);
+    [$tipo_ar, $id_ar] = array_pad(explode(':', (string)($_POST['archivia_conv'] ?? $_POST['ripristina_conv']), 2), 2, '0');
+    $id_ar = (int)$id_ar;
+    if ($tipo_ar === 'c') {
+        if (!$vede_convenzioni) nega_accesso();
+        $msg_conv_rep->archivia($id_ar, $archivia_cv);
+    } else {
+        if (!$pren_gestibile($id_ar)) nega_accesso();
+        $messaggi_srv->archivia($id_ar, $archivia_cv);
+    }
+    flash_set($archivia_cv ? '✅ Conversazione archiviata: la ritrovi in «Archiviate» e torna in casella se arriva un nuovo messaggio.' : '✅ Conversazione rimessa in casella.');
+    admin_redirect($ritorno_msg);
+}
+
 // 2. AZIONE RAPIDA: SEGNA COME LETTO SENZA RISPONDERE
 if (isset($_GET['segna_letto'])) {
     $pr_id = (int)$_GET['segna_letto'];
@@ -75,7 +93,9 @@ if (isset($_GET['segna_letto_conv'])) {
 }
 
 // 3. TUTTE LE CONVERSAZIONI (permessi come nelle singole aree), con il filtro scelto
-$tutte_conv = $casella->conversazioni((int)$u_id_curr, $is_full_admin, $vede_convenzioni);
+$con_archivio = $casella->conversazioni((int)$u_id_curr, $is_full_admin, $vede_convenzioni);
+$n_archiviate = count(array_filter($con_archivio, fn($c) => $c['archiviata']));
+$tutte_conv = array_values(array_filter($con_archivio, fn($c) => $c['archiviata'] === $vedi_archiviate));
 $per_modulo = [];
 foreach ($tutte_conv as $c_m) {
     $per_modulo[$c_m['modulo']] = ($per_modulo[$c_m['modulo']] ?? ['nome' => $c_m['modulo_nome'], 'tot' => 0, 'nuovi' => 0]);
@@ -84,7 +104,7 @@ foreach ($tutte_conv as $c_m) {
 }
 $conversazioni = array_values(array_filter($tutte_conv, fn($c) => ($filtro_modulo_in === '' || $c['modulo'] === $filtro_modulo_in) && (!$solo_da_leggere || $c['da_leggere'] > 0)));
 $n_nuovi_tot = count(array_filter($tutte_conv, fn($c) => $c['da_leggere'] > 0));
-$url_filtro = fn(string $modulo, bool $nuovi) => 'messaggi.php?p_id=' . (int)$filtro_p . ($modulo !== '' ? '&modulo=' . urlencode($modulo) : '') . ($nuovi ? '&da_leggere=1' : '');
+$url_filtro = fn(string $modulo, bool $nuovi) => 'messaggi.php?p_id=' . (int)$filtro_p . ($modulo !== '' ? '&modulo=' . urlencode($modulo) : '') . ($nuovi ? '&da_leggere=1' : '') . ($vedi_archiviate ? '&archiviate=1' : '');
 $colori_mod = fn(string $m) => defined('MODULI_PORTALE') ? (MODULI_PORTALE[$m]['colore'] ?? '#475569') : '#475569';
 ?>
 
@@ -93,12 +113,13 @@ $colori_mod = fn(string $m) => defined('MODULI_PORTALE') ? (MODULI_PORTALE[$m]['
 <?php echo flash_html(); ?>
 
 <div class="d-flex flex-wrap align-items-center gap-2 mb-3" role="group" aria-label="Filtra i messaggi">
-    <a href="<?php echo htmlspecialchars($url_filtro('', false)); ?>" class="btn btn-sm fw-bold <?php echo $filtro_modulo_in === '' && !$solo_da_leggere ? 'btn-dark' : 'btn-outline-dark'; ?>">Tutti (<?php echo count($tutte_conv); ?>)</a>
+    <a href="<?php echo htmlspecialchars($url_filtro('', false)); ?>" class="btn btn-sm fw-bold <?php echo $filtro_modulo_in === '' && !$solo_da_leggere ? 'btn-dark' : 'btn-outline-dark'; ?>"><?php echo $vedi_archiviate ? 'Archiviate' : 'Tutti'; ?> (<?php echo count($tutte_conv); ?>)</a>
     <a href="<?php echo htmlspecialchars($url_filtro($filtro_modulo_in, true)); ?>" class="btn btn-sm fw-bold <?php echo $solo_da_leggere ? 'btn-danger' : 'btn-outline-danger'; ?>"><i class="fa fa-envelope me-1" aria-hidden="true"></i>Da leggere (<?php echo $n_nuovi_tot; ?>)</a>
     <span class="text-secondary small ms-2 d-none d-md-inline">Modulo:</span>
     <?php foreach ($per_modulo as $k_m => $m_m): ?>
         <a href="<?php echo htmlspecialchars($url_filtro($k_m, $solo_da_leggere)); ?>" class="btn btn-sm fw-bold" style="border:1px solid <?php echo $colori_mod($k_m); ?>;<?php echo $filtro_modulo_in === $k_m ? 'background:' . $colori_mod($k_m) . ';color:#fff;' : 'color:' . $colori_mod($k_m) . ';background:#fff;'; ?>"><?php echo htmlspecialchars($m_m['nome']); ?> (<?php echo (int)$m_m['tot']; ?>)<?php echo $m_m['nuovi'] ? ' · ' . (int)$m_m['nuovi'] . ' nuovi' : ''; ?></a>
     <?php endforeach; ?>
+    <a href="messaggi.php?p_id=<?php echo (int)$filtro_p; ?><?php echo $vedi_archiviate ? '' : '&archiviate=1'; ?>" class="btn btn-sm fw-bold ms-md-auto btn-outline-secondary"><i class="fa <?php echo $vedi_archiviate ? 'fa-inbox' : 'fa-box-archive'; ?> me-1" aria-hidden="true"></i><?php echo $vedi_archiviate ? 'Torna alla casella' : 'Archiviate (' . $n_archiviate . ')'; ?></a>
 </div>
 
 <div class="card shadow-sm border-0">
@@ -117,7 +138,7 @@ $colori_mod = fn(string $m) => defined('MODULI_PORTALE') ? (MODULI_PORTALE[$m]['
                 </thead>
                 <tbody>
                     <?php if(empty($conversazioni)): ?>
-                        <tr><td colspan="6" class="text-center py-5 text-muted"><i class="fa fa-check-double fs-2 d-block mb-2 opacity-50"></i> <?php echo $tutte_conv ? 'Nessuna conversazione con questo filtro.' : 'Nessuna conversazione presente.'; ?></td></tr>
+                        <tr><td colspan="6" class="text-center py-5 text-muted"><i class="fa fa-check-double fs-2 d-block mb-2 opacity-50"></i> <?php echo $tutte_conv ? 'Nessuna conversazione con questo filtro.' : ($vedi_archiviate ? 'Nessuna conversazione archiviata.' : 'Nessuna conversazione presente.'); ?></td></tr>
                     <?php else: ?>
                         <?php foreach($conversazioni as $conv):
                             $is_unread = $conv['da_leggere'] > 0;
@@ -163,6 +184,14 @@ $colori_mod = fn(string $m) => defined('MODULI_PORTALE') ? (MODULI_PORTALE[$m]['
                                     <button type="button" class="btn btn-outline-dark btn-sm fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#<?php echo $id_modale; ?>">
                                         <i class="fa fa-book-reader me-1"></i> Leggi / Rispondi
                                     </button>
+                                    <?php $chiave_ar = ($e_conv ? 'c:' : 'p:') . $conv['id']; ?>
+                                    <form method="POST" action="<?php echo htmlspecialchars($ritorno_msg); ?>" class="d-inline m-0"><?php csrf_field(); ?>
+                                        <?php if ($conv['archiviata']): ?>
+                                            <button type="submit" name="ripristina_conv" value="<?php echo $chiave_ar; ?>" class="btn btn-outline-secondary btn-sm fw-bold" title="Rimetti la conversazione in casella"><i class="fa fa-inbox me-1" aria-hidden="true"></i>Ripristina</button>
+                                        <?php else: ?>
+                                            <button type="submit" name="archivia_conv" value="<?php echo $chiave_ar; ?>" class="btn btn-outline-secondary btn-sm fw-bold" title="Archivia: sparisce dalla casella ma non si cancella, e torna se arriva un nuovo messaggio"><i class="fa fa-box-archive me-1" aria-hidden="true"></i>Archivia</button>
+                                        <?php endif; ?>
+                                    </form>
                                 </td>
                             </tr>
 
