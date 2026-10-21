@@ -25,6 +25,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify($_POST['csrf_token'] ?? '');
     $registro_fsl = \App\Core\App::per($conn)->get(\App\Fsl\ServizioRegistroConvenzioni::class);
     // Iter della convenzione caricata dalla scuola: presa in carico, rifiuto con motivo, ricarico finale con protocollo
+    // Scheda «Da stipulare»: richiesta della convenzione o messaggio ai docenti delle prenotazioni della scuola
+    if (isset($_POST['st_chiedi']) || isset($_POST['st_scrivi'])) {
+        $chiave_st = (string)($_POST['st_chiedi'] ?? $_POST['st_scrivi']);
+        $dest_st = \App\Core\App::per($conn)->get(\App\Fsl\ServizioConvenzioniScuole::class)->destinatari($chiave_st);
+        $op_st = new \App\Iscritti\Operatore((int)($_SESSION['utente_id'] ?? 0), (string)($_SESSION['utente_email'] ?? ''), (string)($_SERVER['REMOTE_ADDR'] ?? 'Sconosciuto'));
+        $testo_st = trim((string)($_POST['testo'] ?? ''));
+        if (!$dest_st) {
+            flash_set('Nessuna prenotazione di questa scuola ha un indirizzo email a cui scrivere.', 'danger');
+        } elseif (isset($_POST['st_scrivi']) && $testo_st === '') {
+            flash_set('Scrivi il messaggio da mandare alla scuola.', 'danger');
+        } else {
+            $ok_st = 0;
+            foreach ($dest_st as $d_st) {
+                $ok_st += isset($_POST['st_chiedi'])
+                    ? (int)\App\Core\App::per($conn)->get(\App\Iscritti\ServizioIscritti::class)->richiediConvenzione($d_st['id'])
+                    : (int)\App\Core\App::per($conn)->get(\App\Iscritti\ServizioMessaggi::class)->inviaDaIscritti($d_st['id'], $testo_st, $op_st);
+            }
+            registra_log_audit($conn, isset($_POST['st_chiedi']) ? 'Richiesta della convenzione FSL alla scuola (da Da stipulare)' : 'Messaggio alla scuola (da Da stipulare)', ['Scuola' => $chiave_st, 'Destinatari' => $ok_st]);
+            flash_set($ok_st
+                ? (isset($_POST['st_chiedi']) ? 'Richiesta della convenzione inviata a ' : 'Messaggio mandato a ') . $ok_st . ($ok_st === 1 ? ' docente: ' : ' docenti: ') . implode(', ', array_map(fn($x) => $x['docente'] . ' (' . $x['email'] . ')', $dest_st)) . '.'
+                : 'Email non inviata: controlla gli indirizzi (dettagli in Sistema → registro invii).', $ok_st ? 'success' : 'danger');
+        }
+        admin_redirect("fsl.php?p_id=$filtro_p&tab=stipulare" . (($_POST['mostra'] ?? '') === 'tutte' ? '&mostra=tutte' : '') . '&r=' . time());
+    }
     // Comunicazione con la scuola: promemoria «carica il PDF» (a una scuola o a tutte) e messaggi liberi
     if (isset($_POST['cv_letto'])) {
         \App\Core\App::per($conn)->get(\App\Fsl\MessaggiConvenzioneRepository::class)->segnaLetti((int)$_POST['cv_letto'], 'ufficio');
@@ -772,6 +796,7 @@ $stati_conv_st = ['da_stipulare' => ['Da stipulare', '#991b1b', '#fee2e2'], 'cop
         <div class="alert alert-success mb-0"><i class="fa fa-circle-check me-1" aria-hidden="true"></i><?php echo $mostra_st === 'tutte' ? 'Nessuna scuola ha prenotazioni in corso alle attività FSL.' : 'Nessuna convenzione da stipulare: tutte le scuole con prenotazioni in corso sono a posto.'; ?></div>
     <?php endif; ?>
 
+    <?php $srv_st = \App\Core\App::per($conn)->get(\App\Fsl\ServizioConvenzioniScuole::class); $dest_per_scuola = []; foreach ($elenco_st as $g_d) if ($g_d['da_stipulare']) $dest_per_scuola[$g_d['chiave']] = $srv_st->destinatari($g_d['chiave']); ?>
     <?php foreach ($elenco_st as $g): $k_g = urlencode($g['chiave']); $url_doc = fn($tipo) => 'allegato_a.php?k=' . $k_g . '&doc=' . $tipo; ?>
     <article class="st-card <?php echo $g['da_stipulare'] ? 'da-stipulare' : ''; ?>">
         <div class="st-testa d-flex flex-wrap align-items-start gap-2">
@@ -809,6 +834,10 @@ $stati_conv_st = ['da_stipulare' => ['Da stipulare', '#991b1b', '#fee2e2'], 'cop
             <?php if ($g['codice'] !== '' && preg_match('/^[A-Z0-9]{10}$/', $g['codice'])): ?>
                 <a href="fsl.php?p_id=<?php echo (int)$filtro_p; ?>&tab=convenzioni&conv_nuova=<?php echo urlencode($g['codice']); ?>&dal=<?php echo $h($g['dal']); ?>&al=<?php echo $h($g['al']); ?>#convForm" class="btn btn-success fw-bold"><i class="fa fa-file-signature me-1" aria-hidden="true"></i>Registra la convenzione ricevuta</a>
             <?php endif; ?>
+            <?php if ($g['da_stipulare']): ?>
+                <form method="POST" class="m-0"><?php csrf_field(); ?><input type="hidden" name="mostra" value="<?php echo $h($mostra_st); ?>"><button type="submit" name="st_chiedi" value="<?php echo $h($g['chiave']); ?>" class="btn btn-outline-danger fw-bold" data-confirm="Mandare ai docenti di questa scuola l'email con i modelli della convenzione e la PEC?"><i class="fa fa-envelope me-1" aria-hidden="true"></i>Chiedi la convenzione</button></form>
+                <button type="button" class="btn btn-outline-primary fw-bold" data-bs-toggle="collapse" data-bs-target="#st-msg-<?php echo $h(md5($g['chiave'])); ?>" aria-expanded="false"><i class="fa fa-paper-plane me-1" aria-hidden="true"></i>Scrivi alla scuola</button>
+            <?php endif; ?>
             <div class="dropdown">
                 <button type="button" class="btn btn-outline-secondary fw-bold dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false"><i class="fa fa-file-lines me-1" aria-hidden="true"></i>Documenti già compilati</button>
                 <ul class="dropdown-menu">
@@ -819,6 +848,15 @@ $stati_conv_st = ['da_stipulare' => ['Da stipulare', '#991b1b', '#fee2e2'], 'cop
             </div>
             <a href="<?php echo $h($url_fsl('scuola', '&k=' . urlencode($g['chiave']))); ?>" class="btn btn-outline-secondary fw-bold ms-auto">Apri la scheda della scuola</a>
         </div>
+        <?php if ($g['da_stipulare']): ?>
+        <div class="collapse px-3 pb-3 pt-2 border-top" id="st-msg-<?php echo $h(md5($g['chiave'])); ?>">
+            <form method="POST" class="m-0"><?php csrf_field(); ?><input type="hidden" name="mostra" value="<?php echo $h($mostra_st); ?>">
+                <label class="form-label small fw-bold mb-1" for="st-t-<?php echo $h(md5($g['chiave'])); ?>">Messaggio ai docenti: <?php echo $h(implode(', ', array_map(fn($x) => $x['docente'], $dest_per_scuola[$g['chiave']] ?? [])) ?: 'nessun indirizzo email disponibile'); ?></label>
+                <textarea class="form-control form-control-sm mb-2" id="st-t-<?php echo $h(md5($g['chiave'])); ?>" name="testo" rows="3" maxlength="1500" required placeholder="Scrivi qui il messaggio: arriva per email e resta nella chat della prenotazione."></textarea>
+                <button type="submit" name="st_scrivi" value="<?php echo $h($g['chiave']); ?>" class="btn btn-sm btn-primary fw-bold"><i class="fa fa-paper-plane me-1" aria-hidden="true"></i>Manda il messaggio</button>
+            </form>
+        </div>
+        <?php endif; ?>
     </article>
     <?php endforeach; ?>
 </section>

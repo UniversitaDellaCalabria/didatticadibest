@@ -39,6 +39,8 @@ $m_ds = $manuale_ds[0] ?? [];
 prova(($m_ds['da_stipulare'] ?? false) && ($m_ds['nome'] ?? '') === 'LICEO SCRITTO A MANO' && ($m_ds['codice'] ?? 'x') === '', "scuola scritta a mano: da stipulare, riconosciuta dal nome");
 $ordine_ds = array_keys($gruppi_ds);
 prova($gruppi_ds[$ordine_ds[0]]['da_stipulare'] && !$gruppi_ds[$ordine_ds[count($ordine_ds) - 1]]['da_stipulare'], "in elenco prima le scuole da stipulare");
+$dest_a = $srv_ds->destinatari('ZZDS98600A');
+prova(array_column($dest_a, 'email') === ['anna986@example.org', 'carlo986@example.org'] && $srv_ds->destinatari('ZZDS98600B') === [] && $srv_ds->destinatari('NONESISTE0') === [], "pulsanti «Chiedi la convenzione» e «Scrivi alla scuola»: un docente per email, nessuno se la convenzione è a posto", json_encode($dest_a));
 
 // Testo del PDF (flussi compressi)
 $testo_pdf = function (string $pdf): string {

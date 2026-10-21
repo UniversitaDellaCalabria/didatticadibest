@@ -83,6 +83,29 @@ final class ServizioConvenzioniScuole
     }
 
     /**
+     * A chi scrivere per una scuola con la convenzione da stipulare: un docente per indirizzo email (la prima prenotazione di ciascuno).
+     *
+     * @return list<array{id: int, docente: string, email: string}>
+     */
+    public function destinatari(string $chiave): array
+    {
+        $out = [];
+        foreach ($this->scuole() as $g) {
+            if ($g['chiave'] !== $chiave) {
+                continue;
+            }
+            foreach ($g['prenotazioni'] as $p) {
+                $email = strtolower(trim($p['email']));
+                if ($p['conv'] === 'da_stipulare' && filter_var($email, FILTER_VALIDATE_EMAIL) && !isset($out[$email])) {
+                    $out[$email] = ['id' => $p['id'], 'docente' => $p['docente'], 'email' => $p['email']];
+                }
+            }
+        }
+
+        return array_values($out);
+    }
+
+    /**
      * Documento precompilato per tutte le prenotazioni in essere di una scuola.
      *
      * @return array{file: string, nome: string}|null file temporaneo da cancellare dopo l'uso
