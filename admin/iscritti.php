@@ -273,7 +273,7 @@ if (!$is_archivio) {
 } // Fine blocco if (!$is_archivio)
 
 // 6. ESPORTAZIONI XLS/CSV (Sempre consentite)
-if (isset($_POST['export_xls']) || isset($_POST['export_csv'])) {
+if (isset($_POST['export_xls']) || isset($_POST['export_csv']) || isset($_POST['export_pdf'])) {
     $p_export = (int)($_POST['p_id'] ?? $filtro_p);
     $f_turno_exp = (int)($_POST['f_turno_export'] ?? 0);
     $_f_stato_raw = $_POST['f_stato_export'] ?? '';
@@ -285,18 +285,8 @@ if (isset($_POST['export_xls']) || isset($_POST['export_csv'])) {
     $righe_export = $iscritti_repo->perEsportazione($p_export, $f_turno_exp, $f_stato_exp);
 
     ob_end_clean();
-    if (isset($_POST['export_xls'])) {
-        header("Content-Type: application/vnd.ms-excel; charset=utf-8");
-        header("Content-Disposition: attachment; filename=iscritti_pagina_{$p_export}.xls");
-        header("Pragma: no-cache"); header("Expires: 0");
-        \App\Iscritti\Vista\EsportaIscritti::excel($righe_export, $custom_cols, $mostra_studenti);
-        exit;
-    } else {
-        header('Content-Type: text/csv; charset=utf-8');
-        header('Content-Disposition: attachment; filename=iscritti_pagina_' . $p_export . '.csv');
-        \App\Iscritti\Vista\EsportaIscritti::csv($righe_export, $custom_cols, $mostra_studenti);
-        exit;
-    }
+    \App\Iscritti\Vista\EsportaIscritti::scarica(isset($_POST['export_pdf']) ? 'pdf' : (isset($_POST['export_xls']) ? 'xlsx' : 'csv'), $righe_export, $custom_cols, $mostra_studenti, 'iscritti_pagina_' . $p_export, 'Iscritti della pagina ' . $p_export);
+    exit;
 }
 
 // ==============================================================================
@@ -379,8 +369,12 @@ $col_area_i = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
             <input type="hidden" name="f_stato_export" value="<?php echo htmlspecialchars($filtro_stato); ?>">
             <input type="hidden" name="f_data_da_export" value="<?php echo htmlspecialchars($filtro_data_da); ?>">
             <input type="hidden" name="f_data_fine_export" value="<?php echo htmlspecialchars($filtro_data_fine); ?>">
-            <button type="submit" name="export_xls" class="btn btn-sm btn-outline-success fw-bold" style="border-radius:8px;" title="Esporta Excel"><i class="fa fa-file-excel"></i></button>
-            <button type="submit" name="export_csv" class="btn btn-sm btn-outline-secondary fw-bold" style="border-radius:8px;" title="Esporta CSV"><i class="fa fa-file-csv"></i></button>
+            <div class="dropdown d-inline-block"><button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle fw-bold" style="border-radius:8px;" data-bs-toggle="dropdown" aria-expanded="false"><i class="fa fa-download me-1" aria-hidden="true"></i>Scarica</button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><button type="submit" name="export_xls" class="dropdown-item"><i class="fa fa-file-excel me-2" aria-hidden="true"></i>Excel</button></li>
+                    <li><button type="submit" name="export_pdf" class="dropdown-item"><i class="fa fa-file-pdf me-2" aria-hidden="true"></i>PDF</button></li>
+                    <li><button type="submit" name="export_csv" class="dropdown-item"><i class="fa fa-file-csv me-2" aria-hidden="true"></i>CSV</button></li>
+                </ul></div>
         </form>
     </div>
 </div>

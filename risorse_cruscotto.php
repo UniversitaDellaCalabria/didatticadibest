@@ -19,9 +19,9 @@ if ($ok && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['rinnova_scaden
     flash_set($err ?? "Scadenza rinnovata: l'avviso si è azzerato.", $err ? 'danger' : 'success');
     header('Location: ' . $url . '&r2=' . time() . '#scadenze'); exit;
 }
-if ($ok && isset($_GET['xlsx']) && ($f_x = $cru->esporta($ris, $dal, $al))) {
+if ($ok && (isset($_GET['xlsx']) || isset($_GET['scarica']))) {
     while (ob_get_level() > 0) ob_end_clean();
-    invia_file_scaricabile($f_x, 'Cruscotto_' . preg_replace('/[^A-Za-z0-9]+/', '_', (string)$ris['nome']) . '_' . date('Ymd') . '.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    \App\Infrastructure\Documenti\FogliEsportabili::scaricaDa((string)($_GET['scarica'] ?? 'xlsx'), 'Cruscotto · ' . $ris['nome'], 'Cruscotto_' . preg_replace('/[^A-Za-z0-9]+/', '_', (string)$ris['nome']) . '_' . date('Ymd'), fn() => $cru->esporta($ris, $dal, $al));
 }
 
 $page_cfg['titolo'] = 'Cruscotto della risorsa';
@@ -54,7 +54,7 @@ require_once 'header.php';
             <select class="form-select form-select-sm w-auto" name="p" id="crP" aria-label="Periodo"><?php foreach (\App\Risorse\CruscottoRisorsa::PERIODI as $k => $nome_p): ?><option value="<?php echo $k; ?>"<?php echo $scelta === (string)$k ? ' selected' : ''; ?>><?php echo $h($nome_p); ?></option><?php endforeach; ?></select>
             <span class="gap-1 <?php echo $scelta === 'altro' ? 'd-flex' : 'd-none'; ?>" id="crAltro"><input type="date" class="form-control form-control-sm" name="dal" value="<?php echo $h($dal); ?>" aria-label="Dal"><input type="date" class="form-control form-control-sm" name="al" value="<?php echo $h($al); ?>" aria-label="Al"></span>
             <button class="btn btn-sm btn-primary fw-bold" type="submit">Mostra</button>
-            <a class="btn btn-sm btn-outline-success" href="<?php echo $h($url . '&xlsx=1'); ?>"><i class="fa fa-file-excel me-1" aria-hidden="true"></i>Excel</a>
+            <?php echo pn_scarica($url); ?>
         </form>
     </div>
     <script>document.getElementById('crP').addEventListener('change', function () { document.getElementById('crAltro').className = 'gap-1 ' + (this.value === 'altro' ? 'd-flex' : 'd-none'); });</script>

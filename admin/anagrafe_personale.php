@@ -216,7 +216,7 @@ $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
     </form>
     <div class="d-flex justify-content-between align-items-center mb-2 small">
         <span class="text-secondary"><?php echo count($ins); ?> insegnamenti<?php echo count($ins) >= 600 ? ' (mostrati i primi 600: usa i filtri)' : ''; ?></span>
-        <button type="button" class="btn btn-sm btn-outline-secondary fw-bold" id="csvIns"><i class="fa fa-file-csv me-1" aria-hidden="true"></i>CSV</button>
+        <?php echo pn_scarica_tabella('tabIns', 'Insegnamenti ' . $f_aa, 'insegnamenti_' . $f_aa); ?>
     </div>
     <div class="table-responsive">
         <table class="table table-sm align-middle small" id="tabIns">
@@ -236,15 +236,6 @@ $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
             </tbody>
         </table>
     </div>
-    <script>
-    document.getElementById('csvIns').addEventListener('click', function () {
-        var righe = [];
-        document.querySelectorAll('#tabIns tr').forEach(function (tr) { righe.push(Array.prototype.map.call(tr.children, function (c) { return c.textContent.replace(/\s+/g, ' ').trim(); })); });
-        var csv = '\ufeff' + righe.map(function (r) { return r.map(function (v) { return '"' + v.replace(/"/g, '""') + '"'; }).join(';'); }).join('\r\n');
-        var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-        a.download = 'insegnamenti_<?php echo $f_aa; ?>.csv'; document.body.appendChild(a); a.click(); a.remove();
-    });
-    </script>
     <?php endif; ?>
 </section>
 

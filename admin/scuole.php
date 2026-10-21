@@ -134,7 +134,7 @@ $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
         <p class="small text-secondary">Ogni iscrizione resta collegata alla scuola scelta, anche se il docente in seguito ne indica un'altra. <span class="badge bg-light text-dark border">profilo</span> = scuola proposta al docente nelle prossime iscrizioni (l'ultima indicata).</p>
         <div class="d-flex flex-wrap gap-2 mb-2">
             <input type="search" id="cercaCollegate" class="form-control form-control-sm" style="max-width:320px;" placeholder="Cerca scuola, comune o docente" aria-label="Cerca tra le scuole collegate">
-            <button type="button" class="btn btn-sm btn-outline-secondary fw-bold" id="csvCollegate"><i class="fa fa-file-csv me-1" aria-hidden="true"></i>Scarica CSV</button>
+            <?php echo pn_scarica_tabella('tabCollegate', 'Scuole collegate', 'scuole_collegate'); ?>
         </div>
         <div class="table-responsive">
             <table class="table table-sm align-middle" id="tabCollegate">
@@ -162,21 +162,6 @@ $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
             document.getElementById('cercaCollegate').addEventListener('input', function () {
                 var q = this.value.toLowerCase().trim();
                 tab.querySelectorAll('tbody tr').forEach(function (tr) { tr.style.display = !q || tr.textContent.toLowerCase().indexOf(q) !== -1 ? '' : 'none'; });
-            });
-            // CSV delle righe visibili (separatore ; per Excel in italiano)
-            document.getElementById('csvCollegate').addEventListener('click', function () {
-                var righe = [['Codice', 'Scuola', 'Docenti', 'Iscrizioni', 'Attività', 'Ultima']];
-                tab.querySelectorAll('tbody tr').forEach(function (tr) {
-                    if (tr.style.display === 'none') return;
-                    var td = tr.children;
-                    righe.push([td[0].querySelector('.font-monospace').textContent, td[0].querySelector('.fw-semibold').textContent,
-                                Array.prototype.map.call(td[1].children, function (d) { return d.textContent.replace(/\s+/g, ' ').trim(); }).join(' | '),
-                                td[2].textContent.trim(), td[3].textContent.trim(), td[4].textContent.trim()]);
-                });
-                var csv = '﻿' + righe.map(function (r) { return r.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(';'); }).join('\r\n');
-                var a = document.createElement('a');
-                a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
-                a.download = 'scuole_collegate.csv'; document.body.appendChild(a); a.click(); a.remove();
             });
         })();
         </script>

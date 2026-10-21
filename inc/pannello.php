@@ -88,6 +88,13 @@ if (!function_exists('pn_scarica')) {
     }
 }
 
+if (!function_exists('pn_scarica_tabella')) {
+    // Menu «Scarica» (Excel, PDF, CSV) per una tabella già nella pagina
+    function pn_scarica_tabella(string $idTabella, string $titolo, string $nome, string $escluse = ''): string {
+        return \App\Portale\Vista\Pannello::scaricaTabella($idTabella, $titolo, $nome, $escluse);
+    }
+}
+
 if (!function_exists('pn_indietro')) {
     // Riga «← torna a…»
     function pn_indietro(string $href, string $testo): string {

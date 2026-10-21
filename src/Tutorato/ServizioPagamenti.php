@@ -43,9 +43,6 @@ final class ServizioPagamenti
     public function controlli(array $i): array
     {
         $m = [];
-        if ((string) ($i['iter'] ?? Costanti::ITER_PORTALE) === Costanti::ITER_UNITICKET) {
-            $m[] = 'la lettera segue l\'iter per Uniticket: i pagamenti non passano dal portale';
-        }
         if ((string) $i['stato'] !== 'protocollata') {
             $m[] = 'la lettera di incarico non è ancora protocollata';
         }

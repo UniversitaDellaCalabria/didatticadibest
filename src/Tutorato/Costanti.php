@@ -47,7 +47,7 @@ final class Costanti
     /** Iter delle lettere => [nome, descrizione]. */
     public const ITER = [
         self::ITER_PORTALE => ['Iter nel portale', 'Tutto nel portale: lettera, firme, protocollo, registro, fine attività e pagamenti.'],
-        self::ITER_UNITICKET => ['Iter per Uniticket', 'Il vincitore prende servizio su Uniticket e l\'ufficio lo verifica prima di inviargli la lettera; a firme finite l\'ufficio scarica lettera e dichiarazione individuale (SCAFIS) da allegare su Uniticket. Restano il registro e la fine attività; i pagamenti no.'],
+        self::ITER_UNITICKET => ['Iter per Uniticket', 'Il vincitore prende servizio su Uniticket e l\'ufficio lo verifica prima di inviargli la lettera; a firme finite l\'ufficio scarica lettera e dichiarazione individuale (SCAFIS) da allegare su Uniticket. Dopo la firma il percorso è lo stesso dell\'iter nel portale: protocollo, registro, fine attività, UNILAV e pagamento.'],
     ];
 
     /** L'iter ammesso (se il valore non è valido: quello nel portale). */

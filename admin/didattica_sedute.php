@@ -608,13 +608,36 @@ if ($fase === 'azioni') {
             <?php if ($cons_s): ?><div class="small"><a href="<?php echo $base; ?>&amp;tab=sedute&amp;consiglio=<?php echo (int)$cons_s['id']; ?>"><i class="fa fa-users me-1" aria-hidden="true"></i>Componenti e referenti del consiglio</a></div><?php endif; ?>
         </div>
         <div class="d-flex flex-wrap gap-2">
-            <a class="btn btn-primary fw-bold" href="<?php echo $h($url_sel); ?>&amp;esporta=docx"><i class="fa fa-file-word me-1" aria-hidden="true"></i>Verbale in Word</a>
-            <a class="btn btn-success fw-bold" href="<?php echo $h($url_sel); ?>&amp;esporta=xlsx"><i class="fa fa-file-excel me-1" aria-hidden="true"></i>Excel</a>
-            <a class="btn btn-outline-secondary" href="<?php echo $base; ?>&amp;tab=sedute&amp;modifica=<?php echo (int)$sel['id']; ?>"><i class="fa fa-pen me-1" aria-hidden="true"></i>Modifica</a>
-            <form method="POST" class="m-0"><?php csrf_field(); ?><button type="submit" name="elimina_seduta" value="<?php echo (int)$sel['id']; ?>" class="btn btn-outline-danger" data-confirm="Eliminare la seduta? Le pratiche restano, senza seduta." aria-label="Elimina la seduta"><i class="fa fa-trash" aria-hidden="true"></i></button></form>
+            <div class="dropdown"><button type="button" class="btn btn-outline-secondary dropdown-toggle fw-bold" data-bs-toggle="dropdown" aria-expanded="false"><i class="fa fa-download me-1" aria-hidden="true"></i>Scarica</button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" href="<?php echo $h($url_sel); ?>&amp;esporta=docx"><i class="fa fa-file-word me-2" aria-hidden="true"></i>Verbale in Word</a></li>
+                    <li><a class="dropdown-item" href="<?php echo $h($url_sel); ?>&amp;esporta=xlsx"><i class="fa fa-file-excel me-2" aria-hidden="true"></i>Pratiche in Excel</a></li>
+                    <li><a class="dropdown-item" href="<?php echo $h($url_sel); ?>&amp;esporta=pdf"><i class="fa fa-file-pdf me-2" aria-hidden="true"></i>Pratiche in PDF</a></li>
+                    <li><a class="dropdown-item" href="<?php echo $h($url_sel); ?>&amp;esporta=csv"><i class="fa fa-file-csv me-2" aria-hidden="true"></i>Pratiche in CSV</a></li>
+                </ul></div>
+            <div class="dropdown pn-altro"><button type="button" class="btn btn-outline-secondary dropdown-toggle fw-bold" data-bs-toggle="dropdown" aria-expanded="false"><i class="fa fa-ellipsis me-1" aria-hidden="true"></i>Altro</button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" href="<?php echo $base; ?>&amp;tab=sedute&amp;modifica=<?php echo (int)$sel['id']; ?>"><i class="fa fa-pen me-2" aria-hidden="true"></i>Modifica data, luogo e ordine del giorno</a></li>
+                    <li><form method="POST" class="m-0"><?php csrf_field(); ?><button type="submit" name="elimina_seduta" value="<?php echo (int)$sel['id']; ?>" class="dropdown-item text-danger" data-confirm="Eliminare la seduta? Le pratiche restano, senza seduta."><i class="fa fa-trash me-2" aria-hidden="true"></i>Elimina la seduta</button></form></li>
+                </ul></div>
         </div>
     </div></div>
 
+    <?php
+    // Cosa fare adesso: il passo corrente, con un solo pulsante che lo apre
+    $n_pr_s = count($pr_sel); $n_senza_esito_s = $n_pr_s - $con_esito;
+    $testi_passo = [
+        'presenze' => ['Passo 2: segna chi era presente', 'Spunta i componenti presenti e quelli assenti giustificati.'],
+        'punti' => ['Passo 3: scrivi cosa è stato detto', 'Un testo per ogni punto dell\'ordine del giorno: finiscono nel verbale.'],
+        'pratiche' => ['Passo 4: decidi le pratiche', $n_pr_s ? 'Manca la decisione su ' . $n_senza_esito_s . ' pratiche su ' . $n_pr_s . '.' : 'Non ci sono pratiche in questa seduta: portale dall\'elenco delle pratiche, oppure passa avanti.'],
+        'esiti' => ['Passo 5: comunica gli esiti agli studenti', 'Gli studenti ricevono l\'estratto della decisione.'],
+        'verbale' => ['Passo 6: prepara il verbale e mandalo alla firma', 'Controlla il testo e invia: il segretario e il coordinatore ricevono il link.'],
+        'firme' => ['Passo 7: aspetta le firme', 'Chi deve firmare ha ricevuto l\'email; puoi sollecitare o caricare il PDF già firmato.'],
+    ];
+    if ($vs === 'firmato') echo pn_prossima('Seduta conclusa', 'Il verbale è firmato: non c\'è altro da fare.', '', 'ok');
+    elseif (isset($testi_passo[$passo_corrente])) { [$t_pp, $x_pp] = $testi_passo[$passo_corrente];
+        echo pn_prossima($t_pp, $x_pp, '<button type="button" class="btn btn-danger fw-bold" onclick="var b=document.querySelector(\'[data-bs-target=&quot;#ps-' . $passo_corrente . '&quot;]\'); if (b) { b.click(); b.scrollIntoView({behavior:\'smooth\',block:\'center\'}); }">Vai al passo <i class="fa fa-arrow-down ms-1" aria-hidden="true"></i></button>', $passo_corrente === 'firme' ? 'attesa' : '');
+    } ?>
     <nav class="pn-passi" role="tablist" aria-label="Passi della seduta">
         <?php foreach ($passi_s as $i_ps => [$k_ps, $n_ps, $fatto_ps, $nota_ps]): $on_ps = $k_ps === $passo_aperto; ?>
         <button type="button" class="pn-passo<?php echo $fatto_ps ? ' fatto' : ''; echo $k_ps === $passo_corrente ? ' qui' : ''; echo $on_ps ? ' active' : ''; ?>" role="tab" data-bs-toggle="tab" data-bs-target="#ps-<?php echo $k_ps; ?>" aria-selected="<?php echo $on_ps ? 'true' : 'false'; ?>">

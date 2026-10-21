@@ -10,12 +10,22 @@ namespace App\Infrastructure\Documenti;
  */
 final class Excel
 {
+    /** @var array<string, array<string, mixed>> i fogli dell'ultimo file creato (per rifare gli stessi dati in PDF e CSV) */
+    private static array $ultimi = [];
+
+    /** @return array<string, array<string, mixed>> */
+    public static function ultimiFogli(): array
+    {
+        return self::$ultimi;
+    }
+
     /**
      * @param array<string, array{intestazioni?: array<int, mixed>, righe?: array<int, array<int|string, mixed>>, larghezze?: array<int, float|int>}> $fogli
      * @return string|null percorso di un file temporaneo (null se manca ZipArchive)
      */
     public static function crea(array $fogli): ?string
     {
+    self::$ultimi = $fogli;
     if (!class_exists(\ZipArchive::class)) return null;
     $col = function (int $n): string { $s = ''; for ($n++; $n > 0; $n = intdiv($n - 1, 26)) $s = chr(65 + ($n - 1) % 26) . $s; return $s; };
     $tmp = tempnam(sys_get_temp_dir(), 'xlsx');

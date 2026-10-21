@@ -11,7 +11,7 @@ use App\Tutorato\ServizioDichiarazione;
 use App\Tutorato\ServizioIncarichi;
 use App\Tutorato\ServizioPagamenti;
 
-/** «Iter per Uniticket»: presa di servizio verificata prima dell'invio, modello SCAFIS con i dati SPID, niente pagamenti nel portale. */
+/** «Iter per Uniticket»: presa di servizio verificata prima dell'invio e modello SCAFIS con i dati SPID; poi lo stesso percorso dell'iter nel portale. */
 final class IterUniticketTest extends TutoratoBase
 {
     private const UTENTE = ['id' => 7, 'codice_fiscale' => 'RSSLCU00A31D086X', 'email' => 'luca@x.it'];
@@ -156,7 +156,7 @@ final class IterUniticketTest extends TutoratoBase
         $this->assertNull($this->servizio(ServizioPagamenti::class)->documento($r, 'scafis', ['id' => 1]));
     }
 
-    public function testIPagamentiNonPassanoDalPortale(): void
+    public function testDopoLaFirmaIlPercorsoEQuelloDelPortale(): void
     {
         $this->bando();
         $this->bandoUniticket();
@@ -165,11 +165,10 @@ final class IterUniticketTest extends TutoratoBase
         $this->servizio(IncaricoRepository::class)->impostaIter($p, 'portale');
         $this->db->esegui("UPDATE tutorato_incarichi SET stato = 'protocollata', fine_stato = 'firmata', ore_approvate = 10 WHERE id IN (?, ?)", [$u, $p]);
 
-        $this->assertSame([$p], array_map(static fn (array $x): int => (int) $x['id'], $this->servizio(IncaricoRepository::class)->daValidare()), 'quella per Uniticket non è «da validare»');
+        $ids = array_map(static fn (array $x): int => (int) $x['id'], $this->servizio(IncaricoRepository::class)->daValidare());
+        sort($ids);
+        $this->assertSame([min($u, $p), max($u, $p)], $ids, 'anche quella per Uniticket è «da validare»: dopo la firma il percorso è lo stesso');
         $pag = $this->servizio(ServizioPagamenti::class);
-        $this->assertStringContainsString('Uniticket', implode(' ', $pag->controlli($this->lettera($u))));
-        $es = $pag->passa([$u], 'Referente');
-        $this->assertSame(0, $es['passate']);
-        $this->assertStringContainsString('Uniticket', $es['errori'][$u]);
+        $this->assertStringNotContainsString('Uniticket', implode(' ', $pag->controlli($this->lettera($u))), 'l\'iter per Uniticket non blocca i pagamenti');
     }
 }

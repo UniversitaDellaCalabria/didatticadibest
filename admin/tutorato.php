@@ -245,7 +245,7 @@ $passi_html = function (array $i) use ($h) {
 <?php
 echo pn_testata('Tutorato · lettere di incarico', 'fa-user-graduate',
     'Per ogni bando: i vincitori, la lettera di incarico, la conferma dello studente, le firme e il protocollo.',
-    (!firma_remota_disponibile() ? '<span class="small text-secondary me-2"><i class="fa fa-circle-info me-1" aria-hidden="true"></i>Firma remota Aruba non configurata (.env): docente e direttore caricano il PDF firmato in PAdES.</span>' : '')
+    (!firma_remota_disponibile() && $is_full_admin ? '<span class="small text-secondary me-2"><i class="fa fa-circle-info me-1" aria-hidden="true"></i>Firma remota Aruba non configurata (.env): docente e direttore caricano il PDF firmato in PAdES.</span>' : '')
         . '<a class="btn btn-sm btn-outline-secondary" href="email.php?p_id=' . (int)$filtro_p . '&amp;gruppo=Tutorato"><i class="fa fa-envelope-open-text me-1" aria-hidden="true"></i>Testi delle email</a>',
     '<a href="didattica.php?p_id=' . (int)$filtro_p . '">Didattica</a> › Tutorato');
 ?>
@@ -260,7 +260,7 @@ $vista_validare = ($_GET['vista'] ?? '') === 'validare';
     <li class="nav-item"><a class="nav-link<?php echo !$vista_validare ? ' active' : ''; ?>" href="<?php echo $base; ?>"><i class="fa fa-user-graduate me-1" aria-hidden="true"></i>Bandi e lettere</a></li>
     <li class="nav-item"><a class="nav-link<?php echo $vista_validare ? ' active' : ''; ?>" href="<?php echo $base; ?>&amp;vista=validare"><i class="fa fa-clipboard-check me-1" aria-hidden="true"></i>Da validare e pagamenti<?php echo $da_validare ? ' <span class="badge bg-warning text-dark">' . count($da_validare) . '</span>' : ''; ?></a></li>
 </ul>
-<?php if (!$cifr_ok): ?><div class="alert alert-warning small"><i class="fa fa-triangle-exclamation me-1" aria-hidden="true"></i><strong>Dichiarazione individuale online non attiva.</strong> Per conservare i dati bancari dei tutor cifrati scrivi nel file <code>.env</code> la riga <code>CIFRATURA_CHIAVE=</code> seguita da una frase lunga e casuale (almeno 16 caratteri, da conservare anche fuori dal server). Finché manca, la dichiarazione non si richiede agli studenti.</div><?php endif; ?>
+<?php if (!$cifr_ok && $is_full_admin): ?><div class="alert alert-warning small"><i class="fa fa-triangle-exclamation me-1" aria-hidden="true"></i><strong>Dichiarazione individuale online non attiva.</strong> Per conservare i dati bancari dei tutor cifrati scrivi nel file <code>.env</code> la riga <code>CIFRATURA_CHIAVE=</code> seguita da una frase lunga e casuale (almeno 16 caratteri, da conservare anche fuori dal server). Finché manca, la dichiarazione non si richiede agli studenti.</div><?php endif; ?>
 
 <?php if ($vista_validare): ?>
     <p class="small text-secondary">Pratiche con la lettera protocollata e la <strong>fine attività firmata dal docente titolare</strong> (non serve il protocollo). Controlla ore e documenti, poi passale all'ufficio pagamenti: una sola notifica per ufficio con l'elenco.</p>
@@ -319,7 +319,7 @@ $vista_validare = ($_GET['vista'] ?? '') === 'validare';
                     <?php foreach ($operatori_b as $o): ?><option value="<?php echo (int)$o['id']; ?>"<?php echo (int)$b['operatore_id'] === (int)$o['id'] ? ' selected' : ''; ?>><?php echo $h(etichetta_operatore($o)); ?></option><?php endforeach; ?></select></div>
             <div class="col-md-6"><label class="form-label small fw-bold" for="bIter">Iter delle lettere di questo bando</label>
                 <select class="form-select form-select-sm" id="bIter" name="iter"><?php foreach (\App\Tutorato\Costanti::ITER as $k_it => $v_it): ?><option value="<?php echo $h($k_it); ?>"<?php echo (\App\Tutorato\Costanti::iterValido($b['iter'] ?? '')) === $k_it ? ' selected' : ''; ?>><?php echo $h($v_it[0]); ?></option><?php endforeach; ?></select>
-                <div class="form-text">«Iter per Uniticket»: il vincitore prende servizio su Uniticket e tu lo verifichi prima di mandargli la lettera; a firme finite scarichi lettera e modello SCAFIS da allegare lì. Senza pagamenti nel portale. Le nuove lettere del bando lo ereditano (finché sono in bozza lo puoi cambiare per la singola lettera).</div></div>
+                <div class="form-text">«Iter per Uniticket»: il vincitore prende servizio su Uniticket e tu lo verifichi prima di mandargli la lettera; a firme finite scarichi lettera e modello SCAFIS da allegare lì. Dopo la firma il percorso è lo stesso dell'iter nel portale (registro, fine attività, UNILAV e pagamento). Le nuove lettere del bando lo ereditano (finché sono in bozza lo puoi cambiare per la singola lettera).</div></div>
             <div class="col-md-3"><label class="form-label small fw-bold" for="bLuogo">Luogo della lettera</label><input class="form-control form-control-sm" id="bLuogo" name="luogo" value="<?php echo $h($b['luogo']); ?>" maxlength="100"></div>
         </div>
         <div class="mt-3 d-flex gap-2"><button type="submit" name="salva_bando" value="1" class="btn btn-primary fw-bold"><i class="fa fa-save me-1" aria-hidden="true"></i>Salva</button>
@@ -578,7 +578,7 @@ $vista_validare = ($_GET['vista'] ?? '') === 'validare';
                     <?php endif; ?>
                 </div></div>
             <?php endif; ?>
-            <?php if ($i['stato'] === 'protocollata' && (string)$i['iter'] !== 'uniticket'):
+            <?php if ($i['stato'] === 'protocollata'):
                 $comp_i = $pag_sv->compenso($i); $contr_i = $pag_sv->controlli($i); $ps_i = (string)$i['pagamento_stato']; ?>
                 <div class="card border-0 shadow-sm mb-3" id="pagamento" style="border-left:4px solid #15803d !important;"><div class="card-body">
                     <h6 class="fw-bold"><i class="fa fa-euro-sign me-1" aria-hidden="true"></i>UNILAV, compenso e pagamento</h6>
@@ -717,7 +717,19 @@ $vista_validare = ($_GET['vista'] ?? '') === 'validare';
 
 <?php else:
     $bandi = bandi_tutorato($conn);
+    // Cosa devo fare: le lettere per punto dell'iter, su tutti i bandi
+    $per_stato_t = [];
+    if ($res_t = $conn->query("SELECT stato, COUNT(*) n FROM tutorato_incarichi WHERE stato <> 'annullata' GROUP BY stato")) { while ($r_t = $res_t->fetch_assoc()) $per_stato_t[$r_t['stato']] = (int)$r_t['n']; }
+    $nt = fn(string ...$k) => array_sum(array_map(fn($x) => $per_stato_t[$x] ?? 0, $k));
+    echo pn_compiti([
+        ['numero' => $nt('bozza'), 'titolo' => 'Lettere da inviare', 'testo' => 'Vincitori con la lettera ancora in bozza.', 'href' => '#bandi', 'bottone' => 'Apri i bandi', 'tono' => 'tuo', 'vuoto' => 'Nessuna lettera in bozza.'],
+        ['numero' => $nt('inviata'), 'titolo' => 'Aspettano lo studente', 'testo' => 'Devono confermare con SPID o CIE. Puoi rimandare l\'email dalla lettera.', 'href' => '#bandi', 'bottone' => 'Vedi', 'tono' => 'attesa', 'vuoto' => 'Nessuna conferma in attesa.'],
+        ['numero' => $nt('confermata', 'firmata_docente'), 'titolo' => 'Da firmare', 'testo' => 'Firma del docente o del Direttore: hanno ricevuto il link.', 'href' => '#bandi', 'bottone' => 'Vedi', 'tono' => 'attesa', 'vuoto' => 'Nessuna firma in attesa.'],
+        ['numero' => $nt('firmata'), 'titolo' => 'Da protocollare', 'testo' => 'Firmate da tutti: registra il protocollo.', 'href' => '#bandi', 'bottone' => 'Apri i bandi', 'tono' => 'tuo', 'vuoto' => 'Nessuna lettera da protocollare.'],
+        ['numero' => count($da_validare), 'titolo' => 'Da validare e pagare', 'testo' => 'Fine attività firmata: controlla e passa ai pagamenti.', 'href' => $base . '&vista=validare', 'bottone' => 'Apri', 'tono' => 'tuo', 'vuoto' => 'Nessuna pratica da validare.'],
+    ], 'Cosa devo fare nel tutorato');
 ?>
+    <p class="small text-secondary" id="bandi">Il percorso di ogni lettera: vincitore → lettera → conferma dello studente → firma del docente → firma del Direttore → protocollo → registro e fine attività → pagamento. È lo stesso per tutti i bandi; con l'«Iter per Uniticket» in più c'è la presa di servizio prima dell'invio.</p>
     <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
         <a href="<?php echo $base; ?>&amp;nuovo_bando=1" class="btn btn-primary btn-sm fw-bold"><i class="fa fa-plus-circle me-1" aria-hidden="true"></i>Nuovo bando</a>
         <span class="small text-secondary">Per ogni bando: vincitori con i dati della lettera → conferma dello studente con SPID/CIE → firma PAdES del docente responsabile → firma PAdES del direttore → protocollo.</span>

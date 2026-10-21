@@ -79,6 +79,49 @@ final class EsportaIscritti
     }
 
     /**
+     * Intestazioni e righe dell'esportazione (le stesse del CSV), per i tre formati.
+     *
+     * @param list<array<string, mixed>> $righe righe di IscrittiRepository::perEsportazione()
+     * @param array<array-key, string|null> $colonneCustom campi personalizzati (nome_campo => etichetta)
+     * @return array{0: list<string>, 1: list<list<string>>}
+     */
+    public static function tabella(array $righe, array $colonneCustom, bool $conStudenti): array
+    {
+        $intestazioni = self::INTESTAZIONI;
+        foreach ($colonneCustom as $etichetta) {
+            $intestazioni[] = (string) $etichetta;
+        }
+        if ($conStudenti) {
+            $intestazioni[] = 'N. studenti in elenco';
+            $intestazioni[] = 'Studenti (per gli attestati)';
+        }
+        $intestazioni[] = 'Data Registrazione';
+        $out = [];
+        foreach ($righe as $row) {
+            $json = self::datiModulo($row['dati_custom_json'] ?? null);
+            $riga = [$row['codice_prenotazione'], $row['stato'], ($row['presente'] == 1 ? 'SI' : 'NO'), $row['num_posti'], $row['nome'], $row['cognome'], $row['matricola_effettiva'], $row['email'], $row['evento'], $row['nome_turno'] ?? '', $row['data_turno'] ?? '', $row['orario_inizio'] ?? ''];
+            foreach ($colonneCustom as $chiave => $etichetta) {
+                $riga[] = self::valoreCampo($json, (string) $chiave, (string) $etichetta);
+            }
+            if ($conStudenti) {
+                $riga[] = (int) $row['n_studenti'];
+                $riga[] = (string) $row['studenti'];
+            }
+            $riga[] = $row['data_prenotazione'];
+            $out[] = array_map(static fn ($v) => (string) $v, $riga);
+        }
+
+        return [$intestazioni, $out];
+    }
+
+    /** Scarica l'elenco in Excel (xlsx), PDF o CSV. */
+    public static function scarica(string $formato, array $righe, array $colonneCustom, bool $conStudenti, string $nomeFile, string $titolo): void
+    {
+        [$int, $dati] = self::tabella($righe, $colonneCustom, $conStudenti);
+        (new \App\Infrastructure\Documenti\TabellaEsportabile($titolo, $int, $dati, 'Stampato il ' . date('d/m/Y')))->scarica($formato, $nomeFile);
+    }
+
+    /**
      * Valore del campo nei dati del modulo: per nome esatto, altrimenti per un nome che differisce solo per maiuscole o per gli spazi
      * dell'etichetta scritti come «_».
      *

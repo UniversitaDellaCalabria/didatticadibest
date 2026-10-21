@@ -141,9 +141,10 @@ $dal_a = "$anno-09-01"; $al_a = ($anno + 1) . "-08-31";
 if ($tab === 'report' && $puo_fsl) {
     $rep_fsl = \App\Core\App::per($conn)->get(\App\Fsl\ReportFsl::class);
     $dati_fsl_rep = $rep_fsl->dati($dal_a, $al_a);
-    if (isset($_GET['xlsx']) && ($f_rep = $rep_fsl->esporta($dati_fsl_rep, "$anno/" . ($anno + 1)))) {
-        registra_log_audit($conn, "Report FSL esportato", ["Anno scolastico" => "$anno/" . ($anno + 1)]);
-        invia_file_scaricabile($f_rep, 'Report_FSL_' . $anno . '_' . ($anno + 1) . '.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    if (isset($_GET['xlsx']) || isset($_GET['scarica'])) {
+        registra_log_audit($conn, "Report FSL esportato", ["Anno scolastico" => "$anno/" . ($anno + 1), "Formato" => $_GET['scarica'] ?? 'xlsx']);
+        while (ob_get_level() > 0) ob_end_clean();
+        \App\Infrastructure\Documenti\FogliEsportabili::scaricaDa((string)($_GET['scarica'] ?? 'xlsx'), 'Report FSL ' . $anno . '/' . ($anno + 1), 'Report_FSL_' . $anno . '_' . ($anno + 1), fn() => $rep_fsl->esporta($dati_fsl_rep, "$anno/" . ($anno + 1)));
     }
 }
 
@@ -340,6 +341,12 @@ foreach ($scuole_fsl as $g_h) $opz_scuole[$g_h['nome'] . ($g_h['comune'] !== '' 
 
 <?php
 $n_el_mancanti = count($perc['elenchi_mancanti']);
+echo pn_compiti([
+    ['numero' => $n_scuole_da_stipulare, 'titolo' => 'Scuole senza convenzione', 'testo' => 'Hanno prenotazioni ma non una convenzione valida.', 'href' => $url_fsl('stipulare'), 'bottone' => 'Vedi l\'elenco', 'tono' => 'tuo', 'vuoto' => 'Tutte le scuole sono a posto.'],
+    ['numero' => $n_el_mancanti, 'titolo' => 'Elenchi studenti mancanti', 'testo' => 'Attività finite senza l\'elenco dei nomi: senza, gli attestati non partono.', 'href' => '#elenchi', 'bottone' => 'Vedi le attività', 'tono' => 'tuo', 'vuoto' => 'Tutti gli elenchi sono arrivati.'],
+    ['numero' => max(0, (int)$perc['attestati_dovuti'] - (int)$perc['attestati_inviati']), 'titolo' => 'Attestati da inviare', 'testo' => 'Attività finite con attestati non ancora spediti.', 'href' => '#tabAtt', 'bottone' => 'Vedi le attività', 'tono' => 'tuo', 'vuoto' => 'Tutti gli attestati sono partiti.'],
+    ['numero' => max(0, (int)$n_inviti - count($valutazioni)), 'titolo' => 'Valutazioni attese', 'testo' => 'Schede inviate ai docenti e non ancora compilate.', 'href' => $url_fsl('valutazioni', '&anno=' . $anno), 'bottone' => 'Vedi', 'tono' => 'attesa', 'vuoto' => 'Nessuna scheda in attesa.'],
+], 'Cosa devo fare nell\'anno scolastico');
 echo pn_percorso([
     ['numero' => count($per_att), 'testo' => 'Attività con iscrizioni', 'nota' => 'dell\'anno scolastico', 'href' => '#tabAtt'],
     ['numero' => $perc['scuole'], 'testo' => 'Scuole iscritte', 'nota' => count($conf) . ' iscrizioni · ' . $n_studenti . ' studenti' . ($perc['in_attesa'] ? ' · ' . $perc['in_attesa'] . ' in attesa' : ''), 'href' => '#tabScu'],
@@ -423,7 +430,7 @@ echo pn_percorso([
         <form method="GET" class="d-flex align-items-center gap-2 m-0"><input type="hidden" name="p_id" value="<?php echo (int)$filtro_p; ?>"><input type="hidden" name="tab" value="report">
             <label class="small fw-bold" for="repAnno">Anno scolastico</label>
             <select class="form-select form-select-sm" id="repAnno" name="anno" onchange="this.form.submit()" style="width:auto;"><?php foreach ($anni as $a_r): ?><option value="<?php echo $a_r; ?>"<?php echo $a_r === $anno ? ' selected' : ''; ?>><?php echo $a_r . '/' . ($a_r + 1); ?></option><?php endforeach; ?></select></form>
-        <a class="btn btn-success fw-bold ms-auto" href="<?php echo $h($url_fsl('report', '&anno=' . $anno . '&xlsx=1')); ?>"><i class="fa fa-file-excel me-1" aria-hidden="true"></i>Scarica l'Excel</a>
+        <span class="ms-auto"><?php echo pn_scarica($url_fsl('report', '&anno=' . $anno)); ?></span>
     </div>
     <p class="text-secondary small">Attività di Formazione Scuola Lavoro confermate dal <?php echo $d($dal_a); ?> al <?php echo $d($al_a); ?>. Le <strong>ore di formazione</strong> sono le ore dell'attività per gli studenti <strong>presenti</strong>; nell'Excel trovi anche le ore di ogni studente, per le classi con l'elenco dei nomi inserito.</p>
     <?php echo pn_percorso([

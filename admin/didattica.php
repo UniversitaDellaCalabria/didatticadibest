@@ -10,12 +10,12 @@
 // didattica_statistiche.php) con le sue azioni e la sua pagina; questo file prepara i dati comuni e le include.
 require_once 'admin_header.php';
 define('DIDATTICA_PANNELLO', true);
-const SCHEDE_DIDATTICA = ['pratiche', 'sedute', 'moduli', 'ufficio', 'statistiche'];
+const SCHEDE_DIDATTICA = ['home', 'pratiche', 'sedute', 'moduli', 'ufficio', 'statistiche'];
 
 if (!$puo_didattica) nega_accesso();
 function admin_redirect($url) { echo "<script>window.location.replace(" . json_encode($url) . ");</script>"; exit; }
 $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
-$tab = in_array($_GET['tab'] ?? '', SCHEDE_DIDATTICA, true) ? $_GET['tab'] : 'pratiche';
+$tab = in_array($_GET['tab'] ?? '', SCHEDE_DIDATTICA, true) ? $_GET['tab'] : 'home';
 $base = "didattica.php?p_id=" . (int)$filtro_p;
 $uid = (int)$u_id_curr;
 $ids_post = fn() => array_values(array_filter(array_map('intval', (array)($_POST['ids'] ?? []))));
@@ -85,6 +85,25 @@ if (($_GET['esporta'] ?? '') === 'allegato_verbale' && $tab === 'sedute') {
     readfile($f_all); exit;
 }
 // ── Esportazioni (Excel e Word): scartano la pagina già prodotta dall'intestazione ──
+if (isset($_GET['esporta']) && in_array($_GET['esporta'], ['pdf', 'csv'], true)) {
+    $seduta_exp = $tab === 'sedute' ? seduta_didattica($conn, (int)($_GET['id'] ?? 0)) : null;
+    if ($solo_ref && !$puo_seduta($seduta_exp)) nega_accesso();
+    $repo_exp = \App\Core\App::per($conn)->get(\App\Didattica\PraticaRepository::class);
+    if ($seduta_exp) $ids_e = \App\Core\App::per($conn)->get(\App\Didattica\SedutaRepository::class)->idPratiche((int)$seduta_exp['id']);
+    elseif (!empty($_GET['ids'])) $ids_e = array_map('intval', explode(',', (string)$_GET['ids']));
+    else $ids_e = null;
+    $righe_e = $ids_e === null ? $elenco_pratiche() : array_values(array_filter($repo_exp->elenco('tutte', 0, '', '', '', '', '', null), fn($x) => in_array((int)$x['id'], $ids_e, true)));
+    $uff_e = uffici_didattica($conn);
+    $dati_e = array_map(function ($x) use ($uff_e) {
+        $fase_e = \App\Didattica\FasePratica::di($x, !empty($x['ufficio_id']) ? (string)($uff_e[(int)$x['ufficio_id']]['tipo'] ?? '') : '');
+        return [$x['codice'], $x['modulo_titolo'], trim($x['cognome'] . ' ' . $x['nome']), $x['matricola'], $x['email'], \App\Didattica\FasePratica::FASI[$fase_e][0],
+                $x['seduta_data'] ? date('d/m/Y', strtotime($x['seduta_data'])) : '', date('d/m/Y', strtotime($x['aggiornata_il'] ?: $x['creata_il']))];
+    }, $righe_e);
+    registra_log_audit($conn, "Pratiche esportate", ["Formato" => $_GET['esporta'], "Pratiche" => count($dati_e)]);
+    (new \App\Infrastructure\Documenti\TabellaEsportabile($seduta_exp ? 'Pratiche della seduta' : 'Pratiche degli studenti', ['Codice', 'Tipo di pratica', 'Studente', 'Matricola', 'Email', 'A che punto è', 'Seduta', 'Aggiornata il'], $dati_e,
+        'Stampato il ' . date('d/m/Y'), [2.2, 3.5, 3, 1.6, 3.5, 2.6, 1.4, 1.6]))
+        ->scarica($_GET['esporta'] === 'pdf' ? 'pdf' : 'csv', ($seduta_exp ? 'Pratiche_seduta_' : 'Pratiche_') . date('d_m_Y'));
+}
 if (isset($_GET['esporta']) && in_array($_GET['esporta'], ['xlsx', 'docx'], true)) {
     $seduta_exp = $tab === 'sedute' ? seduta_didattica($conn, (int)($_GET['id'] ?? 0)) : null;
     if ($solo_ref && !$puo_seduta($seduta_exp)) nega_accesso();
@@ -117,22 +136,18 @@ if (isset($_GET['esporta']) && in_array($_GET['esporta'], ['xlsx', 'docx'], true
 
 <?php
 // Intestazione comune: titolo, una frase per scheda e schede uniformi (Pratiche · Sedute · Moduli · Ufficio · Statistiche · Tutorato)
-$aiuto_did = ['pratiche' => 'Le domande degli studenti: ogni riga dice a che punto è la pratica e che cosa tocca fare.',
+$aiuto_did = ['home' => 'Qui vedi solo quello che devi fare. Le altre sezioni sono nel menu a sinistra e nell\'elenco qui sotto.',
+              'pratiche' => 'Le domande degli studenti: ogni riga dice a che punto è la pratica e che cosa tocca fare.',
               'sedute' => 'Consigli dei corsi di studio: sedute, presenze, decisioni sulle pratiche e verbali da firmare.',
               'moduli' => 'Modulistica da scaricare e moduli online che gli studenti compilano.',
               'ufficio' => 'Chi lavora nell\'ufficio, quali compiti ha e quando riceve gli studenti.',
               'statistiche' => 'Quante pratiche, di che tipo e quanto tempo servono.'][$tab] ?? '';
-$schede_did = [];
-foreach (['pratiche' => ['fa-inbox', 'Pratiche', $n_aperte, true], 'sedute' => ['fa-gavel', 'Sedute e verbali', count($sedute), false], 'moduli' => ['fa-file-lines', 'Moduli e documenti', count($moduli), false],
-          'ufficio' => ['fa-user-clock', 'Ricevimento', 0, false], 'statistiche' => ['fa-chart-column', 'Statistiche', 0, false]] as $k_d => [$ico_d, $txt_d, $num_d, $av_d]) {
-    if ($solo_ref && $k_d !== 'sedute') continue;
-    $schede_did[$k_d] = ['href' => $base . '&tab=' . $k_d, 'testo' => $txt_d, 'icona' => $ico_d, 'numero' => $num_d, 'avviso' => $av_d];
-}
-if ($puo_tutorato) $schede_did['tutorato'] = ['href' => 'tutorato.php?p_id=' . (int)$filtro_p, 'testo' => 'Tutorato · lettere di incarico', 'icona' => 'fa-user-graduate'];
-echo pn_testata('Didattica · Ufficio didattico', 'fa-graduation-cap', $aiuto_did,
-    '<a href="../modulistica.php" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary"><i class="fa fa-up-right-from-square me-1" aria-hidden="true"></i>Pagina pubblica della modulistica</a>'
-    . ($puo_didattica_tutto ? ' <a class="btn btn-sm btn-outline-secondary" href="email.php?p_id=' . (int)$filtro_p . '&amp;gruppo=Didattica"><i class="fa fa-envelope-open-text me-1" aria-hidden="true"></i>Testi delle email</a>' : ''));
-echo pn_schede($schede_did, $tab, 'Sezioni della Didattica');
+// Azioni rare nel menu «Altro» (la pagina pubblica della modulistica e i testi delle email)
+$voci_altro_did = ['<a class="dropdown-item" href="../modulistica.php" target="_blank" rel="noopener"><i class="fa fa-up-right-from-square me-2" aria-hidden="true"></i>Pagina pubblica della modulistica</a>'];
+if ($puo_didattica_tutto) $voci_altro_did[] = '<a class="dropdown-item" href="email.php?p_id=' . (int)$filtro_p . '&amp;gruppo=Didattica"><i class="fa fa-envelope-open-text me-2" aria-hidden="true"></i>Testi delle email</a>';
+echo pn_testata('Didattica · Ufficio didattico', 'fa-graduation-cap', $aiuto_did, pn_altro($voci_altro_did));
+// Le sezioni sono nel menu a sinistra: qui solo il ritorno alla prima schermata
+if ($tab !== 'home' && !$solo_ref && !isset($_GET['id']) && !isset($_GET['modifica'])) echo pn_indietro($base . '&tab=home', 'Torna a «Cosa devo fare»');
 ?>
 
 <?php

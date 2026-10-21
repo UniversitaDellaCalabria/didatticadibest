@@ -14,8 +14,9 @@ $ora_ok = fn($t) => preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', (string)$t) ? $t .
 
 // ── Diario di bordo: esportazione Excel ──
 if (isset($_GET['diario_xlsx']) && ($r_x = risorsa($conn, (int)$_GET['diario_xlsx'])) && (int)$r_x['pagina_id'] === (int)$filtro_p) {
-    $f_x = \App\Core\App::per($conn)->get(\App\Risorse\ServizioDiarioBordo::class)->esporta($r_x);
-    if ($f_x) { while (ob_get_level() > 0) ob_end_clean(); invia_file_scaricabile($f_x, 'Diario_di_bordo_' . preg_replace('/[^A-Za-z0-9]+/', '_', (string)$r_x['nome']) . '_' . date('Ymd') . '.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); }
+    while (ob_get_level() > 0) ob_end_clean();
+    \App\Infrastructure\Documenti\FogliEsportabili::scaricaDa((string)($_GET['scarica'] ?? 'xlsx'), 'Diario di bordo · ' . $r_x['nome'], 'Diario_di_bordo_' . preg_replace('/[^A-Za-z0-9]+/', '_', (string)$r_x['nome']) . '_' . date('Ymd'),
+        fn() => \App\Core\App::per($conn)->get(\App\Risorse\ServizioDiarioBordo::class)->esporta($r_x));
 }
 
 // ── Salvataggio della risorsa ──
@@ -496,7 +497,7 @@ $url_pub = '../' . $page_cfg['slug'] . '.php';
     <?php if ($reg_d): ?>
     <div class="border-top mt-3 pt-2 small">
         <strong><?php echo (int)$reg_d['totali']['viaggi']; ?> viaggi · <?php echo (int)$reg_d['totali']['km']; ?> km · <?php echo number_format($reg_d['totali']['litri'], 1, ',', '.'); ?> litri</strong> nel diario.
-        <a class="btn btn-sm btn-outline-success ms-2" href="risorse.php?p_id=<?php echo (int)$filtro_p; ?>&amp;diario_xlsx=<?php echo (int)$modifica['id']; ?>"><i class="fa fa-file-excel me-1" aria-hidden="true"></i>Scarica in Excel</a>
+        <span class="ms-2 d-inline-block"><?php echo pn_scarica('risorse.php?p_id=' . (int)$filtro_p . '&diario_xlsx=' . (int)$modifica['id']); ?></span>
         <span class="text-secondary ms-2">Il responsabile lo vede e lo verifica da «Le mie risorse».</span>
     </div>
     <?php endif; ?>

@@ -53,22 +53,21 @@ $dettagli_pren = function (array $p) use ($usi_pren): array {
 };
 $NOMI_STATO = ['confermata' => ['Confermata', 'success'], 'da_approvare' => ['Da approvare', 'warning'], 'annullata' => ['Annullata', 'secondary'], 'rifiutata' => ['Rifiutata', 'danger']];
 
-if (isset($_GET['csv'])) {
+if (isset($_GET['csv']) || isset($_GET['scarica'])) {
     while (ob_get_level() > 0) ob_end_clean();
-    header('Content-Type: text/csv; charset=utf-8');
-    header('Content-Disposition: attachment; filename="prenotazioni_' . preg_replace('/[^a-z0-9]+/i', '_', $page_cfg['slug']) . '_' . date('Ymd') . '.csv"');
-    $out = fopen('php://output', 'w');
-    fwrite($out, "\xEF\xBB\xBF");
     // Colonne in più: una per ogni quantità (contatore) e una per ogni domanda personalizzata che compare nelle prenotazioni esportate
     $col_extra = [];
     foreach ($righe as $p) foreach ($dettagli_pren($p) as [$k_d]) $col_extra[$k_d] = true;
     $col_extra = array_keys($col_extra);
-    fputcsv($out, array_merge(['Codice', 'Risorsa', 'Data', 'Dalle', 'Alle', 'Cognome', 'Nome', 'Email', 'Motivo', 'Stato', 'Serie', 'Nota gestore', 'Creata il'], $col_extra), ';');
+    $dati_rp = [];
     foreach ($righe as $p) {
         $det = []; foreach ($dettagli_pren($p) as [$k_d, $v_d]) $det[$k_d] = $v_d;
-        fputcsv($out, array_merge([$p['codice'], $p['risorsa_nome'], date('d/m/Y', strtotime($p['inizio'])), date('H:i', strtotime($p['inizio'])), date('H:i', strtotime($p['fine'])),
-            $p['cognome'], $p['nome'], $p['email'], $p['motivo'], $NOMI_STATO[$p['stato']][0] ?? $p['stato'], $p['serie'], $p['nota_gestore'], $p['creata_il']], array_map(fn($k) => $det[$k] ?? '', $col_extra)), ';');
+        $dati_rp[] = array_merge([$p['codice'], $p['risorsa_nome'], date('d/m/Y', strtotime($p['inizio'])), date('H:i', strtotime($p['inizio'])), date('H:i', strtotime($p['fine'])),
+            $p['cognome'], $p['nome'], $p['email'], $p['motivo'], $NOMI_STATO[$p['stato']][0] ?? $p['stato'], $p['serie'], $p['nota_gestore'], $p['creata_il']], array_map(fn($k) => $det[$k] ?? '', $col_extra));
     }
+    (new \App\Infrastructure\Documenti\TabellaEsportabile('Prenotazioni: ' . (string)($page_cfg['titolo'] ?? 'risorse'),
+        array_merge(['Codice', 'Risorsa', 'Data', 'Dalle', 'Alle', 'Cognome', 'Nome', 'Email', 'Motivo', 'Stato', 'Serie', 'Nota gestore', 'Creata il'], $col_extra), $dati_rp, 'Stampato il ' . date('d/m/Y')))
+        ->scarica(isset($_GET['scarica']) ? (string)$_GET['scarica'] : 'csv', 'prenotazioni_' . preg_replace('/[^a-z0-9]+/i', '_', $page_cfg['slug']) . '_' . date('Ymd'));
     exit;
 }
 
@@ -213,7 +212,7 @@ endif; ?>
         <div class="col-md-3"><label class="form-label small fw-bold mb-0" for="fQ">Cerca</label><input type="search" class="form-control form-control-sm" id="fQ" name="q" value="<?php echo $h($filtri['q']); ?>" placeholder="Nome, email, codice, motivo"></div>
         <div class="col-md-2 d-flex gap-1">
             <button type="submit" class="btn btn-sm btn-primary fw-bold flex-grow-1"><i class="fa fa-filter me-1" aria-hidden="true"></i>Filtra</button>
-            <a class="btn btn-sm btn-outline-success" href="<?php echo $h($qs(['csv' => 1])); ?>" title="Esporta CSV" aria-label="Esporta in CSV"><i class="fa fa-file-csv" aria-hidden="true"></i></a>
+            <?php echo pn_scarica($qs(['x' => 1])); ?>
         </div>
     </div>
 </form>

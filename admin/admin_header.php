@@ -416,7 +416,7 @@ $colore_lato = $modulo_corrente === 'portale' ? '#64748b' : $colore_modulo; // l
                 <?php endif; ?>
 
                 <?php if ($modulo_corrente === 'didattica' && ($puo_didattica || $puo_conv_tesi)): ?>
-                    <?php $tab_did = $current_page === 'didattica.php' ? (in_array($_GET['tab'] ?? '', ['sedute', 'moduli', 'ufficio', 'statistiche'], true) ? $_GET['tab'] : 'pratiche') : '';
+                    <?php $tab_did = $current_page === 'didattica.php' ? (in_array($_GET['tab'] ?? '', ['pratiche', 'sedute', 'moduli', 'ufficio', 'statistiche'], true) ? $_GET['tab'] : 'home') : '';
                     if (!$puo_didattica_tutto) $tab_did = $current_page === 'didattica.php' ? 'sedute' : '';
                     // Numeri accanto alle voci: se non si riescono a contare (file non ancora caricato) il menu resta senza numeri
                     $n_da_smistare = $n_verbali_firma = 0;
@@ -425,6 +425,7 @@ $colore_lato = $modulo_corrente === 'portale' ? '#64748b' : $colore_modulo; // l
                         $n_da_smistare = $puo_didattica_tutto ? $cdf_menu->praticheDaSmistare()['n'] : 0;
                         $n_verbali_firma = $cdf_menu->verbaliInFirma($puo_didattica_tutto ? null : $consigli_referente);
                     } catch (\Throwable $e) { error_log('Menu, cose da fare: ' . $e->getMessage()); }
+                    if ($puo_didattica_tutto) $voce_menu([], 'didattica.php?tab=home', 'fa-list-check', 'Cosa devo fare', $tab_did === 'home');
                     if ($puo_didattica_tutto) $voce_menu([], 'didattica.php?tab=pratiche', 'fa-inbox', 'Pratiche degli studenti', $tab_did === 'pratiche', \App\Core\App::get(\App\Portale\CoseDaFare::class)->praticheDaSmistare()['n']);
                     if ($puo_didattica) $voce_menu([], 'didattica.php?tab=sedute', 'fa-gavel', $puo_didattica_tutto ? 'Sedute e verbali' : 'Sedute del consiglio', $tab_did === 'sedute', \App\Core\App::get(\App\Portale\CoseDaFare::class)->verbaliInFirma($puo_didattica_tutto ? null : $consigli_referente));
                     if ($puo_didattica_tutto) {

@@ -14,7 +14,7 @@ $repo_eventi = \App\Core\App::per($conn)->get(\App\Eventi\EventoRepository::clas
 
 // Tutte le azioni sono POST con token CSRF e valgono solo per eventi dell'area corrente visibili al gestore
 $ev_azione = (int)($_POST['evento_id'] ?? 0);
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['ripristina_ev']) || isset($_POST['del_ev']) || isset($_POST['duplica_ev']) || isset($_POST['export_csv_archivio']))) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['ripristina_ev']) || isset($_POST['del_ev']) || isset($_POST['duplica_ev']) || isset($_POST['export_csv_archivio']) || isset($_POST['export_xlsx_archivio']) || isset($_POST['export_pdf_archivio']))) {
     csrf_verify($_POST['csrf_token'] ?? '');
     if (!ev_autorizzato($conn, $ev_azione, $filtro_p, $sql_filtro_eventi_rbac)) nega_accesso();
 }
@@ -53,41 +53,25 @@ if (isset($_POST['duplica_ev'])) {
 }
 
 // 4. AZIONE: ESPORTA ISCRITTI
-if (isset($_POST['export_csv_archivio'])) {
+if (isset($_POST['export_csv_archivio']) || isset($_POST['export_xlsx_archivio']) || isset($_POST['export_pdf_archivio'])) {
     $ev_id = $ev_azione; // già verificato (CSRF + permessi) all'inizio della pagina
     $ev_titolo = preg_replace('/[^a-zA-Z0-9_]/', '_', strtolower($_POST['evento_titolo']));
-    
+
     $custom_cols = $repo_eventi->campiFormEvento($ev_id);
     $righe_export = $repo_eventi->iscrizioniPerRendicontazione($ev_id);
-
-    ob_end_clean(); 
-    header('Content-Type: text/csv; charset=utf-8');
-    header("Content-Disposition: attachment; filename=rendicontazione_{$ev_titolo}.csv");
-    $output = fopen('php://output', 'w');
-    
-    $headers = ['Stato', 'Presente', 'Nome', 'Cognome', 'Email', 'Data Turno', 'Posti'];
+    $headers = ['Stato', 'Presente', 'Nome', 'Cognome', 'Email', 'Data turno', 'Posti'];
     foreach ($custom_cols as $key => $label) $headers[] = $label;
-    fputcsv($output, $headers);
-    
-    if ($righe_export) {
-        foreach ($righe_export as $row) { 
-            $json = json_decode($row['dati_custom_json'] ?? '', true) ?: [];
-            $line = [
-                $row['stato'], 
-                ($row['presente'] == 1 ? 'SI' : 'NO'), 
-                $row['nome'], 
-                $row['cognome'], 
-                $row['email'], 
-                $row['data_turno'], 
-                $row['num_posti']
-            ];
-            foreach ($custom_cols as $key => $label) {
-                $line[] = $json[$key] ?? '';
-            }
-            fputcsv($output, $line); 
-        }
+    $dati_ar = [];
+    foreach ($righe_export ?: [] as $row) {
+        $json = json_decode($row['dati_custom_json'] ?? '', true) ?: [];
+        $line = [$row['stato'], ($row['presente'] == 1 ? 'SI' : 'NO'), $row['nome'], $row['cognome'], $row['email'], $row['data_turno'], $row['num_posti']];
+        foreach ($custom_cols as $key => $label) $line[] = $json[$key] ?? '';
+        $dati_ar[] = $line;
     }
-    fclose($output); exit;
+    ob_end_clean();
+    (new \App\Infrastructure\Documenti\TabellaEsportabile('Rendicontazione: ' . (string)($_POST['evento_titolo'] ?? ''), $headers, $dati_ar, 'Stampato il ' . date('d/m/Y')))
+        ->scarica(isset($_POST['export_pdf_archivio']) ? 'pdf' : (isset($_POST['export_xlsx_archivio']) ? 'xlsx' : 'csv'), 'rendicontazione_' . $ev_titolo);
+    exit;
 }
 
 // RECUPERO EVENTI ARCHIVIATI
@@ -139,7 +123,12 @@ $eventi_archiviati = $repo_eventi->archiviatiAdmin($filtro_p, $sql_filtro_eventi
                                         <input type="hidden" name="evento_id" value="<?php echo $ev['id']; ?>">
                                         <?php csrf_field(); ?>
                                         <input type="hidden" name="evento_titolo" value="<?php echo htmlspecialchars($ev['titolo']); ?>">
-                                        <button type="submit" name="export_csv_archivio" class="btn btn-success btn-sm fw-bold shadow-sm" title="Esporta CSV Rendicontazione"><i class="fa fa-file-csv"></i> Report</button>
+                                        <div class="dropdown d-inline-block"><button type="button" class="btn btn-success btn-sm fw-bold shadow-sm dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="Scarica la rendicontazione"><i class="fa fa-download"></i> Report</button>
+                                            <ul class="dropdown-menu">
+                                                <li><button type="submit" name="export_xlsx_archivio" class="dropdown-item"><i class="fa fa-file-excel me-2"></i>Excel</button></li>
+                                                <li><button type="submit" name="export_pdf_archivio" class="dropdown-item"><i class="fa fa-file-pdf me-2"></i>PDF</button></li>
+                                                <li><button type="submit" name="export_csv_archivio" class="dropdown-item"><i class="fa fa-file-csv me-2"></i>CSV</button></li>
+                                            </ul></div>
                                     </form>
                                     
                                     <a href="sondaggi.php?p_id=<?php echo $filtro_p; ?>&f_sond_ev=<?php echo $ev['id']; ?>&archivio=1" class="btn btn-info btn-sm fw-bold text-white shadow-sm" title="Vedi Risultati Sondaggio Archiviato"><i class="fa fa-poll"></i> Sondaggi</a>

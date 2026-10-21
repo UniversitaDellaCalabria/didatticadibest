@@ -271,8 +271,10 @@ echo pn_prossima($prossima_p[0], $prossima_p[1], $prossima_p[2], $prossima_p[3])
             <form method="POST" class="mt-2"><?php csrf_field(); ?><input type="hidden" name="pratica_id" value="<?php echo (int)$p['id']; ?>">
                 <button type="submit" name="prendi_pratica" value="1" class="btn btn-sm btn-success fw-bold"><i class="fa fa-hand me-1" aria-hidden="true"></i>Prendi in carico</button></form>
         <?php endif; ?>
-        <?php if (!$conclusa): $sugg = operatori_suggeriti($conn, $p, $m_p, $passo_dopo); ?>
-        <form method="POST" id="assegna" class="row g-2 align-items-end mt-2">
+        <?php if (!$conclusa): $sugg = operatori_suggeriti($conn, $p, $m_p, $passo_dopo); $apri_assegna = in_array($fase_p, ['smistare', 'prendere'], true) || empty($p['assegnata_a']); ?>
+        <details class="mt-2" id="assegnaBox"<?php echo $apri_assegna ? ' open' : ''; ?>>
+        <summary class="small fw-bold" style="cursor:pointer;"><i class="fa fa-share me-1" aria-hidden="true"></i><?php echo $p['assegnata_a'] ? 'Passa la pratica a un\'altra persona' : 'Assegna la pratica a una persona'; ?></summary>
+        <form method="POST" id="assegna" class="row g-2 align-items-end mt-1">
             <?php csrf_field(); ?><input type="hidden" name="pratica_id" value="<?php echo (int)$p['id']; ?>">
             <div class="col-md-3"><label class="form-label small fw-bold mb-0" for="itPasso"><?php echo $p['assegnata_a'] ? 'Passa al passo' : 'Smista al passo'; ?></label>
                 <select class="form-select form-select-sm" id="itPasso" name="passo"><?php foreach ($passi as $i => $n): if ($i === 0) continue; ?><option value="<?php echo $i; ?>"<?php echo $i === $passo_dopo ? ' selected' : ''; ?>><?php echo $i . '. ' . $h($n); ?></option><?php endforeach; ?></select></div>
@@ -284,6 +286,8 @@ echo pn_prossima($prossima_p[0], $prossima_p[1], $prossima_p[2], $prossima_p[3])
             <div class="col-md-2"><button type="submit" name="assegna_pratica" value="1" class="btn btn-sm btn-primary fw-bold w-100"><i class="fa fa-share me-1" aria-hidden="true"></i><?php echo $p['assegnata_a'] ? 'Passa' : 'Smista'; ?></button></div>
             <div class="col-12 small text-secondary">★ = persona dell'ufficio previsto per quel passo (e che segue il corso della pratica). Chi riceve la pratica ha un'email; lo studente vede il passaggio, non la nota.</div>
         </form>
+        </details>
+        <script>(function () { function a() { if (location.hash === '#assegna') { var d = document.getElementById('assegnaBox'); if (d) d.open = true; } } a(); window.addEventListener('hashchange', a); })();</script>
         <?php endif; ?>
     </div></div>
 
@@ -572,8 +576,12 @@ echo pn_prossima($prossima_p[0], $prossima_p[1], $prossima_p[2], $prossima_p[3])
         <?php csrf_field(); ?><input type="hidden" name="torna" value="<?php echo $h($url_elenco()); ?>">
         <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
             <span class="small text-secondary"><strong><?php echo count($elenco); ?></strong> <?php echo count($elenco) === 1 ? 'pratica' : 'pratiche'; ?></span>
-            <a class="btn btn-sm btn-outline-success fw-bold dd-esp" data-formato="xlsx" href="<?php echo $base; ?>&amp;tab=pratiche&amp;<?php echo $h($qs_filtri); ?>&amp;esporta=xlsx"><i class="fa fa-file-excel me-1" aria-hidden="true"></i>Scarica in Excel</a>
-            <a class="btn btn-sm btn-outline-primary fw-bold dd-esp" data-formato="docx" href="<?php echo $base; ?>&amp;tab=pratiche&amp;<?php echo $h($qs_filtri); ?>&amp;esporta=docx"><i class="fa fa-file-word me-1" aria-hidden="true"></i>Scarica in Word (per il verbale)</a>
+            <div class="dropdown"><button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle fw-bold" data-bs-toggle="dropdown" aria-expanded="false"><i class="fa fa-download me-1" aria-hidden="true"></i>Scarica</button>
+                <ul class="dropdown-menu">
+                    <?php foreach (['xlsx' => ['Excel', 'fa-file-excel'], 'pdf' => ['PDF', 'fa-file-pdf'], 'csv' => ['CSV', 'fa-file-csv'], 'docx' => ['Word (per il verbale)', 'fa-file-word']] as $f_e => [$n_e, $i_e]): ?>
+                    <li><a class="dropdown-item dd-esp" data-formato="<?php echo $f_e; ?>" href="<?php echo $base; ?>&amp;tab=pratiche&amp;<?php echo $h($qs_filtri); ?>&amp;esporta=<?php echo $f_e; ?>"><i class="fa <?php echo $i_e; ?> me-2" aria-hidden="true"></i><?php echo $n_e; ?></a></li>
+                    <?php endforeach; ?>
+                </ul></div>
             <span class="small text-secondary">Scarica le pratiche dell'elenco o, se ne spunti alcune, solo quelle.</span>
         </div>
 

@@ -53,11 +53,7 @@ final class TabellaEsportabile
     /** Percorso di un file temporaneo .xlsx (null se manca ZipArchive). */
     public function xlsx(): ?string
     {
-        return Excel::crea([$this->titolo => [
-            'intestazioni' => array_map([$this, 'cella'], $this->intestazioni),
-            'righe' => array_map(fn (array $r) => array_map([$this, 'cella'], array_values($r)), $this->righe),
-            'larghezze' => $this->larghezzeExcel(),
-        ]]);
+        return Excel::crea([$this->titolo => $this->foglio()]);
     }
 
     /** Contenuto del PDF: A4 per terzi, in orizzontale se le colonne sono più di cinque. */
@@ -70,6 +66,14 @@ final class TabellaEsportabile
         $pdf->sx = $pdf->dx = 40;
         $pdf->alto = 40;
         $pdf->y = $pdf->alto;
+        $this->disegna($pdf);
+
+        return $pdf->pdf();
+    }
+
+    /** Scrive titolo e tabella nel PDF a partire dalla posizione corrente (anche dentro un PDF con più tabelle). */
+    public function disegna(Documento $pdf): void
+    {
         $pdf->paragrafo($this->titolo, ['font' => 'H', 'b' => true, 'sz' => 15, 'al' => 'sinistra', 'dopo' => 2]);
         if ($this->sottotitolo !== '') {
             $pdf->paragrafo($this->sottotitolo, ['font' => 'H', 'sz' => 9, 'al' => 'sinistra', 'dopo' => 8]);
@@ -80,8 +84,32 @@ final class TabellaEsportabile
         } else {
             $pdf->tabella(array_map([$this, 'cella'], $this->intestazioni), $righe, ['sz' => 8, 'larghezze' => $this->larghezze ?: array_fill(0, count($this->intestazioni), 1)]);
         }
+    }
 
-        return $pdf->pdf();
+    public function titolo(): string
+    {
+        return $this->titolo;
+    }
+
+    public function numeroColonne(): int
+    {
+        return count($this->intestazioni);
+    }
+
+    /** @return array{intestazioni: list<string>, righe: list<list<string>>, larghezze: list<int|float>} il foglio per Excel::crea() */
+    public function foglio(): array
+    {
+        return [
+            'intestazioni' => array_map([$this, 'cella'], $this->intestazioni),
+            'righe' => array_map(fn (array $r) => array_map([$this, 'cella'], array_values($r)), $this->righe),
+            'larghezze' => $this->larghezzeExcel(),
+        ];
+    }
+
+    /** Righe del CSV (intestazione compresa), già ripulite. @return list<list<string>> */
+    public function righeCsv(): array
+    {
+        return array_merge([array_map([$this, 'cella'], $this->intestazioni)], array_map(fn (array $r) => array_map([$this, 'cella'], array_values($r)), $this->righe));
     }
 
     /** Manda il file al browser; con un formato sconosciuto non fa nulla (la pagina si mostra come al solito). */

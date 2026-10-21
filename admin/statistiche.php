@@ -12,65 +12,15 @@ if (!$can_manage_iscritti) {
 // ============================================================================
 // ESPORTAZIONE EXCEL / CSV
 // ============================================================================
-if (isset($_GET['export_csv']) || isset($_GET['export_excel'])) {
-
+if (isset($_GET['scarica']) && in_array($_GET['scarica'], ['xlsx', 'pdf', 'csv'], true)) {
     ob_end_clean();
-
-    $is_excel = isset($_GET['export_excel']);
-    $filename = "Export_Iscritti_" . date('Ymd_His') . ($is_excel ? ".xls" : ".csv");
-
-    if ($is_excel) {
-        header("Content-Type: application/vnd.ms-excel; charset=utf-8");
-        header("Content-Disposition: attachment; filename=\"$filename\"");
-        echo "<html xmlns:x=\"urn:schemas-microsoft-com:office:excel\">
-              <head><meta charset=\"utf-8\"></head><body>";
-        echo "<table border='1' style='font-family: Arial;'>";
-        echo "<tr style='background-color:#1e293b; color:white;'>
-                <th>ID Ticket</th><th>Stato</th><th>Evento</th><th>Turno (Data e Ora)</th>
-                <th>Nome</th><th>Cognome</th><th>Email</th><th>Matricola</th>
-                <th>Posti Prenotati</th><th>Presente</th><th>Data Prenotazione</th>
-              </tr>";
-    } else {
-        header('Content-Type: text/csv; charset=utf-8');
-        header('Content-Disposition: attachment; filename="' . $filename . '"');
-        echo chr(0xEF).chr(0xBB).chr(0xBF);
-        $output = fopen('php://output', 'w');
-        fputcsv($output, ['ID Ticket', 'Stato', 'Evento', 'Turno (Data e Ora)', 'Nome', 'Cognome', 'Email', 'Matricola', 'Posti Prenotati', 'Presente', 'Data Prenotazione'], ';');
-    }
-
     $righe_export = \App\Core\App::per($conn)->get(\App\Eventi\StatisticheRepository::class)->iscrizioniPerEsportazione((int)$filtro_p, (string)$sql_filtro_eventi_rbac);
-    if ($righe_export) {
-        foreach ($righe_export as $r) {
-            $turno_str         = etichetta_turno($r);
-            $data_prenotazione = date('d/m/Y H:i', strtotime($r['data_prenotazione']));
-            $stato_str         = strtoupper($r['stato']);
-            $presente_str      = $r['presente'] ? 'Sì' : 'No';
-
-            if ($is_excel) {
-                echo "<tr>";
-                echo "<td>" . htmlspecialchars($r['codice_prenotazione']) . "</td>";
-                echo "<td>" . htmlspecialchars($stato_str) . "</td>";
-                echo "<td>" . htmlspecialchars($r['evento_titolo']) . "</td>";
-                echo "<td>" . htmlspecialchars($turno_str) . "</td>";
-                echo "<td>" . htmlspecialchars($r['nome']) . "</td>";
-                echo "<td>" . htmlspecialchars($r['cognome']) . "</td>";
-                echo "<td>" . htmlspecialchars($r['email']) . "</td>";
-                echo "<td>" . htmlspecialchars($r['matricola']) . "</td>";
-                echo "<td>" . htmlspecialchars($r['num_posti']) . "</td>";
-                echo "<td>" . $presente_str . "</td>";
-                echo "<td>" . $data_prenotazione . "</td>";
-                echo "</tr>";
-            } else {
-                fputcsv($output, [
-                    $r['codice_prenotazione'], $stato_str, $r['evento_titolo'], $turno_str,
-                    $r['nome'], $r['cognome'], $r['email'], $r['matricola'],
-                    $r['num_posti'], $presente_str, $data_prenotazione
-                ], ';');
-            }
-        }
-    }
-
-    if ($is_excel) { echo "</table></body></html>"; } else { fclose($output); }
+    $dati_export = array_map(fn($r) => [$r['codice_prenotazione'], strtoupper($r['stato']), $r['evento_titolo'], etichetta_turno($r), $r['nome'], $r['cognome'], $r['email'], $r['matricola'],
+        $r['num_posti'], $r['presente'] ? 'Sì' : 'No', date('d/m/Y H:i', strtotime($r['data_prenotazione']))], $righe_export ?: []);
+    (new \App\Infrastructure\Documenti\TabellaEsportabile('Iscritti: ' . ($page_cfg['titolo'] ?? 'area'),
+        ['ID Ticket', 'Stato', 'Evento', 'Turno (Data e Ora)', 'Nome', 'Cognome', 'Email', 'Matricola', 'Posti prenotati', 'Presente', 'Data prenotazione'], $dati_export,
+        'Stampato il ' . date('d/m/Y'), [2, 1.5, 3.5, 3, 2, 2, 3.5, 1.6, 1.2, 1.2, 2.2]))
+        ->scarica((string)$_GET['scarica'], 'Export_Iscritti_' . date('Ymd_His'));
     exit;
 }
 
@@ -159,12 +109,7 @@ foreach ($trend_data as $t) {
         Statistiche & Report &mdash; <?php echo htmlspecialchars($page_cfg['titolo'] ?? 'Area'); ?>
     </h4>
     <div class="d-flex flex-wrap gap-2 no-print">
-        <a href="?p_id=<?php echo $filtro_p; ?>&export_csv=1" class="btn btn-outline-secondary btn-sm fw-bold shadow-sm">
-            <i class="fa fa-file-csv me-1"></i> CSV
-        </a>
-        <a href="?p_id=<?php echo $filtro_p; ?>&export_excel=1" class="btn btn-success btn-sm fw-bold shadow-sm">
-            <i class="fa fa-file-excel me-1"></i> Excel
-        </a>
+        <?php echo pn_scarica('?p_id=' . (int)$filtro_p); ?>
         <button onclick="window.print()" class="btn btn-outline-secondary btn-sm fw-bold shadow-sm">
             <i class="fa fa-print me-1"></i> Stampa
         </button>

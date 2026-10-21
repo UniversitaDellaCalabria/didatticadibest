@@ -129,6 +129,10 @@ def costruisci():
             card('Firme', '<p>Relatore e Direttore firmano dal loro link personale, in formato PAdES. Per il Direttore assente firma il vice.</p>'),
             card('Per gli studenti', '<p>Lo studente può sempre aggiungere documenti e rispondere ai messaggi dell\'ufficio, e scarica il certificato firmato.</p>'),
         )
+        + '<h3>Per l\'ufficio: la prima schermata</h3><p>La Didattica si apre su <b>«Cosa devo fare»</b>: poche schede con un numero e un pulsante (pratiche da lavorare, da assegnare, verbali da firmare, da decidere in seduta, in attesa di altri) e, sotto, il collegamento a tutte le sezioni, <b>Tirocini</b> compresi. Una pratica mostra in alto <b>cosa fare adesso</b>; una seduta mostra il passo corrente con un solo pulsante. Le azioni rare sono in «Altro», i file in «Scarica» (Excel, PDF, CSV).</p>'
+        + gal(fig('map_adm_did_home', '<b>Cosa devo fare:</b> i numeri e, sotto, tutte le sezioni della Didattica.'),
+              fig('map_adm_did_pratica', '<b>Una pratica:</b> cosa fare adesso, iter, assegnazione nascosta in un riquadro.'),
+              fig('map_adm_did_seduta', '<b>Una seduta:</b> il passo corrente e un solo pulsante per andare avanti.'))
         + gal(fig('map_adm_did_pratiche', '<b>Il pannello delle pratiche:</b> filtri, fase e «cosa fare» per ognuna.'),
               fig('map_adm_did_moduli', '<b>I moduli si costruiscono da pannello</b>, senza programmare: campi, iter, testi ed email.'),
               fig('map_adm_did_statistiche', '<b>Statistiche</b> per modulo: aperte, accolte, tempi.'),
@@ -178,7 +182,7 @@ def costruisci():
               '<b>Il pagamento</b>: lo studente indica i dati (l\'IBAN è conservato cifrato) e l\'ufficio pagamenti procede.')
         + gal(fig('tutorato_1_dati_pagamento', '<b>La dichiarazione individuale</b> compilata online dal tutor.'),
               fig('tutorato_7_area_personale', '<b>L\'Area personale del tutor</b> con la linea del tempo dell\'incarico.'),
-              fig('map_adm_tutorato', '<b>Il pannello del tutorato:</b> bandi, lettere e stati.'))
+              fig('map_adm_tutorato', '<b>Il pannello del tutorato:</b> cosa devo fare (lettere da inviare, da firmare, da protocollare, pagamenti) e l\'elenco dei bandi. Il percorso dopo la firma è lo stesso anche con l\'iter per Uniticket.'))
     )))
 
     # 11 ---------------------------------------------------------------------------------------------

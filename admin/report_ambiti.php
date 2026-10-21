@@ -14,9 +14,10 @@ $anno = in_array($_GET['anno'] ?? '', $anni, true) ? $_GET['anno'] : (string)$an
 $periodo = (str_contains($anno, '/') ? 'a.a. ' : 'anno ') . $anno . ' (' . date('d/m/Y', strtotime($dal)) . ' – ' . date('d/m/Y', strtotime($al)) . ')';
 $d = dati_report_ambiti($conn, $dal, $al);
 
-if (($_GET['esporta'] ?? '') === 'xlsx') {
-    $f = excel_report_ambiti($d, $periodo);
-    if ($f) { registra_log_audit($conn, "Report per ambito esportato", ["Periodo" => $anno]); invia_file_scaricabile($f, 'Report_ambiti_' . str_replace('/', '-', $anno) . '.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); }
+if (in_array($_GET['esporta'] ?? '', ['xlsx', 'pdf', 'csv'], true)) {
+    registra_log_audit($conn, "Report per ambito esportato", ["Periodo" => $anno, "Formato" => $_GET['esporta']]);
+    while (ob_get_level() > 0) ob_end_clean();
+    \App\Infrastructure\Documenti\FogliEsportabili::scaricaDa((string)$_GET['esporta'], 'Report per ambito · ' . $anno, 'Report_ambiti_' . str_replace('/', '-', $anno), fn() => excel_report_ambiti($d, $periodo));
     flash_set("Esportazione non riuscita (manca l'estensione ZIP di PHP).", 'danger');
 }
 $iscr = conta_iscritti_avvisi($conn);
@@ -39,7 +40,7 @@ $max_m = 1; foreach ($d['mesi'] as $x) $max_m = max($max_m, array_sum($x));
             <optgroup label="Anno solare"><?php foreach ($anni as $a): if (str_contains($a, '/')) continue; ?><option<?php echo $a === $anno ? ' selected' : ''; ?>><?php echo $a; ?></option><?php endforeach; ?></optgroup>
             <optgroup label="Anno accademico"><?php foreach ($anni as $a): if (!str_contains($a, '/')) continue; ?><option value="<?php echo $a; ?>"<?php echo $a === $anno ? ' selected' : ''; ?>>a.a. <?php echo $a; ?></option><?php endforeach; ?></optgroup>
         </select>
-        <a class="btn btn-sm btn-success fw-bold text-nowrap" href="report_ambiti.php?p_id=<?php echo (int)$filtro_p; ?>&amp;anno=<?php echo urlencode($anno); ?>&amp;esporta=xlsx"><i class="fa fa-file-excel me-1" aria-hidden="true"></i>Excel</a>
+        <?php echo str_replace('scarica=', 'esporta=', pn_scarica('report_ambiti.php?p_id=' . (int)$filtro_p . '&anno=' . urlencode($anno))); ?>
     </form>
 </div>
 <p class="small text-secondary">Periodo: <?php echo $h($periodo); ?>. Contano i turni con data nel periodo, anche degli eventi archiviati. Partecipanti: per le prenotazioni delle classi il numero di studenti dichiarato dal docente. Un evento con più ambiti compare in ciascuno; il totale lo conta una volta.</p>

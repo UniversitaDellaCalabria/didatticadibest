@@ -197,6 +197,29 @@ final class Pannello
         return $o . '</ul></div>';
     }
 
+    /**
+     * Menu «Scarica» per una tabella già nella pagina (elenchi filtrati con JavaScript): esporta le righe visibili in Excel, PDF o CSV
+     * tramite admin/esporta_tabella.php. $idTabella = id della <table>; $escluse = indici di colonna da non esportare.
+     */
+    public static function scaricaTabella(string $idTabella, string $titolo, string $nome, string $escluse = ''): string
+    {
+        static $script = false;
+        $voci = ['xlsx' => ['Excel', 'fa-file-excel'], 'pdf' => ['PDF', 'fa-file-pdf'], 'csv' => ['CSV', 'fa-file-csv']];
+        $o = '<div class="dropdown pn-scarica">' . (new \App\Auth\Csrf(new \App\Auth\SessioneNativa()))->campo()
+            . '<button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle fw-bold" data-bs-toggle="dropdown" aria-expanded="false"><i class="fa fa-download me-1" aria-hidden="true"></i>Scarica</button><ul class="dropdown-menu dropdown-menu-end">';
+        foreach ($voci as $k => [$n, $ico]) {
+            $o .= '<li><button type="button" class="dropdown-item" data-esporta="' . $k . '" data-tabella="' . self::h($idTabella) . '" data-titolo="' . self::h($titolo) . '" data-nome="' . self::h($nome) . '"'
+                . ($escluse !== '' ? '' : '') . '><i class="fa ' . $ico . ' me-2" aria-hidden="true"></i>' . $n . '</button></li>';
+        }
+        $o .= '</ul></div>';
+        if (!$script) {
+            $script = true;
+            $o .= '<script src="../assets/js/esporta_tabella.js"></script>';
+        }
+
+        return $o;
+    }
+
     /** Riga «← torna a…» sopra le schermate di dettaglio. */
     public static function indietro(string $href, string $testo): string
     {

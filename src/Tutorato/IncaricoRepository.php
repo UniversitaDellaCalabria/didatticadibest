@@ -193,7 +193,7 @@ final class IncaricoRepository
     {
         return Righe::testo($this->db->righe(
             "SELECT i.*, " . self::DATI_BANDO . " FROM tutorato_incarichi i JOIN tutorato_bandi b ON b.id = i.bando_id
-             WHERE i.stato = 'protocollata' AND i.iter = 'portale' AND i.fine_stato IN ('firmata', 'protocollata') AND i.pagamento_stato IN ('', 'rimandata') ORDER BY i.pagamento_stato = 'rimandata' DESC, i.fine_firmata_il, i.cognome"
+             WHERE i.stato = 'protocollata' AND i.fine_stato IN ('firmata', 'protocollata') AND i.pagamento_stato IN ('', 'rimandata') ORDER BY i.pagamento_stato = 'rimandata' DESC, i.fine_firmata_il, i.cognome"
         ));
     }
 

@@ -1445,6 +1445,61 @@ var PACCHETTI = [
     ],
     nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
     commit: "Pannello guidato (1): convenzioni FSL con «cosa devo fare», scheda scuola a passi e registro; esportazioni in Excel, PDF e CSV"
+  },
+  {
+    id: "pannello-guidato-2",
+    titolo: "Pacchetto 32 · Pannello guidato: Didattica, Tutorato, resto dell'FSL ed esportazioni ovunque (F16.2-F16.4, X1)",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare",
+    schema: "nessuna modifica (resta la v82)",
+    riassunto: "La <strong>Didattica</strong> si apre su <strong>«Cosa devo fare»</strong> (schede con un numero e un pulsante, e sotto tutte le sezioni, <strong>Tirocini</strong> compresi); le schede doppie in alto sono sparite (restano le voci del menu a sinistra, con la nuova «Cosa devo fare»). Una <strong>pratica</strong> mostra «cosa fare adesso» e nasconde l'assegnazione in un riquadro; una <strong>seduta</strong> mostra il passo corrente con un solo pulsante, con «Scarica» e «Altro» al posto dei quattro pulsanti. Il <strong>Tutorato</strong> ha la sua schermata «Cosa devo fare», e <strong>l'iter per Uniticket segue ora lo stesso percorso dopo la firma</strong> (protocollo, registro, fine attività, UNILAV e pagamenti). La <strong>Panoramica FSL</strong> ha le sue schede-numero. <strong>Tutte le esportazioni</strong> ora offrono Excel, PDF e CSV (menu «Scarica»): iscritti, statistiche, archivio, prenotazioni delle risorse, pratiche, sedute, scuole, insegnamenti, report per ambito, report FSL, cruscotto e diario di bordo.",
+    passi: [["Didattica", "Cosa devo fare"], ["Tutorato", "Cosa devo fare"], ["Qualsiasi elenco", "Scarica"]],
+    cartelle: [
+      { cartella: "admin/", file: [
+        ["admin/didattica.php", "mod", "Didattica", "prima schermata, niente schede doppie, «Altro», PDF e CSV delle pratiche"],
+        ["admin/didattica_home.php", "nuovo", "Didattica", "«Cosa devo fare» con tutte le sezioni (Tirocini compresi)"],
+        ["admin/didattica_pratiche.php", "mod", "Didattica", "«Scarica» con quattro formati, assegnazione in un riquadro"],
+        ["admin/didattica_sedute.php", "mod", "Didattica", "passo corrente con un solo pulsante, «Scarica» e «Altro»"],
+        ["admin/admin_header.php", "mod", "Menu", "voce «Cosa devo fare» nel menu della Didattica"],
+        ["admin/tutorato.php", "mod", "Tutorato", "«Cosa devo fare», avvisi tecnici solo agli amministratori, pagamenti anche per Uniticket"],
+        ["admin/fsl.php", "mod", "Formazione Scuola Lavoro", "schede-numero nella Panoramica, report FSL in Excel, PDF e CSV"],
+        ["admin/esporta_tabella.php", "nuovo", "Esportazioni", "scarica le tabelle già nella pagina"],
+        ["admin/iscritti.php", "mod", "Iscritti", "«Scarica» Excel, PDF, CSV"],
+        ["admin/statistiche.php", "mod", "Statistiche", "«Scarica» Excel, PDF, CSV"],
+        ["admin/archivio.php", "mod", "Archivio", "rendicontazione in Excel, PDF e CSV"],
+        ["admin/prenotazioni_risorse.php", "mod", "Risorse", "«Scarica» Excel, PDF, CSV"],
+        ["admin/risorse.php", "mod", "Risorse", "diario di bordo in Excel, PDF e CSV"],
+        ["admin/report_ambiti.php", "mod", "Report", "report per ambito in Excel, PDF e CSV"],
+        ["admin/scuole.php", "mod", "Scuole", "«Scarica» al posto del CSV nel browser"],
+        ["admin/anagrafe_personale.php", "mod", "Anagrafe", "«Scarica» al posto del CSV nel browser"]
+      ]},
+      { cartella: "radice e inc/", file: [
+        ["risorse_cruscotto.php", "mod", "Risorse", "cruscotto della risorsa in Excel, PDF e CSV"],
+        ["inc/pannello.php", "mod", "Pannello", "pn_scarica_tabella"]
+      ]},
+      { cartella: "src/", file: [
+        ["src/Infrastructure/Documenti/TabellaEsportabile.php", "mod", "Esportazioni", "disegna() e foglio() per i report a più tabelle"],
+        ["src/Infrastructure/Documenti/FogliEsportabili.php", "nuovo", "Esportazioni", "report a più fogli in Excel, PDF e CSV"],
+        ["src/Infrastructure/Documenti/Excel.php", "mod", "Esportazioni", "ricorda gli ultimi fogli per rifarli in PDF e CSV"],
+        ["src/Iscritti/Vista/EsportaIscritti.php", "mod", "Iscritti", "tabella() e scarica()"],
+        ["src/Portale/Vista/Pannello.php", "mod", "Pannello", "scaricaTabella"],
+        ["src/Tutorato/Costanti.php", "mod", "Tutorato", "descrizione dell'iter per Uniticket"],
+        ["src/Tutorato/IncaricoRepository.php", "mod", "Tutorato", "da validare: anche le lettere per Uniticket"],
+        ["src/Tutorato/ServizioPagamenti.php", "mod", "Tutorato", "i pagamenti non sono più esclusi per Uniticket"]
+      ]},
+      { cartella: "assets/", file: [
+        ["assets/css/pannello.css", "mod", "Pannello", "elenco delle sezioni"],
+        ["assets/js/esporta_tabella.js", "nuovo", "Esportazioni", "legge le righe visibili e le manda al server"]
+      ]}
+    ],
+    dopo: [
+      "Apri <strong>Didattica</strong>: la prima schermata è «Cosa devo fare». In fondo trovi tutte le sezioni, <strong>Tirocini</strong> compresi.",
+      "Apri una pratica e una seduta: in alto c'è «cosa fare adesso». I pulsanti Scarica e Altro sostituiscono quelli di prima.",
+      "Apri <strong>Tutorato</strong>: la prima cosa che vedi sono le schede-numero. Per un bando con iter «Uniticket», dopo il protocollo della lettera ci sono ora registro, fine attività, UNILAV e pagamento come per l'altro iter.",
+      "Prova «Scarica» in Excel, PDF e CSV su un elenco qualsiasi (iscritti, statistiche, scuole, report)."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Pannello guidato (2): Didattica e Tutorato con «cosa devo fare», iter Uniticket uguale all'altro dopo la firma, esportazioni in Excel, PDF e CSV ovunque"
   }
 ];
 
