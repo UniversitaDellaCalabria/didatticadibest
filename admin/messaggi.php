@@ -108,6 +108,7 @@ $url_filtro = fn(string $modulo, bool $nuovi) => 'messaggi.php?p_id=' . (int)$fi
 $colori_mod = fn(string $m) => defined('MODULI_PORTALE') ? (MODULI_PORTALE[$m]['colore'] ?? '#475569') : '#475569';
 ?>
 
+<style>#page-content-wrapper { min-width: 0; }</style>
 <h4 class="fw-bold text-dark mb-3"><i class="fa fa-envelope-open-text text-danger me-2"></i> Tutti i Messaggi (Inbox)</h4>
 
 <?php echo flash_html(); ?>
@@ -125,20 +126,19 @@ $colori_mod = fn(string $m) => defined('MODULI_PORTALE') ? (MODULI_PORTALE[$m]['
 <div class="card shadow-sm border-0">
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover align-middle w-100 m-0">
+            <table class="table table-hover table-sm align-middle w-100 m-0">
                 <thead class="table-dark">
                     <tr>
-                        <th class="py-3 px-4">Modulo</th>
-                        <th>Evento / Richiesta</th>
+                        <th class="py-3 px-3">Modulo · Evento / Richiesta</th>
                         <th>Utente</th>
                         <th>Ultimo Aggiornamento</th>
                         <th>Stato Messaggi</th>
-                        <th class="text-end px-4">Azione</th>
+                        <th class="text-end px-3">Azione</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if(empty($conversazioni)): ?>
-                        <tr><td colspan="6" class="text-center py-5 text-muted"><i class="fa fa-check-double fs-2 d-block mb-2 opacity-50"></i> <?php echo $tutte_conv ? 'Nessuna conversazione con questo filtro.' : ($vedi_archiviate ? 'Nessuna conversazione archiviata.' : 'Nessuna conversazione presente.'); ?></td></tr>
+                        <tr><td colspan="5" class="text-center py-5 text-muted"><i class="fa fa-check-double fs-2 d-block mb-2 opacity-50"></i> <?php echo $tutte_conv ? 'Nessuna conversazione con questo filtro.' : ($vedi_archiviate ? 'Nessuna conversazione archiviata.' : 'Nessuna conversazione presente.'); ?></td></tr>
                     <?php else: ?>
                         <?php foreach($conversazioni as $conv):
                             $is_unread = $conv['da_leggere'] > 0;
@@ -147,14 +147,12 @@ $colori_mod = fn(string $m) => defined('MODULI_PORTALE') ? (MODULI_PORTALE[$m]['
                             $id_modale = ($e_conv ? 'modChatConv' : 'modChatInbox') . $conv['id'];
                         ?>
                             <tr class="<?php echo $row_class; ?>">
-                                <td class="py-3 px-4">
+                                <td class="py-3 px-3">
                                     <span class="badge fw-bold" style="background:<?php echo $colori_mod($conv['modulo']); ?>;"><?php echo htmlspecialchars($conv['modulo_nome']); ?></span>
-                                    <?php if ($conv['area'] !== ''): ?><span class="d-block small text-secondary mt-1"><?php echo htmlspecialchars($conv['area']); ?></span><?php endif; ?>
-                                </td>
-                                <td class="py-3">
-                                    <span class="d-block fw-bold text-danger mb-1"><?php echo htmlspecialchars($conv['titolo']); ?></span>
+                                    <?php if ($conv['area'] !== ''): ?><span class="small text-secondary ms-1"><?php echo htmlspecialchars($conv['area']); ?></span><?php endif; ?>
+                                    <span class="d-block fw-bold text-danger my-1"><?php echo htmlspecialchars($conv['titolo']); ?></span>
                                     <?php if ($e_conv): ?>
-                                        <span class="badge bg-dark fw-normal font-monospace">Convenzione online<?php echo $conv['rif'] !== '' ? ' · ' . htmlspecialchars($conv['rif']) : ''; ?></span>
+                                        <span class="badge bg-dark fw-normal font-monospace">Convenzione online</span><?php if ($conv['rif'] !== ''): ?> <small class="text-muted font-monospace"><?php echo htmlspecialchars($conv['rif']); ?></small><?php endif; ?>
                                     <?php else: ?>
                                         <span class="badge bg-dark fw-normal font-monospace">Ticket: <?php echo htmlspecialchars($conv['rif']); ?></span>
                                     <?php endif; ?>
@@ -164,7 +162,7 @@ $colori_mod = fn(string $m) => defined('MODULI_PORTALE') ? (MODULI_PORTALE[$m]['
                                     <small class="text-muted"><?php echo htmlspecialchars($conv['email']); ?></small>
                                 </td>
                                 <td>
-                                    <span class="d-block"><i class="fa fa-clock text-secondary me-1"></i> <?php echo date('d/m/Y H:i', strtotime($conv['ultimo'])); ?></span>
+                                    <span class="d-block text-nowrap"><i class="fa fa-clock text-secondary me-1"></i><?php echo date('d/m/Y', strtotime($conv['ultimo'])); ?></span><small class="text-muted ms-3"><?php echo date('H:i', strtotime($conv['ultimo'])); ?></small>
                                 </td>
                                 <td>
                                     <?php if ($is_unread): ?>
@@ -177,7 +175,7 @@ $colori_mod = fn(string $m) => defined('MODULI_PORTALE') ? (MODULI_PORTALE[$m]['
                                         </span>
                                     <?php endif; ?>
                                 </td>
-                                <td class="text-end px-4">
+                                <td class="text-end px-3 text-nowrap">
                                     <?php if ($is_unread): ?>
                                         <a href="<?php echo htmlspecialchars($ritorno_msg . '&' . ($e_conv ? 'segna_letto_conv=' : 'segna_letto=') . $conv['id']); ?>" class="btn btn-sm btn-outline-secondary me-1" title="Segna come già letto senza aprire"><i class="fa fa-check-double"></i></a>
                                     <?php endif; ?>
@@ -189,7 +187,7 @@ $colori_mod = fn(string $m) => defined('MODULI_PORTALE') ? (MODULI_PORTALE[$m]['
                                         <?php if ($conv['archiviata']): ?>
                                             <button type="submit" name="ripristina_conv" value="<?php echo $chiave_ar; ?>" class="btn btn-outline-secondary btn-sm fw-bold" title="Rimetti la conversazione in casella"><i class="fa fa-inbox me-1" aria-hidden="true"></i>Ripristina</button>
                                         <?php else: ?>
-                                            <button type="submit" name="archivia_conv" value="<?php echo $chiave_ar; ?>" class="btn btn-outline-secondary btn-sm fw-bold" title="Archivia: sparisce dalla casella ma non si cancella, e torna se arriva un nuovo messaggio"><i class="fa fa-box-archive me-1" aria-hidden="true"></i>Archivia</button>
+                                            <button type="submit" name="archivia_conv" value="<?php echo $chiave_ar; ?>" class="btn btn-outline-secondary btn-sm fw-bold" title="Archivia: sparisce dalla casella ma non si cancella, e torna se arriva un nuovo messaggio"><i class="fa fa-box-archive" aria-hidden="true"></i><span class="visually-hidden">Archivia</span></button>
                                         <?php endif; ?>
                                     </form>
                                 </td>

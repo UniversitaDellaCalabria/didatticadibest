@@ -92,13 +92,15 @@ def costruisci():
               fig('fsl_presa_in_carico', '<b>4 · Presa in carico</b> con il protocollo in entrata.'),
               fig('fsl_attiva', '<b>5 · Convenzione attiva.</b> Le prenotazioni in attesa sono confermate.'),
               fig('fsl_email_link', '<b>Le email</b> accompagnano ogni passaggio, con il link personale.'))
-        + '<h3>Parlare con la scuola</h3><p>Se una scuola non ha ancora caricato il PDF, l\'ufficio può mandare con un clic un <b>promemoria</b> (o a tutte le scuole in attesa) oppure scrivere un <b>messaggio</b>. La scuola lo legge e risponde dalla propria pagina; l\'ufficio vede il bollino «Nuova risposta».</p>'
+        + '<h3>Parlare con la scuola</h3><p>Se una scuola non ha ancora caricato il PDF, l\'ufficio può mandare con un clic un <b>promemoria</b> (o a tutte le scuole in attesa) oppure scrivere un <b>messaggio</b>. La scuola lo legge e risponde dalla propria pagina; l\'ufficio vede il bollino «Nuova risposta». Anche dalla scheda delle scuole senza convenzione ci sono due pulsanti: <b>Chiedi la convenzione</b> (email con i modelli e la PEC ai docenti della scuola) e <b>Scrivi alla scuola</b> (un messaggio ai docenti, che resta anche nella chat della prenotazione).</p>'
         + '<h3>Per l\'ufficio: cosa devo fare</h3><p>La prima schermata di <b>Formazione Scuola Lavoro</b> mostra solo quello che c\'è da fare, con un numero e un pulsante: PDF da prendere in carico, convenzioni da protocollare, convenzioni dal Direttore, scuole senza convenzione. Nella scheda di ogni scuola i cinque passi della convenzione e l\'unica cosa da fare adesso. Le azioni rare sono nel menu «Altro»; il registro si scarica in Excel, PDF e CSV.</p>'
         + gal(fig('map_adm_fsl_home', '<b>Convenzioni con le scuole:</b> le schede «cosa devo fare», la ricerca di una scuola e il menu «Altro».'),
               fig('map_adm_fsl_scuola', '<b>Scheda della scuola:</b> i cinque passi e il riquadro con la cosa da fare adesso.'))
         + gal(fig('map_adm_fsl_iter', '<b>Convenzioni da seguire:</b> le convenzioni suddivise per tappa, con i pulsanti per ricordare e scrivere.'),
               fig('map_adm_fsl_registro', '<b>Registro delle convenzioni:</b> in vigore o scadute, con «Rinnova» e il menu «Scarica» (Excel, PDF, CSV).'))
-        + fig('map_adm_fsl_stipulare', '<b>Scuole senza convenzione:</b> una scheda per ogni scuola con prenotazioni in corso, con i documenti già compilati.')
+        + fig('map_adm_fsl_stipulare', '<b>Scuole senza convenzione:</b> una scheda per ogni scuola, con «Registra la convenzione ricevuta», «Chiedi la convenzione», «Scrivi alla scuola» e i documenti già compilati.')
+        + '<h3>Una scuola che fa l\'attività solo come orientamento</h3><p>Se una scuola non ha la convenzione e sceglie di partecipare solo come <b>orientamento</b> e non come Formazione Scuola Lavoro, dal menu «…» della sua iscrizione si sceglie <b>Segna come solo orientamento</b>. Per quella prenotazione il portale non chiede più né la convenzione né l\'elenco degli studenti e l\'autorizzazione, non manda promemoria, non la conta nel registro FSL e nelle valutazioni, e l\'attestato non porta la dicitura FSL. Un clic sulla stessa voce («Riporta a Formazione Scuola Lavoro») la rimette com\'era. Le altre scuole della stessa attività non cambiano.</p>'
+        + fig('map_adm_iscritti_orientamento', '<b>Iscritti:</b> la prima scuola ha la convenzione da stipulare e i documenti mancanti; la seconda è segnata «Solo orientamento» e non ha nulla da consegnare.')
         + '<h3>L\'elenco degli studenti</h3><p>Il docente referente riceve un link e inserisce i nomi (a mano, incollando da Excel o con il modello): bastano cognome e nome. Con quell\'elenco il portale prepara gli attestati.</p>'
         + gal(fig('fsl_elenco_2_pagina', '<b>La pagina dei documenti</b> da consegnare: elenco, autorizzazione e modello Excel.'),
               fig('fsl_elenco_4_compilato', '<b>Elenco compilato</b> riga per riga, con il contatore degli studenti.'))
@@ -267,6 +269,8 @@ def costruisci():
               fig('map_adm_report_ambiti', '<b>Report per ambito</b>, anche per la Terza missione.'),
               fig('map_adm_impostazioni_area', '<b>Impostazioni dell\'area</b>: colori, layout e regole di iscrizione.'),
               fig('map_adm_sondaggi', '<b>Sondaggi</b> e questionari collegati agli eventi.'))
+        + '<h3>I messaggi, tutti in un posto</h3><p>Il pulsante <b>Messaggi</b> in alto apre una casella unica: le conversazioni sulle prenotazioni di tutte le aree che gestisci e le risposte delle scuole sulle convenzioni FSL, ognuna con il <b>modulo</b> da cui arriva. Si filtra per modulo o per «da leggere», e il numero rosso nel pulsante somma tutto. Si risponde da lì e una conversazione finita si <b>archivia</b>: sparisce dalla casella ma non si cancella, si ritrova in «Archiviate» e torna da sola se l\'altra parte scrive di nuovo. Chi gestisce solo alcune attività vede solo i loro messaggi.</p>'
+        + fig('map_adm_messaggi', '<b>La casella dei messaggi:</b> prenotazioni e convenzioni insieme, col modulo, i filtri, «Leggi / Rispondi» e «Archivia».')
         + '<h3>Il sito e le persone</h3>'
         + gal(fig('map_adm_testata', '<b>Testata e home</b>: logo, carosello e widget.'),
               fig('map_adm_menu', '<b>Il menu</b> a tre livelli, con ordine a trascinamento.'),
