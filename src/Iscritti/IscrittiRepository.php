@@ -30,7 +30,7 @@ final class IscrittiRepository
     {
         return Righe::riga($this->db->riga(
             'SELECT pr.*, t.id as turno_id, t.nome_turno, t.data_turno, t.orario_inizio, t.orario_fine,
-                    e.titolo as evento_titolo, e.luogo
+                    e.titolo as evento_titolo, e.luogo, e.pagina_id
              FROM prenotazioni pr
              JOIN turni t ON pr.turno_id = t.id
              JOIN eventi e ON t.evento_id = e.id

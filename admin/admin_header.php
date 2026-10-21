@@ -232,7 +232,8 @@ $sys = \App\Core\App::get(\App\Sistema\ImpostazioniSistemaRepository::class)->ri
 $cfg_p = get_configurazione_portale($conn);
 $current_page = basename($_SERVER['PHP_SELF']);
 
-$unread_count = \App\Core\App::get(\App\Portale\AreeRepository::class)->messaggiNonLetti((int)$filtro_p, $sql_filtro_eventi_rbac);
+// Un solo numero per tutte le aree e le risposte delle scuole sulle convenzioni FSL (la casella Messaggi è unica)
+$unread_count = \App\Core\App::get(\App\Iscritti\CasellaMessaggi::class)->nonLetti((int)$uid_rbac, $is_full_admin, $puo_fsl_convenzioni);
 ?>
 <!DOCTYPE html>
 <html lang="it" data-bs-theme="light">
@@ -645,7 +646,6 @@ document.addEventListener('DOMContentLoaded', function() {
 // ── Badge messaggi in tempo reale (polling ogni 30s) ─────────────────────────
 (function() {
     var pId = <?php echo (int)$filtro_p; ?>;
-    if (!pId) return;
 
     function aggiornaBadge(n) {
         var el = document.getElementById('badgeUnread');

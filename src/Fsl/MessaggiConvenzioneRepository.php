@@ -74,6 +74,30 @@ final class MessaggiConvenzioneRepository
     }
 
     /**
+     * Conversazioni in cui la scuola ha scritto almeno una volta (i promemoria automatici da soli non fanno una conversazione).
+     *
+     * @return list<array<string, string|null>>
+     */
+    public function conversazioni(): array
+    {
+        return Righe::testo($this->db->righe(
+            "SELECT m.compilazione_id, c.scuola_codice, c.dati_json, c.email, MAX(m.creato_il) AS ultimo, COUNT(*) AS totale,
+                    SUM(m.da = 'scuola' AND m.letto_il IS NULL) AS da_leggere
+             FROM convenzioni_messaggi m JOIN convenzioni_compilate c ON c.id = m.compilazione_id
+             GROUP BY m.compilazione_id, c.scuola_codice, c.dati_json, c.email
+             HAVING SUM(m.da = 'scuola') > 0"
+        ));
+    }
+
+    /** Conversazioni con almeno una risposta della scuola da leggere. */
+    public function conversazioniNonLette(): int
+    {
+        return (int) $this->db->valore(
+            "SELECT COUNT(DISTINCT m.compilazione_id) FROM convenzioni_messaggi m JOIN convenzioni_compilate c ON c.id = m.compilazione_id WHERE m.da = 'scuola' AND m.letto_il IS NULL"
+        );
+    }
+
+    /**
      * Ultimo messaggio per compilazione: [compilazione_id => riga], per le etichette dell'elenco.
      *
      * @return array<int, array<string, string|null>>

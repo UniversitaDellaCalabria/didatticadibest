@@ -13,11 +13,13 @@ if (empty($_SESSION['utente_id'])) {
     exit;
 }
 
-$p_id = isset($_GET['p_id']) ? (int)$_GET['p_id'] : 0;
-if ($p_id <= 0) {
-    echo json_encode(['unread' => 0]);
+// Come il numero del pulsante «Messaggi»: tutte le aree dell'utente e le risposte delle scuole sulle convenzioni FSL
+$app = \App\Core\App::per($conn);
+$utente = $app->get(\App\Auth\UtenteRepository::class)->perId((int)$_SESSION['utente_id']);
+if (!$utente) {
+    echo json_encode(['unread' => 0, 'auth' => false]);
     exit;
 }
-
-$n = \App\Core\App::per($conn)->get(\App\Iscritti\ServizioMessaggi::class)->nonLetti($p_id);
+$casella = $app->get(\App\Iscritti\CasellaMessaggi::class);
+$n = $casella->nonLetti((int)$utente['id'], \App\Iscritti\CasellaMessaggi::eAmministratore($utente), $casella->puoConvenzioniFsl($utente));
 echo json_encode(['unread' => $n, 'auth' => true]);
