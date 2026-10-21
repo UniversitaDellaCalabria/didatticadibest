@@ -273,7 +273,7 @@ final class ServizioScuole
         $separatori = [';' => substr_count($prima, ';'), ',' => substr_count($prima, ','), "\t" => substr_count($prima, "\t")];
         arsort($separatori);
         $sep = (string) array_key_first($separatori);
-        $intestazioni = array_map(static fn ($c): string => strtoupper((string) preg_replace('/[\s"\']+/', '', (string) $c)), str_getcsv(trim($prima), $sep));
+        $intestazioni = array_map(static fn ($c): string => strtoupper((string) preg_replace('/[\s"\']+/', '', (string) $c)), str_getcsv(trim($prima), $sep, '"', '\\'));
         $indici = [];
         foreach (self::MAPPA_COLONNE as $col => $nomi) {
             foreach ($nomi as $nm) {
@@ -295,7 +295,7 @@ final class ServizioScuole
         $righe = [];
         $scartate = 0;
         $fuori = 0;
-        while (($r = fgetcsv($fh, 0, $sep)) !== false) {
+        while (($r = fgetcsv($fh, 0, $sep, '"', '\\')) !== false) {
             // Codifica controllata riga per riga: le prime righe possono essere tutte in lettere semplici
             if (!mb_check_encoding(implode('', $r), 'UTF-8')) {
                 $r = array_map(static fn ($v): string => (string) mb_convert_encoding((string) $v, 'UTF-8', 'Windows-1252'), $r);

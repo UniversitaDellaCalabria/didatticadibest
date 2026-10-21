@@ -61,7 +61,7 @@ final class EsportaIscritti
             $intestazioni[] = 'Studenti (per gli attestati)';
         }
         $intestazioni[] = 'Data Registrazione';
-        fputcsv($output, $intestazioni);
+        fputcsv($output, $intestazioni, ',', '"', '\\');
         foreach ($righe as $row) {
             $json = self::datiModulo($row['dati_custom_json'] ?? null);
             $riga = [$row['codice_prenotazione'], $row['stato'], ($row['presente'] == 1 ? 'SI' : 'NO'), $row['num_posti'], $row['nome'], $row['cognome'], $row['matricola_effettiva'], $row['email'], $row['evento'], $row['nome_turno'] ?? '', $row['data_turno'] ?? '', $row['orario_inizio'] ?? ''];
@@ -73,7 +73,7 @@ final class EsportaIscritti
                 $riga[] = (string) $row['studenti'];
             }
             $riga[] = $row['data_prenotazione'];
-            fputcsv($output, $riga);
+            fputcsv($output, $riga, ',', '"', '\\');
         }
         fclose($output);
     }
