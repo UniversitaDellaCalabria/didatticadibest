@@ -812,19 +812,23 @@ $n_eventi_normali = $repo_eventi->contaNormali((int)$filtro_p);
                         <?php if ($p['per_scuole'] && $una_ed && ($lim_t = testo_limiti_partecipanti(...array_values(limiti_partecipanti($d, $t)))) !== ''): ?><span><i class="fa fa-users" aria-hidden="true"></i> <?php echo h(ucfirst($lim_t)); ?> partecipanti per iscrizione</span><?php endif; ?>
                     </div>
                 </div>
-                <div class="d-flex gap-1 flex-shrink-0">
-                    <a href="progetti.php?p_id=<?php echo $filtro_p; ?>&id=<?php echo $id; ?>" class="btn btn-sm btn-outline-primary" title="Modifica" aria-label="Modifica progetto"><i class="fa fa-edit" aria-hidden="true"></i></a>
-                    <?php if ($slug_area): ?><a href="../<?php echo h($slug_area); ?>.php?progetto=<?php echo $id; ?>" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary" title="Scheda pubblica" aria-label="Scheda pubblica"><i class="fa fa-eye" aria-hidden="true"></i></a><?php endif; ?>
-                    <?php if ($puo_creare): ?>
-                        <form method="POST" class="m-0"><?php csrf_field(); ?><input type="hidden" name="duplica_progetto" value="<?php echo $id; ?>">
-                            <button type="submit" class="btn btn-sm btn-outline-secondary" title="Duplica" aria-label="Duplica progetto" data-confirm="Duplicare il progetto? Le iscrizioni non vengono copiate."><i class="fa fa-copy" aria-hidden="true"></i></button></form>
-                    <?php endif; ?>
-                    <?php if ($can_manage_settings): ?>
-                        <form method="POST" class="m-0"><?php csrf_field(); ?><input type="hidden" name="archivia_progetto" value="<?php echo $id; ?>">
-                            <button type="submit" class="btn btn-sm btn-outline-warning text-dark" title="Archivia" aria-label="Archivia progetto" data-confirm="Archiviare questo progetto?"><i class="fa fa-archive" aria-hidden="true"></i></button></form>
-                        <form method="POST" class="m-0"><?php csrf_field(); ?><input type="hidden" name="elimina_progetto" value="<?php echo $id; ?>">
-                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Elimina" aria-label="Elimina progetto" data-confirm="Eliminare il progetto con tutte le iscrizioni? L'operazione non si può annullare."><i class="fa fa-trash" aria-hidden="true"></i></button></form>
-                    <?php endif; ?>
+                <div class="d-flex gap-1 flex-shrink-0 align-items-start">
+                    <a href="progetti.php?p_id=<?php echo $filtro_p; ?>&id=<?php echo $id; ?>" class="btn btn-sm fw-bold" style="background:var(--pn-mod);border-color:var(--pn-mod);color:var(--pn-mod-testo);"><i class="fa fa-pen me-1" aria-hidden="true"></i>Modifica</a>
+                    <div class="dropdown"><button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle fw-bold" data-bs-toggle="dropdown" aria-expanded="false"><i class="fa fa-ellipsis me-1" aria-hidden="true"></i>Altro</button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <?php if ($slug_area): ?><li><a class="dropdown-item" href="../<?php echo h($slug_area); ?>.php?progetto=<?php echo $id; ?>" target="_blank" rel="noopener"><i class="fa fa-eye me-2" aria-hidden="true"></i>Vedi la scheda pubblica</a></li><?php endif; ?>
+                            <?php if ($puo_creare): ?>
+                                <li><form method="POST" class="m-0"><?php csrf_field(); ?><input type="hidden" name="duplica_progetto" value="<?php echo $id; ?>">
+                                    <button type="submit" class="dropdown-item" data-confirm="Duplicare il progetto? Le iscrizioni non vengono copiate."><i class="fa fa-copy me-2" aria-hidden="true"></i>Duplica il progetto</button></form></li>
+                            <?php endif; ?>
+                            <?php if ($can_manage_settings): ?>
+                                <li><form method="POST" class="m-0"><?php csrf_field(); ?><input type="hidden" name="archivia_progetto" value="<?php echo $id; ?>">
+                                    <button type="submit" class="dropdown-item" data-confirm="Archiviare questo progetto?"><i class="fa fa-box-archive me-2" aria-hidden="true"></i>Archivia</button></form></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><form method="POST" class="m-0"><?php csrf_field(); ?><input type="hidden" name="elimina_progetto" value="<?php echo $id; ?>">
+                                    <button type="submit" class="dropdown-item text-danger" data-confirm="Eliminare il progetto con tutte le iscrizioni? L'operazione non si può annullare."><i class="fa fa-trash me-2" aria-hidden="true"></i>Elimina</button></form></li>
+                            <?php endif; ?>
+                        </ul></div>
                 </div>
             </div>
 

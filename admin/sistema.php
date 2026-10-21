@@ -116,10 +116,10 @@ if (isset($_POST['save_system_settings'])) {
     </form>
 </div>
 
-<div class="card shadow-sm border-0 p-4">
-    <form method="POST">
+<details class="card shadow-sm border-0 p-4 mb-4"<?php echo empty($sys['smtp_host']) ? ' open' : ''; ?> id="smtp">
+    <summary class="fw-bold text-primary" style="cursor:pointer;"><i class="fa fa-cogs me-1" aria-hidden="true"></i> Impostazioni di invio delle email (SMTP) <span class="text-secondary fw-normal small">: servono solo se cambia il server di posta</span></summary>
+    <form method="POST" class="mt-3">
         <?php csrf_field(); ?>
-        <h5 class="fw-bold text-primary border-bottom pb-2 mb-4"><i class="fa fa-cogs me-1"></i> Configurazione Server SMTP e Template Notifiche</h5>
         
         <div class="row g-3 mb-4 bg-light p-3 border rounded">
             <div class="col-md-4">
@@ -166,7 +166,7 @@ if (isset($_POST['save_system_settings'])) {
             </button>
         </div>
     </form>
-</div>
+</details>
 
 <?php
 // Registro invii (tabella creata al primo invio da registra_log_email())

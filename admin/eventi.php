@@ -770,11 +770,9 @@ $col_area = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
             </select>
         </form>
         <?php if ($can_manage_settings): ?>
-            <form method="POST" class="m-0">
-                <?php csrf_field(); ?>
-                <input type="hidden" name="p_id" value="<?php echo $filtro_p; ?>">
-                <button type="submit" name="archivia_conclusi" class="btn btn-outline-secondary btn-sm fw-bold" data-confirm="Archiviare tutti gli eventi passati?" title="Archivia conclusi"><i class="fa fa-archive me-1"></i>Archivia vecchi</button>
-            </form>
+            <div class="dropdown"><button type="button" class="btn btn-outline-secondary btn-sm dropdown-toggle fw-bold" data-bs-toggle="dropdown" aria-expanded="false"><i class="fa fa-ellipsis me-1" aria-hidden="true"></i>Altro</button>
+                <ul class="dropdown-menu dropdown-menu-end"><li><form method="POST" class="m-0"><?php csrf_field(); ?><input type="hidden" name="p_id" value="<?php echo $filtro_p; ?>">
+                    <button type="submit" name="archivia_conclusi" class="dropdown-item" data-confirm="Archiviare tutti gli eventi passati?"><i class="fa fa-box-archive me-2" aria-hidden="true"></i>Archivia tutti gli eventi passati</button></form></li></ul></div>
         <?php endif; ?>
         <?php if ($puo_creare_ev): ?>
             <a href="eventi.php?p_id=<?php echo $filtro_p; ?>&azione=nuovo" class="btn btn-sm fw-bold px-3 shadow-sm text-white" style="background:<?php echo $col_area; ?>;border:none;border-radius:8px;"><i class="fa fa-plus-circle me-1"></i>Crea Evento</a>
@@ -784,9 +782,10 @@ $col_area = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
 
 <div class="row g-0">
     <?php if ($can_manage_settings): ?>
-    <div class="col-md-3 pe-md-3 mb-4">
-        <div class="ev-card p-3" style="border-top:3px solid <?php echo $col_area; ?>;">
-            <div class="fw-bold mb-3 text-uppercase" style="font-size:.72rem;letter-spacing:.06em;color:<?php echo $col_area; ?>;"><i class="fa fa-tags me-1"></i>Sottocategorie / Sezioni</div>
+    <div class="col-12 mb-3">
+        <details class="ev-card p-3" style="border-top:3px solid <?php echo $col_area; ?>;">
+            <summary class="fw-bold" style="cursor:pointer;color:<?php echo $col_area; ?>;"><i class="fa fa-tags me-1" aria-hidden="true"></i>Sezioni degli eventi <span class="text-secondary fw-normal small">(per raggruppare gli eventi nella pagina pubblica: aprilo solo se serve)</span></summary>
+            <div class="mt-3" style="max-width:460px;">
             <form method="POST" class="mb-3">
                 <?php csrf_field(); ?>
                 <input type="hidden" name="pagina_id" value="<?php echo $filtro_p; ?>">
@@ -818,11 +817,12 @@ $col_area = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
                     <div class="text-muted small text-center py-2">Nessuna sezione</div>
                 <?php endif; ?>
             </div>
-        </div>
+            </div>
+        </details>
     </div>
     <?php endif; ?>
 
-    <div class="<?php echo $can_manage_settings ? 'col-md-9' : 'col-12'; ?>">
+    <div class="col-12">
         <?php if ($n_progetti > 0): ?>
             <div class="alert alert-light border small py-2 mb-3"><i class="fa fa-diagram-project me-1" aria-hidden="true"></i>In quest'area ci sono <?php echo $n_progetti; ?> <?php echo $n_progetti === 1 ? 'progetto' : 'progetti'; ?>: li gestisci da <a href="progetti.php?p_id=<?php echo $filtro_p; ?>" class="fw-bold">Progetti</a>.</div>
         <?php endif; ?>
@@ -853,34 +853,38 @@ $col_area = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
                                 <?php endif; ?>
                             </div>
                         </div>
-                        <!-- Bottoni azione -->
-                        <div class="d-flex gap-1 flex-shrink-0">
-                            <a href="eventi.php?p_id=<?php echo $filtro_p; ?>&id=<?php echo (int)$ev['id']; ?><?php echo $filtro_ev ? '&f_ev=' . $filtro_ev : ''; ?>" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center justify-content-center" style="border-radius:8px;width:34px;height:34px;padding:0;" title="Modifica evento" aria-label="Modifica evento"><i class="fa fa-edit" style="font-size:.85rem;" aria-hidden="true"></i></a>
-                            <?php if (!empty($page_cfg['slug'])): ?>
-                                <a href="../<?php echo htmlspecialchars($page_cfg['slug']); ?>.php?evento=<?php echo (int)$ev['id']; ?>" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center justify-content-center" style="border-radius:8px;width:34px;height:34px;padding:0;" title="Scheda pubblica" aria-label="Scheda pubblica"><i class="fa fa-eye" style="font-size:.85rem;" aria-hidden="true"></i></a>
-                            <?php endif; ?>
-                            <form method="POST" class="d-inline m-0">
-                                <?php csrf_field(); ?>
-                                <input type="hidden" name="duplica_evento" value="<?php echo $ev['id']; ?>">
-                                <input type="hidden" name="f_ev" value="<?php echo $filtro_ev; ?>">
-                                <button type="submit" class="btn btn-sm btn-outline-secondary" style="border-radius:8px;width:34px;height:34px;padding:0;" data-confirm="Duplicare questo evento con turni, campi del form e sondaggio? Gli iscritti e le risposte non vengono copiati." title="Duplica evento" aria-label="Duplica evento"><i class="fa fa-copy" aria-hidden="true"></i></button>
-                            </form>
-                            <?php if ($can_manage_settings): ?>
-                                <form method="POST" class="d-inline m-0">
-                                    <?php csrf_field(); ?>
-                                    <input type="hidden" name="archivia_ev" value="<?php echo $ev['id']; ?>">
-                                    <input type="hidden" name="p_id" value="<?php echo $filtro_p; ?>">
-                                    <input type="hidden" name="f_ev" value="<?php echo $filtro_ev; ?>">
-                                    <button type="submit" class="btn btn-sm btn-outline-warning text-dark" style="border-radius:8px;width:34px;height:34px;padding:0;" data-confirm="Archiviare questo evento?" title="Archivia"><i class="fa fa-archive" style="font-size:.85rem;"></i></button>
-                                </form>
-                                <form method="POST" class="d-inline m-0">
-                                    <?php csrf_field(); ?>
-                                    <input type="hidden" name="del_ev" value="<?php echo $ev['id']; ?>">
-                                    <input type="hidden" name="p_id" value="<?php echo $filtro_p; ?>">
-                                    <input type="hidden" name="f_ev" value="<?php echo $filtro_ev; ?>">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger" style="border-radius:8px;width:34px;height:34px;padding:0;" data-confirm="Eliminare questo evento e tutti i suoi turni e prenotazioni?" title="Elimina"><i class="fa fa-trash" style="font-size:.85rem;"></i></button>
-                                </form>
-                            <?php endif; ?>
+                        <!-- Azioni: una principale (Modifica) e il resto in «Altro» -->
+                        <div class="d-flex gap-1 flex-shrink-0 align-items-start">
+                            <a href="eventi.php?p_id=<?php echo $filtro_p; ?>&id=<?php echo (int)$ev['id']; ?><?php echo $filtro_ev ? '&f_ev=' . $filtro_ev : ''; ?>" class="btn btn-sm fw-bold" style="background:var(--pn-mod);border-color:var(--pn-mod);color:var(--pn-mod-testo);"><i class="fa fa-pen me-1" aria-hidden="true"></i>Modifica</a>
+                            <div class="dropdown"><button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle fw-bold" data-bs-toggle="dropdown" aria-expanded="false"><i class="fa fa-ellipsis me-1" aria-hidden="true"></i>Altro</button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <?php if (!empty($page_cfg['slug'])): ?>
+                                    <li><a class="dropdown-item" href="../<?php echo htmlspecialchars($page_cfg['slug']); ?>.php?evento=<?php echo (int)$ev['id']; ?>" target="_blank" rel="noopener"><i class="fa fa-eye me-2" aria-hidden="true"></i>Vedi la scheda pubblica</a></li>
+                                    <?php endif; ?>
+                                    <li><form method="POST" class="m-0">
+                                        <?php csrf_field(); ?>
+                                        <input type="hidden" name="duplica_evento" value="<?php echo $ev['id']; ?>">
+                                        <input type="hidden" name="f_ev" value="<?php echo $filtro_ev; ?>">
+                                        <button type="submit" class="dropdown-item" data-confirm="Duplicare questo evento con turni, campi del form e sondaggio? Gli iscritti e le risposte non vengono copiati."><i class="fa fa-copy me-2" aria-hidden="true"></i>Duplica l'evento</button>
+                                    </form></li>
+                                    <?php if ($can_manage_settings): ?>
+                                    <li><form method="POST" class="m-0">
+                                        <?php csrf_field(); ?>
+                                        <input type="hidden" name="archivia_ev" value="<?php echo $ev['id']; ?>">
+                                        <input type="hidden" name="p_id" value="<?php echo $filtro_p; ?>">
+                                        <input type="hidden" name="f_ev" value="<?php echo $filtro_ev; ?>">
+                                        <button type="submit" class="dropdown-item" data-confirm="Archiviare questo evento?"><i class="fa fa-box-archive me-2" aria-hidden="true"></i>Archivia</button>
+                                    </form></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><form method="POST" class="m-0">
+                                        <?php csrf_field(); ?>
+                                        <input type="hidden" name="del_ev" value="<?php echo $ev['id']; ?>">
+                                        <input type="hidden" name="p_id" value="<?php echo $filtro_p; ?>">
+                                        <input type="hidden" name="f_ev" value="<?php echo $filtro_ev; ?>">
+                                        <button type="submit" class="dropdown-item text-danger" data-confirm="Eliminare questo evento e tutti i suoi turni e prenotazioni?"><i class="fa fa-trash me-2" aria-hidden="true"></i>Elimina</button>
+                                    </form></li>
+                                    <?php endif; ?>
+                                </ul></div>
                         </div>
                     </div>
 
@@ -941,16 +945,14 @@ $col_area = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
                                 <?php if(!empty($t['annullabile_fino'])): ?><span class="badge" style="background:#f1f5f9;color:#334155;font-size:.68rem;" title="Dopo questa data non si può più annullare né cambiare turno"><i class="fa fa-rotate-left me-1" aria-hidden="true"></i>Annullabile fino al <?php echo date('d/m H:i', strtotime($t['annullabile_fino'])); ?></span><?php endif; ?>
                             </div>
                             <div class="d-flex align-items-center gap-1 flex-shrink-0">
-                                <a href="stampa_qr_aula.php?t_id=<?php echo $t['id']; ?>&p_id=<?php echo $filtro_p; ?>" class="btn btn-sm btn-outline-success py-0 px-2 fw-bold" style="border-radius:6px;font-size:.75rem;" title="QR Aula"><i class="fa fa-qrcode me-1"></i>QR Aula</a>
-                                <a href="eventi.php?p_id=<?php echo $filtro_p; ?>&id=<?php echo (int)$ev['id']; ?>#turni" class="btn btn-sm btn-outline-primary py-0 px-2" style="border-radius:6px;" title="Modifica turno" aria-label="Modifica turno"><i class="fa fa-edit" aria-hidden="true"></i></a>
-<form method="POST" class="d-inline m-0">                                    <?php csrf_field(); ?>                                    <input type="hidden" name="duplica_turno" value="<?php echo $t['id']; ?>">                                    <input type="hidden" name="f_ev" value="<?php echo $filtro_ev; ?>">                                    <button type="submit" class="btn btn-sm btn-outline-secondary py-0 px-2" style="border-radius:6px;" title="Duplica turno" aria-label="Duplica turno"><i class="fa fa-copy" aria-hidden="true"></i></button>                                </form>
-                                <form method="POST" class="d-inline m-0">
-                                    <?php csrf_field(); ?>
-                                    <input type="hidden" name="del_turno" value="<?php echo $t['id']; ?>">
-                                    <input type="hidden" name="p_id" value="<?php echo $filtro_p; ?>">
-                                    <input type="hidden" name="f_ev" value="<?php echo $filtro_ev; ?>">
-                                    <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" style="border-radius:6px;" data-confirm="Eliminare questo turno?" title="Elimina turno"><i class="fa fa-times"></i></button>
-                                </form>
+                                <a href="eventi.php?p_id=<?php echo $filtro_p; ?>&id=<?php echo (int)$ev['id']; ?>#turni" class="btn btn-sm btn-outline-primary py-0 px-2 fw-bold" style="border-radius:6px;"><i class="fa fa-pen me-1" aria-hidden="true"></i>Modifica</a>
+                                <div class="dropdown"><button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 dropdown-toggle" style="border-radius:6px;" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Altre azioni del turno"><i class="fa fa-ellipsis" aria-hidden="true"></i></button>
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                        <li><a class="dropdown-item" href="stampa_qr_aula.php?t_id=<?php echo $t['id']; ?>&p_id=<?php echo $filtro_p; ?>"><i class="fa fa-qrcode me-2" aria-hidden="true"></i>Stampa il QR dell'aula</a></li>
+                                        <li><form method="POST" class="m-0"><?php csrf_field(); ?><input type="hidden" name="duplica_turno" value="<?php echo $t['id']; ?>"><input type="hidden" name="f_ev" value="<?php echo $filtro_ev; ?>"><button type="submit" class="dropdown-item"><i class="fa fa-copy me-2" aria-hidden="true"></i>Duplica il turno</button></form></li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li><form method="POST" class="m-0"><?php csrf_field(); ?><input type="hidden" name="del_turno" value="<?php echo $t['id']; ?>"><input type="hidden" name="p_id" value="<?php echo $filtro_p; ?>"><input type="hidden" name="f_ev" value="<?php echo $filtro_ev; ?>"><button type="submit" class="dropdown-item text-danger" data-confirm="Eliminare questo turno?"><i class="fa fa-times me-2" aria-hidden="true"></i>Elimina il turno</button></form></li>
+                                    </ul></div>
                             </div>
                         </div>
                         <?php endforeach; ?>

@@ -280,6 +280,7 @@ def costruisci():
               fig('map_adm_uffici_direzione', '<b>La Direzione</b>: chi firma ora e l\'interruttore «Direttore assente».'),
               fig('map_adm_uffici_ateneo', '<b>Gli uffici di Ateneo</b>.'))
         + '<h3>Sistema e controlli</h3>'
+        + fig('map_adm_portale_home', '<b>Gestione del portale:</b> in alto i controlli da guardare (controlli del sito, email non partite, persone non più in anagrafe, Direttore), poi tutte le sezioni.')
         + gal(fig('map_adm_sistema', '<b>Email e controlli:</b> invio, backup, controllo notturno del sito.'),
               fig('map_adm_sistema_promemoria', '<b>Promemoria:</b> si possono sospendere per Direttore e uffici durante l\'avvio, e riattivare.'),
               fig('map_adm_audit', '<b>Il registro operazioni</b>: chi ha fatto cosa e quando.'))

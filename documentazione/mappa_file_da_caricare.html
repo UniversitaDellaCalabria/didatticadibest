@@ -1500,6 +1500,46 @@ var PACCHETTI = [
     ],
     nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
     commit: "Pannello guidato (2): Didattica e Tutorato con «cosa devo fare», iter Uniticket uguale all'altro dopo la firma, esportazioni in Excel, PDF e CSV ovunque"
+  },
+  {
+    id: "pannello-guidato-3",
+    titolo: "Pacchetto 33 · Pannello guidato: Eventi e iscrizioni, Gestione del portale, guida per l'ufficio (F16.5-F16.6)",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare",
+    schema: "nessuna modifica (resta la v82)",
+    riassunto: "Nelle <strong>aree di eventi e seminari</strong> la dashboard ha le schede «Cosa devo fare» (iscrizioni da approvare, messaggi, attestati da controllare, turni dei prossimi 7 giorni) e la data in italiano; in <strong>Eventi e turni</strong> e in <strong>Progetti</strong> ogni scheda ha il pulsante «Modifica» e il menu «Altro» al posto delle icone; in <strong>Iscritti e presenze</strong> ogni riga ha un pulsante principale (Approva o Apri) e un menu, e la barra in alto ha «Aggiungi un iscritto», «Scanner», «Altro» e «Scarica». Nella pagina di <strong>Gestione del portale</strong> compaiono i controlli da guardare; in «Sistema» le impostazioni SMTP sono in un riquadro chiuso. La <strong>guida dell'amministratore</strong> ha le sezioni nuove (anche in PDF).",
+    passi: [["Eventi e seminari", "Dashboard dell'area"], ["Eventi e seminari", "Iscritti e presenze"], ["Gestione del portale", "prima schermata"]],
+    cartelle: [
+      { cartella: "admin/", file: [
+        ["admin/dashboard.php", "mod", "Dashboard area", "schede «Cosa devo fare», data in italiano"],
+        ["admin/eventi.php", "mod", "Eventi e turni", "Modifica + Altro per evento e turno, sezioni in un riquadro chiuso"],
+        ["admin/progetti.php", "mod", "Progetti", "Modifica + Altro"],
+        ["admin/iscritti.php", "mod", "Iscritti e presenze", "pulsante principale per riga e menu, «Altro» in alto"],
+        ["admin/inizio.php", "mod", "Gestione del portale", "schede «Cosa devo fare» nella pagina del modulo"],
+        ["admin/sistema.php", "mod", "Sistema", "SMTP in un riquadro che si apre solo se serve"]
+      ]},
+      { cartella: "src/Portale/ e assets/guide/", file: [
+        ["src/Portale/GuidePerRuolo.php", "mod", "Guide", "sezioni nuove per l'amministratore e l'ufficio"],
+        ["assets/guide/adm_did_home.png", "nuovo", "Guide", "schermata"],
+        ["assets/guide/adm_did_pratica.png", "nuovo", "Guide", "schermata"],
+        ["assets/guide/adm_did_seduta.png", "nuovo", "Guide", "schermata"],
+        ["assets/guide/adm_tutorato.png", "nuovo", "Guide", "schermata"],
+        ["assets/guide/adm_fsl_home.png", "nuovo", "Guide", "schermata"],
+        ["assets/guide/adm_fsl_scuola.png", "nuovo", "Guide", "schermata"],
+        ["assets/guide/adm_fsl_registro.png", "nuovo", "Guide", "schermata"],
+        ["assets/guide/adm_ev_dashboard.png", "nuovo", "Guide", "schermata"],
+        ["assets/guide/adm_ev_eventi.png", "nuovo", "Guide", "schermata"],
+        ["assets/guide/adm_portale_home.png", "nuovo", "Guide", "schermata"]
+      ]}
+    ],
+    dopo: [
+      "Apri una <strong>area di eventi</strong>: la dashboard mostra le schede in alto. In «Eventi e turni» e in «Iscritti e presenze» prova i menu «Altro».",
+      "Apri <strong>Gestione del portale</strong> dalla scrivania: in alto ci sono i controlli da guardare.",
+      "La guida dell'amministratore è in <code>guida.php?r=amministratore</code>; il PDF aggiornato è <code>documentazione/guide/Guida_Amministratore.pdf</code> (non va sul server: si scarica dal repository).",
+      "Lo schema resta la v82."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Pannello guidato (3): Eventi e iscrizioni, Gestione del portale, guida dell'amministratore aggiornata"
   }
 ];
 

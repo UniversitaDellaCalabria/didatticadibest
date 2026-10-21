@@ -355,9 +355,12 @@ $col_area_i = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
             <span class="badge p-2" style="background:#f1f5f9;color:#64748b;border-radius:8px;"><i class="fa fa-lock me-1"></i>Sola Lettura</span>
         <?php else: ?>
             <a href="scanner.php?p_id=<?php echo $filtro_p; ?>" class="btn btn-sm fw-bold text-white" style="background:<?php echo $col_area_i; ?>;border-radius:8px;border:none;"><i class="fa fa-qrcode me-1"></i>Scanner</a>
-            <a href="stampa_badge.php?p_id=<?php echo $filtro_p; ?>" class="btn btn-sm fw-bold" style="border-radius:8px;background:#f1f5f9;border:1px solid #e2e8f0;color:#334155;"><i class="fa fa-id-badge me-1" aria-hidden="true"></i>Stampa badge</a>
-            <a href="../cron_attestati.php" class="btn btn-sm btn-outline-success fw-bold" style="border-radius:8px;" data-confirm="Vuoi scansionare tutti gli eventi terminati e inviare le email agli studenti presenti?"><i class="fa fa-graduation-cap me-1"></i>Invia attestati</a>
-            <button type="button" class="btn btn-sm fw-bold" style="border-radius:8px;background:#f1f5f9;border:1px solid #e2e8f0;color:#334155;" data-bs-toggle="modal" data-bs-target="#modMailMassiva"><i class="fa fa-paper-plane me-1"></i>Scrivi a tutti</button>
+            <div class="dropdown"><button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle fw-bold" style="border-radius:8px;" data-bs-toggle="dropdown" aria-expanded="false"><i class="fa fa-ellipsis me-1" aria-hidden="true"></i>Altro</button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modMailMassiva"><i class="fa fa-paper-plane me-2" aria-hidden="true"></i>Scrivi a tutti gli iscritti</button></li>
+                    <li><a class="dropdown-item" href="stampa_badge.php?p_id=<?php echo $filtro_p; ?>"><i class="fa fa-id-badge me-2" aria-hidden="true"></i>Stampa i badge</a></li>
+                    <li><a class="dropdown-item" href="../cron_attestati.php" data-confirm="Vuoi scansionare tutti gli eventi terminati e inviare le email agli studenti presenti?"><i class="fa fa-graduation-cap me-2" aria-hidden="true"></i>Invia gli attestati ora</a></li>
+                </ul></div>
             <button type="button" class="btn btn-sm fw-bold text-white" style="background:<?php echo $col_area_i; ?>;border-radius:8px;border:none;" data-bs-toggle="modal" data-bs-target="#modPrenotazioneManuale"><i class="fa fa-user-plus me-1"></i>Aggiungi un iscritto</button>
         <?php endif; ?>
         <a href="stampa_lista_iscritti.php?p_id=<?php echo $filtro_p; ?>&f_turno=<?php echo $filtro_turno; ?>&f_stato=<?php echo urlencode($filtro_stato); ?>&f_cerca=<?php echo urlencode($filtro_cerca); ?>&f_data_da=<?php echo urlencode($filtro_data_da); ?>&f_data_fine=<?php echo urlencode($filtro_data_fine); ?><?php echo $is_archivio ? '&archivio=1' : ''; ?>" target="_blank" class="btn btn-sm btn-outline-secondary fw-bold" style="border-radius:8px;"><i class="fa fa-print me-1"></i>Stampa</a>
@@ -613,69 +616,54 @@ echo '</nav>';
 
                     <!-- Azioni -->
                     <td>
-                        <div class="d-flex gap-1 justify-content-end flex-wrap">
-                            <a href="../stampa_ricevuta.php?code=<?php echo urlencode($pr['codice_prenotazione']); ?>" target="_blank" class="act-btn" title="Ricevuta PDF"><i class="fa fa-file-pdf"></i></a>
-                            <?php $prog_row = ($pr['evento_tipo'] ?? '') === 'progetto'; ?>
-                            <?php if (attestati_di_classe(['evento_tipo' => $pr['evento_tipo'] ?? '', 'attestati' => $pr['progetto_attestati'] ?? 0, 'per_scuole' => $pr['per_scuole'] ?? 1]) && $st_val === 'confermata'): ?>
-                                <a href="partecipanti.php?p_id=<?php echo $filtro_p; ?>&pr=<?php echo (int)$pr['id']; ?>" class="act-btn green" title="Studenti e attestati (<?php echo (int)$pr['n_studenti']; ?>)" aria-label="Studenti e attestati"><i class="fa fa-graduation-cap"></i><?php if ((int)$pr['n_studenti'] > 0): ?><span class="ms-1" style="font-size:.7rem;"><?php echo (int)$pr['n_studenti']; ?></span><?php endif; ?></a>
-                            <?php elseif ($ev_chk_attivo === 1 && $is_presente && $st_val === 'confermata' && (!$prog_row || (int)($pr['progetto_attestati'] ?? 0) === 1)): ?>
-                                <a href="../stampa_attestato.php?code=<?php echo urlencode($pr['codice_prenotazione']); ?>" target="_blank" class="act-btn green" title="Attestato PDF"><i class="fa fa-graduation-cap"></i></a>
+                        <?php
+                        $prog_row = ($pr['evento_tipo'] ?? '') === 'progetto';
+                        $url_f = ['p_id' => $filtro_p];
+                        $campi_post = function (string $nome) use ($pr, $filtro_p, $filtro_turno, $filtro_stato): string {
+                            ob_start(); csrf_field(); $c = ob_get_clean();
+                            return $c . '<input type="hidden" name="' . $nome . '" value="' . (int)$pr['id'] . '"><input type="hidden" name="p_id" value="' . (int)$filtro_p . '"><input type="hidden" name="f_turno" value="' . (int)$filtro_turno . '"><input type="hidden" name="f_stato" value="' . htmlspecialchars($filtro_stato) . '">';
+                        };
+                        $conv_no_riga = ($pr['convenzione'] ?? '') === 'no';
+                        ?>
+                        <div class="d-flex gap-1 justify-content-end flex-wrap align-items-center">
+                            <?php if (!$is_archivio && $st_val === 'da_approvare'): ?>
+                                <form method="POST" class="d-inline m-0"><?php echo $campi_post('approva_pren'); ?>
+                                    <button type="submit" class="btn btn-sm btn-success fw-bold" data-confirm="<?php echo $conv_no_riga ? 'La convenzione della scuola è arrivata? Confermando, la prenotazione passa a confermata.' : 'Approvare questa prenotazione?'; ?>"><i class="fa fa-check me-1" aria-hidden="true"></i><?php echo $conv_no_riga ? 'Conferma' : 'Approva'; ?></button></form>
+                            <?php elseif (!$is_archivio): ?>
+                                <button type="button" class="btn btn-sm btn-outline-secondary fw-bold" data-bs-toggle="modal" data-bs-target="#modEditPren<?php echo $pr['id']; ?>"><i class="fa fa-pen me-1" aria-hidden="true"></i>Apri</button>
                             <?php endif; ?>
-                            <?php if (!$is_archivio): ?>
-                                <?php if ($puo_fsl_convenzioni && $cv_attiva && $documenti_fsl->richiesti($pr)): ?>
-                                    <a href="allegato_a.php?pr=<?php echo (int)$pr['id']; ?>&amp;doc=allegato_pdf" class="act-btn" title="Allegato A già compilato (PDF), con le prenotazioni della scuola. Il logo si aggiunge a mano" aria-label="Scarica l'Allegato A già compilato"><i class="fa fa-file-pdf"></i></a>
-                                <?php endif; ?>
-                                <?php if (($pr['convenzione'] ?? '') === 'no' && in_array($st_val, ['confermata', 'in_attesa', 'richiesta_conferma', 'da_approvare'], true)): ?>
-                                    <?php if ($st_val !== 'da_approvare'): ?>
-                                    <form method="POST" class="d-inline">
-                                        <?php csrf_field(); ?>
-                                        <button type="submit" name="conv_ricevuta_pren" value="<?php echo (int)$pr['id']; ?>" class="act-btn green" data-confirm="La convenzione della scuola è arrivata? Viene registrata per la scuola e vale anche per le sue altre iscrizioni." title="Convenzione ricevuta" aria-label="Convenzione ricevuta"><i class="fa fa-file-circle-check"></i></button>
-                                    </form>
+                            <div class="dropdown"><button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" data-bs-popper-config='{"strategy":"fixed"}' aria-expanded="false" aria-label="Altre azioni su questa iscrizione"><i class="fa fa-ellipsis" aria-hidden="true"></i></button>
+                                <ul class="dropdown-menu dropdown-menu-end">
+                                    <?php if (!$is_archivio && $st_val === 'da_approvare'): ?>
+                                        <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modEditPren<?php echo $pr['id']; ?>"><i class="fa fa-pen me-2" aria-hidden="true"></i>Dettagli e modifica</button></li>
                                     <?php endif; ?>
-                                    <form method="POST" class="d-inline">
-                                        <?php csrf_field(); ?>
-                                        <button type="submit" name="chiedi_conv_pren" value="<?php echo (int)$pr['id']; ?>" class="act-btn" data-confirm="Inviare di nuovo alla scuola l'email con i modelli della convenzione e la PEC?" title="Invia di nuovo la richiesta della convenzione" aria-label="Invia di nuovo la richiesta della convenzione"><i class="fa fa-envelope"></i></button>
-                                    </form>
-                                <?php endif; ?>
-                                <?php if ($st_val === 'da_approvare'): ?>
-                                    <form method="POST" class="d-inline">
-                                        <?php csrf_field(); ?>
-                                        <input type="hidden" name="approva_pren" value="<?php echo $pr['id']; ?>">
-                                        <input type="hidden" name="p_id" value="<?php echo $filtro_p; ?>">
-                                        <input type="hidden" name="f_turno" value="<?php echo $filtro_turno; ?>">
-                                        <input type="hidden" name="f_stato" value="<?php echo htmlspecialchars($filtro_stato); ?>">
-                                        <button type="submit" class="act-btn green" data-confirm="<?php echo ($pr['convenzione'] ?? '') === 'no' ? 'La convenzione della scuola è arrivata? Confermando, la prenotazione passa a confermata.' : 'Approvare questa prenotazione?'; ?>" title="<?php echo ($pr['convenzione'] ?? '') === 'no' ? 'Convenzione ricevuta: conferma' : 'Approva'; ?>"><i class="fa fa-check"></i></button>
-                                    </form>
-                                    <form method="POST" class="d-inline">
-                                        <?php csrf_field(); ?>
-                                        <input type="hidden" name="rifiuta_pren" value="<?php echo $pr['id']; ?>">
-                                        <input type="hidden" name="p_id" value="<?php echo $filtro_p; ?>">
-                                        <input type="hidden" name="f_turno" value="<?php echo $filtro_turno; ?>">
-                                        <input type="hidden" name="f_stato" value="<?php echo htmlspecialchars($filtro_stato); ?>">
-                                        <button type="submit" class="act-btn orange" data-confirm="Rifiutare questa prenotazione?" title="Rifiuta"><i class="fa fa-times"></i></button>
-                                    </form>
-                                <?php endif; ?>
-                                <?php if (!empty($pr['email'])): ?>
-                                    <button type="button" class="act-btn blue" data-bs-toggle="modal" data-bs-target="#modChat<?php echo $pr['id']; ?>" title="Chat / Messaggi"><i class="fa fa-comments"></i></button>
-                                <?php endif; ?>
-                                <button type="button" class="act-btn" data-bs-toggle="modal" data-bs-target="#modEditPren<?php echo $pr['id']; ?>" title="Dettagli / Modifica"><i class="fa fa-edit"></i></button>
-                                <form method="POST" class="d-inline">
-                                    <?php csrf_field(); ?>
-                                    <input type="hidden" name="annulla_pren" value="<?php echo $pr['id']; ?>">
-                                    <input type="hidden" name="p_id" value="<?php echo $filtro_p; ?>">
-                                    <input type="hidden" name="f_turno" value="<?php echo $filtro_turno; ?>">
-                                    <input type="hidden" name="f_stato" value="<?php echo htmlspecialchars($filtro_stato); ?>">
-                                    <button type="submit" class="act-btn orange" data-confirm="Annullare questa prenotazione?" title="Annulla"><i class="fa fa-ban"></i></button>
-                                </form>
-                                <form method="POST" class="d-inline">
-                                    <?php csrf_field(); ?>
-                                    <input type="hidden" name="del_pren" value="<?php echo $pr['id']; ?>">
-                                    <input type="hidden" name="p_id" value="<?php echo $filtro_p; ?>">
-                                    <input type="hidden" name="f_turno" value="<?php echo $filtro_turno; ?>">
-                                    <input type="hidden" name="f_stato" value="<?php echo htmlspecialchars($filtro_stato); ?>">
-                                    <button type="submit" class="act-btn red" data-confirm="Cancellare definitivamente la prenotazione?" title="Elimina"><i class="fa fa-trash"></i></button>
-                                </form>
-                            <?php endif; ?>
+                                    <?php if (!$is_archivio && !empty($pr['email'])): ?>
+                                        <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modChat<?php echo $pr['id']; ?>"><i class="fa fa-comments me-2" aria-hidden="true"></i>Messaggi con l'iscritto</button></li>
+                                    <?php endif; ?>
+                                    <li><a class="dropdown-item" href="../stampa_ricevuta.php?code=<?php echo urlencode($pr['codice_prenotazione']); ?>" target="_blank"><i class="fa fa-file-pdf me-2" aria-hidden="true"></i>Ricevuta (PDF)</a></li>
+                                    <?php if (attestati_di_classe(['evento_tipo' => $pr['evento_tipo'] ?? '', 'attestati' => $pr['progetto_attestati'] ?? 0, 'per_scuole' => $pr['per_scuole'] ?? 1]) && $st_val === 'confermata'): ?>
+                                        <li><a class="dropdown-item" href="partecipanti.php?p_id=<?php echo $filtro_p; ?>&pr=<?php echo (int)$pr['id']; ?>"><i class="fa fa-graduation-cap me-2" aria-hidden="true"></i>Studenti e attestati<?php echo (int)$pr['n_studenti'] > 0 ? ' (' . (int)$pr['n_studenti'] . ')' : ''; ?></a></li>
+                                    <?php elseif ($ev_chk_attivo === 1 && $is_presente && $st_val === 'confermata' && (!$prog_row || (int)($pr['progetto_attestati'] ?? 0) === 1)): ?>
+                                        <li><a class="dropdown-item" href="../stampa_attestato.php?code=<?php echo urlencode($pr['codice_prenotazione']); ?>" target="_blank"><i class="fa fa-graduation-cap me-2" aria-hidden="true"></i>Attestato (PDF)</a></li>
+                                    <?php endif; ?>
+                                    <?php if (!$is_archivio): ?>
+                                        <?php if ($puo_fsl_convenzioni && $cv_attiva && $documenti_fsl->richiesti($pr)): ?>
+                                            <li><a class="dropdown-item" href="allegato_a.php?pr=<?php echo (int)$pr['id']; ?>&amp;doc=allegato_pdf" title="Con le prenotazioni della scuola. Il logo si aggiunge a mano"><i class="fa fa-file-pdf me-2" aria-hidden="true"></i>Allegato A già compilato (PDF)</a></li>
+                                        <?php endif; ?>
+                                        <?php if ($conv_no_riga && in_array($st_val, ['confermata', 'in_attesa', 'richiesta_conferma', 'da_approvare'], true)): ?>
+                                            <?php if ($st_val !== 'da_approvare'): ?>
+                                            <li><form method="POST" class="m-0"><?php csrf_field(); ?><button type="submit" name="conv_ricevuta_pren" value="<?php echo (int)$pr['id']; ?>" class="dropdown-item" data-confirm="La convenzione della scuola è arrivata? Viene registrata per la scuola e vale anche per le sue altre iscrizioni."><i class="fa fa-file-circle-check me-2" aria-hidden="true"></i>Convenzione ricevuta</button></form></li>
+                                            <?php endif; ?>
+                                            <li><form method="POST" class="m-0"><?php csrf_field(); ?><button type="submit" name="chiedi_conv_pren" value="<?php echo (int)$pr['id']; ?>" class="dropdown-item" data-confirm="Inviare di nuovo alla scuola l'email con i modelli della convenzione e la PEC?"><i class="fa fa-envelope me-2" aria-hidden="true"></i>Chiedi di nuovo la convenzione</button></form></li>
+                                        <?php endif; ?>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <?php if ($st_val === 'da_approvare'): ?>
+                                            <li><form method="POST" class="m-0"><?php echo $campi_post('rifiuta_pren'); ?><button type="submit" class="dropdown-item" data-confirm="Rifiutare questa prenotazione?"><i class="fa fa-times me-2" aria-hidden="true"></i>Rifiuta</button></form></li>
+                                        <?php endif; ?>
+                                        <li><form method="POST" class="m-0"><?php echo $campi_post('annulla_pren'); ?><button type="submit" class="dropdown-item" data-confirm="Annullare questa prenotazione?"><i class="fa fa-ban me-2" aria-hidden="true"></i>Annulla la prenotazione</button></form></li>
+                                        <li><form method="POST" class="m-0"><?php echo $campi_post('del_pren'); ?><button type="submit" class="dropdown-item text-danger" data-confirm="Cancellare definitivamente la prenotazione?"><i class="fa fa-trash me-2" aria-hidden="true"></i>Elimina definitivamente</button></form></li>
+                                    <?php endif; ?>
+                                </ul></div>
                         </div>
                     </td>
                 </tr>

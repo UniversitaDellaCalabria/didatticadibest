@@ -89,7 +89,7 @@ foreach ($stati_data as $sd) {
         <div class="text-muted mt-1" style="font-size:.83rem;">
             Benvenuto/a, <strong><?php echo htmlspecialchars($utente_admin['nome'] ?? ''); ?></strong>
             &mdash; <span style="color:<?php echo $colore_area; ?>;"><?php echo $area_nome; ?></span>
-            &mdash; <?php echo date('l d F Y'); ?>
+            &mdash; <?php echo ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'][(int)date('w')] . ' ' . date('j') . ' ' . ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'][(int)date('n') - 1] . ' ' . date('Y'); ?>
         </div>
     </div>
     <div class="d-flex gap-2 align-items-center flex-wrap">
@@ -106,6 +106,30 @@ foreach ($stati_data as $sd) {
         </a>
     </div>
 </div>
+
+<?php
+// ── Cosa devo fare: poche schede con un numero e un pulsante ──
+if ($can_manage_iscritti) {
+    $n_da_appr = 0;
+    if ($st_ap = $conn->prepare("SELECT COUNT(*) FROM prenotazioni p JOIN turni t ON p.turno_id = t.id JOIN eventi e ON t.evento_id = e.id WHERE e.pagina_id = ? $sql_filtro_eventi_rbac AND p.stato = 'da_approvare'")) {
+        $st_ap->bind_param('i', $filtro_p); $st_ap->execute(); $st_ap->bind_result($n_da_appr); $st_ap->fetch(); $st_ap->close();
+    }
+    $n_att_ctrl = 0;
+    $oggi_d = date('Y-m-d'); $tra7_d = date('Y-m-d', strtotime('+7 days'));
+    foreach ($dash->attestatiClassiDaControllare((int)$filtro_p, $sql_filtro_eventi_rbac) as $ca_d) {
+        $fine_d = $ca_d['fine'] ?? null;
+        if (!$fine_d || $fine_d > $tra7_d) continue;
+        if ((int)$ca_d['n_studenti'] === 0 || ($fine_d < $oggi_d && (int)$ca_d['presente'] !== 1) || ($fine_d < date('Y-m-d', strtotime('-1 day')) && (int)$ca_d['presente'] === 1)) $n_att_ctrl++;
+    }
+    $n_turni_7 = count(array_filter($next_events ?? [], fn($e_d) => !empty($e_d['data_turno']) && $e_d['data_turno'] <= $tra7_d));
+    echo pn_compiti([
+        ['numero' => (int)$n_da_appr, 'titolo' => 'Iscrizioni da approvare', 'testo' => 'Persone che aspettano la tua risposta.', 'href' => 'iscritti.php?p_id=' . (int)$filtro_p . '&f_stato=da_approvare', 'bottone' => 'Apri', 'tono' => 'tuo', 'vuoto' => 'Nessuna iscrizione da approvare.'],
+        ['numero' => (int)$msg_unread, 'titolo' => 'Messaggi da leggere', 'testo' => 'Domande degli iscritti senza risposta.', 'href' => 'messaggi.php?p_id=' . (int)$filtro_p, 'bottone' => 'Leggi', 'tono' => 'tuo', 'vuoto' => 'Nessun messaggio da leggere.'],
+        ['numero' => $n_att_ctrl, 'titolo' => 'Attestati da controllare', 'testo' => 'Elenchi studenti mancanti o attestati non partiti.', 'href' => 'partecipanti.php?p_id=' . (int)$filtro_p, 'bottone' => 'Apri', 'tono' => 'tuo', 'vuoto' => 'Gli attestati sono a posto.'],
+        ['numero' => $n_turni_7, 'titolo' => 'Turni nei prossimi 7 giorni', 'testo' => 'Eventi in arrivo: controlla posti e iscritti.', 'href' => 'eventi.php?p_id=' . (int)$filtro_p, 'bottone' => 'Vedi gli eventi', 'tono' => 'attesa', 'vuoto' => 'Nessun turno in arrivo questa settimana.'],
+    ], 'Cosa devo fare in quest\'area');
+}
+?>
 
 <?php
 // ── Avviso attestati delle classi: elenchi vuoti, presenze da segnare, invii in ritardo ──

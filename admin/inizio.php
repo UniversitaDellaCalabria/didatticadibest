@@ -175,6 +175,29 @@ $nome_u = trim((string)($utente_admin['nome'] ?? ''));
     <?php echo pn_testata($s['nome'], $s['icona'], $s['descr'] . '.' . ($aree_mod ? " Scegli l'area: entri nella sua dashboard." : ''),
         '', count($moduli_utente) > 1 ? '<a href="inizio.php?p_id=' . (int)$filtro_p . '" class="text-decoration-none"><i class="fa fa-arrow-left me-1" aria-hidden="true"></i>La mia scrivania</a>' : ''); ?>
 
+    <?php
+    // Gestione del portale: poche schede su quello che chiede attenzione (solo amministratori)
+    if ($sez_sel === 'portale' && $is_full_admin) {
+        try {
+            $file_cs = RADICE_SITO . '/cache/controllo_sito.json';
+            $cs = is_file($file_cs) ? (json_decode((string)file_get_contents($file_cs), true) ?: []) : [];
+            $n_problemi = (int)($cs['problemi'] ?? 0);
+            $em7 = \App\Core\App::per($conn)->get(\App\Sistema\LogEmailRepository::class)->esitiSettimana();
+            $av_pers = avvisi_anagrafe($conn);
+            $n_pers = count($av_pers['gestori'] ?? []) + count($av_pers['referenti'] ?? []);
+            $senza_dir = \App\Core\App::per($conn)->get(\App\Fsl\ServizioFirmaDirettore::class)->direttore()['email'] === '';
+            echo pn_compiti([
+                ['numero' => $n_problemi, 'titolo' => 'Controlli del sito da guardare', 'testo' => 'Qualcosa non va (backup, spazio, pagine): il dettaglio è in Sistema.', 'href' => 'sistema.php?p_id=' . (int)$filtro_p . '#controllo', 'bottone' => 'Apri', 'tono' => 'tuo', 'vuoto' => 'Tutti i controlli sono a posto.'],
+                ['numero' => (int)$em7['ko'], 'titolo' => 'Email non partite', 'testo' => 'Negli ultimi 7 giorni: controlla le impostazioni di invio.', 'href' => 'sistema.php?p_id=' . (int)$filtro_p, 'bottone' => 'Apri', 'tono' => 'tuo', 'vuoto' => 'Tutte le email sono partite.'],
+                ['numero' => $n_pers, 'titolo' => 'Persone non più in anagrafe', 'testo' => 'Gestori o referenti che l\'Ateneo non elenca più: controlla le abilitazioni.', 'href' => 'utenti.php?p_id=' . (int)$filtro_p, 'bottone' => 'Apri', 'tono' => 'tuo', 'vuoto' => 'Nessuna persona da controllare.'],
+                ['numero' => $senza_dir ? 1 : 0, 'titolo' => 'Direttore da indicare', 'testo' => 'Serve per le firme delle convenzioni e delle pratiche.', 'href' => 'uffici.php?u=direzione&p_id=' . (int)$filtro_p, 'bottone' => 'Indicalo', 'tono' => 'tuo', 'vuoto' => 'Il Direttore è indicato.'],
+            ], 'Cosa devo fare nella gestione del portale');
+        } catch (\Throwable $e_cp) {
+            error_log('Gestione del portale, cose da fare: ' . $e_cp->getMessage());
+        }
+        echo '<h2 class="h6 fw-bold text-secondary text-uppercase mb-2 mt-2" style="letter-spacing:.05em;font-size:.75rem;">Tutte le sezioni</h2>';
+    }
+    ?>
     <?php if ($aree_mod): ?>
     <?php if ($funz): ?><h2 class="h6 fw-bold text-secondary text-uppercase mb-2" style="letter-spacing:.05em;font-size:.75rem;">Aree</h2><?php endif; ?>
     <div class="row g-3 mb-4">

@@ -54,6 +54,7 @@ $elenco = [
     $pan('map_adm_fsl_stipulare.png', 1, 'admin/fsl.php?tab=stipulare', 900),
     $pan('map_adm_risorse.png', 1, 'admin/risorse.php?p_id=20', 900),
     $pan('map_adm_did_home.png', 1, 'admin/didattica.php', 900),
+    $pan('map_adm_portale_home.png', 1, 'admin/inizio.php?sezione=portale', 900),
     $pan('map_adm_did_pratiche.png', 1, 'admin/didattica.php?tab=pratiche', 800),
     $pan('map_adm_did_pratica.png', 1, 'admin/didattica.php?tab=pratiche&id=4', 1100),
     $pan('map_adm_did_seduta.png', 1, 'admin/didattica.php?tab=sedute&id=1', 1000),
