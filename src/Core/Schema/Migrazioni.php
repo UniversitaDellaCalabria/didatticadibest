@@ -16,8 +16,8 @@ use Closure;
  */
 final class Migrazioni
 {
-    /** 82: testi delle email modificabili dal pannello (tabella email_modelli). 80: verbali pubblici in sola visualizzazione, download con le credenziali di Ateneo (ufficio «verbali_scarico»). 75: dati del Direttore nel testo della convenzione di tesi (colonne tesi_direttore_* di impostazioni_sistema). 74: nella richiesta di tesi la sede esterna sceglie l'azienda tra le convenzionate (aggiorna il modulo già creato). 73: convenzioni di tesi con enti e aziende (tabella convenzioni_tesi e ufficio «convenzioni_tesi»). 72: interruttore per sospendere i promemoria al Direttore e agli uffici. 71: uffici di Dipartimento e di Ateneo in un'unica anagrafe (tabelle uffici e uffici_persone): la migrazione copia i dati delle quattro tabelle di prima. */
-    public const VERSIONE = 85;
+    /** 89: Didacticus (tabelle didacticus_voci e didacticus_mancate, colonne dell'assistenza e voci di partenza). 88: notifiche push (tabella push_sottoscrizioni). 87: assistenza acceso/spento e orari (colonne assistenza_attiva e assistenza_orari di impostazioni_sistema). 86: assistenza (tabelle assistenza_conversazioni e assistenza_messaggi, ufficio fisso «assistenza»). 82: testi delle email modificabili dal pannello (tabella email_modelli). 80: verbali pubblici in sola visualizzazione, download con le credenziali di Ateneo (ufficio «verbali_scarico»). 75: dati del Direttore nel testo della convenzione di tesi (colonne tesi_direttore_* di impostazioni_sistema). 74: nella richiesta di tesi la sede esterna sceglie l'azienda tra le convenzionate (aggiorna il modulo già creato). 73: convenzioni di tesi con enti e aziende (tabella convenzioni_tesi e ufficio «convenzioni_tesi»). 72: interruttore per sospendere i promemoria al Direttore e agli uffici. 71: uffici di Dipartimento e di Ateneo in un'unica anagrafe (tabelle uffici e uffici_persone): la migrazione copia i dati delle quattro tabelle di prima. */
+    public const VERSIONE = 89;
 
     /**
      * @param list<string> $gruppiPersonale gruppi assegnati al login in base al ruolo in Ateneo (GRUPPI_PERSONALE)
@@ -116,6 +116,12 @@ final class Migrazioni
         $this->db->comando("INSERT IGNORE INTO anagrafe_strutture (codice, nome) VALUES ('002014', 'Dipartimento di Biologia, Ecologia e Scienze della Terra')");
         foreach ($this->gruppiPersonale as $g) {
             $this->db->esegui('INSERT INTO ruoli (nome) SELECT ? FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM ruoli WHERE nome = ?)', [$g, $g]);
+        }
+
+        // 4a2. v89: le voci di partenza di Didacticus (una volta sola: se il pannello le cancella non tornano)
+        if ((int) ($this->db->valore('SELECT didacticus_seminato FROM impostazioni_sistema WHERE id = 1') ?? 1) === 0 && (int) ($this->db->valore('SELECT COUNT(*) FROM impostazioni_sistema WHERE id = 1') ?? 0) === 1) {
+            \App\Assistenza\Didacticus\VociDiPartenza::inserisci($this->db);
+            $this->db->esegui('UPDATE impostazioni_sistema SET didacticus_seminato = 1 WHERE id = 1');
         }
 
         // 4b. v32: indice per le tendine regione / provincia / comune della scelta guidata della scuola
@@ -230,7 +236,8 @@ final class Migrazioni
 
         // Uffici fissi che servono al portale (se mancano si creano): convenzioni FSL e persone che possono scaricare i verbali
         foreach ([['convenzioni_fsl', 'Ufficio convenzioni FSL', 'Prende in carico le convenzioni delle scuole (Formazione Scuola Lavoro): protocollo in entrata e definitivo', 90],
-                  ['verbali_scarico', 'Download dei verbali', 'Persone che possono scaricare i verbali dalla pagina pubblica (accedendo con le credenziali di Ateneo)', 91]] as [$chiave, $nome, $descr, $ord]) {
+                  ['verbali_scarico', 'Download dei verbali', 'Persone che possono scaricare i verbali dalla pagina pubblica (accedendo con le credenziali di Ateneo)', 91],
+                  ['assistenza', 'Assistenza a studenti e utenti', 'Risponde alle chat di assistenza (le richieste che Didacticus non risolve arrivano qui)', 92]] as [$chiave, $nome, $descr, $ord]) {
             if ((int) $this->db->valore('SELECT COUNT(*) FROM uffici WHERE chiave = ?', [$chiave]) === 0) {
                 $this->db->inserisci("INSERT INTO uffici (nome, descrizione, chiave, ambito, ordine) VALUES (?, ?, ?, 'dipartimento', ?)", [$nome, $descr, $chiave, $ord]);
             }

@@ -125,6 +125,13 @@ if ($mesi_conv > 0) echo $cron->conservazioneSedute($mesi_conv);
 $mesi_ut = max(0, (int)(env_valore('CONSERVAZIONE_UTENTI_MESI') ?? 0));
 if ($mesi_ut > 0) echo $cron->conservazioneAccount($mesi_ut);
 
+// - Chat di assistenza ferme da CONSERVAZIONE_ASSISTENZA_MESI (predefinito 12, 0 = mai): messaggi cancellati e conversazione senza dati personali
+$mesi_as = max(0, (int)(env_valore('CONSERVAZIONE_ASSISTENZA_MESI') ?? 12));
+if ($mesi_as > 0) {
+    try { echo '- Conservazione assistenza: ' . \App\Core\App::per($conn)->get(\App\Assistenza\ConservazioneAssistenza::class)->applica($mesi_as) . " chat ripulite (ferme da più di $mesi_as mesi).\n"; }
+    catch (\Throwable $e) { error_log('Cron, conservazione assistenza: ' . $e->getMessage()); }
+}
+
 // =========================================================================
 // TASK 1d: RIEPILOGO SETTIMANALE DELLE EMAIL AGLI AMMINISTRATORI (dal lunedì, una volta a settimana)
 // =========================================================================

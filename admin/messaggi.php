@@ -4,10 +4,11 @@ require_once 'admin_header.php';
 
 $casella = \App\Core\App::get(\App\Iscritti\CasellaMessaggi::class);
 $vede_convenzioni = $puo_fsl_convenzioni;
+$vede_assistenza = $puo_assistenza; // le chat di assistenza si aprono e si risolvono nella pagina Assistenza
 $aree_casella = $casella->aree((int)$u_id_curr, $is_full_admin);
 
-// Controllo Permessi: serve gestire gli iscritti di almeno un'area oppure lavorare le convenzioni FSL
-if (!$aree_casella && !$vede_convenzioni) {
+// Controllo Permessi: serve gestire gli iscritti di almeno un'area, lavorare le convenzioni FSL oppure rispondere alle chat di assistenza
+if (!$aree_casella && !$vede_convenzioni && !$vede_assistenza) {
     echo "<div class='alert alert-danger fw-bold shadow-sm m-4'><i class='fa fa-ban me-2'></i> Accesso negato.</div>";
     require_once 'admin_footer.php';
     exit;
@@ -93,7 +94,7 @@ if (isset($_GET['segna_letto_conv'])) {
 }
 
 // 3. TUTTE LE CONVERSAZIONI (permessi come nelle singole aree), con il filtro scelto
-$con_archivio = $casella->conversazioni((int)$u_id_curr, $is_full_admin, $vede_convenzioni);
+$con_archivio = $casella->conversazioni((int)$u_id_curr, $is_full_admin, $vede_convenzioni, $vede_assistenza);
 $n_archiviate = count(array_filter($con_archivio, fn($c) => $c['archiviata']));
 $tutte_conv = array_values(array_filter($con_archivio, fn($c) => $c['archiviata'] === $vedi_archiviate));
 $per_modulo = [];
@@ -144,6 +145,7 @@ $colori_mod = fn(string $m) => defined('MODULI_PORTALE') ? (MODULI_PORTALE[$m]['
                             $is_unread = $conv['da_leggere'] > 0;
                             $row_class = $is_unread ? 'table-warning font-weight-bold' : '';
                             $e_conv = $conv['tipo'] === \App\Iscritti\CasellaMessaggi::CONVENZIONE;
+                            $e_as = $conv['tipo'] === \App\Iscritti\CasellaMessaggi::ASSISTENZA;
                             $id_modale = ($e_conv ? 'modChatConv' : 'modChatInbox') . $conv['id'];
                         ?>
                             <tr class="<?php echo $row_class; ?>">
@@ -151,7 +153,9 @@ $colori_mod = fn(string $m) => defined('MODULI_PORTALE') ? (MODULI_PORTALE[$m]['
                                     <span class="badge fw-bold" style="background:<?php echo $colori_mod($conv['modulo']); ?>;"><?php echo htmlspecialchars($conv['modulo_nome']); ?></span>
                                     <?php if ($conv['area'] !== ''): ?><span class="small text-secondary ms-1"><?php echo htmlspecialchars($conv['area']); ?></span><?php endif; ?>
                                     <span class="d-block fw-bold text-danger my-1"><?php echo htmlspecialchars($conv['titolo']); ?></span>
-                                    <?php if ($e_conv): ?>
+                                    <?php if ($e_as): ?>
+                                        <span class="badge bg-dark fw-normal">Chat di assistenza</span><?php if ($conv['rif'] !== ''): ?> <small class="text-muted"><?php echo htmlspecialchars($conv['rif']); ?></small><?php endif; ?>
+                                    <?php elseif ($e_conv): ?>
                                         <span class="badge bg-dark fw-normal font-monospace">Convenzione online</span><?php if ($conv['rif'] !== ''): ?> <small class="text-muted font-monospace"><?php echo htmlspecialchars($conv['rif']); ?></small><?php endif; ?>
                                     <?php else: ?>
                                         <span class="badge bg-dark fw-normal font-monospace">Ticket: <?php echo htmlspecialchars($conv['rif']); ?></span>
@@ -176,6 +180,10 @@ $colori_mod = fn(string $m) => defined('MODULI_PORTALE') ? (MODULI_PORTALE[$m]['
                                     <?php endif; ?>
                                 </td>
                                 <td class="text-end px-3 text-nowrap">
+                                    <?php if ($e_as): ?>
+                                        <a href="assistenza.php?p_id=<?php echo (int)$filtro_p; ?>&vista=<?php echo $conv['archiviata'] ? 'chiuse' : 'tutte'; ?>&c=<?php echo (int)$conv['id']; ?>" class="btn btn-outline-dark btn-sm fw-bold shadow-sm"><i class="fa fa-headset me-1"></i> Apri la chat</a>
+                                    </td></tr>
+                                    <?php continue; endif; ?>
                                     <?php if ($is_unread): ?>
                                         <a href="<?php echo htmlspecialchars($ritorno_msg . '&' . ($e_conv ? 'segna_letto_conv=' : 'segna_letto=') . $conv['id']); ?>" class="btn btn-sm btn-outline-secondary me-1" title="Segna come già letto senza aprire"><i class="fa fa-check-double"></i></a>
                                     <?php endif; ?>

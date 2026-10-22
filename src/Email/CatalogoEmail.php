@@ -17,7 +17,7 @@ final class CatalogoEmail
     /** @return array<string, array<string, mixed>> */
     public static function modelli(): array
     {
-        return self::$cache ??= self::tutorato() + CatalogoDidattica::modelli() + CatalogoConvenzioni::modelli() + CatalogoRisorse::modelli() + CatalogoEventi::modelli() + CatalogoSistema::modelli();
+        return self::$cache ??= self::tutorato() + CatalogoDidattica::modelli() + CatalogoConvenzioni::modelli() + CatalogoRisorse::modelli() + CatalogoEventi::modelli() + CatalogoAssistenza::modelli() + CatalogoSistema::modelli();
     }
 
     /** @return list<string> i gruppi, nell'ordine del catalogo */

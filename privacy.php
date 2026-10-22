@@ -13,6 +13,7 @@ $mesi_inc    = max(0, (int)(env_valore('CONSERVAZIONE_INCARICHI_MESI') ?? 0));
 $mesi_conv   = max(0, (int)(env_valore('CONSERVAZIONE_CONVOCAZIONI_MESI') ?? 12));
 $giorni_nas  = max(1, (int)(env_valore('BACKUP_NAS_GIORNI') ?? 30));
 $mesi_stud   = (int)MESI_CONSERVAZIONE_STUDENTI;
+$mesi_assistenza = max(0, (int)(env_valore('CONSERVAZIONE_ASSISTENZA_MESI') ?? 12)) ?: 12;
 $aggiornata  = date('d/m/Y', filemtime(__FILE__));
 
 $page_cfg['titolo'] = "Privacy e cookie";
@@ -57,6 +58,9 @@ require_once 'header.php';
     <p>Per le attività di Formazione Scuola Lavoro il Dipartimento conserva le <strong>convenzioni</strong> stipulate con le scuole e i relativi Allegati A, con il periodo di validità e nome ed email dei <strong>docenti di riferimento</strong> indicati dalla scuola: servono a verificare che ogni attività sia coperta da una convenzione valida e sono consultabili solo dagli amministratori del portale. Prima dell'attività il docente che ha prenotato carica anche l'<strong>elenco degli studenti</strong> (cognome e nome) e l'<strong>autorizzazione della scuola</strong> alla partecipazione (PDF): sono visibili solo a chi ha prenotato e a chi gestisce l'attività e vengono cancellati con gli altri dati della prenotazione.</p>
     <p>A fine attività il docente può compilare la <strong>scheda di valutazione della struttura ospitante</strong> prevista dalla convenzione: le risposte sono collegate alla prenotazione e alla scuola, con il nome di chi la compila, e servono al Dipartimento per valutare e migliorare i percorsi.</p>
 
+    <h3>Chi chiede assistenza (chat e Didacticus)</h3>
+    <p>Chi scrive dal pulsante «Serve aiuto?» fornisce l'argomento e il testo dei messaggi e, se non ha effettuato l'accesso, nome ed email; l'indirizzo IP è usato solo per limitare gli abusi. Se la richiesta parte da una pratica o da una prenotazione, il portale le collega alla chat. Le prime risposte le dà <strong>Didacticus</strong>, un assistente virtuale <strong>che non usa intelligenza artificiale generativa né servizi esterni</strong>: confronta la domanda con una raccolta di risposte scritte dal Dipartimento, sul server dell'Ateneo. Se non basta, la chat passa alle persone dell'ufficio «Assistenza». Chi lo desidera può ricevere avvisi sul proprio browser (<em>notifiche push</em>): servono solo l'indirizzo che il browser stesso fornisce e non contengono il testo delle risposte. Si consiglia di non scrivere password, codici fiscali o dati bancari.</p>
+
     <h3>Personale dell'Ateneo</h3>
     <p>Per docenti e personale delle strutture che organizzano le attività il portale riprende dal portale pubblico dell'Università della Calabria nome, ruolo, struttura, settore disciplinare, recapiti di ufficio e, per chi è indicato come referente di un'attività, foto, curriculum e orari di ricevimento già pubblicati dall'Ateneo. Servono a indicare i referenti, a riconoscere al login il personale (per email) e a gestire le abilitazioni. I dati si aggiornano ogni settimana e chi non compare più nel portale di Ateneo viene cancellato dopo 12 mesi.</p>
 
@@ -66,6 +70,7 @@ require_once 'header.php';
         <li>inviare comunicazioni di servizio (conferme, promemoria, variazioni, posti liberati);</li>
         <li>registrare le presenze e rilasciare gli <strong>attestati di partecipazione</strong>, verificabili con il codice stampato;</li>
         <li>produrre statistiche in forma aggregata sulle attività;</li>
+        <li>rispondere alle richieste di <strong>assistenza</strong> di studenti, personale ed esterni e migliorare il servizio con statistiche non identificative;</li>
         <li>garantire la sicurezza del portale e prevenire usi impropri.</li>
     </ul>
     <p>Il trattamento è necessario per lo svolgimento dei <strong>compiti di interesse pubblico</strong> dell'Ateneo, come didattica, orientamento e attività per le scuole e il territorio (art. 6, par. 1, lett. e, del Regolamento). Non si basa sul consenso. Il conferimento dei dati richiesti è necessario per prenotarsi: senza, la prenotazione non può essere registrata. Non effettuiamo decisioni automatizzate né profilazione e non usiamo i dati a fini commerciali.</p>
@@ -88,6 +93,7 @@ require_once 'header.php';
             ? $mesi_pren . " mesi dopo l'attività nome e cognome vengono ridotti alle iniziali ed email, matricola, risposte al modulo, allegati e messaggi vengono cancellati. Restano, in forma non identificativa, i dati per le statistiche e per la verifica degli attestati."
             : "per il tempo necessario alla gestione delle attività, al rilascio e alla verifica degli attestati e agli obblighi di documentazione dell'Ateneo."; ?></li>
         <li><strong>Lettere di incarico di tutorato</strong> (dati del vincitore, conferma con SPID/CIE, firme, registro delle attività, UNILAV e dichiarazione individuale con i dati per il pagamento: l'IBAN è conservato cifrato e visibile solo al tutor e all'ufficio pagamenti, con registro degli accessi): <?php echo $mesi_inc > 0 ? "$mesi_inc mesi dopo il protocollo restano solo nome, ore, compenso e numeri di protocollo; dati personali, PDF e registro vengono cancellati (gli originali firmati sono nel protocollo di Ateneo)." : "per il tempo necessario agli adempimenti amministrativi e contabili dell'incarico; gli originali firmati sono conservati nel protocollo di Ateneo."; ?></li>
+        <li><strong>Chat di assistenza</strong> (messaggi, nome, email, indirizzo IP, pratica collegata, recapiti delle notifiche e domande senza risposta di Didacticus): <?php echo $mesi_assistenza; ?> mesi dopo l'ultimo messaggio; poi i messaggi si cancellano e restano solo argomento, tempi e valutazione, senza dati identificativi.</li>
         <li><strong>Convocazioni delle sedute dei consigli</strong> (link personali e motivi delle assenze giustificate): <?php echo $mesi_conv; ?> mesi dopo la seduta; le presenze restano nel verbale.</li>
         <li><strong>Avvisi dei nuovi eventi</strong> (email e argomenti scelti): finché non ti cancelli dal link in ogni email o da <a href="avvisi.php">avvisi.php</a>; le iscrizioni non confermate si cancellano dopo 30 giorni.</li>
         <li><strong>Account</strong>: <?php echo $mesi_utenti > 0 ? "eliminati dopo $mesi_utenti mesi senza accessi." : "finché l'utente utilizza il servizio; su richiesta vengono eliminati."; ?></li>
@@ -112,6 +118,7 @@ require_once 'header.php';
                 <tr><td class="font-monospace">cookie_dibest_accepted</td><td>memoria locale</td><td>Ricorda che hai chiuso il banner informativo</td><td>finché non la cancelli</td></tr>
                 <tr><td class="font-monospace">zoom_dibest, hc_dibest</td><td>memoria locale</td><td>Preferenze di accessibilità: dimensione del testo e alto contrasto</td><td>finché non la cancelli</td></tr>
                 <tr><td class="font-monospace">barra_gestore_chiusa, adminTheme</td><td>memoria locale</td><td>Solo per i gestori: barra di gestione ridotta e tema del pannello</td><td>finché non la cancelli</td></tr>
+                <tr><td class="font-monospace">assistenza_t</td><td>memoria locale</td><td>Solo per chi scrive all'assistenza senza accesso: ricorda il link personale per ritrovare la propria chat</td><td>finché non la cancelli</td></tr>
                 <tr><td>Service worker</td><td>cache del browser</td><td>Rende più veloce il caricamento di stili e icone e mostra una pagina di cortesia offline; non contiene dati personali</td><td>fino all'aggiornamento del portale</td></tr>
             </tbody>
         </table>

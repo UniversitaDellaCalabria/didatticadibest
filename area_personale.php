@@ -455,9 +455,21 @@ require_once 'header.php';
         </a>
     <?php endif; ?>
 
+    <?php // Assistenza: la chat con gli operatori (la conversazione più recente, o una nuova richiesta) ?>
+    <a href="assistenza.php" class="card border-0 shadow-sm mb-4 text-decoration-none" style="border-radius: 12px; border-left: 5px solid #B30000 !important;">
+        <div class="card-body d-flex align-items-center gap-3 flex-wrap">
+            <i class="fa fa-headset fs-3 text-danger" aria-hidden="true"></i>
+            <div class="flex-grow-1">
+                <div class="fw-bold text-dark">Serve aiuto?</div>
+                <div class="small text-secondary">Scrivi all'assistenza su tirocini, certificati, pratiche, tutorato, tesi o eventi: ti risponde una persona dell'ufficio.</div>
+            </div>
+            <span class="btn btn-sm btn-danger fw-bold">Apri la chat</span>
+        </div>
+    </a>
+
     <?php
     // Pratiche della didattica (moduli online): collegamento a Le mie pratiche se l'utente ne ha
-    $pr_rows = \App\Core\App::get(\App\Iscrizioni\AreaPersonaleRepository::class)->riepilogoPratiche((int)$_SESSION['utente_id']);
+    $pr_rows =\App\Core\App::get(\App\Iscrizioni\AreaPersonaleRepository::class)->riepilogoPratiche((int)$_SESSION['utente_id']);
     if ($pr_rows && (int)$pr_rows['n'] > 0): ?>
         <a href="pratiche.php" class="card border-0 shadow-sm mb-4 text-decoration-none" style="border-radius: 12px; border-left: 5px solid #047857 !important;">
             <div class="card-body d-flex align-items-center gap-3 flex-wrap">

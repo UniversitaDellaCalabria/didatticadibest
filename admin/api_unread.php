@@ -21,5 +21,5 @@ if (!$utente) {
     exit;
 }
 $casella = $app->get(\App\Iscritti\CasellaMessaggi::class);
-$n = $casella->nonLetti((int)$utente['id'], \App\Iscritti\CasellaMessaggi::eAmministratore($utente), $casella->puoConvenzioniFsl($utente));
+$n = $casella->nonLetti((int)$utente['id'], \App\Iscritti\CasellaMessaggi::eAmministratore($utente), $casella->puoConvenzioniFsl($utente), $casella->puoAssistenza($utente));
 echo json_encode(['unread' => $n, 'auth' => true]);

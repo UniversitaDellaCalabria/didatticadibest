@@ -16,7 +16,7 @@ final class UfficiRepository
     public const DIPARTIMENTO = 'dipartimento';
     public const ATENEO = 'ateneo';
     /** Uffici fissi del Dipartimento: servono al portale, non si eliminano. Le loro persone non sono «operatori» della Didattica (senza op_id). */
-    public const CHIAVI_FISSE = ['direzione', 'segreteria_direzione', 'convenzioni_fsl', 'verbali_scarico'];
+    public const CHIAVI_FISSE = ['direzione', 'segreteria_direzione', 'convenzioni_fsl', 'verbali_scarico', 'assistenza'];
 
     public function __construct(private Database $db)
     {

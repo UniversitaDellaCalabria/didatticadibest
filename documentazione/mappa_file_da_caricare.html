@@ -1540,10 +1540,192 @@ var PACCHETTI = [
     ],
     nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
     commit: "Pannello guidato (3): Eventi e iscrizioni, Gestione del portale, guida dell'amministratore aggiornata"
+  },
+  {
+    id: "assistenza-h1",
+    titolo: "Pacchetto 34 · Assistenza: chat con gli operatori (H1a–H1d)",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare",
+    schema: "v87 (due tabelle nuove e due colonne di impostazioni_sistema; si crea da solo alla prima pagina)",
+    riassunto: "<strong>Il servizio di assistenza.</strong> Chi chiede aiuto (studenti e personale con il login; esterni con nome, email e controllo anti-robot, che ricevono un <strong>link personale</strong> per email) sceglie l'argomento e scrive; compare in tutte le pagine pubbliche il pulsante <strong>«Serve aiuto?»</strong> che apre la chat in una finestrella. Gli operatori (persone dell'ufficio fisso <strong>«Assistenza»</strong> + amministratori) la trovano in <strong>Didattica → Assistenza</strong>: schede <em>Da prendere · Mie · Tutte · Chiuse</em>, chat che si aggiorna da sola, «Prendo io», «Passa a…», note interne, «Chiudi». Le email di avviso partono solo se l'altra parte non ha la chat aperta. Fuori orario si può scrivere lo stesso. Le chat compaiono anche nella casella unica <strong>Messaggi</strong> e nel suo contatore. Dopo 12 mesi i messaggi si cancellano e restano solo argomento e tempi.",
+    passi: [["H1a", "Tabelle, ufficio «Assistenza», servizi, email"], ["H1b", "Casella e chat degli operatori"], ["H1c", "Chat per chi chiede aiuto e pulsante «Serve aiuto?»"], ["H1d", "Orari, servizio acceso/spento, conservazione, collegamento alle pratiche"]],
+    cartelle: [
+      { cartella: "/ (radice del portale)", file: [
+        ["assistenza.php", "nuovo", "H1c", "pagina pubblica: nuova richiesta e chat (anche dentro la finestrella)"],
+        ["assistenza_ajax.php", "nuovo", "H1c", "risposte JSON della chat di chi chiede aiuto"],
+        ["footer.php", "mod", "H1c H1d", "pulsante «Serve aiuto?» su tutte le pagine pubbliche (spento se il servizio è spento)"],
+        ["area_personale.php", "mod", "H1d", "riquadro «Serve aiuto?»"],
+        ["pratiche.php", "mod", "H1d", "pulsante «Chiedi aiuto su questa pratica»"],
+        ["cron_background.php", "mod", "H1d", "conservazione delle chat (CONSERVAZIONE_ASSISTENZA_MESI, predefinito 12)"]
+      ]},
+      { cartella: "admin/", file: [
+        ["admin/assistenza.php", "nuovo", "H1b H1d", "casella e chat degli operatori, orari e servizio"],
+        ["admin/assistenza_ajax.php", "nuovo", "H1b", "risposte JSON per la casella degli operatori"],
+        ["admin/admin_header.php", "mod", "H1b", "voce «Assistenza» nel menu di Didattica e contatore nel pulsante Messaggi"],
+        ["admin/inizio.php", "mod", "H1b", "scheda «Assistenza» e «Da fare» sulla scrivania"],
+        ["admin/messaggi.php", "mod", "H1b", "le chat di assistenza nella casella unica"],
+        ["admin/api_unread.php", "mod", "H1b", "il contatore somma anche le chat"]
+      ]},
+      { cartella: "assets/js/", file: [
+        ["assets/js/assistenza-chat.js", "nuovo", "H1c", "chat di chi chiede aiuto"],
+        ["assets/js/assistenza-operatori.js", "nuovo", "H1b", "casella e chat degli operatori"],
+        ["assets/js/assistenza-widget.js", "nuovo", "H1c", "pulsante e finestrella «Serve aiuto?»"]
+      ]},
+      { cartella: "src/Assistenza/ (cartella nuova)", file: [
+        ["src/Assistenza/Costanti.php", "nuovo", "H1a", "stati, argomenti e limiti"],
+        ["src/Assistenza/ConversazioniRepository.php", "nuovo", "H1a", "conversazioni"],
+        ["src/Assistenza/MessaggiAssistenzaRepository.php", "nuovo", "H1a", "messaggi"],
+        ["src/Assistenza/OperatoriAssistenza.php", "nuovo", "H1a", "chi risponde (ufficio «Assistenza» e amministratori)"],
+        ["src/Assistenza/ServizioAssistenza.php", "nuovo", "H1a", "aprire, scrivere, prendere in carico, passare, chiudere"],
+        ["src/Assistenza/NotificheAssistenza.php", "nuovo", "H1a", "email agli operatori e a chi chiede aiuto"],
+        ["src/Assistenza/ChatApi.php", "nuovo", "H1b H1c", "dati per le pagine di chat"],
+        ["src/Assistenza/Contesti.php", "nuovo", "H1d", "pratica o prenotazione di cui si parla (solo se sono della persona)"],
+        ["src/Assistenza/OrariAssistenza.php", "nuovo", "H1d", "orari e servizio acceso/spento"],
+        ["src/Assistenza/ConservazioneAssistenza.php", "nuovo", "H1d", "cancellazione dei messaggi dopo 12 mesi"]
+      ]},
+      { cartella: "src/ (altri)", file: [
+        ["src/Email/CatalogoAssistenza.php", "nuovo", "H1a", "i quattro testi delle email (modificabili da «Testi delle email»)"],
+        ["src/Email/CatalogoEmail.php", "mod", "H1a", "aggiunge il catalogo dell'assistenza"],
+        ["src/Iscritti/CasellaMessaggi.php", "mod", "H1b", "le chat nella casella unica"],
+        ["src/Uffici/UfficiRepository.php", "mod", "H1a", "«assistenza» tra gli uffici fissi"],
+        ["src/Core/Schema/Definizioni.php", "mod", "H1a H1d", "tabelle assistenza_* e colonne degli orari"],
+        ["src/Core/Schema/Migrazioni.php", "mod", "H1a H1d", "versione 87 e ufficio fisso «Assistenza»"],
+        ["inc/sezioni.php", "mod", "H1b", "la pagina Assistenza nel modulo Didattica"]
+      ]}
+    ],
+    dopo: [
+      "Apri una pagina qualsiasi del sito: lo schema v87 si crea da solo (compare <code>cache/schema_v87.ok</code>).",
+      "In <strong>Gestione del portale → Uffici</strong> apri l'ufficio <strong>«Assistenza a studenti e utenti»</strong> e aggiungi le persone che risponderanno (dall'anagrafe). Finché è vuoto gli avvisi vanno agli amministratori.",
+      "In <strong>Didattica → Assistenza → Orari e servizio</strong> scrivi gli orari (es. 09:00-13:00, 14:00-16:00). Senza orari il servizio è sempre aperto.",
+      "Prova: dal sito, senza accesso, premi «Serve aiuto?» e scrivi; poi rispondi da Assistenza. Controlla che l'email arrivi (se la chat è chiusa) e che il link personale funzioni.",
+      "Per spegnere tutto: «Servizio acceso» nella stessa pagina (il pulsante sparisce dal sito). Facoltativo nel <code>.env</code>: <code>CONSERVAZIONE_ASSISTENZA_MESI=12</code>.",
+      "Se qualcosa non va dopo il caricamento, controlla prima che tutti i file sopra siano stati caricati (soprattutto <code>footer.php</code>, che chiama <code>OrariAssistenza</code>: se manca la cartella <code>src/Assistenza/</code> il pulsante semplicemente non compare)."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code> (compreso <code>scenario_assistenza.php</code>), <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Assistenza (1): chat di assistenza per studenti, personale ed esterni con operatori dell'ufficio «Assistenza», pulsante «Serve aiuto?», orari, conservazione a 12 mesi, chat nella casella Messaggi"
+  },
+  {
+    id: "assistenza-h2",
+    titolo: "Pacchetto 35 · Assistenza: notifiche a finestrella (H2a–H2c)",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare (dopo il Pacchetto 34)",
+    schema: "v88 (tabella push_sottoscrizioni; si crea da sola alla prima pagina)",
+    riassunto: "<strong>Le notifiche a finestrella (Web Push).</strong> Gli operatori attivano le notifiche da <strong>Assistenza → Notifiche sul computer</strong> (il browser chiede il permesso una volta): da quel momento una nuova richiesta, un messaggio o una chat passata da un collega compaiono come finestrella di Windows, anche a sito chiuso purché il browser (Chrome o Edge) sia aperto, anche ridotto a icona. Un clic apre la chat giusta. Si può silenziare per un po' o scegliere «solo le chat in carico a me». Studenti ed esterni trovano nella chat il pulsante «Avvisami»: la finestrella dice solo «Hai una risposta», <strong>senza il testo</strong>. Scritto in PHP puro: nessuna libreria da installare.",
+    passi: [["H2a", "Motore Web Push (cifratura RFC 8291, firma VAPID)"], ["H2b", "Notifiche agli operatori"], ["H2c", "Notifiche a studenti ed esterni"]],
+    cartelle: [
+      { cartella: "/ (radice del portale)", file: [
+        ["assistenza.php", "mod", "H2c", "invito «Avvisami» nella chat"],
+        ["assistenza_ajax.php", "mod", "H2c", "iscrizione e rinuncia di chi ha chiesto aiuto"],
+        ["sw.js", "mod", "H2b", "riceve la notifica e apre la chat al clic (versione dibest-v8)"]
+      ]},
+      { cartella: "admin/", file: [
+        ["admin/assistenza.php", "mod", "H2b", "barra «Notifiche sul computer»"],
+        ["admin/push_ajax.php", "nuovo", "H2b", "iscrizione, preferenze e prova per gli operatori"]
+      ]},
+      { cartella: "assets/js/", file: [
+        ["assets/js/assistenza-push.js", "nuovo", "H2b H2c", "iscrive il browser alle notifiche"],
+        ["assets/js/assistenza-push-operatori.js", "nuovo", "H2b", "barra degli operatori"],
+        ["assets/js/assistenza-chat.js", "mod", "H2c", "invito «Avvisami» (versione 2)"]
+      ]},
+      { cartella: "src/Assistenza/ e src/Assistenza/Push/ (cartella nuova)", file: [
+        ["src/Assistenza/Push/CurvaEc.php", "nuovo", "H2a", "chiavi e firma P-256"],
+        ["src/Assistenza/Push/CifraturaPush.php", "nuovo", "H2a", "cifratura del messaggio (RFC 8291)"],
+        ["src/Assistenza/Push/ChiaviVapid.php", "nuovo", "H2a", "chiavi del portale dal .env"],
+        ["src/Assistenza/Push/InvioPush.php", "nuovo", "H2a", "invio al servizio push"],
+        ["src/Assistenza/Push/ClienteHttp.php", "nuovo", "H2a", "interfaccia dell'invio"],
+        ["src/Assistenza/Push/ClienteCurl.php", "nuovo", "H2a", "invio con curl"],
+        ["src/Assistenza/Push/SottoscrizioniRepository.php", "nuovo", "H2b", "i recapiti dei browser"],
+        ["src/Assistenza/Push/ServizioPush.php", "nuovo", "H2b H2c", "chi riceve cosa"],
+        ["src/Assistenza/Registrazione.php", "nuovo", "H2a", "collega l'invio con curl"],
+        ["src/Assistenza/NotificheAssistenza.php", "mod", "H2b", "manda anche le finestrelle"],
+        ["src/Assistenza/ServizioAssistenza.php", "mod", "H2b", "le finestrelle nei momenti giusti"],
+        ["src/Assistenza/ConservazioneAssistenza.php", "mod", "H2c", "cancella anche i recapiti delle chat vecchie"]
+      ]},
+      { cartella: "src/Core/Schema/", file: [
+        ["src/Core/Schema/Definizioni.php", "mod", "H2a", "tabella push_sottoscrizioni"],
+        ["src/Core/Schema/Migrazioni.php", "mod", "H2a", "versione 88"]
+      ]},
+      { cartella: "strumenti/ (solo da lanciare)", file: [
+        ["strumenti/genera_chiavi_push.php", "nuovo", "H2a", "crea le chiavi VAPID: da eseguire una volta sul server"]
+      ]}
+    ],
+    dopo: [
+      "Sul server, una volta sola: <code>cd /opt/lampp/htdocs/didattica &amp;&amp; /opt/lampp/bin/php strumenti/genera_chiavi_push.php indirizzo.email@unical.it</code> (servono il file <code>strumenti/genera_chiavi_push.php</code> e la cartella <code>src/</code>). Stampa tre righe: incollale nel file <code>.env</code> del server. <strong>Non cambiarle</strong> in seguito: i browser già iscritti smetterebbero di ricevere.",
+      "Il server deve poter raggiungere internet in uscita (HTTPS) verso i servizi di notifica di Google, Mozilla e Microsoft (fcm.googleapis.com, updates.push.services.mozilla.com, *.notify.windows.com) e avere curl con OpenSSL. Con PHP 8.4 va bene.",
+      "Dal PC di ogni operatore (Chrome o Edge): <strong>Didattica → Assistenza → Attiva le notifiche su questo computer</strong>, accetta il permesso, poi premi <strong>Prova</strong>: deve comparire la finestrella di Windows. Se non compare, controlla che Windows non sia in «Non disturbare» e che le notifiche di Chrome/Edge siano attive nelle Impostazioni di Windows.",
+      "Perché le finestrelle arrivino a sito chiuso il browser deve restare aperto (anche ridotto a icona); in Chrome/Edge si può lasciare attiva «Continua a eseguire app in background alla chiusura».",
+      "Senza le chiavi nel <code>.env</code> la barra mostra che le notifiche non sono attive e restano solo le email: nulla si rompe.",
+      "L'aggiornamento di <code>sw.js</code> (v8) viene preso dai browser da solo al prossimo accesso."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/prove/…</code>, <code>strumenti/locale/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Assistenza (2): notifiche a finestrella (Web Push) per gli operatori e per chi chiede aiuto, motore in PHP puro con cifratura RFC 8291 e firma VAPID"
+  },
+  {
+    id: "assistenza-h3",
+    titolo: "Pacchetto 36 · Didacticus, statistiche e guide dell'assistenza (H1e, H3)",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare (insieme ai Pacchetti 34 e 35)",
+    schema: "v89 (due tabelle nuove, colonne dell'assistenza e le 23 voci di partenza; si crea da solo alla prima pagina)",
+    riassunto: "<strong>Didacticus</strong>, il gufo-assistente: ogni nuova chat comincia con lui. Risponde subito alle domande più comuni usando <strong>solo</strong> le voci scritte dal pannello (domande, parole chiave, risposta, <strong>link</strong> che diventano pulsanti, <strong>allegati</strong> da scaricare), propone voci vicine se non è sicuro, e passa la parola a un operatore se la persona lo chiede, se la risposta non basta («Non mi basta») o se non capisce due volte di fila. <strong>Nessun servizio esterno né IA generativa.</strong> Dal pannello <strong>Didattica → Didacticus</strong>: voci (con importazione ed esportazione), <em>domande senza risposta</em> da trasformare in voci con un clic, <em>prova</em> («cosa risponderebbe?») e impostazioni (acceso/spento, saluto, soglia, immagine di profilo). In più, le <strong>statistiche</strong> dell'assistenza (Excel/PDF/CSV) e la nuova <strong>Guida «Assistenza e Didacticus»</strong>.",
+    passi: [["H1e", "Statistiche dell'assistenza, guide, informativa privacy"], ["H3a", "Base di conoscenza e pannello"], ["H3b", "Motore di Didacticus"], ["H3c", "Didacticus nella chat"], ["H3d", "Impara dall'uso"]],
+    cartelle: [
+      { cartella: "/ (radice del portale)", file: [
+        ["assistenza.php", "mod", "H3c", "Didacticus nell'invito, nella chat e nel modulo («scrivi subito a un operatore»)"],
+        ["didacticus_file.php", "nuovo", "H3a", "immagine di profilo e allegati delle risposte (cartella uploads/didacticus/ chiusa al web)"],
+        ["privacy.php", "mod", "H1e", "paragrafo e conservazione dell'assistenza"]
+      ]},
+      { cartella: "admin/", file: [
+        ["admin/didacticus.php", "nuovo", "H3a H3d", "voci, domande senza risposta, prova, impostazioni, esportazione e importazione"],
+        ["admin/assistenza.php", "mod", "H1e H3c", "statistiche, scheda «Con Didacticus», collegamento a Didacticus"],
+        ["admin/admin_header.php", "mod", "H3a", "voce «Didacticus» nel menu, con le domande da vedere"],
+        ["admin/inizio.php", "mod", "H3a", "scheda «Didacticus» nella Scrivania"]
+      ]},
+      { cartella: "assets/", file: [
+        ["assets/img/didacticus.svg", "nuovo", "H3c", "il gufo (immagine di serie)"],
+        ["assets/js/assistenza-chat.js", "mod", "H3c", "risposte, link, allegati, suggerimenti e pulsanti di Didacticus (versione 3)"],
+        ["assets/js/assistenza-operatori.js", "mod", "H3c", "scheda «Con Didacticus» e risposte del bot nelle chat (versione 2)"],
+        ["assets/guide/ass_*.png, did_*.png, stud_assistenza*.png", "nuovo", "H1e", "dieci schermate per la guida"]
+      ]},
+      { cartella: "src/Assistenza/Didacticus/ (cartella nuova)", file: [
+        ["src/Assistenza/Didacticus/Motore.php", "nuovo", "H3b", "il confronto tra domanda e voci (punteggio 0-100)"],
+        ["src/Assistenza/Didacticus/ServizioDidacticus.php", "nuovo", "H3b", "tipi di risposta, suggerimenti, voci riservate, prova"],
+        ["src/Assistenza/Didacticus/VociRepository.php", "nuovo", "H3a", "la base di conoscenza"],
+        ["src/Assistenza/Didacticus/MancateRepository.php", "nuovo", "H3d", "domande senza risposta"],
+        ["src/Assistenza/Didacticus/ImpostazioniDidacticus.php", "nuovo", "H3a", "acceso, saluto, soglia, immagine"],
+        ["src/Assistenza/Didacticus/VociDiPartenza.php", "nuovo", "H3a", "le 23 voci di partenza (solo come usare il portale)"]
+      ]},
+      { cartella: "src/Assistenza/ (modificati e nuovi)", file: [
+        ["src/Assistenza/StatisticheAssistenza.php", "nuovo", "H1e", "numeri per periodo"],
+        ["src/Assistenza/ServizioAssistenza.php", "mod", "H3c", "stato «bot», passaggio all'operatore, pulsanti"],
+        ["src/Assistenza/ChatApi.php", "mod", "H3c", "extra dei messaggi e azioni di Didacticus"],
+        ["src/Assistenza/ConversazioniRepository.php", "mod", "H3c", "passata, risolta da Didacticus, scheda bot"],
+        ["src/Assistenza/MessaggiAssistenzaRepository.php", "mod", "H3c", "extra JSON"],
+        ["src/Assistenza/ConservazioneAssistenza.php", "mod", "H3d", "cancella anche le domande senza risposta"]
+      ]},
+      { cartella: "src/ (altri)", file: [
+        ["src/Core/Schema/Definizioni.php", "mod", "H3a", "tabelle didacticus_*, colonne nuove"],
+        ["src/Core/Schema/Migrazioni.php", "mod", "H3a", "versione 89 e voci di partenza"],
+        ["src/Portale/GuidePerRuolo.php", "mod", "H1e", "guida «Assistenza e Didacticus» e sezione per gli studenti"],
+        ["inc/sezioni.php", "mod", "H3a", "la pagina Didacticus nel modulo Didattica"]
+      ]}
+    ],
+    dopo: [
+      "Apri una pagina del sito: lo schema v89 si crea da solo e inserisce le <strong>23 voci di partenza</strong> (una volta sola; se le cancelli non tornano).",
+      "Vai in <strong>Didattica → Didacticus</strong>, scheda «Voci»: <strong>rileggile tutte</strong> (descrivono solo come si usa il portale) e correggi, spegni o aggiungi le tue: orari, contatti, link ufficiali, moduli da scaricare come allegato. Scheda «Prova» per controllare come risponde.",
+      "Scheda «Impostazioni»: controlla il saluto e la soglia (consigliata 60). Puoi caricare un'altra immagine al posto del gufo.",
+      "Per spegnere Didacticus e far andare le chat subito agli operatori: «Impostazioni → Didacticus acceso» (le chat già aperte con lui continuano).",
+      "Nel tempo, ogni settimana guarda <strong>«Domande senza risposta»</strong> (il numero compare nel menu): «Crea una voce» è il modo più rapido per istruirlo.",
+      "La cartella <code>uploads/didacticus/</code> si crea da sola al primo allegato ed è chiusa al web: i file si scaricano solo da <code>didacticus_file.php</code>.",
+      "Le guide PDF aggiornate (compresa la nuova «Assistenza e Didacticus») sono in <code>documentazione/guide/</code> nel repository."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Assistenza e Didacticus: chat per studenti ed esterni con operatori, notifiche a finestrella (Web Push), assistente virtuale Didacticus istruibile dal pannello, statistiche, orari e conservazione; guide e mappe aggiornate"
   }
 ];
 
 var PROSSIMI = [
+  ["H2 · Notifiche push a finestrella su Windows (operatori, poi studenti ed esterni)", "fatto in locale: vedi Pacchetto 35 (da provare sul PC con il pulsante «Prova»)"],
+  ["H3 · Didacticus, il bot a regole (base di conoscenza gestita dal pannello, passaggio all'operatore)", "fatto in locale: vedi Pacchetto 36. Da fare tu: rileggere le 23 voci di partenza e aggiungere le tue (orari, contatti, moduli come allegato)"],
     ["F11 · Verbali pubblici: sola visualizzazione e download con le credenziali di Ateneo", "fatto in locale (schema v80): vedi il piano (F11). File: verbali.php, admin/didattica_accessi.php, admin/didattica_sedute.php, src/Didattica/ServizioVerbaliPubblici.php, src/Didattica/AccessoVerbaliRepository.php, src/Uffici/*, src/Core/Schema/*, assets/vendor/cdnjs/ajax/libs/pdf.js/ (nuova cartella: 2 file)"],
   ["F10 · Convenzioni di tesi con enti e aziende esterne", "fatto in locale: vedi Pacchetto 20 (link all'azienda senza registrazione, modifiche agli articoli, firma del Direttore, archivio ed elenco pubblico)"],
   ["F8 · Uffici di Dipartimento e di Ateneo in un'unica anagrafe, Direttore e vice, «Direttore assente»", "fatto in locale: vedi Pacchetto 19 (restano da decidere la pagina pubblica «Organigramma» e un selettore unico per gli eventi)"],

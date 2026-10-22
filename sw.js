@@ -4,7 +4,7 @@
 // In cache solo le librerie in assets/vendor e assets/js (percorsi con la versione: Cache-First) e la pagina offline.
 // Cambiare SW_VERSION fa cancellare ai browser tutte le cache delle versioni precedenti.
 
-const SW_VERSION = 'dibest-v7';
+const SW_VERSION = 'dibest-v8';
 
 const CACHE_STATIC  = SW_VERSION + '-static';   // CSS, JS, font e icone delle librerie
 const CACHE_OFFLINE = SW_VERSION + '-offline';  // Solo offline.html
@@ -53,6 +53,32 @@ self.addEventListener('fetch', event => {
         event.respondWith(fetch(req).catch(offlineFallback));
     }
     // Tutto il resto (AJAX, immagini, file locali): gestito normalmente dal browser
+});
+
+// Notifiche push dell'assistenza: il messaggio arriva cifrato dal portale (titolo, corpo, url, tag) e si mostra come finestrella del sistema.
+// Con lo stesso tag la notifica nuova sostituisce la precedente della stessa chat e suona di nuovo (renotify).
+self.addEventListener('push', event => {
+    let d = {};
+    try { d = event.data ? event.data.json() : {}; } catch (e) { d = { corpo: event.data ? event.data.text() : '' }; }
+    event.waitUntil(self.registration.showNotification(d.titolo || 'Didattica DiBEST', {
+        body: d.corpo || '', tag: d.tag || undefined, renotify: !!d.tag,
+        icon: './assets/icon-192.png', badge: './assets/icon-192.png', data: { url: d.url || './' },
+    }));
+});
+
+// Un clic sulla notifica porta alla chat: se il sito è già aperto in una scheda si riusa quella, altrimenti se ne apre una nuova
+self.addEventListener('notificationclick', event => {
+    event.notification.close();
+    const url = new URL((event.notification.data && event.notification.data.url) || './', self.registration.scope).href;
+    event.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(lista => {
+        const base = url.split('?')[0];
+        for (const c of lista) {
+            if (c.url.split('?')[0] === base && 'focus' in c) {
+                return c.focus().then(w => ('navigate' in w && w.url !== url ? w.navigate(url) : w));
+            }
+        }
+        return clients.openWindow(url);
+    }));
 });
 
 async function cacheFirst(req) {

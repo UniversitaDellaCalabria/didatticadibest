@@ -20,7 +20,7 @@ stampa() { # $1 = URL o file, $2 = PDF di uscita
 }
 
 echo "Guide per ruolo"
-for r in "studente:Studente" "docente:Docente_relatore" "protocollo:Ufficio_protocollo" "referente:Ufficio_del_corso" "consiglio:Referente_consiglio" "risorsa:Responsabile_risorsa" "scuola:Scuole_convenzione_FSL" "elenco:Docenti_elenco_studenti_FSL" "tutor:Tutor" "direttore:Direttore" "amministratore:Amministratore"; do
+for r in "studente:Studente" "docente:Docente_relatore" "protocollo:Ufficio_protocollo" "referente:Ufficio_del_corso" "consiglio:Referente_consiglio" "risorsa:Responsabile_risorsa" "scuola:Scuole_convenzione_FSL" "elenco:Docenti_elenco_studenti_FSL" "tutor:Tutor" "direttore:Direttore" "assistenza:Assistenza_Didacticus" "amministratore:Amministratore"; do
     stampa "http://127.0.0.1:$PORTA/eventi/guida.php?r=${r%%:*}&stampa=1" "$SITO/documentazione/guide/Guida_${r##*:}.pdf"
 done
 

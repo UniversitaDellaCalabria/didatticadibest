@@ -231,6 +231,44 @@ final class Definizioni
             testo TEXT DEFAULT NULL, autore VARCHAR(150) DEFAULT '', creato_il DATETIME DEFAULT CURRENT_TIMESTAMP, letto_il DATETIME DEFAULT NULL,
             INDEX idx_compilazione (compilazione_id, creato_il)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        // v86: assistenza a studenti e utenti esterni. Una conversazione per richiesta (collegata all'utente col login oppure, per gli esterni, al link personale
+        // con token); stato bot / nuova / assegnata / chiusa; i tempi servono a non mandare troppe email (utente_visto_il e operatore_visto_il = ultima volta
+        // che la chat era aperta) e alle statistiche (prima_risposta_il)
+        'assistenza_conversazioni' => "CREATE TABLE IF NOT EXISTS assistenza_conversazioni (
+            id INT AUTO_INCREMENT PRIMARY KEY, token CHAR(32) NOT NULL, canale VARCHAR(10) NOT NULL DEFAULT 'utente', utente_id INT DEFAULT NULL,
+            nome VARCHAR(150) NOT NULL DEFAULT '', email VARCHAR(190) NOT NULL DEFAULT '', argomento VARCHAR(30) NOT NULL DEFAULT 'altro',
+            contesto_tipo VARCHAR(20) NOT NULL DEFAULT '', contesto_id INT DEFAULT NULL, contesto_testo VARCHAR(200) NOT NULL DEFAULT '',
+            stato VARCHAR(10) NOT NULL DEFAULT 'nuova', operatore_id INT DEFAULT NULL, operatore_nome VARCHAR(150) NOT NULL DEFAULT '', ip VARCHAR(45) NOT NULL DEFAULT '',
+            creato_il DATETIME NOT NULL, ultimo_il DATETIME NOT NULL, ultimo_da VARCHAR(10) NOT NULL DEFAULT 'utente', prima_risposta_il DATETIME DEFAULT NULL,
+            chiusa_il DATETIME DEFAULT NULL, chiusa_da VARCHAR(10) NOT NULL DEFAULT '', valutazione TINYINT DEFAULT NULL,
+            utente_visto_il DATETIME DEFAULT NULL, operatore_visto_il DATETIME DEFAULT NULL, avviso_utente_il DATETIME DEFAULT NULL, avviso_operatore_il DATETIME DEFAULT NULL,
+            UNIQUE KEY uq_token (token), INDEX idx_stato (stato, ultimo_il), INDEX idx_utente (utente_id), INDEX idx_email (email), INDEX idx_operatore (operatore_id, stato)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        'assistenza_messaggi' => "CREATE TABLE IF NOT EXISTS assistenza_messaggi (
+            id INT AUTO_INCREMENT PRIMARY KEY, conversazione_id INT NOT NULL, da VARCHAR(10) NOT NULL DEFAULT 'utente', tipo VARCHAR(10) NOT NULL DEFAULT 'messaggio',
+            testo TEXT DEFAULT NULL, autore VARCHAR(150) NOT NULL DEFAULT '', creato_il DATETIME NOT NULL, letto_il DATETIME DEFAULT NULL,
+            INDEX idx_conversazione (conversazione_id, id), INDEX idx_letti (conversazione_id, da, letto_il)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        // v88: notifiche push (Web Push): i «recapiti» dei browser di chi ha accettato di ricevere gli avvisi. Gli operatori sono legati all'utente (e hanno
+        // le preferenze: silenzia fino a, solo le mie chat); chi chiede aiuto è legato alla sua conversazione. L'indirizzo (endpoint) è unico: lo si riconosce dall'impronta
+        'push_sottoscrizioni' => "CREATE TABLE IF NOT EXISTS push_sottoscrizioni (
+            id INT AUTO_INCREMENT PRIMARY KEY, endpoint_hash CHAR(64) NOT NULL, endpoint TEXT NOT NULL, p256dh VARCHAR(130) NOT NULL DEFAULT '', auth VARCHAR(40) NOT NULL DEFAULT '',
+            ruolo VARCHAR(10) NOT NULL DEFAULT 'operatore', utente_id INT DEFAULT NULL, conversazione_id INT DEFAULT NULL, silenzia_fino DATETIME DEFAULT NULL,
+            solo_mie TINYINT(1) NOT NULL DEFAULT 0, agente VARCHAR(200) NOT NULL DEFAULT '', creato_il DATETIME NOT NULL, ultimo_invio_il DATETIME DEFAULT NULL, errori SMALLINT NOT NULL DEFAULT 0,
+            UNIQUE KEY uq_endpoint (endpoint_hash), INDEX idx_utente (ruolo, utente_id), INDEX idx_conversazione (conversazione_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        // v89: Didacticus, il bot dell'assistenza a regole: la base di conoscenza (voci con domande, parole chiave, risposta, link e allegati, scritte dal pannello)
+        // e le domande a cui non ha saputo rispondere (o la cui risposta non è servita), da trasformare in voci con un clic
+        'didacticus_voci' => "CREATE TABLE IF NOT EXISTS didacticus_voci (
+            id INT AUTO_INCREMENT PRIMARY KEY, argomento VARCHAR(30) NOT NULL DEFAULT 'altro', titolo VARCHAR(200) NOT NULL DEFAULT '', domande TEXT DEFAULT NULL,
+            parole_chiave TEXT DEFAULT NULL, risposta TEXT DEFAULT NULL, link_json TEXT DEFAULT NULL, allegati_json TEXT DEFAULT NULL, solo_login TINYINT(1) NOT NULL DEFAULT 0,
+            proponi_operatore TINYINT(1) NOT NULL DEFAULT 0, attiva TINYINT(1) NOT NULL DEFAULT 1, ordine INT NOT NULL DEFAULT 0, usi INT NOT NULL DEFAULT 0, utile INT NOT NULL DEFAULT 0,
+            non_utile INT NOT NULL DEFAULT 0, creato_il DATETIME DEFAULT CURRENT_TIMESTAMP, aggiornato_il DATETIME DEFAULT NULL, INDEX idx_attiva (attiva, argomento)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        'didacticus_mancate' => "CREATE TABLE IF NOT EXISTS didacticus_mancate (
+            id INT AUTO_INCREMENT PRIMARY KEY, conversazione_id INT DEFAULT NULL, domanda TEXT DEFAULT NULL, argomento VARCHAR(30) NOT NULL DEFAULT 'altro', tipo VARCHAR(12) NOT NULL DEFAULT 'nessuna',
+            voce_id INT DEFAULT NULL, stato VARCHAR(12) NOT NULL DEFAULT 'da_vedere', creato_il DATETIME NOT NULL, INDEX idx_stato (stato, creato_il), INDEX idx_conv (conversazione_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         // v37: uffici dell'Ufficio didattico, definiti dal pannello (manager che smista, referenti dei corsi, carriere…):
         // il personale si assegna a un ufficio e l'iter dei moduli elenca gli uffici che ricevono la pratica
         'didattica_uffici' => "CREATE TABLE IF NOT EXISTS didattica_uffici (
@@ -480,6 +518,16 @@ final class Definizioni
     public static function colonne(): array
     {
     return [
+        // v89: le chat nascono con Didacticus (stato «bot»): quando passano a un operatore, se si sono risolte da sole, quante risposte di fila sono andate a vuoto
+        'assistenza_conversazioni' => [
+            'passata_il'      => "ADD COLUMN passata_il DATETIME DEFAULT NULL",
+            'risolta_da_bot'  => "ADD COLUMN risolta_da_bot TINYINT(1) NOT NULL DEFAULT 0",
+            'bot_mancate'     => "ADD COLUMN bot_mancate SMALLINT NOT NULL DEFAULT 0",
+        ],
+        // v89: le risposte di Didacticus portano link, allegati e suggerimenti (JSON)
+        'assistenza_messaggi' => [
+            'extra' => "ADD COLUMN extra TEXT DEFAULT NULL",
+        ],
         'turni' => [
             'nome_turno' => "ADD COLUMN nome_turno VARCHAR(150) DEFAULT NULL AFTER evento_id, MODIFY data_turno DATE NULL DEFAULT NULL, MODIFY orario_inizio TIME NULL DEFAULT NULL, MODIFY orario_fine TIME NULL DEFAULT NULL",
             'token_checkin' => "ADD COLUMN token_checkin VARCHAR(64) DEFAULT NULL",
@@ -864,6 +912,15 @@ final class Definizioni
             'testo_attestato'       => "ADD COLUMN testo_attestato VARCHAR(300) DEFAULT NULL",
         ],
         'impostazioni_sistema' => [
+            // v89: Didacticus acceso/spento, saluto, soglia di sicurezza (0-100: sotto non risponde) e immagine di profilo; didacticus_seminato = voci di partenza già inserite
+            'didacticus_attivo'    => "ADD COLUMN didacticus_attivo TINYINT(1) NOT NULL DEFAULT 1",
+            'didacticus_saluto'    => "ADD COLUMN didacticus_saluto TEXT DEFAULT NULL",
+            'didacticus_soglia'    => "ADD COLUMN didacticus_soglia TINYINT NOT NULL DEFAULT 60",
+            'didacticus_avatar'    => "ADD COLUMN didacticus_avatar VARCHAR(100) NOT NULL DEFAULT ''",
+            'didacticus_seminato'  => "ADD COLUMN didacticus_seminato TINYINT(1) NOT NULL DEFAULT 0",
+            // v87: assistenza: servizio acceso o spento e orari in cui risponde una persona (JSON giorno => «09:00-13:00, 14:00-16:00»)
+            'assistenza_attiva' => "ADD COLUMN assistenza_attiva TINYINT(1) NOT NULL DEFAULT 1",
+            'assistenza_orari'  => "ADD COLUMN assistenza_orari VARCHAR(600) NOT NULL DEFAULT ''",
             // v75: il Direttore come si scrive nella convenzione di tesi (titolo, nome, luogo e data di nascita): il nome viene dalla Direzione, il resto si indica una volta
             'tesi_direttore_titolo' => "ADD COLUMN tesi_direttore_titolo VARCHAR(20) NOT NULL DEFAULT 'Prof.'",
             'tesi_direttore_nome'   => "ADD COLUMN tesi_direttore_nome VARCHAR(150) NOT NULL DEFAULT ''",

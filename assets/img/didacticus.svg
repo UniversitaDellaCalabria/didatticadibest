@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" role="img" aria-label="Didacticus, il gufo dell'assistenza">
+  <title>Didacticus</title>
+  <defs>
+    <linearGradient id="sfondo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c8102e"/><stop offset="1" stop-color="#8e0f1f"/></linearGradient>
+    <linearGradient id="piume" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4c98a"/><stop offset="1" stop-color="#d9a05b"/></linearGradient>
+  </defs>
+  <circle cx="100" cy="100" r="98" fill="url(#sfondo)"/>
+  <!-- ali -->
+  <ellipse cx="45" cy="128" rx="19" ry="38" fill="#c98a45" transform="rotate(14 45 128)"/>
+  <ellipse cx="155" cy="128" rx="19" ry="38" fill="#c98a45" transform="rotate(-14 155 128)"/>
+  <!-- corpo -->
+  <ellipse cx="100" cy="132" rx="52" ry="55" fill="url(#piume)"/>
+  <ellipse cx="100" cy="146" rx="33" ry="38" fill="#fdf1da"/>
+  <g fill="#e8c18a" opacity=".9"><path d="M84 132q4 6 8 0M100 132q4 6 8 0M92 146q4 6 8 0M108 146q4 6 8 0M84 160q4 6 8 0M100 160q4 6 8 0" stroke="#d09a55" stroke-width="2" fill="none" stroke-linecap="round"/></g>
+  <!-- testa -->
+  <ellipse cx="100" cy="86" rx="56" ry="48" fill="url(#piume)"/>
+  <!-- cappello da laureato -->
+  <path d="M62 56 L100 36 L138 56 L100 76 Z" fill="#1e293b"/>
+  <path d="M78 68 v14 q22 12 44 0 v-14 l-22 11 Z" fill="#334155"/>
+  <line x1="138" y1="56" x2="150" y2="84" stroke="#f5b82e" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="150" cy="88" r="5" fill="#f5b82e"/>
+  <path d="M146 92 l-3 12 M150 93 v13 M154 92 l3 12" stroke="#f5b82e" stroke-width="2.4" stroke-linecap="round"/>
+  <!-- occhi con occhiali -->
+  <circle cx="76" cy="96" r="21" fill="#fff"/>
+  <circle cx="124" cy="96" r="21" fill="#fff"/>
+  <circle cx="79" cy="98" r="10" fill="#1e293b"/>
+  <circle cx="121" cy="98" r="10" fill="#1e293b"/>
+  <circle cx="83" cy="94" r="3.6" fill="#fff"/>
+  <circle cx="125" cy="94" r="3.6" fill="#fff"/>
+  <circle cx="76" cy="96" r="22" fill="none" stroke="#f5b82e" stroke-width="3.5"/>
+  <circle cx="124" cy="96" r="22" fill="none" stroke="#f5b82e" stroke-width="3.5"/>
+  <path d="M98 96 h4" stroke="#f5b82e" stroke-width="3.5" stroke-linecap="round"/>
+  <!-- becco -->
+  <path d="M100 106 L91 122 Q100 130 109 122 Z" fill="#f59e0b"/>
+  <path d="M100 106 L95 116 Q100 119 105 116 Z" fill="#fbbf24"/>
+  <!-- zampe -->
+  <path d="M84 184 v-8 M80 186 h10 M116 184 v-8 M112 186 h10" stroke="#f59e0b" stroke-width="4" stroke-linecap="round"/>
+</svg>

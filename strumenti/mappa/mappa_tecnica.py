@@ -400,7 +400,49 @@ consumaToken($t, $sedutaId)    // vale una sola volta, per quel verbale''')
     )))
 
     # 13 -----------------------------------------------------------------------------------------------
-    S.append(('cron', 'Job pianificati', sezione('cron', '13', 'Job pianificati (cron)',
+    S.append(('assistenza', 'Assistenza e Didacticus', sezione('assistenza', '13', 'Assistenza, notifiche push e Didacticus',
+        'Chat di assistenza con operatori (<code>src/Assistenza/</code>), notifiche a finestrella (Web Push in PHP puro, <code>src/Assistenza/Push/</code>) e l\'assistente virtuale a regole (<code>src/Assistenza/Didacticus/</code>). Nessun servizio esterno, nessuna libreria da installare. Schema v86–v89.',
+        '<h3>Dati</h3>'
+        + tab(['Tabella', 'Contenuto'], [
+            ['<code>assistenza_conversazioni</code>', 'una chat: canale (<code>utente</code> con login / <code>esterno</code> con link personale <code>token</code>), argomento, contesto (pratica/prenotazione), stato <code>bot → nuova → assegnata → chiusa</code>, operatore, tempi (<code>prima_risposta_il</code>, <code>passata_il</code>), <code>risolta_da_bot</code>, <code>bot_mancate</code>, valutazione, presenze e orari degli avvisi'],
+            ['<code>assistenza_messaggi</code>', 'messaggi (<code>da</code> utente · operatore · bot · sistema; <code>tipo</code> messaggio · nota interna), <code>extra</code> JSON per link, allegati e suggerimenti di Didacticus'],
+            ['<code>push_sottoscrizioni</code>', 'i recapiti dei browser (endpoint unico per impronta SHA-256, chiavi, ruolo, preferenze: silenzia, solo le mie chat)'],
+            ['<code>didacticus_voci</code>', 'la base di conoscenza: argomento, titolo, domande, parole chiave, risposta, link e allegati (JSON), solo_login, proponi_operatore, attiva, contatori usi/utile/non_utile'],
+            ['<code>didacticus_mancate</code>', 'domande senza risposta o la cui risposta non è bastata (da trasformare in voci)'],
+            ['<code>impostazioni_sistema</code>', 'colonne <code>assistenza_attiva</code>, <code>assistenza_orari</code> (JSON giorno → fasce) e <code>didacticus_*</code> (acceso, saluto, soglia, avatar, seminato)'],
+        ])
+        + '<h3>Classi</h3>'
+        + tab(['Classe', 'Compito'], [
+            ['<code>ServizioAssistenza</code>', 'apre le chat (<code>apriDaUtente</code>, <code>apriDaEsterno</code>), scrive, prende in carico, passa, chiude, riapre, valuta; gestisce Didacticus (<code>rispondiBot</code>, <code>passaAOperatore</code>, <code>azioneBot</code>); limiti anti-abuso (per IP, email, utente, messaggi in 10 minuti)'],
+            ['<code>ConversazioniRepository</code>, <code>MessaggiAssistenzaRepository</code>', 'accesso ai dati; gli orari arrivano dal servizio (<code>Orologio</code> iniettato), mai da <code>NOW()</code>'],
+            ['<code>OperatoriAssistenza</code>', 'operatori = persone dell\'ufficio fisso <code>assistenza</code> + amministratori; destinatari degli avvisi (se l\'ufficio è vuoto, gli amministratori)'],
+            ['<code>NotificheAssistenza</code>', 'email (modelli in <code>CatalogoAssistenza</code>) e finestrelle; un guasto delle notifiche non ferma mai la chat'],
+            ['<code>ChatApi</code>', 'le risposte JSON delle pagine (casella, chat dell\'operatore, chat di chi chiede aiuto): permessi controllati dall\'endpoint, dati qui'],
+            ['<code>OrariAssistenza</code>', 'servizio acceso/spento e fasce orarie («09:00-13:00, 14:00-16:00»), avviso fuori orario'],
+            ['<code>ConservazioneAssistenza</code>', 'dopo 12 mesi (<code>CONSERVAZIONE_ASSISTENZA_MESI</code>) cancella messaggi, recapiti push e domande senza risposta; nome alle iniziali, email e IP svuotati, link personale invalidato'],
+            ['<code>StatisticheAssistenza</code>, <code>Contesti</code>', 'numeri per periodo (argomento, operatore, tempi, utilità, risolte da Didacticus); pratica o prenotazione collegata, solo se della persona'],
+        ])
+        + '<h3>Notifiche push (Web Push)</h3>'
+        + '<p>Scritte a mano con OpenSSL, senza Composer: <code>CifraturaPush</code> cifra il messaggio come vuole il browser (RFC 8291, <code>aes128gcm</code>; verificata contro il <b>vettore di prova della RFC</b>), <code>ChiaviVapid</code> firma la richiesta (ES256, RFC 8292) con le chiavi del <code>.env</code> (<code>PUSH_VAPID_PUBLIC/PRIVATE/SUBJECT</code>, create una volta con <code>strumenti/genera_chiavi_push.php</code>), <code>InvioPush</code> la spedisce con curl (<code>ClienteHttp</code> è un\'interfaccia: nelle prove un finto). Un 404/410 elimina il recapito; dopo 5 errori di fila pure. Il <code>sw.js</code> riceve la notifica e al clic apre la chat giusta. Agli operatori arriva chi scrive e le prime parole; a chi chiede aiuto solo «hai una risposta», senza testo. Senza chiavi VAPID tutto resta com\'è e valgono le email.</p>'
+        + '<h3>Didacticus: come decide</h3>'
+        + '<p><code>Motore</code> confronta la domanda con le voci: normalizza (minuscole, senza accenti, parole vuote tolte), riduce ogni parola a una radice (senza vocale finale, al massimo 5 lettere) e calcola un punteggio 0–100 come somiglianza pesata (peso = rarità della parola tra le voci) con ogni domanda della voce; una <b>parola chiave</b> contenuta nella domanda porta la voce in alto in proporzione a quanta parte della domanda copre; l\'argomento scelto dà un piccolo vantaggio. <code>ServizioDidacticus</code> traduce i punteggi: ≥ soglia (predefinita 60, regolabile 20–90) <b>risposta</b> con link, allegati e pulsanti; fino a 12 punti sotto la soglia <b>suggerimenti</b>; altrimenti <b>nessuna</b> (conta una domanda a vuoto: alla seconda di fila la chat passa a un operatore). Saluti, ringraziamenti e «voglio un operatore» sono riconosciuti a parte; una voce riservata a chi accede invita gli esterni ad accedere. Non genera testo e non chiama servizi esterni: dice solo quello che è scritto nelle voci.</p>'
+        + cod("""stato «bot»  --  la persona scrive -->  Didacticus risponde (voce, suggerimenti o «non so»)
+   |-- «Sì, grazie» ................................. chiusa, risolta_da_bot = 1
+   |-- «Non mi basta» / «operatore» / 2 volte «non so» -> stato «nuova», passata_il, nota interna, email + finestrella agli operatori
+   '-- un operatore risponde o «Prendo io» ............ stato «assegnata» (passata_il se veniva da Didacticus)""")
+        + '<h3>Pagine e file</h3>'
+        + tab(['File', 'Ruolo'], [
+            ['<code>assistenza.php</code>, <code>assistenza_ajax.php</code>', 'pagina pubblica (anche come finestrella <code>?pannello=1</code>) e risposte JSON; chat di chi ha il login o, per gli esterni, del link <code>?t=</code>'],
+            ['<code>admin/assistenza.php</code>, <code>admin/assistenza_ajax.php</code>, <code>admin/push_ajax.php</code>', 'casella e chat degli operatori, statistiche, orari; notifiche del browser'],
+            ['<code>admin/didacticus.php</code>', 'voci (con link e allegati), domande senza risposta, prova, impostazioni; esportazione Excel/PDF/CSV e importazione CSV'],
+            ['<code>didacticus_file.php</code>', 'immagine di profilo e allegati (cartella <code>uploads/didacticus/</code> chiusa al web, scaricabili solo da qui e solo per le voci attive)'],
+            ['<code>assets/js/assistenza-*.js</code>', 'chat, casella degli operatori, finestrella, iscrizione push (testo sempre via <code>textContent</code>, mai HTML; il Service Worker mette i JS in cache: si cambia <code>?v=</code> a ogni modifica)'],
+        ])
+        + '<h3>Prove</h3><p><code>strumenti/prove/oop/assistenza.php</code> (chat, operatori, limiti, orari, conservazione), <code>assistenza_push.php</code> e <code>assistenza_push_db.php</code> (cifratura contro la RFC, firma, invio, iscrizioni, preferenze, integrazione con la chat), <code>assistenza_didacticus.php</code> (motore su domande vere, risposte, passaggi all\'operatore, domande senza risposta, statistiche). Scenario di dimostrazione e schermate: <code>strumenti/locale/scenario_assistenza.php</code>, <code>schermate_assistenza.php</code>.</p>'
+    )))
+
+    # 14 -----------------------------------------------------------------------------------------------
+    S.append(('cron', 'Job pianificati', sezione('cron', '14', 'Job pianificati (cron)',
         'Quattro script, avviabili da riga di comando o via URL con <code>CRON_KEY</code> (≥ 16 caratteri).',
         tab(['Script', 'Cosa fa'], [
             ['<code>cron_background.php</code>', 'Passo principale: auto-archiviazione, email post evento, promemoria elenco studenti, attestati delle classi, verifica/promemoria/avvisi/scadenze delle convenzioni, documenti FSL, valutazioni FSL, conservazione dei dati, <b>riepilogo «Da fare per te»</b> (<code>RiepilogoPersone::cron()</code>), <b>convenzioni di tesi</b>, controllo notturno del sito, aggiornamento anagrafe di Ateneo.'],
@@ -415,7 +457,7 @@ consumaToken($t, $sedutaId)    // vale una sola volta, per quel verbale''')
     )))
 
     # 14 -----------------------------------------------------------------------------------------------
-    S.append(('sicurezza', 'Sicurezza', sezione('sicurezza', '14', 'Sicurezza',
+    S.append(('sicurezza', 'Sicurezza', sezione('sicurezza', '15', 'Sicurezza',
         'Difesa in profondità, con le scelte che contano per un portale universitario.',
         '<div class="grid">'
         + card('Input e output', '<p>Prepared statement ovunque; output HTML sempre codificato; dati JS in <code>json_encode</code>; colori validati prima degli stili; QR letti mai aperti come link.</p>')
@@ -430,7 +472,7 @@ consumaToken($t, $sedutaId)    // vale una sola volta, per quel verbale''')
     )))
 
     # 15 -----------------------------------------------------------------------------------------------
-    S.append(('frontend', 'Front-end', sezione('frontend', '15', 'Front-end e asset',
+    S.append(('frontend', 'Front-end', sezione('frontend', '16', 'Front-end e asset',
         'Rendering lato server con Bootstrap; JavaScript solo dove serve.',
         tab(['File', 'Ruolo'], [
             ['<code>assets/css/pannello.css</code>, <code>assets/js/pannello.js</code>', 'Stile e comportamenti del pannello (menu a gruppi richiudibili, «?» con le guide)'],
@@ -447,7 +489,7 @@ consumaToken($t, $sedutaId)    // vale una sola volta, per quel verbale''')
     )))
 
     # 16 -----------------------------------------------------------------------------------------------
-    S.append(('test', 'Test e strumenti', sezione('test', '16', 'Test, ambiente locale e strumenti',
+    S.append(('test', 'Test e strumenti', sezione('test', '17', 'Test, ambiente locale e strumenti',
         'La rete di sicurezza sono le «prove»: girano su un database usa-e-getta e, in locale, anche contro le pagine reali.',
         tab(['Cosa', 'Come', 'Note'], [
             ['Prove del portale', '<code>php -d extension=zip -d extension=gd -d extension=intl strumenti/prove/esegui.php</code>', 'Crea il database <code>eventi_prova</code> da <code>database/schema.sql</code> + migrazioni; un file per modulo in <code>strumenti/prove/oop/</code>; ≈ 1.600 verifiche; esce 1 se una fallisce. Con l\'ambiente locale acceso prova anche le pagine via HTTP'],
@@ -471,7 +513,7 @@ final class FirmaDirettoreTest extends FslBase
     )))
 
     # 17 -----------------------------------------------------------------------------------------------
-    S.append(('rilascio', 'Rilascio', sezione('rilascio', '17', 'Rilascio e operazioni',
+    S.append(('rilascio', 'Rilascio', sezione('rilascio', '18', 'Rilascio e operazioni',
         'Il deploy è manuale e verificabile: si costruisce un pacchetto dall\'ultimo commit e lo si estrae sul server.',
         cod('''# 1. sul PC: pacchetto con tutti i file committati (senza .env, uploads, cache, tests, strumenti, documentazione)
 bash strumenti/crea_pacchetto.sh            # -> aggiornamento_completo.tgz  (+ SHA256SUMS_pacchetto.txt dentro)
@@ -488,7 +530,7 @@ rm -f cache/schema_v*.ok                      # se serve: forza il ricalcolo del
     )))
 
     # 18 -----------------------------------------------------------------------------------------------
-    S.append(('estendere', 'Come estendere', sezione('estendere', '18', 'Come aggiungere una funzione',
+    S.append(('estendere', 'Come estendere', sezione('estendere', '19', 'Come aggiungere una funzione',
         'La ricetta per un nuovo modulo o una nuova tabella, seguendo i pattern esistenti.',
         passi('<b>Tabella</b>: aggiungi il <code>CREATE TABLE IF NOT EXISTS</code> in <code>Definizioni::tabelle()</code> (o la colonna in <code>colonne()</code>) e alza <code>Migrazioni::VERSIONE</code>. I dati di partenza vanno in <code>datiDiPartenza()</code>, con una guardia di idempotenza.',
               '<b>Repository</b> in <code>src/&lt;Modulo&gt;/</code>: costruttore con <code>Database</code>, metodi con query preparate che restituiscono array.',
@@ -501,7 +543,7 @@ rm -f cache/schema_v*.ok                      # se serve: forza il ricalcolo del
     )))
 
     # 19 -----------------------------------------------------------------------------------------------
-    S.append(('appendice', 'Appendice', sezione('appendice', '19', 'Appendice',
+    S.append(('appendice', 'Appendice', sezione('appendice', '20', 'Appendice',
         '',
         '<h3>Variabili del file <code>.env</code> (nomi, mai i valori)</h3>'
         + tab(['Gruppo', 'Variabili'], [

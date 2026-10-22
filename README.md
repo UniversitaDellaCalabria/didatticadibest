@@ -111,6 +111,7 @@ Ogni area ha un **tipo** (`pagine_eventi.tipo_area`: fsl, eventi, gruppi, calend
 - **Rate limiting** anti-flood sugli endpoint pubblici
 - **PWA-ready** (manifest + service worker + offline fallback): le pagine arrivano sempre dal server, in cache solo le librerie statiche
 - **Configurazione portale** da pannello admin (logo, colori, SMTP, email template)
+- **Assistenza e Didacticus** (`assistenza.php`, pulsante «Serve aiuto?» su ogni pagina pubblica, `admin/assistenza.php`, `admin/didacticus.php`, `src/Assistenza/`): chat per studenti, personale ed esterni (link personale, senza registrazione) con le persone dell'ufficio fisso «Assistenza»; risponde prima **Didacticus**, l'assistente virtuale a regole (nessun servizio esterno né IA generativa: confronta la domanda con le voci scritte dal pannello, con link e allegati, e passa all'operatore quando non basta); notifiche a finestrella (**Web Push** in PHP puro, cifratura RFC 8291, chiavi in `.env`: `php strumenti/genera_chiavi_push.php email@unical.it`), orari, statistiche con Excel/PDF/CSV, conservazione 12 mesi (`CONSERVAZIONE_ASSISTENZA_MESI`)
 
 ---
 

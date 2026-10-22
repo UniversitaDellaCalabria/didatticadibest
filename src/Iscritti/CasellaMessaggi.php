@@ -6,6 +6,9 @@ namespace App\Iscritti;
 
 use App\Auth\Abilitazioni\AbilitazioniRepository;
 use App\Auth\Abilitazioni\IdsGestori;
+use App\Assistenza\Costanti as CostantiAssistenza;
+use App\Assistenza\OperatoriAssistenza;
+use App\Assistenza\ServizioAssistenza;
 use App\Auth\Abilitazioni\ServizioAbilitazioni;
 use App\Fsl\MessaggiConvenzioneRepository;
 use App\Portale\AreeRepository;
@@ -21,6 +24,7 @@ final class CasellaMessaggi
 {
     public const PRENOTAZIONE = 'prenotazione';
     public const CONVENZIONE = 'convenzione';
+    public const ASSISTENZA = 'assistenza';
 
     public function __construct(
         private AreeRepository $aree,
@@ -29,7 +33,19 @@ final class CasellaMessaggi
         private MessaggiRepository $prenotazioni,
         private MessaggiConvenzioneRepository $convenzioni,
         private ServizioUffici $uffici,
+        private ServizioAssistenza $assistenza,
+        private OperatoriAssistenza $operatoriAssistenza,
     ) {
+    }
+
+    /**
+     * Chi risponde alle chat di assistenza (ufficio «Assistenza» e amministratori) le vede nella casella.
+     *
+     * @param array<string, mixed> $utente
+     */
+    public function puoAssistenza(array $utente): bool
+    {
+        return $this->operatoriAssistenza->eOperatore($utente);
     }
 
     /** @param array<string, mixed> $utente riga dell'utente (ruolo_id e ruoli_secondari) */
@@ -102,12 +118,24 @@ final class CasellaMessaggi
     /**
      * Tutte le conversazioni, prima quelle con messaggi da leggere, poi le più recenti.
      *
+     * Con $assistenza si aggiungono le chat di assistenza (tipo «assistenza», modulo «Assistenza»).
+     *
      * @return list<array{tipo: string, id: int, titolo: string, rif: string, nome: string, email: string, modulo: string, modulo_nome: string, area: string,
      *     pagina_id: int, ultimo: string, totale: int, da_leggere: int, archiviata: bool}>
      */
-    public function conversazioni(int $uid, bool $amministratore, bool $convenzioniFsl): array
+    public function conversazioni(int $uid, bool $amministratore, bool $convenzioniFsl, bool $assistenza = false): array
     {
         $out = [];
+        if ($assistenza) {
+            // Le chat di assistenza: le chiuse stanno tra le archiviate; si aprono nella pagina Assistenza, non in una finestra
+            foreach (array_merge($this->assistenza->elenco('tutte', $uid), $this->assistenza->elenco('chiuse', $uid)) as $c) {
+                $out[] = [
+                    'tipo' => self::ASSISTENZA, 'id' => (int) $c['id'], 'titolo' => CostantiAssistenza::nomeArgomento((string) $c['argomento']), 'rif' => (string) $c['contesto_testo'],
+                    'nome' => (string) $c['nome'], 'email' => (string) $c['email'], 'modulo' => 'assistenza', 'modulo_nome' => 'Assistenza', 'area' => '', 'pagina_id' => 0,
+                    'ultimo' => (string) $c['ultimo_il'], 'totale' => (int) $c['totale'], 'da_leggere' => (int) $c['da_leggere'], 'archiviata' => $c['stato'] === CostantiAssistenza::STATO_CHIUSA,
+                ];
+            }
+        }
         foreach ($this->aree($uid, $amministratore) as $a) {
             $modulo = Sezioni::moduloDiArea($a['area']);
             foreach ($this->prenotazioni->conversazioni((int) $a['area']['id'], $a['rbac']) as $c) {
@@ -135,14 +163,14 @@ final class CasellaMessaggi
     }
 
     /** Conversazioni con almeno un messaggio da leggere (numero del pulsante «Messaggi»). */
-    public function nonLetti(int $uid, bool $amministratore, bool $convenzioniFsl): int
+    public function nonLetti(int $uid, bool $amministratore, bool $convenzioniFsl, bool $assistenza = false): int
     {
         $n = 0;
         foreach ($this->aree($uid, $amministratore) as $a) {
             $n += $this->aree->messaggiNonLetti((int) $a['area']['id'], $a['rbac']);
         }
 
-        return $n + ($convenzioniFsl ? $this->convenzioni->conversazioniNonLette() : 0);
+        return $n + ($convenzioniFsl ? $this->convenzioni->conversazioniNonLette() : 0) + ($assistenza ? $this->assistenza->daLeggere() : 0);
     }
 
     private static function nomeModulo(string $modulo): string

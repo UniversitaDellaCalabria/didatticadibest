@@ -16,7 +16,9 @@ $funzioni_modulo = [
     'fsl'          => $puo_fsl_convenzioni ? [[$puo_fsl ? 'Pannello della Formazione Scuola Lavoro' : 'Convenzioni FSL', 'Per tutte le aree FSL: convenzioni con le scuole, verifica delle iscrizioni, riepilogo per anno e valutazioni', 'fa-briefcase', 'fsl.php']] : [],
     'calendari'    => [],
     // Referenti dei consigli: solo le sedute; Tutorato a chi ha il compito «Bandi» (o gestisce tutta la Didattica)
-    'didattica'    => ($puo_didattica || $puo_conv_tesi) ? array_values(array_filter([
+    'didattica'    => ($puo_didattica || $puo_conv_tesi || $puo_assistenza) ? array_values(array_filter([
+        $puo_assistenza ? ['Assistenza', 'Le chat di studenti, personale e utenti esterni: da prendere, in carico a te, chiuse', 'fa-headset', 'assistenza.php'] : null,
+        $puo_assistenza ? ['Didacticus', 'L’assistente virtuale: istruiscilo con domande, risposte, link e allegati e guarda cosa non ha saputo rispondere', 'fa-robot', 'didacticus.php'] : null,
         $puo_didattica_tutto ? ['Pratiche degli studenti', 'Moduli online, pratiche con stato, istruttoria e messaggi', 'fa-inbox', 'didattica.php?tab=pratiche'] : null,
         $puo_didattica ? ['Sedute e verbali', 'Consigli dei corsi di studio, presenze, convalide e piani di studio, verbale in Word ed Excel', 'fa-gavel', 'didattica.php?tab=sedute'] : null,
         $puo_didattica_tutto ? ['Moduli e documenti', 'Modulistica: documenti da scaricare e moduli online guidati', 'fa-file-lines', 'didattica.php?tab=moduli'] : null,
@@ -64,6 +66,11 @@ try {
         $sm = $cdf->praticheDaSmistare();
         if ($sm['n'] > 0) $cose[] = ['didattica', $sm['n'], $sm['n'] === 1 ? 'Pratica da assegnare' : 'Pratiche da assegnare',
             'Didattica · ' . ($sm['giorni'] >= 3 ? 'la più vecchia aspetta da ' . $sm['giorni'] . ' giorni' : 'arrivate da poco'), 'didattica.php?tab=pratiche&carico=smistare', $sm['giorni'] >= 7];
+    });
+    if ($puo_assistenza) $sicuro('assistenza', function () use (&$cose, $conn, $u_id_curr) {
+        $c_as = \App\Core\App::per($conn)->get(\App\Assistenza\ServizioAssistenza::class)->contatori((int)$u_id_curr);
+        if ($c_as['da_prendere'] > 0) $cose[] = ['didattica', $c_as['da_prendere'], 'Chat di assistenza da prendere', 'Assistenza · qualcuno aspetta una risposta', 'assistenza.php?vista=da_prendere', false];
+        if ($c_as['mie'] > 0) $cose[] = ['didattica', $c_as['mie'], $c_as['mie'] === 1 ? 'Tua chat di assistenza aperta' : 'Tue chat di assistenza aperte', 'Assistenza · in carico a te', 'assistenza.php?vista=mie', false];
     });
     if ($puo_conv_tesi) $sicuro('convenzioni di tesi', function () use (&$cose, $conn) {
         $n_ct = \App\Core\App::per($conn)->get(\App\ConvenzioniTesi\ServizioConvenzioniTesi::class)->daFare();

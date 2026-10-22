@@ -239,7 +239,45 @@ def costruisci():
     )))
 
     # 13 ---------------------------------------------------------------------------------------------
-    S.append(('direttore', 'Il Direttore', sezione('direttore', '14', 'Il Direttore: un cruscotto e le firme',
+    # 14 ---------------------------------------------------------------------------------------------
+    S.append(('assistenza', 'Assistenza e Didacticus', sezione('assistenza', '14', 'Assistenza e Didacticus, l\'assistente virtuale',
+        'Per qualsiasi dubbio (tirocini, certificati, pratiche, tutorato, tesi, eventi, accesso) studenti, personale e utenti esterni scrivono dal pulsante <b>«Serve aiuto?»</b>, in basso a destra su ogni pagina. Risponde prima <b>Didacticus</b>, l\'assistente virtuale; se non basta, passa la parola a una persona dell\'ufficio, che riceve un avviso e continua la stessa chat.',
+        griglia(
+            card('Per tutti', '<p>Chi ha il login ritrova la sua chat e le sue pratiche; gli esterni scrivono nome ed email e ricevono un <b>link personale</b> per riprendere la conversazione, senza registrarsi.</p>', '💬'),
+            card('Didacticus', '<p>Risponde subito alle domande più comuni con le risposte scritte dal Dipartimento, con <b>pulsanti, link e allegati</b>. Se non sa, lo dice: non inventa. Se la risposta non basta, un clic e arriva una persona.</p>', '🦉'),
+            card('Gli operatori', '<p>Le persone dell\'ufficio «Assistenza» vedono le chat da prendere, le loro, quelle ancora con Didacticus e quelle chiuse. «Prendo io», «Passa a…», note interne, «Chiudi».</p>', '🎧'),
+            card('Avvisi a finestrella', '<p>Gli operatori possono ricevere una <b>finestrella di Windows</b> a ogni richiesta, anche a sito chiuso; chi ha chiesto aiuto può essere avvisato delle risposte (senza il testo).</p>', '🔔'),
+            card('Orari e privacy', '<p>Gli orari si scrivono dal pannello e fuori orario si può scrivere lo stesso. Le chat si cancellano dopo 12 mesi; restano solo i numeri per le statistiche.</p>', '🛡️'),
+            card('Impara dall\'uso', '<p>Le domande a cui Didacticus non ha saputo rispondere finiscono in una lista: con un clic diventano nuove voci, con la risposta data dall\'operatore come bozza.</p>', '🌱'),
+        )
+        + '<h3>Come funziona, per chi chiede aiuto</h3>'
+        + passi(
+            'Dal pulsante <b>«Serve aiuto?»</b> (o dalla pagina Assistenza, o dal pulsante «Chiedi aiuto su questa pratica») si sceglie l\'argomento e si scrive la domanda. Gli esterni indicano nome ed email.',
+            '<b>Didacticus risponde subito</b>, con il testo, i pulsanti dei link e gli eventuali allegati. Se non è sicuro propone delle voci vicine («intendevi…?»).',
+            'Sotto ogni risposta: <b>«Sì, grazie»</b> chiude la chat; <b>«Non mi basta»</b> o <b>«Parla con un operatore»</b> (o la parola «operatore» scritta in chat) passano la parola a una persona.',
+            'La chat passa agli operatori, che ricevono email e finestrella con la domanda e vedono già quello che Didacticus ha risposto. Chi ha chiesto aiuto continua a scrivere nella stessa chat e, se chiude la pagina, riceve la risposta per email.',
+            'A fine conversazione si può dire se l\'assistenza è stata utile.')
+        + gal(fig('map_pub_assistenza_form', '<b>Nuova richiesta.</b> Argomento, domanda e, per gli esterni, nome ed email. Chi preferisce può scrivere subito a un operatore.'),
+              fig('map_pub_assistenza_didacticus', '<b>La chat con Didacticus:</b> risposta, link, «Ti è stato utile?» e «Parla con un operatore».'),
+              fig('map_pub_assistenza_esterno', '<b>La chat di un utente esterno</b>, ripresa dal suo link personale.'))
+        + '<h3>Per chi risponde</h3><p>Le persone dell\'ufficio <b>Assistenza</b> (scelte da Gestione del portale → Uffici) trovano la voce <b>Assistenza</b> nel menu di Didattica e le chat anche nella casella <b>Messaggi</b>. La chat si aggiorna da sola; il pulsante «Prendo io» assegna la chat, «Passa a…» la gira a un collega, le <b>note interne</b> non le vede chi ha chiesto aiuto.</p>'
+        + gal(fig('map_adm_assistenza_coda', '<b>Una chat da prendere</b>, con le schede Da prendere · Mie · Tutte · Con Didacticus · Chiuse.'),
+              fig('map_adm_assistenza', '<b>Una chat in carico</b>: la domanda, la risposta di Didacticus, la nota interna e la risposta dell\'operatrice.'),
+              fig('map_adm_assistenza_statistiche', '<b>Le statistiche</b>: chat per argomento e per operatore, tempo di prima risposta, utilità, e quante ne ha risolte Didacticus. Si scaricano in Excel, PDF e CSV.'))
+        + '<h3>Istruire Didacticus</h3><p>Da <b>Didattica → Didacticus</b> chi gestisce l\'assistenza scrive e cura la <b>base di conoscenza</b>: ogni <b>voce</b> ha le domande che la persona potrebbe fare (una per riga), le parole chiave e i sinonimi, la risposta, i <b>link</b> che diventano pulsanti e gli <b>allegati</b> da scaricare (PDF, Word, Excel, immagini). Una voce si può spegnere, riservare a chi ha fatto l\'accesso o impostare perché proponga sempre un operatore. L\'elenco si scarica e si può importare da un file CSV per scrivere tante voci in una volta.</p>'
+        + passi(
+            '<b>Voci</b>: l\'elenco con quante volte ogni risposta è stata usata e quanti l\'hanno trovata utile.',
+            '<b>Prova</b>: si scrive una domanda come la scriverebbe uno studente e si vede cosa risponderebbe Didacticus, con il punteggio di ogni voce.',
+            '<b>Domande senza risposta</b>: quelle che Didacticus non ha saputo gestire; «Crea una voce» le trasforma in risposte.',
+            '<b>Impostazioni</b>: acceso o spento, saluto, soglia di sicurezza e immagine di profilo.')
+        + gal(fig('map_adm_didacticus_voci', '<b>La base di conoscenza:</b> voci, usi, utilità, stato e azioni.'),
+              fig('map_adm_didacticus_voce', '<b>Una voce:</b> domande, parole chiave, risposta, link e allegati.'),
+              fig('map_adm_didacticus_prova', '<b>La prova:</b> cosa risponderebbe e le voci più vicine con il punteggio.'),
+              fig('map_adm_didacticus_mancate', '<b>Domande senza risposta</b> da trasformare in voci.'),
+              fig('map_adm_didacticus_impostazioni', '<b>Impostazioni:</b> acceso/spento, saluto, soglia e immagine del gufo.'))
+    )))
+
+    S.append(('direttore', 'Il Direttore', sezione('direttore', '15', 'Il Direttore: un cruscotto e le firme',
         'Una pagina sola con le cose che aspettano la firma del Direttore e quelle che si sono fermate nei vari moduli.',
         gal(fig('map_dir_cruscotto', '<b>Il Cruscotto del Direttore.</b> Documenti da firmare, pratiche ferme, conferme in ritardo, verbali, convenzioni, tutorato e risorse.'),
             fig('map_dir_assente', '<b>«Direttore assente».</b> Con un interruttore firme e avvisi passano al vice direttore, fino al rientro.'))
@@ -247,7 +285,7 @@ def costruisci():
     )))
 
     # 14 ---------------------------------------------------------------------------------------------
-    S.append(('pannello', 'Il pannello', sezione('pannello', '15', 'Il pannello di gestione',
+    S.append(('pannello', 'Il pannello', sezione('pannello', '16', 'Il pannello di gestione',
         'Per chi organizza: un pannello unico, diviso in cinque moduli. Ognuno entra solo in quelli per cui è abilitato.',
         fig('map_adm_inizio', '<b>L\'ingresso.</b> Le cose da fare e i moduli a cui si ha accesso.')
         + griglia(
@@ -291,7 +329,7 @@ def costruisci():
     )))
 
     # 15 ---------------------------------------------------------------------------------------------
-    S.append(('fiducia', 'Fiducia e privacy', sezione('fiducia', '16', 'Firme, protocollo, privacy',
+    S.append(('fiducia', 'Fiducia e privacy', sezione('fiducia', '17', 'Firme, protocollo, privacy',
         'Il portale è pensato per documenti che valgono: firmati, protocollati, tracciati e protetti.',
         griglia(
             card('Firme digitali', '<p>I documenti importanti si firmano in formato <b>PAdES</b> (PDF firmato). Il portale controlla che la firma sia integra e del titolare.</p>'),
@@ -304,7 +342,7 @@ def costruisci():
     )))
 
     # 16 ---------------------------------------------------------------------------------------------
-    S.append(('guide', 'Guide', sezione('guide', '17', 'Se hai bisogno di aiuto',
+    S.append(('guide', 'Guide', sezione('guide', '18', 'Se hai bisogno di aiuto',
         'Il portale ha le sue guide «Come si fa», una per ruolo, con le schermate. Si trovano nella pagina <code>guida.php</code> e si possono stampare.',
         griglia(
             card('Studente', '<p>Presentare una pratica, seguirla, prenotare aule.</p>'),
@@ -313,6 +351,7 @@ def costruisci():
             card('Responsabile di risorsa', '<p>Approvare, controllare il diario e le scadenze.</p>'),
             card('Tutor', '<p>Lettera di incarico, registro e pagamento.</p>'),
             card('Scuole', '<p>La convenzione FSL passo per passo; l\'elenco degli studenti.</p>'),
+            card('Chi risponde all\'assistenza', '<p>Le chat, «Prendo io», le note e le statistiche; come istruire Didacticus.</p>'),
             card('Direttore', '<p>Cruscotto, firme e «Direttore assente».</p>'),
             card('Amministratore', '<p>Moduli, uffici, utenti, backup e ripristino.</p>'),
         )
