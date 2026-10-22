@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tirocini;
 
 use App\Core\Database;
+use App\Core\Esito;
 
 /**
  * Aziende convenzionate per i tirocini curriculari: il report dell'Albo aziende del TSP (Cineca) si carica dal pannello, resta
@@ -15,6 +16,9 @@ final class ServizioAziende
 {
     public const ORIGINE_MANUALE = 'manuale';
     public const ORIGINE_WEB = 'web';
+
+    /** Le aziende inserite a mano non hanno un codice del TSP: ne ricevono uno che comincia così (MAN-1, MAN-2…) */
+    public const PREFISSO_MANUALE = 'MAN-';
 
     /** Parole (e loro radici) che indicano un'organizzazione: senza, un nome di 2-4 parole è con ogni probabilità una persona (ditta individuale, professionista) */
     private const PAROLE_ORGANIZZAZIONE = '/\b(?:s\.?r\.?l|s\.?p\.?a|s\.?a\.?s|s\.?n\.?c|soc|societ|asd|a\.s\.d|aps|ets|odv|onlus|ass|associazione|comune|provincia|regione|ente|parco|universit|istituto|azienda|cooperativa|coop|fondazione|consorzio|studio|centro|laborator|clinic|ospedal|asp|agenzia|arpa|camera|museo|biblioteca|club|football|gruppo|group|italia|calabria|cosenza|service|servizi|ditta|farmaci|parafarmaci|hotel|impresa|officina|parrocchia|proloco|pro loco|sport|team|center|lab|cnr|inrca|irccs|stazione|zoolog|ricerca|research|veterinar|medic|analisi|gym|fitness|industry|industrie|consulting|engineering|energy|ambiente|ambiental)\w*/iu';
@@ -113,17 +117,110 @@ final class ServizioAziende
         if ($provincia !== '' && Province::sigla($provincia) === '') {
             return 'Scegli la provincia dall\'elenco.';
         }
-        $sito = trim($sito);
-        if ($sito !== '' && !preg_match('#^https?://#i', $sito)) {
-            $sito = 'https://' . $sito;
-        }
-        if ($sito !== '' && !filter_var($sito, FILTER_VALIDATE_URL)) {
+        $sito = self::normalizzaSito($sito);
+        if ($sito === null) {
             return 'Il sito web non è un indirizzo valido.';
         }
         $this->salvaIndirizzo($id, $indirizzo, $cap, $comune, $provincia, self::ORIGINE_MANUALE, true);
         $this->db->esegui('UPDATE tirocini_aziende SET sito = ?, pubblica = ?, settore = ? WHERE id = ?', [mb_substr($sito, 0, 255), $pubblica ? 1 : 0, mb_substr(trim($settore), 0, 255), $id]);
 
         return null;
+    }
+
+    /**
+     * Aggiunge a mano un'azienda con convenzione attiva che non è nel report del TSP. Si pubblica se ha comune e provincia e la si lascia
+     * pubblica. Non si accettano doppioni (stessa partita IVA, stesso codice fiscale o stesso nome).
+     */
+    public function creaManuale(string $nome, string $partitaIva, string $codiceFiscale, string $settore, string $indirizzo, string $cap, string $comune, string $provincia, string $sito, bool $pubblica): Esito
+    {
+        $nome = trim($nome);
+        $piva = preg_replace('/\s+/', '', $partitaIva) ?? '';
+        $cf = strtoupper(preg_replace('/\s+/', '', $codiceFiscale) ?? '');
+        if ($nome === '') {
+            return Esito::errore('Scrivi il nome dell\'azienda.');
+        }
+        if ($provincia !== '' && Province::sigla($provincia) === '') {
+            return Esito::errore('Scegli la provincia dall\'elenco.');
+        }
+        $sitoOk = self::normalizzaSito($sito);
+        if ($sitoOk === null) {
+            return Esito::errore('Il sito web non è un indirizzo valido.');
+        }
+        $doppione = $this->db->riga(
+            'SELECT nome FROM tirocini_aziende WHERE LOWER(nome) = LOWER(?) OR (? <> \'\' AND partita_iva = ?) OR (? <> \'\' AND codice_fiscale = ?) LIMIT 1',
+            [$nome, $piva, $piva, $cf, $cf]
+        );
+        if ($doppione) {
+            return Esito::errore('«' . $doppione['nome'] . '» è già nell\'elenco: cercala e modificala da lì.');
+        }
+        $n = (int) $this->db->valore("SELECT MAX(CAST(SUBSTRING(cod_tsp, " . (strlen(self::PREFISSO_MANUALE) + 1) . ") AS UNSIGNED)) FROM tirocini_aziende WHERE cod_tsp LIKE ?", [self::PREFISSO_MANUALE . '%']);
+        $id = $this->db->inserisci(
+            'INSERT INTO tirocini_aziende (cod_tsp, nome, codice_fiscale, partita_iva, settore, convenzione, sito, pubblica) VALUES (?, ?, ?, ?, ?, 1, ?, ?)',
+            [self::PREFISSO_MANUALE . ($n + 1), mb_substr($nome, 0, 255), mb_substr($cf, 0, 20), mb_substr($piva, 0, 20), mb_substr(self::conIniziale($settore), 0, 255), mb_substr($sitoOk, 0, 255), $pubblica ? 1 : 0]
+        );
+        if ($id <= 0) {
+            return Esito::errore('Azienda non salvata: riprova.');
+        }
+        if (trim($comune) !== '' || trim($indirizzo) !== '') {
+            $this->salvaIndirizzo($id, $indirizzo, $cap, $comune, $provincia, self::ORIGINE_MANUALE, true);
+        }
+
+        return Esito::ok((string) $id);
+    }
+
+    /** Ragione sociale, partita IVA e codice fiscale: si cambiano solo per le aziende inserite a mano (quelle del TSP si aggiornano dal report). */
+    public function salvaAnagrafica(int $id, string $nome, string $partitaIva, string $codiceFiscale): ?string
+    {
+        $a = $this->perId($id);
+        if (!$a || !$this->eManuale($a)) {
+            return 'Il nome delle aziende del TSP si aggiorna caricando il report.';
+        }
+        if (trim($nome) === '') {
+            return 'Scrivi il nome dell\'azienda.';
+        }
+        $this->db->esegui(
+            'UPDATE tirocini_aziende SET nome = ?, partita_iva = ?, codice_fiscale = ?, modificata_il = NOW() WHERE id = ?',
+            [mb_substr(trim($nome), 0, 255), mb_substr(preg_replace('/\s+/', '', $partitaIva) ?? '', 0, 20), mb_substr(strtoupper(preg_replace('/\s+/', '', $codiceFiscale) ?? ''), 0, 20), $id]
+        );
+
+        return null;
+    }
+
+    /** Toglie un'azienda inserita a mano (quelle del TSP escono dall'elenco da sole quando perdono la convenzione). */
+    public function eliminaManuale(int $id): ?string
+    {
+        $a = $this->perId($id);
+        if (!$a || !$this->eManuale($a)) {
+            return 'Si possono togliere solo le aziende inserite a mano.';
+        }
+        $this->db->esegui('DELETE FROM tirocini_aziende WHERE id = ?', [$id]);
+
+        return null;
+    }
+
+    /** @param array<string, mixed> $azienda */
+    public function eManuale(array $azienda): bool
+    {
+        return str_starts_with((string) ($azienda['cod_tsp'] ?? ''), self::PREFISSO_MANUALE);
+    }
+
+    /** Scritto a mano: solo la prima lettera diventa maiuscola (il resto resta com'è, sigle comprese) */
+    private static function conIniziale(string $testo): string
+    {
+        $t = self::maiuscolaIniziale($testo);
+
+        return mb_strtoupper(mb_substr($t, 0, 1)) . mb_substr($t, 1);
+    }
+
+    /** «www.azienda.it» → «https://www.azienda.it»; '' resta vuoto, un indirizzo non valido dà null. */
+    public static function normalizzaSito(string $sito): ?string
+    {
+        $sito = trim($sito);
+        if ($sito !== '' && !preg_match('#^https?://#i', $sito)) {
+            $sito = 'https://' . $sito;
+        }
+
+        return $sito !== '' && !filter_var($sito, FILTER_VALIDATE_URL) ? null : $sito;
     }
 
     /** Conferma gli indirizzi trovati sul web (di tutte o di una azienda): da quel momento si pubblicano. */

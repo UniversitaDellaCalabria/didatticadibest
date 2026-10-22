@@ -47,8 +47,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash_set("File letto: {$r['nuove']} aziende nuove, {$r['aggiornate']} aggiornate" . ($r['senza_convenzione'] ? ", {$r['senza_convenzione']} senza più la convenzione" : '') . ($r['indirizzi'] ? ", {$r['indirizzi']} indirizzi inseriti" : '') . ($r['siti'] ? ", {$r['siti']} siti web" : '') . ($r['scartate'] ? ", {$r['scartate']} righe scartate perché senza codice azienda" : '') . '.', $r['scartate'] ? 'warning' : 'success');
         }
         admin_redirect($url() . '&r=' . time());
+    } elseif (isset($_POST['nuova_azienda'])) {
+        $es = $az->creaManuale((string)($_POST['nome'] ?? ''), (string)($_POST['partita_iva'] ?? ''), (string)($_POST['codice_fiscale'] ?? ''), (string)($_POST['settore'] ?? ''), (string)($_POST['indirizzo'] ?? ''),
+            (string)($_POST['cap'] ?? ''), (string)($_POST['comune'] ?? ''), (string)($_POST['provincia'] ?? ''), (string)($_POST['sito'] ?? ''), !empty($_POST['pubblica']));
+        if ($es->riuscito) {
+            registra_log_audit($conn, "Tirocini: azienda inserita a mano", ["Azienda" => trim((string)($_POST['nome'] ?? '')), "Id" => $es->messaggio]);
+            $nuova = $az->perId((int)$es->messaggio);
+            flash_set('Azienda aggiunta' . ($nuova && $nuova['comune'] === '' ? ': senza comune e provincia non si pubblica finché non li scrivi.' : '.'));
+            admin_redirect($url('esterni', '&q=' . urlencode(trim((string)($_POST['nome'] ?? '')))) . '&r=' . time() . '#a' . (int)$es->messaggio);
+        }
+        flash_set($es->messaggio, 'danger');
+        $_SESSION['tirocini_bozza'] = array_intersect_key($_POST, array_flip(['nome', 'partita_iva', 'codice_fiscale', 'settore', 'indirizzo', 'cap', 'comune', 'provincia', 'sito']));
+        admin_redirect($url('esterni', '&nuova=1') . '&r=' . time());
+    } elseif (isset($_POST['elimina_azienda'])) {
+        $err = $az->eliminaManuale($id);
+        if (!$err) registra_log_audit($conn, "Tirocini: azienda inserita a mano eliminata", ["Azienda" => $id]);
+        flash_set($err ?? 'Azienda tolta dall\'elenco.', $err ? 'danger' : 'warning');
+        admin_redirect($url('esterni', '&f=' . $filtro) . '&r=' . time());
     } elseif (isset($_POST['salva_azienda'])) {
-        $err = $az->salvaScheda($id, (string)($_POST['indirizzo'] ?? ''), (string)($_POST['cap'] ?? ''), (string)($_POST['comune'] ?? ''), (string)($_POST['provincia'] ?? ''), (string)($_POST['sito'] ?? ''), !empty($_POST['pubblica']), (string)($_POST['settore'] ?? ''));
+        $errNome = isset($_POST['nome']) ? $az->salvaAnagrafica($id, (string)$_POST['nome'], (string)($_POST['partita_iva'] ?? ''), (string)($_POST['codice_fiscale'] ?? '')) : null;
+        $err = $errNome ?? $az->salvaScheda($id, (string)($_POST['indirizzo'] ?? ''), (string)($_POST['cap'] ?? ''), (string)($_POST['comune'] ?? ''), (string)($_POST['provincia'] ?? ''), (string)($_POST['sito'] ?? ''), !empty($_POST['pubblica']), (string)($_POST['settore'] ?? ''));
         if (!$err) registra_log_audit($conn, "Tirocini: azienda modificata", ["Azienda" => $id]);
         flash_set($err ?? 'Azienda salvata.', $err ? 'danger' : 'success');
         admin_redirect($url('esterni', '&f=' . $filtro . '&q=' . urlencode($cerca)) . '&r=' . time() . '#a' . $id);
@@ -77,6 +95,8 @@ $cont = $az->conteggi();
 $elenco = $tab === 'esterni' ? $az->elenco($filtro, $cerca) : [];
 $labs = $tab === 'interni' ? $lab->tutti() : [];
 $province = \App\Tirocini\Province::tutte();
+$bozza = $_SESSION['tirocini_bozza'] ?? []; unset($_SESSION['tirocini_bozza']);
+$apri_nuova = isset($_GET['nuova']);
 ?>
 <style>
 .tir-kpi { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin:12px 0; }
@@ -107,6 +127,32 @@ echo pn_schede([
         <?php endforeach; ?>
     </div>
 
+    <div class="mb-3">
+        <button class="btn btn-danger btn-sm fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#nuovaAzienda" aria-expanded="<?php echo $apri_nuova ? 'true' : 'false'; ?>" aria-controls="nuovaAzienda"><i class="fa fa-plus me-1" aria-hidden="true"></i>Aggiungi un'azienda a mano</button>
+        <div class="collapse<?php echo $apri_nuova ? ' show' : ''; ?> mt-3" id="nuovaAzienda">
+            <form method="POST" class="border rounded p-3 bg-white"><?php csrf_field(); ?>
+                <h2 class="h6 fw-bold"><i class="fa fa-building-circle-check me-1 text-success" aria-hidden="true"></i>Nuova azienda con convenzione attiva</h2>
+                <p class="small text-secondary mb-2">Per le aziende che non sono nel report del TSP. Servono il nome e, per pubblicarla, comune e provincia: il resto si può aggiungere dopo. Non si accettano doppioni (stessa partita IVA, codice fiscale o nome).</p>
+                <div class="row g-2">
+                    <div class="col-lg-6"><label class="form-label small mb-0" for="na-nome">Nome dell'azienda <span class="text-danger">*</span></label><input class="form-control form-control-sm" id="na-nome" name="nome" value="<?php echo $h($bozza['nome'] ?? ''); ?>" maxlength="255" required></div>
+                    <div class="col-6 col-lg-3"><label class="form-label small mb-0" for="na-piva">Partita IVA</label><input class="form-control form-control-sm" id="na-piva" name="partita_iva" value="<?php echo $h($bozza['partita_iva'] ?? ''); ?>" maxlength="20"></div>
+                    <div class="col-6 col-lg-3"><label class="form-label small mb-0" for="na-cf">Codice fiscale</label><input class="form-control form-control-sm" id="na-cf" name="codice_fiscale" value="<?php echo $h($bozza['codice_fiscale'] ?? ''); ?>" maxlength="20"></div>
+                    <div class="col-lg-4"><label class="form-label small mb-0" for="na-ind">Indirizzo</label><input class="form-control form-control-sm" id="na-ind" name="indirizzo" value="<?php echo $h($bozza['indirizzo'] ?? ''); ?>" maxlength="255" placeholder="Via e numero civico"></div>
+                    <div class="col-4 col-lg-1"><label class="form-label small mb-0" for="na-cap">CAP</label><input class="form-control form-control-sm" id="na-cap" name="cap" value="<?php echo $h($bozza['cap'] ?? ''); ?>" maxlength="10"></div>
+                    <div class="col-8 col-lg-3"><label class="form-label small mb-0" for="na-com">Comune</label><input class="form-control form-control-sm" id="na-com" name="comune" value="<?php echo $h($bozza['comune'] ?? ''); ?>" maxlength="100"></div>
+                    <div class="col-lg-4"><label class="form-label small mb-0" for="na-prov">Provincia</label><select class="form-select form-select-sm" id="na-prov" name="provincia"><option value="">—</option>
+                        <?php foreach ($province as $sig => [$nomeP]): ?><option value="<?php echo $h($sig); ?>"<?php echo ($bozza['provincia'] ?? '') === $sig ? ' selected' : ''; ?>><?php echo $h($nomeP . ' (' . $sig . ')'); ?></option><?php endforeach; ?></select></div>
+                    <div class="col-lg-6"><label class="form-label small mb-0" for="na-set">Settore (ATECO)</label><input class="form-control form-control-sm" id="na-set" name="settore" value="<?php echo $h($bozza['settore'] ?? ''); ?>" maxlength="255" placeholder="es. Consulenza ambientale"></div>
+                    <div class="col-lg-6"><label class="form-label small mb-0" for="na-sito">Sito web</label><input class="form-control form-control-sm" id="na-sito" name="sito" value="<?php echo $h($bozza['sito'] ?? ''); ?>" maxlength="255" placeholder="facoltativo"></div>
+                    <div class="col-12 d-flex flex-wrap align-items-center gap-3">
+                        <div class="form-check mb-0"><input class="form-check-input" type="checkbox" name="pubblica" value="1" id="na-pub" checked><label class="form-check-label small" for="na-pub">Pubblica nell'elenco</label></div>
+                        <button class="btn btn-danger btn-sm fw-bold ms-auto" name="nuova_azienda" value="1" type="submit"><i class="fa fa-floppy-disk me-1" aria-hidden="true"></i>Aggiungi l'azienda</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div class="row g-3 mb-3">
         <div class="col-lg-6"><form method="POST" enctype="multipart/form-data" class="border rounded p-3 bg-white h-100"><?php csrf_field(); ?>
             <h2 class="h6 fw-bold"><i class="fa fa-file-excel me-1 text-success" aria-hidden="true"></i>Carica il report del TSP</h2>
@@ -129,11 +175,12 @@ echo pn_schede([
     <?php if (!$elenco): ?><p class="text-muted small"><?php echo $cont['totale'] ? 'Nessuna azienda in questo elenco.' : 'Carica il report del TSP per cominciare.'; ?></p><?php endif; ?>
     <?php foreach ($elenco as $a):
         $web = $a['origine'] === 'web' && !(int)$a['verificato'];
-        $pub = (int)$a['pubblica'] && $a['comune'] !== '' && !$web; ?>
+        $pub = (int)$a['pubblica'] && $a['comune'] !== '' && !$web;
+        $manuale = $az->eManuale($a); ?>
     <div class="tir-riga<?php echo $pub ? '' : ' off'; ?>" id="a<?php echo (int)$a['id']; ?>">
         <form method="POST"><?php csrf_field(); ?><input type="hidden" name="id" value="<?php echo (int)$a['id']; ?>">
             <div class="d-flex flex-wrap justify-content-between gap-2 mb-2">
-                <div><h3><?php echo $h($a['nome']); ?></h3><div class="sub">TSP <?php echo $h($a['cod_tsp']); ?> · <?php echo $h($a['partita_iva'] !== '' ? 'P.IVA ' . $a['partita_iva'] : ($a['codice_fiscale'] !== '' ? 'CF ' . $a['codice_fiscale'] : 'senza P.IVA')); ?></div></div>
+                <div><h3><?php echo $h($a['nome']); ?><?php if ($manuale): ?> <span class="badge text-bg-info fw-normal align-middle">Inserita a mano</span><?php endif; ?></h3><div class="sub"><?php echo $manuale ? 'Codice ' : 'TSP '; ?><?php echo $h($a['cod_tsp']); ?> · <?php echo $h($a['partita_iva'] !== '' ? 'P.IVA ' . $a['partita_iva'] : ($a['codice_fiscale'] !== '' ? 'CF ' . $a['codice_fiscale'] : 'senza P.IVA')); ?></div></div>
                 <div>
                     <?php if ($pub): ?><span class="badge text-bg-success">Pubblicata</span>
                     <?php elseif ($web): ?><span class="badge text-bg-warning">Indirizzo da confermare</span>
@@ -142,6 +189,11 @@ echo pn_schede([
                 </div>
             </div>
             <div class="row g-2">
+                <?php if ($manuale): ?>
+                <div class="col-lg-6"><label class="form-label small mb-0">Nome dell'azienda</label><input class="form-control form-control-sm" name="nome" value="<?php echo $h($a['nome']); ?>" maxlength="255" required></div>
+                <div class="col-6 col-lg-3"><label class="form-label small mb-0">Partita IVA</label><input class="form-control form-control-sm" name="partita_iva" value="<?php echo $h($a['partita_iva']); ?>" maxlength="20"></div>
+                <div class="col-6 col-lg-3"><label class="form-label small mb-0">Codice fiscale</label><input class="form-control form-control-sm" name="codice_fiscale" value="<?php echo $h($a['codice_fiscale']); ?>" maxlength="20"></div>
+                <?php endif; ?>
                 <div class="col-lg-4"><label class="form-label small mb-0">Indirizzo</label><input class="form-control form-control-sm" name="indirizzo" value="<?php echo $h($a['indirizzo']); ?>" maxlength="255" placeholder="Via e numero civico"></div>
                 <div class="col-4 col-lg-1"><label class="form-label small mb-0">CAP</label><input class="form-control form-control-sm" name="cap" value="<?php echo $h($a['cap']); ?>" maxlength="10"></div>
                 <div class="col-8 col-lg-3"><label class="form-label small mb-0">Comune</label><input class="form-control form-control-sm" name="comune" value="<?php echo $h($a['comune']); ?>" maxlength="100"></div>
@@ -151,7 +203,8 @@ echo pn_schede([
                 <div class="col-lg-8"><label class="form-label small mb-0">Settore (ATECO)</label><input class="form-control form-control-sm" name="settore" value="<?php echo $h($a['settore']); ?>" maxlength="255"></div>
                 <div class="col-lg-4 d-flex align-items-end gap-2">
                     <div class="form-check mb-1"><input class="form-check-input" type="checkbox" name="pubblica" value="1" id="p<?php echo (int)$a['id']; ?>"<?php echo (int)$a['pubblica'] ? ' checked' : ''; ?>><label class="form-check-label small" for="p<?php echo (int)$a['id']; ?>">Pubblica nell'elenco</label></div>
-                    <button class="btn btn-danger btn-sm ms-auto" name="salva_azienda" value="1" type="submit">Salva</button>
+                    <?php if ($manuale): ?><button class="btn btn-outline-danger btn-sm ms-auto" name="elimina_azienda" value="1" type="submit" data-confirm="Togliere questa azienda dall'elenco? Si può solo per quelle inserite a mano.">Elimina</button><?php endif; ?>
+                    <button class="btn btn-danger btn-sm<?php echo $manuale ? '' : ' ms-auto'; ?>" name="salva_azienda" value="1" type="submit">Salva</button>
                 </div>
             </div>
             <?php if ($web): ?><div class="small mt-2 text-warning-emphasis"><i class="fa fa-triangle-exclamation me-1" aria-hidden="true"></i>Indirizzo trovato sul web, da controllare.

@@ -109,6 +109,24 @@ $guasto = new class implements \App\Anagrafi\ClientApiAteneo {
 $es2 = (new \App\Tirocini\ServizioLaboratori(\App\Core\Database::per($conn), $guasto, $str_ti))->sincronizza('TI9');
 prova(!$es2['TI9']['ok'] && (int)$conn->query("SELECT COUNT(*) c FROM tirocini_laboratori WHERE id = 990002")->fetch_assoc()['c'] === 1, "API non raggiungibili: i laboratori di prima restano");
 
+// Azienda inserita a mano dal pannello
+$q("DELETE FROM tirocini_aziende WHERE nome LIKE 'ZZ Prova a mano%'");
+$m1 = $az_ti->creaManuale('ZZ Prova a mano Srl', '09876543210', '', 'consulenza ambientale', 'Via Roma 1', '87100', 'Cosenza', 'cs', 'www.provamano.it', true);
+$riga_m1 = $m1->riuscito ? $az_ti->perId((int)$m1->messaggio) : null;
+prova($m1->riuscito && $riga_m1 && str_starts_with($riga_m1['cod_tsp'], AziendeTi::PREFISSO_MANUALE) && (int)$riga_m1['convenzione'] === 1 && $riga_m1['provincia'] === 'CS' && $riga_m1['regione'] === 'Calabria' && $riga_m1['sito'] === 'https://www.provamano.it' && $riga_m1['settore'] === 'Consulenza ambientale' && $az_ti->eManuale($riga_m1),
+    "azienda inserita a mano: codice MAN-n, convenzione attiva, regione dalla provincia, sito con https, settore con l'iniziale maiuscola");
+prova(in_array('ZZ Prova a mano Srl', array_column($az_ti->pubbliche(), 'nome'), true), "azienda inserita a mano con comune e provincia: si pubblica subito");
+prova(!$az_ti->creaManuale('zz prova a MANO srl', '', '', '', '', '', '', '', '', true)->riuscito && !$az_ti->creaManuale('Altro nome', '09876543210', '', '', '', '', '', '', '', true)->riuscito, "doppioni rifiutati: stesso nome o stessa partita IVA");
+prova(!$az_ti->creaManuale('', '', '', '', '', '', '', '', '', true)->riuscito && !$az_ti->creaManuale('ZZ Prova a mano Due', '', '', '', '', '', 'Rende', 'XX', '', true)->riuscito && !$az_ti->creaManuale('ZZ Prova a mano Due', '', '', '', '', '', '', '', 'non un sito', true)->riuscito, "nome obbligatorio, provincia e sito controllati");
+$m2 = $az_ti->creaManuale('ZZ Prova a mano Due', '', '', '', '', '', '', '', '', true);
+prova($m2->riuscito && (int)$m2->messaggio > (int)$m1->messaggio, "seconda azienda a mano senza indirizzo: salvata");
+prova(!in_array('ZZ Prova a mano Due', array_column($az_ti->pubbliche(), 'nome'), true), "senza comune e provincia non si pubblica");
+prova($az_ti->salvaAnagrafica((int)$m1->messaggio, 'ZZ Prova a mano Nuovo', '09876543210', '') === null && $az_ti->perId((int)$m1->messaggio)['nome'] === 'ZZ Prova a mano Nuovo', "nome e partita IVA di un'azienda a mano si modificano");
+$tsp_id = (int)$conn->query("SELECT id FROM tirocini_aziende WHERE cod_tsp = 'T9001'")->fetch_assoc()['id'];
+prova($az_ti->salvaAnagrafica($tsp_id, 'Altro', '', '') !== null && $az_ti->eliminaManuale($tsp_id) !== null && $az_ti->perId($tsp_id) !== null, "le aziende del TSP non si rinominano né si eliminano dal pannello");
+prova($az_ti->eliminaManuale((int)$m1->messaggio) === null && $az_ti->perId((int)$m1->messaggio) === null, "un'azienda inserita a mano si può togliere");
+$q("DELETE FROM tirocini_aziende WHERE nome LIKE 'ZZ Prova a mano%'");
+
 $q("DELETE FROM tirocini_aziende WHERE cod_tsp LIKE 'T9%'");
 $q("DELETE FROM tirocini_laboratori WHERE id >= 990000");
 $q("DELETE FROM anagrafe_strutture WHERE codice = 'TI9'");
