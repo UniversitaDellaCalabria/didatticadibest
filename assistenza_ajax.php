@@ -28,7 +28,8 @@ $conv = null;
 if ($token !== '') {
     $c = $srv->perToken($token);
     $conv = $c && $c['canale'] === \App\Assistenza\Costanti::CANALE_ESTERNO ? $c : null;
-} elseif (!empty($_SESSION['utente_id'])) {
+}
+if (!$conv && !empty($_SESSION['utente_id'])) { // senza link valido (o con uno vecchio ricordato dal browser) vale la chat di chi ha il login
     $mie = $app->get(\App\Assistenza\ConversazioniRepository::class)->diUtente((int)$_SESSION['utente_id'], 1);
     $conv = $mie[0] ?? null;
 }

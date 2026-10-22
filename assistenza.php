@@ -23,8 +23,10 @@ $conv = null;
 if ($token !== '') {
     $c_tok = $srv->perToken($token);
     $conv = $c_tok && $c_tok['canale'] === $Cost::CANALE_ESTERNO ? $c_tok : null;
-} elseif ($utente) {
+}
+if (!$conv && $utente) { // senza link valido (o con un link vecchio ricordato dal browser) vale la chat di chi ha il login
     $conv = ($repo->diUtente((int)$utente['id'], 1)[0] ?? null);
+    $token = '';
 }
 $url_pagina = function (array $extra = []) use ($qs_pannello): string {
     $q = array_filter(($qs_pannello ? ['pannello' => 1] : []) + $extra, fn($v) => $v !== '' && $v !== null);
@@ -71,7 +73,13 @@ if ($pannello) {
         . $css('fonts/titillium-lora.css') . $css('jsdelivr/npm/bootstrap-italia@2.8.3/dist/css/bootstrap-italia.min.css') . $css('cdnjs/ajax/libs/font-awesome/6.4.0/css/all.min.css')
         . '<style>body{font-family:"Titillium Web",sans-serif;background:#fff;} html{font-size:15px;height:100%} body{height:100%;margin:0}'
         . ' .ac-pannello{height:100%;display:flex;flex-direction:column;padding:10px;overflow-y:auto} .ac-pannello #ac-app{flex:1;min-height:0;display:flex;flex-direction:column}'
-        . ' .ac-pannello #ac-log{flex:1;height:auto !important;min-height:0 !important}</style></head><body><div class="ac-pannello">';
+        . ' .ac-pannello #ac-log{flex:1;height:auto !important;min-height:0 !important;padding:.6rem !important;font-size:1rem}'
+        . ' .ac-pannello .card-header{padding:.4rem .6rem !important;flex-wrap:nowrap !important} .ac-pannello .card-header>div:first-child{min-width:0;flex:1 1 auto} .ac-pannello .card-header .d-flex{flex-shrink:0} .ac-pannello{padding-bottom:0 !important} .ac-pannello #ac-stato{font-size:.75rem;line-height:1.25}'
+        . ' .ac-pannello #ac-intestazione img{width:28px;height:28px} .ac-pannello .btn-sm{padding:.15rem .5rem;font-size:.8rem}'
+        . ' .ac-pannello #ac-push{padding:.35rem .6rem !important;font-size:.78rem;line-height:1.3} .ac-pannello #ac-valuta{padding:.35rem .6rem !important}'
+        . ' .ac-pannello #ac-form{padding:.5rem .6rem} .ac-pannello #ac-form .form-text{font-size:.72rem;margin-top:.2rem} .ac-pannello #ac-testo{font-size:.95rem}'
+        . ' .ac-pannello .ac-azioni .btn{font-size:.82rem;padding:.2rem .55rem} .ac-pannello .ac-azioni .small{font-size:.78rem}'
+        . '</style></head><body><div class="ac-pannello">';
 } else {
     require_once 'header.php';
     echo '<div class="container my-4" style="max-width: 760px;">';
@@ -123,7 +131,7 @@ if (!$servizio_attivo): ?>
         </div>
         <?php if ($push_pub->attivo()): ?>
         <div id="ac-push" class="px-3 py-2 border-top bg-white d-none small">
-            <i class="fa fa-bell text-danger me-1" aria-hidden="true"></i>Vuoi un avviso sul computer o sul telefono quando l'assistenza risponde?
+            <i class="fa fa-bell text-danger me-1" aria-hidden="true"></i>Vuoi un avviso quando l'assistenza risponde?
             <button type="button" class="btn btn-outline-danger btn-sm ms-1" id="ac-push-attiva">Avvisami</button>
             <span id="ac-push-msg" class="text-secondary ms-1" role="status"></span>
         </div>
@@ -140,7 +148,7 @@ if (!$servizio_attivo): ?>
     </div>
     <?php if ($chiusa && !$pannello): ?><p class="small text-secondary mt-2">La conversazione è chiusa: se scrivi di nuovo si riapre, oppure inizia una <a href="<?php echo $h($url_pagina(['t' => $token, 'nuova' => 1])); ?>">nuova richiesta</a>.</p><?php endif; ?>
     <?php if ($push_pub->attivo()): ?><script src="assets/js/assistenza-push.js?v=1"></script><?php endif; ?>
-    <script src="assets/js/assistenza-chat.js?v=3"></script>
+    <script src="assets/js/assistenza-chat.js?v=4"></script>
     <?php if ($conv['canale'] === $Cost::CANALE_ESTERNO): ?>
         <script>try { localStorage.setItem('assistenza_t', <?php echo json_encode($token, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>); } catch (e) {}</script>
     <?php endif; ?>

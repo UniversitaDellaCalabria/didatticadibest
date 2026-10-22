@@ -132,7 +132,7 @@
         var intest = el('ac-intestazione');
         if (intest) intest.classList.toggle('d-none', !c.bot);
         if (c.chiusa) s.textContent = 'Conversazione chiusa';
-        else if (c.bot) s.textContent = 'Ti risponde Didacticus, l\'assistente virtuale. Quando vuoi puoi parlare con un operatore.';
+        else if (c.bot) s.textContent = 'Ti risponde Didacticus · puoi chiedere un operatore';
         else if (c.stato === 'assegnata' && c.operatore_nome) s.textContent = 'Ti risponde ' + c.operatore_nome;
         else s.textContent = 'In attesa di un operatore: ti risponderemo il prima possibile';
         stato.chiusa = c.chiusa;

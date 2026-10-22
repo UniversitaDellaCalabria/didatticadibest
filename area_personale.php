@@ -455,7 +455,9 @@ require_once 'header.php';
         </a>
     <?php endif; ?>
 
-    <?php // Assistenza: la chat con gli operatori (la conversazione più recente, o una nuova richiesta) ?>
+    <?php // Assistenza: la chat con gli operatori (la conversazione più recente, o una nuova richiesta); sparisce se il servizio è spento
+    try { $assist_on = \App\Core\App::get(\App\Assistenza\OrariAssistenza::class)->attiva(); } catch (\Throwable $e_as) { $assist_on = false; }
+    if ($assist_on): ?>
     <a href="assistenza.php" class="card border-0 shadow-sm mb-4 text-decoration-none" style="border-radius: 12px; border-left: 5px solid #B30000 !important;">
         <div class="card-body d-flex align-items-center gap-3 flex-wrap">
             <i class="fa fa-headset fs-3 text-danger" aria-hidden="true"></i>
@@ -466,6 +468,7 @@ require_once 'header.php';
             <span class="btn btn-sm btn-danger fw-bold">Apri la chat</span>
         </div>
     </a>
+    <?php endif; ?>
 
     <?php
     // Pratiche della didattica (moduli online): collegamento a Le mie pratiche se l'utente ne ha

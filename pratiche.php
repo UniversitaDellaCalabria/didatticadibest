@@ -4,6 +4,7 @@
 require_once __DIR__ . '/middleware.php';
 
 $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+try { $assist_on = \App\Core\App::get(\App\Assistenza\OrariAssistenza::class)->attiva(); } catch (\Throwable $e_as) { $assist_on = false; } // servizio di assistenza acceso?
 $uid = (int)$_SESSION['utente_id'];
 $id = (int)($_GET['id'] ?? 0);
 $p = $id ? pratica($conn, $id) : null;
@@ -51,7 +52,7 @@ require_once 'header.php';
         $etichette_ev = ['passaggio' => 'Passaggio', 'attivita' => 'Attività', 'autodich' => 'Autodichiarazione']; ?>
         <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
             <div><h1 class="fw-bold h3 mb-0"><?php echo $h($p['modulo_titolo']); ?></h1><div class="small text-secondary font-monospace"><?php echo $h($p['codice']); ?> · inviata il <?php echo date('d/m/Y H:i', strtotime($p['creata_il'])); ?><?php echo ($p['protocollo'] ?? '') !== '' ? ' · prot. ' . $h($p['protocollo']) . (!empty($p['protocollo_data']) ? ' del ' . date('d/m/Y', strtotime($p['protocollo_data'])) : '') : ''; ?></div></div>
-            <div class="fs-6 d-flex flex-wrap gap-2 align-items-center"><?php echo badge_stato_pratica($p['stato']); ?><a href="assistenza.php?pratica=<?php echo (int)$p['id']; ?>&amp;argomento=pratiche" class="btn btn-sm btn-outline-secondary fw-bold" title="Scrivi all'assistenza: la chat parte già collegata a questa pratica"><i class="fa fa-headset me-1" aria-hidden="true"></i>Chiedi aiuto su questa pratica</a><?php if (pratica_modificabile($p)): ?><a href="modulo.php?id=<?php echo (int)$p['modulo_id']; ?>&amp;pratica=<?php echo (int)$p['id']; ?>" class="btn btn-sm btn-outline-primary fw-bold"><i class="fa fa-pen me-1" aria-hidden="true"></i>Modifica la richiesta</a><?php endif; ?></div>
+            <div class="fs-6 d-flex flex-wrap gap-2 align-items-center"><?php echo badge_stato_pratica($p['stato']); ?><?php if ($assist_on): ?><a href="assistenza.php?pratica=<?php echo (int)$p['id']; ?>&amp;argomento=pratiche" class="btn btn-sm btn-outline-secondary fw-bold" title="Scrivi all'assistenza: la chat parte già collegata a questa pratica"><i class="fa fa-headset me-1" aria-hidden="true"></i>Chiedi aiuto su questa pratica</a><?php endif; ?><?php if (pratica_modificabile($p)): ?><a href="modulo.php?id=<?php echo (int)$p['modulo_id']; ?>&amp;pratica=<?php echo (int)$p['id']; ?>" class="btn btn-sm btn-outline-primary fw-bold"><i class="fa fa-pen me-1" aria-hidden="true"></i>Modifica la richiesta</a><?php endif; ?></div>
         </div>
         <?php $link_sond = \App\Core\App::per($conn)->get(\App\Didattica\SondaggioPratica::class)->link($p); if ($link_sond !== ''): ?>
         <div class="alert alert-light border d-flex flex-wrap justify-content-between align-items-center gap-2"><span><i class="fa fa-comment-dots me-1 text-primary" aria-hidden="true"></i>La pratica è conclusa. Vuoi dirci com'è andata? Due domande, <strong>facoltative</strong>.</span><a class="btn btn-sm btn-primary fw-bold" href="<?php echo $h($link_sond); ?>">Rispondi</a></div>

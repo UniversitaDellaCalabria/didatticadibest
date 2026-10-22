@@ -67,6 +67,10 @@ if ($puo_didattica_tutto) {
 }
 if ($puo_conv_tesi) $sezioni_h[] = ['fa-handshake', 'Convenzioni di tesi', 'Enti e aziende che accolgono studenti per la tesi.', 'convenzioni_tesi.php?p_id=' . (int)$filtro_p];
 if ($puo_tutorato) $sezioni_h[] = ['fa-user-graduate', 'Tutorato · lettere di incarico', 'Bandi, lettere, firme e pagamenti dei tutor.', 'tutorato.php?p_id=' . (int)$filtro_p];
+if ($puo_assistenza) {
+    $sezioni_h[] = ['fa-headset', 'Assistenza', 'Le chat di studenti, personale ed esterni: da prendere, tue, statistiche e orari.', 'assistenza.php?p_id=' . (int)$filtro_p];
+    $sezioni_h[] = ['fa-robot', 'Didacticus', 'L\'assistente virtuale: voci, link e allegati, domande senza risposta e prova.', 'didacticus.php?p_id=' . (int)$filtro_p];
+}
 ?>
 <h2 class="h6 fw-bold text-uppercase text-secondary mt-4 mb-2" style="letter-spacing:.05em;">Tutte le sezioni</h2>
 <div class="pn-sezioni">
