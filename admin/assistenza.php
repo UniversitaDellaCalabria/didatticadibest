@@ -52,8 +52,8 @@ $dur = fn($m) => \App\Assistenza\StatisticheAssistenza::durata($m);
 <?php if ($push_as->attivo()): ?>
 <div id="as-push" class="card border-0 shadow-sm mb-3 d-none" data-url="push_ajax.php" data-csrf="<?php echo htmlspecialchars((string)csrf_token()); ?>" data-chiave="<?php echo htmlspecialchars($push_as->chiavePubblica()); ?>">
     <div class="card-body py-2 d-flex flex-wrap align-items-center gap-2">
-        <span class="fw-bold"><i class="fa fa-bell text-danger me-1" aria-hidden="true"></i>Notifiche sul computer</span>
-        <button type="button" class="btn btn-danger btn-sm fw-bold" id="as-push-attiva"><i class="fa fa-bell me-1" aria-hidden="true"></i>Attiva le notifiche su questo computer</button>
+        <span class="fw-bold"><i class="fa fa-bell text-secondary me-1" aria-hidden="true"></i>Notifiche sul computer</span>
+        <button type="button" class="btn btn-azione btn-sm fw-bold" id="as-push-attiva"><i class="fa fa-bell me-1" aria-hidden="true"></i>Attiva le notifiche su questo computer</button>
         <span id="as-push-attive" class="d-none"><span class="d-inline-flex flex-wrap align-items-center gap-2">
             <span class="badge bg-success" id="as-push-stato">Attive su questo computer</span>
             <label class="visually-hidden" for="as-push-silenzia">Silenzia le notifiche</label>
@@ -149,7 +149,7 @@ $dur = fn($m) => \App\Assistenza\StatisticheAssistenza::durata($m);
 <script src="../assets/js/assistenza-operatori.js?v=2"></script>
 <?php if ($push_as->attivo()): ?>
 <script src="../assets/js/assistenza-push.js?v=1"></script>
-<script src="../assets/js/assistenza-push-operatori.js?v=1"></script>
+<script src="../assets/js/assistenza-push-operatori.js?v=2"></script>
 <?php endif; ?>
 <?php else: // STATISTICHE ?>
 <form method="GET" class="d-flex flex-wrap align-items-end gap-2 mb-3"><input type="hidden" name="p_id" value="<?php echo (int)$filtro_p; ?>"><input type="hidden" name="scheda" value="statistiche">

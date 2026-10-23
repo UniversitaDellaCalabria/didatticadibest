@@ -209,6 +209,10 @@ $kpi_defs = [
     </div>
 <?php endforeach; ?>
 </div>
+<?php $n_pren_archivio = $dash->prenotazioniInArchivio((int)$filtro_p, $sql_filtro_eventi_rbac);
+if ($n_pren_archivio > 0): ?>
+<p class="small text-secondary mb-3"><i class="fa fa-box-archive me-1" aria-hidden="true"></i>I numeri qui sopra riguardano gli eventi in corso. Altre <strong><?php echo $n_pren_archivio; ?></strong> prenotazioni sono in eventi già archiviati: <a href="archivio.php?p_id=<?php echo (int)$filtro_p; ?>">apri l'archivio</a>.</p>
+<?php endif; ?>
 
 <!-- ── CORPO ──────────────────────────────────────────────── -->
 <div class="row g-3">

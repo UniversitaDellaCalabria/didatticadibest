@@ -433,7 +433,7 @@ echo '</nav>';
             <span class="text-muted">—</span>
             <input type="date" name="f_data_fine" class="form-control form-control-sm" style="max-width:135px;border-radius:8px;" value="<?php echo htmlspecialchars($filtro_data_fine); ?>" title="Al giorno" aria-label="Al giorno">
 
-            <div class="input-group input-group-sm" style="max-width:220px;">
+            <div class="input-group input-group-sm" style="max-width:300px;">
                 <input type="text" name="f_cerca" class="form-control" style="border-radius:8px 0 0 8px;" placeholder="Cerca per nome, email o codice" aria-label="Cerca per nome, email o codice" value="<?php echo htmlspecialchars($filtro_cerca); ?>">
                 <button type="submit" class="btn btn-outline-secondary" style="border-radius:0 8px 8px 0;"><i class="fa fa-search"></i></button>
             </div>
@@ -1019,6 +1019,7 @@ document.addEventListener('DOMContentLoaded', function() {
     $('#tabellaIscritti').DataTable({
         paging:  false,
         info:    false,
+        searching: false, // la ricerca è quella sopra (filtri): una sola, non due
         language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/it-IT.json' },
         order: [[<?php echo $is_archivio ? 4 : 5; ?>, "desc"]],
         columnDefs: [ { orderable: false, targets: <?php echo $is_archivio ? "5" : "[0, 6]"; ?> } ]

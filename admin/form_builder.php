@@ -131,7 +131,7 @@ $tipi_non_input = ['separator', 'hidden'];
 
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
     <h4 class="fw-bold text-dark mb-0"><i class="fa fa-list-check text-primary me-2"></i>Form Builder</h4>
-    <button class="btn btn-sm btn-danger fw-bold" style="border-radius:8px;" type="button" data-bs-toggle="collapse" data-bs-target="#panelAddCampo">
+    <button class="btn btn-sm btn-azione fw-bold" style="border-radius:8px;" type="button" data-bs-toggle="collapse" data-bs-target="#panelAddCampo">
         <i class="fa fa-plus me-1"></i>Aggiungi Campo
     </button>
 </div>
@@ -224,7 +224,7 @@ $tipi_non_input = ['separator', 'hidden'];
         <?php endif; ?>
 
         <div class="col-12 d-flex gap-2">
-            <button type="submit" name="add_campo_custom" class="btn btn-sm btn-danger fw-bold px-4"><i class="fa fa-plus me-1"></i>Aggiungi</button>
+            <button type="submit" name="add_campo_custom" class="btn btn-sm btn-azione fw-bold px-4"><i class="fa fa-plus me-1"></i>Aggiungi</button>
             <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#panelAddCampo">Annulla</button>
         </div>
     </form>
@@ -236,7 +236,7 @@ $tipi_non_input = ['separator', 'hidden'];
 <div class="text-center py-5 text-muted">
     <i class="fa fa-list-check fa-3x mb-3 d-block" style="opacity:.2;"></i>
     <p class="fw-semibold mb-2">Nessun campo personalizzato per quest'area.</p>
-    <button class="btn btn-danger btn-sm fw-bold" data-bs-toggle="collapse" data-bs-target="#panelAddCampo"><i class="fa fa-plus me-1"></i>Aggiungi il primo campo</button>
+    <button class="btn btn-azione btn-sm fw-bold" data-bs-toggle="collapse" data-bs-target="#panelAddCampo"><i class="fa fa-plus me-1"></i>Aggiungi il primo campo</button>
 </div>
 <?php else: ?>
 
@@ -445,7 +445,7 @@ $tipi_non_input = ['separator', 'hidden'];
                 </div>
                 <div class="modal-footer py-2">
                     <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Annulla</button>
-                    <button type="submit" name="edit_campo_custom" class="btn btn-primary btn-sm fw-bold">Salva</button>
+                    <button type="submit" name="edit_campo_custom" class="btn btn-azione btn-sm fw-bold">Salva</button>
                 </div>
             </form>
         </div>

@@ -829,7 +829,10 @@ $col_area = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
         <?php if(empty($eventi)): ?>
             <div class="ev-card p-5 text-center text-muted">
                 <i class="fa fa-folder-open fs-1 mb-3 d-block" style="opacity:.3;"></i>
-                <div class="fw-semibold">Nessun evento trovato.</div>
+                <div class="fw-semibold">Nessun evento in corso.</div>
+                <?php $n_arch_ev = count($repo_eventi->archiviatiAdmin((int)$filtro_p, $sql_filtro_eventi_rbac)); if ($n_arch_ev > 0): ?>
+                    <div class="small mt-2">Gli eventi già conclusi sono in <a href="archivio.php?p_id=<?php echo (int)$filtro_p; ?>">Archivio</a> (<?php echo $n_arch_ev; ?>).</div>
+                <?php endif; ?>
             </div>
         <?php else: ?>
         <div class="d-flex flex-column gap-3">

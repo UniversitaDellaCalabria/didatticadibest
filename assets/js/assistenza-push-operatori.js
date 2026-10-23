@@ -23,10 +23,10 @@
         return fetch(url, o).then(function (r) { return r.json(); }).catch(function () { return { ok: false, errore: 'Collegamento perso: riprova.' }; });
     }
 
-    function messaggio(testo, errore) {
+    function messaggio(testo, errore, avviso) {
         var m = el('as-push-msg');
         m.textContent = testo || '';
-        m.className = 'small ' + (errore ? 'text-danger' : 'text-secondary');
+        m.className = 'small ' + (errore && !avviso ? 'text-danger' : 'text-secondary');
     }
 
     function mostra(attive, dettaglio) {
@@ -42,8 +42,8 @@
     function aggiorna() {
         window.AssistenzaPush.stato().then(function (st) {
             barra.classList.remove('d-none');
-            if (st.permesso === 'non_supportato') { el('as-push-attiva').classList.add('d-none'); messaggio('Questo browser non supporta le notifiche a finestrella: usa Chrome o Edge.', true); return; }
-            if (st.permesso === 'denied') { el('as-push-attiva').disabled = true; messaggio('Le notifiche sono bloccate per questo sito: abilitale dall\'icona del lucchetto accanto all\'indirizzo.', true); }
+            if (st.permesso === 'non_supportato') { el('as-push-attiva').classList.add('d-none'); messaggio('Questo browser non supporta le notifiche a finestrella: usa Chrome o Edge.', true, true); return; }
+            if (st.permesso === 'denied') { el('as-push-attiva').classList.add('d-none'); messaggio('Le notifiche a finestrella sono disattivate in questo browser. Per averle: clicca sul lucchetto accanto all\'indirizzo e consenti le notifiche. Le richieste restano comunque visibili qui sotto.', false, true); }
             endpoint = st.sottoscrizione ? st.sottoscrizione.endpoint : '';
             chiama({ endpoint: endpoint }).then(function (r) {
                 if (!r.ok) { messaggio(r.errore, true); return; }

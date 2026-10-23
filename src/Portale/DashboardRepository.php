@@ -17,7 +17,7 @@ final class DashboardRepository
     {
     }
 
-    /** Prenotazioni attive, confermate, in attesa e check-in del perimetro (tutte tranne le annullate).
+    /** Prenotazioni attive, confermate, in attesa e check-in degli eventi non archiviati (tutte tranne le annullate).
      * @return array<string, mixed> vuoto se la query non riesce */
     public function kpi(int $paginaId, string $rbac): array
     {
@@ -28,8 +28,18 @@ final class DashboardRepository
      FROM prenotazioni p
      JOIN turni t ON p.turno_id = t.id
      JOIN eventi e ON t.evento_id = e.id
-     WHERE e.pagina_id = ? $rbac
+     WHERE e.pagina_id = ? AND e.archiviato = 0 $rbac
        AND p.stato NOT IN ('annullata','annullato','cancelled')", [$paginaId]) ?? [];
+    }
+
+    /** Prenotazioni attive degli eventi già archiviati (non contate nei numeri della dashboard). */
+    public function prenotazioniInArchivio(int $paginaId, string $rbac): int
+    {
+        return (int) $this->db->valore("SELECT COUNT(*) FROM prenotazioni p
+     JOIN turni t ON p.turno_id = t.id
+     JOIN eventi e ON t.evento_id = e.id
+     WHERE e.pagina_id = ? AND e.archiviato = 1 $rbac
+       AND p.stato NOT IN ('annullata','annullato','cancelled')", [$paginaId]);
     }
 
     /** Check-in di oggi.
@@ -67,7 +77,7 @@ final class DashboardRepository
      FROM prenotazioni p
      JOIN turni t ON p.turno_id = t.id
      JOIN eventi e ON t.evento_id = e.id
-     WHERE e.pagina_id = ? $rbac
+     WHERE e.pagina_id = ? AND e.archiviato = 0 $rbac
      ORDER BY p.data_prenotazione DESC
      LIMIT 8", [$paginaId]);
     }

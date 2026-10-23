@@ -33,6 +33,10 @@ body { background-color: var(--pn-sfondo); color: var(--pn-testo); }
 #page-content-wrapper .text-secondary { color: var(--pn-tenue) !important; }
 #page-content-wrapper .form-label { color: var(--pn-testo); }
 
+/* Pulsante dell'azione principale nel colore del modulo (non il rosso «pericolo» di Bootstrap) */
+.btn-azione { background: var(--pn-mod); border-color: var(--pn-mod); color: var(--pn-mod-testo); }
+.btn-azione:hover, .btn-azione:focus-visible { background: var(--pn-mod); border-color: var(--pn-mod); color: var(--pn-mod-testo); filter: brightness(.88); }
+
 /* Pulsanti: un po' più grandi e con un'area di clic più comoda */
 #page-content-wrapper .btn { border-radius: 8px; }
 #page-content-wrapper .btn-sm { padding: .32rem .7rem; min-height: 32px; }
