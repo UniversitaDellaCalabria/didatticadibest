@@ -775,7 +775,7 @@ $col_area = htmlspecialchars($page_cfg['colore_primario'] ?? '#0056b3');
                     <button type="submit" name="archivia_conclusi" class="dropdown-item" data-confirm="Archiviare tutti gli eventi passati?"><i class="fa fa-box-archive me-2" aria-hidden="true"></i>Archivia tutti gli eventi passati</button></form></li></ul></div>
         <?php endif; ?>
         <?php if ($puo_creare_ev): ?>
-            <a href="eventi.php?p_id=<?php echo $filtro_p; ?>&azione=nuovo" class="btn btn-sm fw-bold px-3 shadow-sm text-white" style="background:<?php echo $col_area; ?>;border:none;border-radius:8px;"><i class="fa fa-plus-circle me-1"></i>Crea Evento</a>
+            <a href="eventi.php?p_id=<?php echo $filtro_p; ?>&azione=nuovo" class="btn btn-sm fw-bold px-3 shadow-sm text-white text-nowrap" style="background:<?php echo $col_area; ?>;border:none;border-radius:8px;"><i class="fa fa-plus-circle me-1"></i>Crea Evento</a>
         <?php endif; ?>
     </div>
 </div>

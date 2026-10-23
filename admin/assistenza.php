@@ -37,7 +37,7 @@ $dur = fn($m) => \App\Assistenza\StatisticheAssistenza::durata($m);
     #as-elenco { max-height: 66vh; overflow-y: auto; }
 </style>
 
-<h4 class="fw-bold text-dark mb-1"><i class="fa fa-headset text-danger me-2" aria-hidden="true"></i> Assistenza</h4>
+<h1 class="h4 fw-bold text-dark mb-1"><i class="fa fa-headset text-danger me-2" aria-hidden="true"></i> Assistenza</h1>
 <p class="text-secondary mb-3">Le richieste di aiuto di studenti, personale e utenti esterni. Scegli una conversazione: la chat si aggiorna da sola e chi scrive riceve la tua risposta subito (o per email, se ha chiuso la pagina).</p>
 
 <?php echo flash_html(); ?>

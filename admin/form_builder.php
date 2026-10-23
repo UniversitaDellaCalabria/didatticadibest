@@ -130,7 +130,7 @@ $tipi_non_input = ['separator', 'hidden'];
 </style>
 
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-    <h4 class="fw-bold text-dark mb-0"><i class="fa fa-list-check text-primary me-2"></i>Form Builder</h4>
+    <h1 class="h4 fw-bold text-dark mb-0"><i class="fa fa-list-check text-primary me-2"></i>Form Builder</h1>
     <button class="btn btn-sm btn-azione fw-bold" style="border-radius:8px;" type="button" data-bs-toggle="collapse" data-bs-target="#panelAddCampo">
         <i class="fa fa-plus me-1"></i>Aggiungi Campo
     </button>

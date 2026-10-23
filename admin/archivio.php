@@ -78,7 +78,7 @@ if (isset($_POST['export_csv_archivio']) || isset($_POST['export_xlsx_archivio']
 $eventi_archiviati = $repo_eventi->archiviatiAdmin($filtro_p, $sql_filtro_eventi_rbac);
 ?>
 
-<h4 class="fw-bold text-dark mb-4"><i class="fa fa-archive text-secondary me-2"></i> Archivio Storico Eventi</h4>
+<h1 class="h4 fw-bold text-dark mb-4"><i class="fa fa-archive text-secondary me-2"></i> Archivio Storico Eventi</h1>
 
 <div class="card shadow-sm border-0 bg-white">
     <div class="card-header bg-secondary text-white py-3 d-flex justify-content-between align-items-center">

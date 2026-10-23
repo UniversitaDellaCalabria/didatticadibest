@@ -104,10 +104,10 @@ foreach ($trend_data as $t) {
 
 <!-- HEADER -->
 <div class="d-flex justify-content-between align-items-start align-items-md-center flex-wrap gap-3 mb-4">
-    <h4 class="fw-bold text-dark m-0">
+    <h1 class="h4 fw-bold text-dark m-0">
         <i class="fa fa-chart-pie text-primary me-2"></i>
         Statistiche & Report &mdash; <?php echo htmlspecialchars($page_cfg['titolo'] ?? 'Area'); ?>
-    </h4>
+    </h1>
     <div class="d-flex flex-wrap gap-2 no-print">
         <?php echo pn_scarica('?p_id=' . (int)$filtro_p); ?>
         <button onclick="window.print()" class="btn btn-outline-secondary btn-sm fw-bold shadow-sm">
@@ -387,7 +387,7 @@ document.addEventListener("DOMContentLoaded", function() {
     <?php endif; ?>
 
     // Grafico 3: Trend iscrizioni line
-    <?php if (!empty($trend_labels)): ?>
+    <?php if (!empty($trend_labels) && array_sum($trend_counts) > 0): ?>
     new Chart(document.getElementById('chartTrend').getContext('2d'), {
         type: 'line',
         data: {

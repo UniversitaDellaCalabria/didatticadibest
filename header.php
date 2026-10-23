@@ -236,14 +236,14 @@ if ($u_logged_header) {
         }
         .mob-nav-title  { color: #fff; font-weight: 700; font-size: 1rem; }
         .mob-nav-sub    { color: rgba(255,255,255,0.65); font-size: 0.75rem; }
-        #mobileNavClose { background: transparent; border: none; color: #fff; font-size: 1.4rem; line-height: 1; padding: 0; }
+        #mobileNavClose { background: transparent; border: none; color: #fff; font-size: 1.4rem; line-height: 1; padding: 0; min-width: 44px; min-height: 44px; }
 
         .mob-nav-body   { padding: 1rem; flex: 1; }
         .mob-nav-search { margin-bottom: 1rem; }
 
         .mob-nav-label {
-            text-transform: uppercase; font-size: 0.68rem; font-weight: 700;
-            color: rgba(255,255,255,0.35); letter-spacing: 0.08em;
+            text-transform: uppercase; font-size: 0.75rem; font-weight: 700;
+            color: rgba(255,255,255,0.6); letter-spacing: 0.08em;
             padding: 0.25rem 0; border-bottom: 1px solid rgba(255,255,255,0.08);
             margin-bottom: 0.4rem;
         }
@@ -260,6 +260,9 @@ if ($u_logged_header) {
         .mob-nav-toggle .fa { font-size: 0.7rem; color: #f87171; transition: transform 0.2s; }
         .mob-nav-toggle[aria-expanded="true"] .fa { transform: rotate(180deg); }
         .mob-nav-sublist { padding-bottom: 0.4rem; background: rgba(255,255,255,0.03); }
+        /* Zone di tocco e testi minimi: link del piè di pagina comodi da toccare, badge leggibili */
+        footer a.text-white { display: inline-block; padding: 6px 0; }
+        .badge { font-size: max(.75em, 12px); }
         .mob-nav-link {
             display: block; padding: 0.5rem 0.25rem;
             color: #cbd5e1 !important; text-decoration: none;

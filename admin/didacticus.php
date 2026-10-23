@@ -164,7 +164,7 @@ $schede_d = ['voci' => ['Voci', 'fa-book-open'], 'mancate' => ['Domande senza ri
 <div class="d-flex flex-wrap align-items-center gap-3 mb-2">
     <img src="../didacticus_file.php?avatar=1" alt="" width="64" height="64" class="rounded-circle shadow-sm" style="object-fit:cover;">
     <div>
-        <h4 class="fw-bold text-dark mb-0">Didacticus <span class="badge <?php echo $imp['attivo'] && $n_attive ? 'bg-success' : 'bg-secondary'; ?> fs-6 align-middle"><?php echo $imp['attivo'] ? ($n_attive ? 'acceso' : 'acceso, senza voci') : 'spento'; ?></span></h4>
+        <h1 class="h4 fw-bold text-dark mb-0">Didacticus <span class="badge <?php echo $imp['attivo'] && $n_attive ? 'bg-success' : 'bg-secondary'; ?> fs-6 align-middle"><?php echo $imp['attivo'] ? ($n_attive ? 'acceso' : 'acceso, senza voci') : 'spento'; ?></span></h1>
         <p class="text-secondary mb-0">L'assistente virtuale dell'assistenza: risponde alle domande più comuni usando solo quello che scrivi qui, e passa la parola a un operatore quando non basta. <strong><?php echo $n_attive; ?></strong> voci attive.</p>
     </div>
 </div>

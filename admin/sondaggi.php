@@ -199,13 +199,13 @@ foreach ($curr_domande as $d) $dom_id_map[$d['id']] = $d;
 </style>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h4 class="fw-bold text-dark m-0">
+    <h1 class="h4 fw-bold text-dark m-0">
         <?php if ($is_archivio): ?>
             <i class="fa fa-archive text-secondary me-2"></i> Archivio Sondaggi
         <?php else: ?>
             <i class="fa fa-star text-success me-2"></i> Sondaggi & Feedback
         <?php endif; ?>
-    </h4>
+    </h1>
     <?php if ($is_archivio): ?>
         <a href="archivio.php?p_id=<?= $filtro_p ?>" class="btn btn-secondary btn-sm fw-bold shadow-sm"><i class="fa fa-arrow-left me-1"></i> Torna all'Archivio</a>
     <?php endif; ?>

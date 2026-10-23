@@ -306,6 +306,8 @@ $unread_count = \App\Core\App::get(\App\Iscritti\CasellaMessaggi::class)->nonLet
         .btn-info { --bs-btn-color: #000; --bs-btn-hover-color: #000; --bs-btn-active-color: #000; color: #000; }
         html:not([data-bs-theme="dark"]) .text-info { color: #0b6b80 !important; }
         html:not([data-bs-theme="dark"]) .text-warning { color: #a15c00 !important; }
+        #sidebar .text-info { color: #7dd3fc !important; }
+        #sidebar .text-warning { color: #fbbf24 !important; }
         .side-num { margin-left: auto; min-width: 22px; padding: 0 7px; border-radius: 999px; background: #f59e0b; color: #1f2937; font-size: .72rem; font-weight: 800; line-height: 20px; text-align: center; }
         #sidebar .nav-link { display: flex; align-items: center; }
         .side-area { background: rgba(255,255,255,0.06); overflow: hidden; }

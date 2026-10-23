@@ -155,7 +155,7 @@ if (isset($_POST['save_pagina_config'])) {
 ?>
 
 <div class="d-flex align-items-center mb-3 gap-2">
-    <h4 class="fw-bold text-dark mb-0"><i class="fa fa-paint-brush me-2 text-primary"></i>Impostazioni Area: <?php echo htmlspecialchars($page_cfg['titolo'] ?? ''); ?></h4>
+    <h1 class="h4 fw-bold text-dark mb-0"><i class="fa fa-paint-brush me-2 text-primary"></i>Impostazioni Area: <?php echo htmlspecialchars($page_cfg['titolo'] ?? ''); ?></h1>
 </div>
 
 <ul class="nav nav-tabs mb-0" id="impoTabs" role="tablist">
@@ -179,7 +179,7 @@ if (isset($_POST['save_pagina_config'])) {
                 <div class="col-md-2"><label class="form-label small fw-bold">Colore Primario</label><input type="color" name="colore_primario" class="form-control form-control-color w-100" value="<?php echo htmlspecialchars($page_cfg['colore_primario'] ?? '#990000'); ?>"></div>
                 <div class="col-md-2"><label class="form-label small fw-bold">Colore Secondario</label><input type="color" name="colore_secondario" class="form-control form-control-color w-100" value="<?php echo htmlspecialchars($page_cfg['colore_secondario'] ?? '#0056b3'); ?>"></div>
                 <div class="col-md-2"><label class="form-label small fw-bold">Larghezza Pagina</label><input type="text" name="larghezza_contenitore" class="form-control" value="<?php echo htmlspecialchars($page_cfg['larghezza_contenitore'] ?? '85%'); ?>"></div>
-                <div class="col-md-2"><label class="form-label small fw-bold">Template Layout</label>
+                <div class="col-md-3"><label class="form-label small fw-bold">Template Layout</label>
                     <select name="layout_template" class="form-select">
                         <option value="grid" <?php echo ($page_cfg['layout_template'] ?? '') == 'grid' ? 'selected' : ''; ?>>Griglia Colonne (per Categoria)</option>
                         <option value="list" <?php echo ($page_cfg['layout_template'] ?? '') == 'list' ? 'selected' : ''; ?>>Lista Cronologica per Date</option>
