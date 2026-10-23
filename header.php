@@ -168,6 +168,13 @@ if ($u_logged_header) {
             .brand-logo-link:not(.con-logo-mobile) .brand-logo-principale { height: auto; max-height: 52px; }
             .brand-logo-link:not(.con-logo-mobile) .brand-testi { border-left: 0; padding-left: 0; }
         }
+        @media (max-width: 575.98px) {
+            /* Telefono stretto: il nome può andare a capo, altrimenti l'intestazione allarga la pagina */
+            .it-brand-wrapper, .it-brand-wrapper a.brand-logo-link { max-width: 100%; min-width: 0; }
+            .brand-testi { min-width: 0; }
+            .brand-nome { white-space: normal; font-size: 1.15rem; }
+            .brand-logo-link.con-logo-mobile .brand-logo-mobile { height: 40px; }
+        }
         
         .header-search-box { background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 4px; overflow: hidden; display: flex; align-items: center; transition: all 0.3s; }
         .header-search-box:focus-within { background: rgba(255, 255, 255, 0.25); border-color: #ffffff; box-shadow: 0 0 0 0.2rem rgba(255,255,255,0.25); }
@@ -245,6 +252,14 @@ if ($u_logged_header) {
             color: rgba(255,255,255,0.45); text-transform: uppercase;
             padding: 0.55rem 0 0.2rem; letter-spacing: 0.05em;
         }
+        .mob-nav-toggle {
+            display: flex; align-items: center; justify-content: space-between; width: 100%;
+            background: transparent; border: 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+            color: #fff; font-size: 0.95rem; font-weight: 600; text-align: left; padding: 0.6rem 0.25rem;
+        }
+        .mob-nav-toggle .fa { font-size: 0.7rem; color: #f87171; transition: transform 0.2s; }
+        .mob-nav-toggle[aria-expanded="true"] .fa { transform: rotate(180deg); }
+        .mob-nav-sublist { padding-bottom: 0.4rem; background: rgba(255,255,255,0.03); }
         .mob-nav-link {
             display: block; padding: 0.5rem 0.25rem;
             color: #cbd5e1 !important; text-decoration: none;
@@ -411,7 +426,12 @@ if ($u_logged_header) {
         foreach ($menu_voci_header as $mob_m):
             if ($mob_m->conSottovoci):
         ?>
-                <div class="mob-nav-group-label"><?php echo htmlspecialchars($mob_m->etichetta); ?></div>
+                <?php /* voce principale chiusa: si apre toccandola (come nel menu mobile dell'Ateneo) */ ?>
+                <button type="button" class="mob-nav-toggle" aria-expanded="false" aria-controls="mobSub<?php echo (int)$mob_m->id; ?>">
+                    <span><?php echo htmlspecialchars($mob_m->etichetta); ?></span>
+                    <i class="fa fa-chevron-down" aria-hidden="true"></i>
+                </button>
+                <div class="mob-nav-sublist" id="mobSub<?php echo (int)$mob_m->id; ?>" hidden>
                 <?php foreach ($mob_m->figli as $mob_sub):
                     $mob_href_s = (!empty($mob_sub->url) && $mob_sub->url !== '#') ? htmlspecialchars($mob_sub->url) : '#';
                     $mob_tgt_s  = $mob_sub->target();
@@ -426,6 +446,7 @@ if ($u_logged_header) {
                             </a>
                     <?php endforeach; endif; ?>
                 <?php endforeach; ?>
+                </div>
         <?php else: ?>
                 <a href="<?php echo htmlspecialchars($mob_m->url); ?>" <?php echo $mob_m->target(); ?> class="mob-nav-link"><?php echo htmlspecialchars($mob_m->etichetta); ?></a>
         <?php
@@ -567,6 +588,20 @@ document.addEventListener("DOMContentLoaded", function() {
         mobileOverlay?.classList.remove('active');
         document.body.style.overflow = '';
     }
+    // Voci principali a fisarmonica: se ne apre una alla volta
+    document.querySelectorAll('.mob-nav-toggle').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const apri = btn.getAttribute('aria-expanded') !== 'true';
+            document.querySelectorAll('.mob-nav-toggle').forEach(function (b) {
+                b.setAttribute('aria-expanded', 'false');
+                document.getElementById(b.getAttribute('aria-controls')).hidden = true;
+            });
+            if (apri) {
+                btn.setAttribute('aria-expanded', 'true');
+                document.getElementById(btn.getAttribute('aria-controls')).hidden = false;
+            }
+        });
+    });
     document.getElementById('mobileNavToggle')?.addEventListener('click', openMobileNav);
     document.getElementById('mobileNavClose')?.addEventListener('click', closeMobileNav);
     mobileOverlay?.addEventListener('click', closeMobileNav);

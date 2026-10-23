@@ -144,6 +144,20 @@ if ('serviceWorker' in navigator) {
 </div>
 
 <script>
+// Accessibilità: dà un nome ai pulsanti di chiusura e ai campi dei moduli che non hanno un'etichetta collegata
+document.addEventListener("DOMContentLoaded", function() {
+    document.querySelectorAll('.btn-close:not([aria-label])').forEach(function (b) { b.setAttribute('aria-label', 'Chiudi'); });
+    document.querySelectorAll('input:not([type=hidden]):not([type=submit]):not([type=button]), select, textarea').forEach(function (c) {
+        if (c.getAttribute('aria-label') || c.getAttribute('aria-labelledby') || c.closest('label') || (c.id && document.querySelector('label[for="' + c.id + '"]'))) return;
+        var riga = c.closest('.mb-2, .mb-3, .col, [class*="col-"], .form-group, div');
+        var et = riga ? riga.querySelector('label, .form-label') : null;
+        var testo = (et ? et.textContent : (c.getAttribute('placeholder') || c.getAttribute('title') || '')).replace(/\s+/g, ' ').replace(/\*/g, '').trim();
+        if (testo) c.setAttribute('aria-label', testo);
+    });
+});
+</script>
+
+<script>
 document.addEventListener("DOMContentLoaded", function() {
     if (!localStorage.getItem("cookie_dibest_accepted")) {
         document.getElementById("cookieBanner").style.display = "block";

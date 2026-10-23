@@ -292,6 +292,20 @@ $unread_count = \App\Core\App::get(\App\Iscritti\CasellaMessaggi::class)->nonLet
             #page-content-wrapper > .navbar .area-top { flex: 1 1 0; max-width: none; justify-content: center; }
             .navbar-azioni { width: 100%; flex-wrap: wrap; justify-content: flex-end; }
         }
+        /* Telefono: tabelle larghe scorrono dentro la loro scheda, barre di pulsanti vanno a capo, menu a tendina non esce dallo schermo */
+        @media (max-width: 767.98px) {
+            #page-content-wrapper table.table:not(.table-responsive .table) { display: block; max-width: 100%; overflow-x: auto; }
+            #page-content-wrapper .d-flex:has(> .ms-auto), .menu-node-header { flex-wrap: wrap; }
+            #page-content-wrapper .form-select { max-width: 100%; }
+            #dashArea, #formFiltroEv .form-select { min-width: 0 !important; width: 100% !important; }
+            #formFiltroEv { flex: 1 1 100%; }
+        }
+        /* Contrasto: etichette grigie sulla barra scura e pulsanti chiari */
+        #sidebar .text-secondary { color: #b4c0d0 !important; }
+        html:not([data-bs-theme="dark"]) .btn-outline-secondary { --bs-btn-color: #475569; --bs-btn-border-color: #64748b; }
+        .btn-info { --bs-btn-color: #000; --bs-btn-hover-color: #000; --bs-btn-active-color: #000; color: #000; }
+        html:not([data-bs-theme="dark"]) .text-info { color: #0b6b80 !important; }
+        html:not([data-bs-theme="dark"]) .text-warning { color: #a15c00 !important; }
         .side-num { margin-left: auto; min-width: 22px; padding: 0 7px; border-radius: 999px; background: #f59e0b; color: #1f2937; font-size: .72rem; font-weight: 800; line-height: 20px; text-align: center; }
         #sidebar .nav-link { display: flex; align-items: center; }
         .side-area { background: rgba(255,255,255,0.06); overflow: hidden; }

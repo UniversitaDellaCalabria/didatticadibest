@@ -47,9 +47,9 @@ final class Agenda
 .ag-voce { display: flex; gap: 14px; align-items: center; padding: 12px 14px; border-bottom: 1px solid #e5e7eb; text-decoration: none; color: inherit; background: #fff; transition: background .15s; }
 .ag-voce:hover, .ag-voce:focus { background: #f8fafc; }
 .ag-voce:last-child { border-bottom: 0; }
-.ag-data { width: 58px; flex-shrink: 0; text-align: center; border-radius: 10px; padding: 6px 0; background: color-mix(in srgb, var(--c) 10%, white); color: var(--c); line-height: 1.1; }
+.ag-data { width: 58px; flex-shrink: 0; text-align: center; border-radius: 10px; padding: 6px 0; background: color-mix(in srgb, var(--c) 10%, white); color: color-mix(in srgb, var(--c) 70%, black); line-height: 1.1; }
 .ag-data strong { display: block; font-size: 1.45rem; }
-.ag-g, .ag-m { display: block; font-size: .7rem; text-transform: uppercase; font-weight: 700; letter-spacing: .03em; }
+.ag-g, .ag-m { display: block; font-size: .75rem; text-transform: uppercase; font-weight: 700; letter-spacing: .03em; }
 .ag-testo { flex-grow: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .ag-titolo { font-weight: 700; color: #0f172a; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .ag-info { font-size: .82rem; color: #475569; }

@@ -121,6 +121,25 @@
         }, true);
     })();
 
+    // Accessibilità: dà un nome ai pulsanti con la sola icona (titolo, altrimenti dall'icona)
+    document.addEventListener('DOMContentLoaded', function () {
+        var nomi = { 'fa-edit': 'Modifica', 'fa-pen': 'Modifica', 'fa-pencil': 'Modifica', 'fa-trash': 'Elimina', 'fa-trash-alt': 'Elimina',
+            'fa-times': 'Chiudi', 'fa-xmark': 'Chiudi', 'fa-plus': 'Aggiungi', 'fa-plus-circle': 'Aggiungi', 'fa-bars': 'Menu',
+            'fa-moon': 'Cambia tema', 'fa-sun': 'Cambia tema', 'fa-circle-half-stroke': 'Cambia tema', 'fa-magnifying-glass': 'Cerca',
+            'fa-search': 'Cerca', 'fa-copy': 'Copia', 'fa-eye': 'Mostra', 'fa-eye-slash': 'Nascondi', 'fa-download': 'Scarica',
+            'fa-print': 'Stampa', 'fa-arrow-up': 'Sposta su', 'fa-arrow-down': 'Sposta giù', 'fa-ellipsis-v': 'Altre azioni' };
+        document.querySelectorAll('button, a.btn, .btn-close').forEach(function (b) {
+            if (b.textContent.trim() || b.getAttribute('aria-label') || b.getAttribute('aria-labelledby')) return;
+            var nome = b.getAttribute('title');
+            if (!nome && b.classList.contains('btn-close')) nome = 'Chiudi';
+            if (!nome) {
+                var i = b.querySelector('i.fa, i[class*="fa-"]');
+                if (i) i.classList.forEach(function (c) { if (!nome && nomi[c]) nome = nomi[c]; });
+            }
+            if (nome) b.setAttribute('aria-label', nome);
+        });
+    });
+
     $(document).ready(function() {
         // Logica apertura/chiusura Sidebar su mobile
         $('#sidebarToggle').on('click', function() {
