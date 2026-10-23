@@ -263,4 +263,51 @@ prova(count(array_filter($manc_rep->elenco(), fn($m) => (int) $m['conversazione_
 $manc_rep->segna((int) $manc_rep->elenco()[0]['id'], MancateRepository::IGNORATA);
 prova(count($manc_rep->elenco(MancateRepository::IGNORATA)) === 1 && $manc_rep->contaDaVedere() === count($manc_rep->elenco()), "domande senza risposta: si possono mettere da parte e rimettere tra quelle da vedere");
 
+// 11. Le voci sulla didattica (strumenti/didacticus/voci_didattica.txt → CSV da importare dal pannello): file ben fatto, importazione, risposte alle domande tipiche degli studenti
+require_once __DIR__ . '/../../didacticus/genera_csv.php';
+$voci_did = leggi_voci_didattica(__DIR__ . '/../../didacticus/voci_didattica.txt');
+$titoli_did = [];
+$difetti_did = [];
+foreach ($voci_did as $v) {
+    if (!isset(CostDi::ARGOMENTI[$v['argomento']])) $difetti_did[] = "«{$v['titolo']}»: argomento {$v['argomento']} sconosciuto";
+    if (count($v['domande']) < 3 || $v['parole'] === '' || mb_strlen($v['risposta']) < 60) $difetti_did[] = "«{$v['titolo']}»: poche domande, niente parole chiave o risposta troppo corta";
+    if (isset($titoli_did[mb_strtolower($v['titolo'])])) $difetti_did[] = "«{$v['titolo']}»: titolo ripetuto";
+    $titoli_did[mb_strtolower($v['titolo'])] = 1;
+    foreach ($v['link'] as $l) {
+        if (!VociRepository::urlValido($l['u']) || (!str_starts_with($l['u'], 'http') && !is_file(__DIR__ . '/../../../' . strtok($l['u'], '?')))) $difetti_did[] = "«{$v['titolo']}»: link {$l['u']} non valido";
+    }
+}
+prova(count($voci_did) >= 40 && !$difetti_did, "voci sulla didattica: file ben fatto (argomenti, domande, parole chiave, link validi, titoli unici)", implode(' | ', $difetti_did));
+$conn->begin_transaction();
+$prima_did = count($voci_rep->tutte());
+[$n_nuove, $n_agg, $n_salt] = $voci_rep->importaCsv(csv_da_voci($voci_did), date('Y-m-d H:i:s'));
+prova($n_salt === 0 && $n_nuove + $n_agg === count($voci_did) && $n_agg >= 5 && count($voci_rep->tutte()) === $prima_did + $n_nuove, "voci sulla didattica: importate dal CSV (le voci con lo stesso titolo si aggiornano, le altre si aggiungono)", "$n_nuove nuove, $n_agg aggiornate, $n_salt saltate");
+$ammissione_did = array_values(array_filter($voci_rep->tutte(), fn($v) => str_starts_with((string) $v['titolo'], 'Ammissione al primo anno')))[0] ?? null;
+prova($ammissione_did && (int) $ammissione_did['proponi_operatore'] === 1 && (int) $ammissione_did['solo_login'] === 0 && count(VociRepository::link($ammissione_did)) === 3 && $ammissione_did['argomento'] === 'iscrizione', "voci sulla didattica: argomento, link e «propone l'operatore» arrivano dal CSV");
+[$n2_nuove, $n2_agg] = $voci_rep->importaCsv(csv_da_voci($voci_did), date('Y-m-d H:i:s'));
+prova($n2_nuove === 0 && $n2_agg === count($voci_did) && count($voci_rep->tutte()) === $prima_did + $n_nuove, "voci sulla didattica: importare di nuovo lo stesso file non duplica le voci");
+$motore_did = new Motore($voci_rep->attive());
+$top_did = fn(string $d): array => ($motore_did->classifica($d, null)[0] ?? ['punteggio' => 0, 'voce' => ['titolo' => '']]);
+$casi_did = [
+    'non vedo l appello su esse3' => "Non vedo l'appello", 'non riesco a prenotarmi all esame' => "Non vedo l'appello", 'come mi prenoto a un esame' => 'Come mi prenoto a un esame',
+    'quando posso modificare il piano di studi' => 'Come modifico il piano di studi', 'esse3 non mi fa modificare il piano di studi' => 'Non riesco a modificare il piano di studi',
+    'il mio piano di studi è stato respinto' => 'Non riesco a modificare il piano di studi',
+    'la mia proposta di stage è stata rifiutata' => 'La proposta di stage risulta rifiutata', 'come faccio la proposta di stage' => 'Tirocinio: come si avvia su TSP',
+    'dove carico la relazione finale del tirocinio' => 'Tirocinio: registro presenze', 'ho finito il tirocinio ma non vedo i crediti' => 'Ho finito il tirocinio ma i crediti',
+    'la scuola chiede la convenzione per il tirocinio' => "L'azienda, l'ente o la scuola non è convenzionata", 'la firma digitale non è valida pades' => 'Convenzione di tirocinio: firma digitale',
+    'posso prorogare il tirocinio' => 'Proroga o cambio', 'dove faccio il corso sulla sicurezza' => 'Corso sulla sicurezza', 'chi è il tutor accademico' => 'Conferma del progetto formativo',
+    'come chiedo la tesi' => 'Come chiedo la tesi', 'voglio aggiungere un correlatore' => 'Variazione della tesi', 'come presento la domanda di laurea' => 'Domanda di laurea',
+    'quanto costa la tassa di fine corso' => 'Domanda di laurea', 'come richiedo il certificato di laurea' => 'Come richiedo un certificato', 'come ritiro la pergamena' => 'Pergamena di laurea',
+    'cosa sono gli ofa' => 'OFA', 'come estinguo l ofa di matematica' => 'OFA', 'voglio passare a un altro corso di laurea' => 'Trasferimenti e passaggi', 'come mi trasferisco in un altra università' => 'Trasferimenti e passaggi',
+    'come riprendo gli studi dopo la rinuncia' => 'Rinuncia, sospensione', 'come chiedo la borsa di studio' => 'Borse di studio', 'dove si trova l ufficio didattico' => "Dove e quando trovo l'ufficio didattico",
+    'ho dimenticato la password di esse3' => 'Password dimenticata', 'come funziona l erasmus' => 'Mobilità internazionale', 'come divento tutor' => 'Tutorato: accettazione',
+    'cos è il mentoring' => 'Tutorato: chi sono i tutor', 'quando posso iscrivermi al primo anno' => 'Ammissione al primo anno', 'come cambio curriculum' => 'Come modifico il piano di studi',
+    'devo pagare la prima rata' => 'Tasse, rate', 'come funziona il part time' => 'Attività aggiuntive, part-time',
+];
+foreach ($casi_did as $domanda => $atteso) {
+    $t = $top_did($domanda);
+    prova($t['punteggio'] >= 60 && str_starts_with($t['voce']['titolo'], $atteso), "voci sulla didattica: «" . $domanda . "» → " . $atteso, $t['punteggio'] . ' ' . $t['voce']['titolo']);
+}
+$conn->rollback(); // le prove non lasciano le voci importate nella base di prova
+
 foreach (["DELETE FROM didacticus_mancate", "DELETE FROM assistenza_messaggi", "DELETE FROM assistenza_conversazioni", "DELETE FROM uffici_persone WHERE email = 'op-d989@example.org'", "DELETE FROM utenti WHERE id BETWEEN 98931 AND 98949", "UPDATE impostazioni_sistema SET didacticus_attivo = 0 WHERE id = 1"] as $sql) $q($sql);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Assistenza\Didacticus;
 
+use App\Assistenza\Costanti;
 use App\Core\Database;
 use App\Eventi\Righe;
 
@@ -77,6 +78,61 @@ final class VociRepository
             'INSERT INTO didacticus_voci (argomento, titolo, domande, parole_chiave, risposta, link_json, allegati_json, solo_login, proponi_operatore, attiva, ordine, creato_il) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             array_merge($valori, [$quando])
         );
+    }
+
+    /**
+     * Importa voci da un CSV con «;» (colonne: Argomento, Titolo, Domande, Parole chiave, Risposta, Link, Attiva, [Usi, Utile, Non utile], Propone operatore, Solo con accesso).
+     * Le voci con lo stesso titolo si aggiornano (allegati, e link o flag non indicati, restano), le altre si aggiungono.
+     *
+     * @return array{0: int, 1: int, 2: int} nuove, aggiornate, saltate
+     */
+    public function importaCsv(string $testo, string $quando): array
+    {
+        $testo = ltrim($testo, "\xEF\xBB\xBF");
+        if (!mb_check_encoding($testo, 'UTF-8')) {
+            $testo = mb_convert_encoding($testo, 'UTF-8', 'Windows-1252');
+        }
+        $f = fopen('php://temp', 'r+');
+        fwrite($f, $testo);
+        rewind($f);
+        $mappaArg = array_flip(array_map(fn ($a) => mb_strtolower($a['nome']), Costanti::ARGOMENTI));
+        $perTitolo = [];
+        foreach ($this->tutte() as $v) {
+            $perTitolo[mb_strtolower((string) $v['titolo'])] = $v;
+        }
+        [$nuove, $aggiornate, $saltate] = [0, 0, 0];
+        $riga = 0;
+        while (($c = fgetcsv($f, 0, ';', '"', '\\')) !== false && $riga < 500) {
+            ++$riga;
+            if (count($c) < 5 || ($riga === 1 && mb_strtolower(trim((string) $c[0])) === 'argomento')) {
+                continue;
+            }
+            [$arg, $tit, $dom, $par, $ris] = [trim((string) $c[0]), trim((string) $c[1]), trim((string) $c[2]), trim((string) $c[3]), trim((string) $c[4])];
+            if ($tit === '' || $ris === '') {
+                ++$saltate;
+                continue;
+            }
+            $arg = isset(Costanti::ARGOMENTI[mb_strtolower($arg)]) ? mb_strtolower($arg) : ($mappaArg[mb_strtolower($arg)] ?? Costanti::ARGOMENTO_PREDEFINITO);
+            $link = [];
+            foreach (preg_split('/\R/u', (string) ($c[5] ?? '')) ?: [] as $rigaL) {
+                [$e, $u] = array_pad(explode('|', $rigaL, 2), 2, '');
+                $u = trim($u) !== '' ? trim($u) : trim($e);
+                if (self::urlValido($u)) {
+                    $link[] = ['e' => trim($e) !== '' && trim($u) !== trim($e) ? trim($e) : $u, 'u' => $u];
+                }
+            }
+            $si = fn (int $i, int $predefinito): int => isset($c[$i]) && trim((string) $c[$i]) !== '' ? (in_array(mb_strtolower(trim((string) $c[$i])), ['sì', 'si', '1', 'x'], true) ? 1 : 0) : $predefinito;
+            $esiste = $perTitolo[mb_strtolower($tit)] ?? null;
+            $this->salva((int) ($esiste['id'] ?? 0), [
+                'argomento' => $arg, 'titolo' => $tit, 'domande' => $dom, 'parole_chiave' => $par, 'risposta' => $ris, 'link' => $link ?: ($esiste ? self::link($esiste) : []),
+                'allegati' => $esiste ? self::allegati($esiste) : [], 'solo_login' => $si(11, (int) ($esiste['solo_login'] ?? 0)), 'proponi_operatore' => $si(10, (int) ($esiste['proponi_operatore'] ?? 0)),
+                'attiva' => !isset($c[6]) || mb_strtolower(trim((string) $c[6])) !== 'no', 'ordine' => (int) ($esiste['ordine'] ?? 0),
+            ], $quando);
+            $esiste ? ++$aggiornate : ++$nuove;
+        }
+        fclose($f);
+
+        return [$nuove, $aggiornate, $saltate];
     }
 
     public function elimina(int $id): void

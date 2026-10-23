@@ -56,6 +56,8 @@ final class Costanti
         'tirocini' => ['nome' => 'Tirocini e Formazione Scuola Lavoro', 'icona' => 'fa-briefcase', 'aiuto' => 'Tirocini, convenzioni con scuole e aziende, FSL'],
         'certificati' => ['nome' => 'Certificati e attestati', 'icona' => 'fa-certificate', 'aiuto' => 'Certificato di iscrizione o di laurea, attestati, Diploma Supplement'],
         'pratiche' => ['nome' => 'Pratiche e moduli', 'icona' => 'fa-file-signature', 'aiuto' => 'Piano di studi, convalide, esoneri, cambi di corso, mobilità'],
+        'iscrizione' => ['nome' => 'Iscrizione, tasse e orientamento', 'icona' => 'fa-id-card', 'aiuto' => 'Ammissione, immatricolazione, tasse, OFA, trasferimenti, borse di studio'],
+        'esami' => ['nome' => 'Esami e piano di studi', 'icona' => 'fa-book-open', 'aiuto' => 'Appelli e prenotazioni su Esse3, piano di studi, convalide'],
         'tutorato' => ['nome' => 'Tutorato', 'icona' => 'fa-people-arrows', 'aiuto' => 'Bandi, incarichi e pagamenti del tutorato'],
         'tesi' => ['nome' => 'Tesi e laurea', 'icona' => 'fa-graduation-cap', 'aiuto' => 'Richiesta di tesi, relatore, convenzioni con enti e aziende'],
         'eventi' => ['nome' => 'Eventi e prenotazioni', 'icona' => 'fa-calendar-check', 'aiuto' => 'Iscrizione a eventi e seminari, prenotazione di aule e risorse'],

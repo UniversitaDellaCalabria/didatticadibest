@@ -1,0 +1,778 @@
+# Voci di Didacticus sulla didattica del DiBEST (tirocini, tesi e laurea, esami e piano di studi, certificati, iscrizione, tasse, OFA, trasferimenti, tutorato, mobilità).
+# Fonti: le risposte che l'ufficio dà agli studenti, le guide TSP 2.0 (studenti ed enti), le pagine del Dipartimento (dibest.unical.it) e di Ateneo (unical.it), i moduli di uniTicket.
+# Importi, finestre e scadenze cambiano ogni anno: dove ci sono sono indicati come «di norma» o con rinvio alla pagina ufficiale. Controllarli a ogni anno accademico dal pannello.
+#
+# Formato di ogni voce (le righe che iniziano con # sono commenti):
+#   [argomento] Titolo {op} {login}     {op} = propone di parlare con un operatore; {login} = riservata a chi ha fatto l'accesso
+#   ? una domanda che gli studenti fanno (una per riga)
+#   = parole chiave, separate da virgole
+#   @ Etichetta | indirizzo             un link (uno per riga)
+#   ---                                 da qui fino alla prossima voce: la risposta
+# Per rigenerare il CSV da importare:  php strumenti/didacticus/genera_csv.php
+
+[pratiche] Come presento una pratica o una richiesta {op}
+? Come presento una pratica
+? Come faccio una richiesta alla segreteria
+? Dove trovo i moduli
+? Dove compilo la richiesta online
+? Modulistica dei corsi di studio
+? Come uso uniTicket
+= pratica, richiesta, modulo, moduli, modulistica, segreteria didattica, presentare, uniticket, ticket, credenziali esse3, spid
+@ Modulistica per gli studenti | https://dibest.unical.it/didattica/iscriversi-studiare-laurearsi/modulistica-studenti/
+@ uniTicket | https://ticket.unical.it
+---
+Le richieste agli uffici (certificati, convalide, piano di studi, tesi, esoneri, trasferimenti…) si presentano con i **moduli online di uniTicket**. L'elenco completo, con il link di ogni modulo, è nella pagina «Modulistica per gli studenti» del Dipartimento.
+
+Si entra con le credenziali Esse3 (codice fiscale e password) oppure con SPID o CIE: alcuni moduli richiedono SPID o CIE.
+
+**Attenzione alle notifiche:** se hai effettuato l'accesso con SPID ricevi le risposte per email; se hai usato le credenziali Unical non arriva nessuna notifica, quindi devi tornare su uniTicket per leggere le risposte degli uffici.
+
+Il tirocinio non passa da uniTicket: si gestisce sulla piattaforma TSP 2.0.
+
+[pratiche] Dove vedo a che punto è la mia pratica {op}
+? Dove vedo lo stato della mia pratica
+? A che punto è la mia richiesta
+? Come controllo la richiesta che ho inviato
+? Nessuno mi ha risposto
+? Non mi è arrivata nessuna email dopo la richiesta
+= stato pratica, a che punto, pratica ferma, tempi, sollecito, risposta ufficio, notifiche, richiesta inviata
+@ uniTicket | https://ticket.unical.it
+---
+Entra su uniTicket con le stesse credenziali con cui hai inviato la richiesta: nella tua area trovi le richieste fatte, il loro stato e i messaggi dell'ufficio.
+
+Se hai usato le credenziali Unical e non SPID **non ricevi email**: le risposte degli uffici si leggono solo accedendo alla piattaforma.
+
+Per il tirocinio lo stato lo vedi su TSP 2.0, in «I miei stage». Se la richiesta sembra ferma da troppo, scrivi un messaggio dentro la richiesta oppure parla con un operatore.
+
+[pratiche] Posso modificare una pratica già inviata {op}
+? Posso modificare la richiesta dopo averla inviata
+? Ho sbagliato a compilare il modulo
+? Come correggo una richiesta inviata
+? Voglio cambiare la richiesta
+? Come annullo una richiesta
+= modificare, correggere, sbagliato, errore nel modulo, cambiare richiesta, annullare, ritirare
+---
+Una richiesta inviata non si modifica da sola. Se hai sbagliato qualcosa, scrivi all'ufficio didattico un messaggio dentro la tua richiesta su uniTicket (oppure parla con un operatore) spiegando cosa va corretto; se serve, l'ufficio ti dice se conviene annullarla e inviarne un'altra.
+
+Per errori di iscrizione c'è un modulo apposito: «Richiesta cancellazione errata iscrizione».
+@ Richiesta cancellazione errata iscrizione | https://ticket.unical.it/tickets/new/13/121/
+
+[pratiche] L'ufficio mi ha chiesto un'integrazione {op}
+? L'ufficio mi ha chiesto un'integrazione
+? Mi hanno chiesto altri documenti
+? Come invio documenti aggiuntivi
+? Come allego un file alla richiesta
+? Integrazione documentazione
+= integrazione, integrare, documenti aggiuntivi, allegare, allegato, documentazione, mancano documenti
+@ uniTicket | https://ticket.unical.it
+---
+Accedi a uniTicket, apri la tua richiesta e rispondi con un messaggio allegando il file richiesto: l'ufficio lo vede subito e la pratica riprende.
+
+Ricorda che con le credenziali Unical (senza SPID) non arrivano email: controlla la piattaforma per vedere cosa ti è stato chiesto.
+
+[certificati] Come richiedo un certificato (iscrizione, laurea, Diploma Supplement) {op}
+? Come richiedo il certificato di iscrizione
+? Come richiedo il certificato di laurea
+? Come ottengo il Diploma Supplement
+? Certificato di iscrizione online
+? Ho bisogno di un certificato
+? Autocertificazione di iscrizione
+? Certificato per uso estero
+= certificato, certificati, iscrizione, laurea, diploma supplement, autocertificazione, bollo, estero, anis, questura, permesso di soggiorno
+@ Certificato di iscrizione | https://ticket.unical.it/tickets/new/13/116/
+@ Certificato di laurea | https://ticket.unical.it/tickets/new/13/117/
+@ Diploma Supplement | https://ticket.unical.it/tickets/new/13/118/
+@ Certificati e pergamene | https://dibest.unical.it/didattica/iscriversi-studiare-laurearsi/certificati-pergamene/
+---
+**Uso nazionale:** i certificati di iscrizione e di laurea si chiedono con i moduli di uniTicket (accesso con credenziali Esse3 anche a carriera chiusa, o con SPID). Servono **due marche da bollo da 16 €**, che si caricano su Esse3 prima del rilascio; il certificato lo ritiri su uniTicket.
+
+Con la Pubblica Amministrazione e i gestori di servizi pubblici i certificati si sostituiscono con le **autocertificazioni**, che stampi gratis da Esse3.
+
+**Diploma Supplement:** solo per i titoli del nuovo ordinamento (DM 270), senza bollo, modulo su uniTicket.
+
+**Uso estero** (permesso di soggiorno, assegni familiari): modulo online disponibile dal lunedì alle 9 al venerdì alle 14, con 16 € di istanza più 16 € per ogni certificato. Per i privati esistono anche le attestazioni ANIS (con SPID o CIE, area riservata del MUR).
+
+[certificati] Marca da bollo sulle richieste {op}
+? Serve la marca da bollo
+? Come pago la marca da bollo
+? Marca da bollo certificato
+? Bollo sulla richiesta
+? Dove pago il bollo da 16 euro
+= marca da bollo, bollo, pagamento bollo, bollo virtuale, 16 euro, pagopa, situazione tasse
+---
+La marca da bollo è di **16 €**. Di norma funziona così:
+
+- **Certificati di iscrizione e di laurea:** due bolli, caricati su Esse3 prima del rilascio.
+- **Trasferimento in entrata e abbreviazione di corso:** dopo la presentazione il sistema genera su Esse3 un bollo da 16 €.
+- **Sospensione degli studi e ricongiungimento:** bollo da 16 € più gli importi previsti dalla pagina «Lasciare e riprendere gli studi».
+- **Diploma Supplement:** nessun bollo.
+
+Il pagamento si fa da Esse3, in Segreteria → Situazione tasse (PagoPA), quando l'ufficio ha emesso l'avviso. Non devi stampare né incollare nulla. Se hai dubbi sul tuo caso, parla con un operatore.
+@ Esse3 | https://unical.esse3.cineca.it/Home.do
+
+[certificati] Certificato o ricevuta di rinuncia agli studi {op}
+? Mi serve la ricevuta della rinuncia agli studi
+? Ho rinunciato agli studi anni fa e mi serve un certificato
+? Autocertificazione di rinuncia
+? Certificato di rinuncia
+= rinuncia, rinuncia agli studi, ricevuta rinuncia, certificato rinuncia, autocertificazione
+@ Richiesta certificato di iscrizione | https://ticket.unical.it/tickets/new/13/116/
+@ Esse3 | https://unical.esse3.cineca.it/Home.do
+---
+Hai due strade:
+
+- **Autocertificazione:** la scarichi da Esse3 entrando con codice fiscale e password (se non la ricordi usa «Password dimenticata»).
+- **Certificato ufficiale:** compila la richiesta di certificato di iscrizione su uniTicket e scrivi nelle note che ti serve il **certificato di rinuncia**.
+
+[certificati] Pergamena di laurea: come si ritira {op}
+? Come ritiro la pergamena
+? Dove ritiro la pergamena di laurea
+? Posso far ritirare la pergamena a un'altra persona
+? Delega per la pergamena
+= pergamena, ritiro pergamena, delega, laurea, diploma di laurea
+@ Certificati e pergamene | https://dibest.unical.it/didattica/iscriversi-studiare-laurearsi/certificati-pergamene/
+@ Delega online al ritiro | https://ticket.unical.it/tickets/new/2/466/
+---
+Per chi si è laureato dal 1° gennaio 2010 la pergamena si ritira **senza appuntamento** agli sportelli dell'Area Servizi Didattici con un documento d'identità valido; può ritirarla anche un delegato, con la delega online. Gli orari degli sportelli sono su unical.it/sd.
+
+Per chi si è laureato prima del 2010 serve prima una verifica amministrativa, che si chiede con un modulo di uniTicket (disponibile dal lunedì alle 9 al venerdì alle 14). Controlla sulla pagina «Certificati e pergamene» le date aggiornate.
+
+[certificati] Timbro dell'Università sui programmi degli esami {op}
+? Mi serve il timbro sui programmi degli esami
+? Un'altra università chiede i programmi timbrati
+? Programmi degli esami per la convalida in un altro ateneo
+? Timbro Unical sui programmi
+= timbro, programmi, programmi esami, programma degli esami, convalida altro ateneo, libretto
+---
+L'Università della Calabria timbra solo i programmi che **non** sono pubblicati sul portale di Ateneo: quelli pubblici sono di libera consultazione e non hanno bisogno di timbro. Se però l'altra università pretende comunque il timbro, scrivi all'ufficio didattico allegando i programmi e indicando corso di laurea e matricola.
+
+[certificati] Attestato di esame sostenuto o di frequenza {op}
+? Mi serve un attestato di esame sostenuto
+? Come chiedo l'attestato di frequenza a un corso
+? Attestazione di un esame superato
+= attestato, esame sostenuto, frequenza, attestato frequenza, richiesta attestato
+@ Attestato esame sostenuto | https://ticket.unical.it/tickets/new/13/402/
+@ Attestato frequenza | https://ticket.unical.it/tickets/new/13/403/
+@ Richiesta generica di attestato | https://ticket.unical.it/tickets/new/13/229/
+---
+Si chiedono con i moduli di uniTicket (credenziali Esse3, SPID o CIE). Leggi con attenzione le note operative prima di compilare. Per attestazioni diverse da queste c'è la «Richiesta generica di attestato».
+
+[esami] Come modifico il piano di studi {op}
+? Come modifico il piano di studi
+? Come compilo il piano di studi
+? Quando posso modificare il piano di studi
+? Piano di studi online
+? Come cambio curriculum
+? Come inserisco esami fuori piano
+= piano di studi, piano di studio, modificare piano, compilare piano, curriculum, classe di laurea, fuori piano, finestra, esse3
+@ Esse3 | https://unical.esse3.cineca.it/Home.do
+@ Guida alla compilazione del piano di studi | https://www.unical.it/media/publications_attachments/3132/Guida_compilazione_piani_di_studio_dibest.pdf
+@ Videoguida | https://www.youtube.com/watch?v=e4rhzGqIS5w
+@ Modifica curriculum o classe | https://ticket.unical.it/tickets/new/13/122/
+@ Esami fuori piano | https://ticket.unical.it/tickets/new/13/139/
+---
+Il piano di studi si compila o si modifica **da Esse3**: accedi con le tue credenziali, scegli «Piano di studio» dal menu laterale e premi «Modifica». All'immatricolazione ti viene assegnato quello statutario.
+
+Si può fare solo nelle **finestre** stabilite dal Dipartimento (di norma a settembre, con una finestra successiva per chi ha il piano «Respinto»): le date arrivano per email istituzionale e sono pubblicate sul sito. Per compilarlo devi risultare **iscritto all'anno accademico in corso**.
+
+- **Studenti fuori corso:** la modifica si chiede con il modulo di uniTicket «Modifica Piano di Studi».
+- **Cambio di curriculum o classe di laurea** e **insegnamenti fuori piano:** moduli di uniTicket, nello stesso periodo.
+
+[esami] Non riesco a modificare il piano di studi {op}
+? Esse3 non mi fa modificare il piano di studi
+? Il pulsante Modifica non compare
+? Il mio piano di studi risulta in bozza
+? Il mio piano di studi è stato respinto
+? Ho perso la finestra per il piano di studi
+= piano di studi, non riesco, bloccato, bozza, respinto, tasse, iscrizione, finestra chiusa, rinnova iscrizione
+---
+Le cause più frequenti:
+
+- **Non risulti iscritto all'anno accademico:** serve aver pagato la prima rata (o l'importo di iscrizione). Se la rata non risulta fatturata, in Esse3 vai in Segreteria → Iscrizioni e premi «Rinnova iscrizione».
+- **Piano in bozza:** finché non lo confermi non è valido. Ricontrolla in Esse3 che sia confermato.
+- **Piano «Respinto»:** il Dipartimento apre di solito una finestra supplementare per ricompilarlo: guarda l'email istituzionale.
+- **Finestra chiusa:** scrivi all'ufficio didattico (o parla con un operatore) spiegando il motivo.
+
+[esami] Non vedo l'appello d'esame su Esse3 o non riesco a prenotarmi {op}
+? Non riesco a prenotarmi all'esame
+? Non trovo l'appello su Esse3
+? Non mi esce nessun appello disponibile
+? Esse3 non mi fa prenotare l'esame
+? Il docente dice che l'appello è aperto ma io non lo vedo
+? Appello non visibile
+= appello, appelli, prenotare esame, prenotazione esame, esse3, non vedo, sessione, docente non ha aperto, iscrizione appello
+@ Elenco degli appelli aperti | https://unical.esse3.cineca.it/ListaAppelliOfferta.do?menu_opened_cod=menu_link-navbox_didattica_Esami
+---
+Il motivo più comune è che **il docente non ha ancora aperto l'appello**. Per verificarlo guarda l'elenco di tutti gli appelli aperti su Esse3.
+
+Altre cause:
+
+- Le **prenotazioni** hanno una data di apertura: l'appello può essere visibile ma prenotabile solo da una certa data.
+- L'appello è stato aperto solo per un altro corso di laurea o per il **vecchio codice** del tuo insegnamento: il docente deve aprirlo anche per il tuo corso.
+- Non risulti **iscritto all'anno accademico** (tasse).
+
+Se il docente conferma di averlo aperto per il tuo corso e tu non lo vedi, scrivi all'ufficio con nome dell'esame, data e matricola.
+
+[esami] Come mi prenoto a un esame su Esse3
+? Come prenoto un esame
+? Come mi iscrivo a un appello
+? Dove prenoto gli esami
+= prenotare, esame, appello, esse3, iscriversi appello
+@ Esse3 | https://unical.esse3.cineca.it/Home.do
+---
+Accedi a Esse3 con le tue credenziali, vai in **Esami → Appelli**, trova l'insegnamento (icona del libro) e premi **«Prenotati all'appello»**. Ricorda che le prenotazioni hanno una scadenza.
+
+[esami] Convalida di esami e corsi singoli {op}
+? Come chiedo la convalida di esami
+? Ho fatto esami come corso singolo e voglio convalidarli
+? Convalida esame di inglese
+? Esonero dall'inglese
+? Riconoscimento di esami sostenuti altrove
+= convalida, convalide, riconoscimento esami, corsi singoli, inglese, english for basic academic skills, esonero inglese
+@ Convalida esami | https://ticket.unical.it/tickets/new/13/115/
+@ Convalida inglese | https://ticket.unical.it/tickets/new/13/125/
+@ Esonero dall'inglese | https://ticket.unical.it/tickets/new/13/566/
+---
+La convalida si chiede con il modulo di uniTicket «Richiesta convalida/riconoscimento esami» (per l'inglese ci sono i moduli dedicati di convalida e di esonero). Di norma si presentano **nella stessa finestra del piano di studi** (settembre): non perdere la scadenza, perché poi i moduli si chiudono. Decide il Consiglio di Corso di Studio.
+
+Se hai sostenuto esami come corsi singoli e hai perso i tempi, scrivi all'ufficio didattico.
+
+[esami] Attività aggiuntive, part-time ed esami fuori piano {op}
+? Posso inserire esami in più nel piano
+? Come passo al part-time
+? Come funziona il part time
+? Quanti CFU sono previsti per il part-time
+? Riconoscimento di competenze extrauniversitarie
+? Quanti esami extra posso fare
+= fuori piano, attività aggiuntive, esami in più, part-time, tempo parziale, competenze extrauniversitarie, sovrannumero
+@ Modifica tempo pieno / part-time | https://ticket.unical.it/tickets/new/13/266/
+@ Esami fuori piano | https://ticket.unical.it/tickets/new/13/139/
+---
+- **Attività formative aggiuntive:** al massimo due per anno accademico, scelte nell'offerta dell'Ateneo, con autorizzazione del Consiglio di Corso e domanda su Esse3. Non contano per i CFU del titolo né per la media.
+- **Part-time:** di norma 30 CFU all'anno e 60 per biennio, con contribuzione ridotta. Si chiede all'immatricolazione su Esse3 o dopo con il modulo di uniTicket; è riservato agli studenti in corso.
+- **Competenze extrauniversitarie:** nelle magistrali si possono riconoscere al massimo 12 CFU; la richiesta si fa nella prima finestra di modifica dei piani di studio.
+
+[pratiche] Convalide, esoneri, piano di studi e altre pratiche di carriera {op}
+? Come chiedo la convalida di esami
+? Esonero dalla frequenza
+? Passo a un altro corso di studi
+? Trasferimento in entrata
+? Come faccio a sapere quale modulo mi serve
+= convalida, esoneri, esonero, piano di studi, curriculum, fuori corso, trasferimento, passaggio, immatricolazione, abbreviazione, rinuncia, decadenza, cancellazione, moduli
+@ Modulistica per gli studenti | https://dibest.unical.it/didattica/iscriversi-studiare-laurearsi/modulistica-studenti/
+---
+Tutte le richieste di carriera hanno un modulo di uniTicket: convalide, esoneri dalla frequenza, variazioni del piano di studi, cambio di curriculum, part-time, trasferimenti e passaggi, abbreviazione di corso, iscrizione dopo rinuncia o decadenza, cancellazione di un'iscrizione errata, esami fuori piano. L'elenco con tutti i link è nella pagina «Modulistica per gli studenti».
+
+Molti moduli sono aperti **solo in certi periodi** dell'anno (trasferimenti e abbreviazioni dal 1° luglio al 31 agosto, piano di studi e convalide di norma a settembre): se un modulo risulta chiuso, scrivi all'ufficio. Per capire quale modulo ti serve, parla con un operatore.
+
+[pratiche] Mobilità internazionale (Erasmus e altre esperienze all'estero) {op}
+? Come faccio l'Erasmus
+? Mobilità internazionale
+? Studiare all'estero
+? Come compilo il Learning Agreement
+? Modulo per fare la tesi all'estero
+? Bando Erasmus
+= erasmus, mobilità, estero, internazionale, internazionalizzazione, learning agreement, most, tesi all'estero, traineeship, bando
+@ Studiare all'estero (DiBEST) | https://dibest.unical.it/didattica/orientamento-mobilita/studiare-all-estero/
+@ Guida al Learning Agreement | https://www.unical.it/media/medias/2025/Guida_alla_compilazione_Learning_Agreement.pdf
+@ Svolgimento attività di studio all'estero | https://ticket.unical.it/tickets/new/13/228/
+@ Variazione attività all'estero | https://ticket.unical.it/tickets/new/13/544/
+@ Comunicazione fine attività all'estero | https://ticket.unical.it/tickets/new/13/134/
+---
+L'Ateneo indice ogni anno i **bandi di mobilità** (Erasmus+, MOST per le sedi extra-UE e altri): per partecipare devi essere iscritto a un corso del DiBEST e aver partecipato alla selezione annuale. Le informazioni sono nella pagina «Studiare all'estero», con le linee guida e la guida al Learning Agreement.
+
+Dopo la selezione le pratiche si fanno con i moduli di uniTicket: **svolgimento** dell'attività, **variazione** e **comunicazione di fine attività**. Per la tesi all'estero c'è un modulo dedicato scaricabile dalla pagina.
+
+Per dubbi su bandi e sedi scrivi all'Area Internazionalizzazione: relazioni.internazionali@unical.it.
+
+[tesi] Come chiedo la tesi {op}
+? Come chiedo la tesi
+? Richiesta di tesi
+? Come scelgo il relatore
+? Voglio fare la tesi
+? Il relatore non vede la mia richiesta di tesi
+? La mia richiesta di tesi non risulta
+= tesi, relatore, richiesta tesi, assegnazione tesi, laurea, lavoro finale, correlatore, tesi esterna, restauro
+@ Richiesta tesi | https://ticket.unical.it/tickets/new/13/124/
+@ Richiesta tesi Conservazione e Restauro | https://ticket.unical.it/tickets/new/13/135/
+@ Variazione tesi | https://ticket.unical.it/tickets/new/13/437/
+---
+La tesi si chiede con il modulo di uniTicket **«Domanda Lavoro Finale (Richiesta tesi)»**: indichi relatore e argomento. Il relatore riceve la richiesta e deve confermarla; poi prosegue con l'ufficio. Per il corso di laurea magistrale a ciclo unico in Conservazione e Restauro c'è un modulo dedicato.
+
+Se la richiesta non compare al relatore o a te, scrivi all'ufficio: a volte il docente non è ancora abilitato all'invio e va abilitato.
+
+Per le lauree magistrali in Biologia e in Health Biotechnology la tesi dura **almeno 8 mesi**.
+
+[tesi] Variazione della tesi: titolo, relatore o correlatore {op}
+? Come cambio il titolo della tesi
+? Voglio cambiare relatore
+? Come aggiungo un correlatore
+? Variazione della richiesta di tesi
+= variazione tesi, cambiare titolo, cambio relatore, correlatore, aggiungere correlatore
+@ Variazione tesi | https://ticket.unical.it/tickets/new/13/437/
+---
+Qualsiasi cambiamento dopo la richiesta (titolo, relatore, **aggiunta del correlatore**) si fa con il modulo di uniTicket **«Variazione richiesta tesi»**: non va inviata una nuova richiesta di tesi.
+
+[tesi] Domanda di laurea, sedute e scadenze {op}
+? Come presento la domanda di laurea
+? Quando sono le sedute di laurea
+? Quali documenti servono per laurearmi
+? Quanto costa la tassa di fine corso
+? Come carico la tesi
+? Non mi laureo più
+= laurea, domanda di laurea, conseguimento titolo, seduta, sedute di laurea, scadenze, almalaurea, pdf/a, tassa fine corso, carichi pendenti
+@ Sedute di laurea | https://dibest.unical.it/didattica/iscriversi-studiare-laurearsi/sedute-laurea/
+@ Esse3 | https://unical.esse3.cineca.it/Home.do
+---
+La **domanda di conseguimento titolo** si presenta su Esse3 (Laurea → conseguimento titolo) entro i termini pubblicati nella pagina «Sedute di laurea», una per ogni seduta a cui vuoi partecipare. Devi essere in regola con le tasse.
+
+Da caricare su Esse3 (non per email):
+
+- autocertificazione di assenza di carichi pendenti con il Centro Residenziale;
+- ricevuta del questionario AlmaLaurea;
+- attestato di assenza di carichi pendenti con le Biblioteche (da chiedere con ticket).
+
+La **tesi** si carica in formato PDF/A. La **tassa di fine corso** è di 50 €, si paga una sola volta con PagoPA da Segreteria → Situazione tasse.
+
+Invia anche una email dal tuo indirizzo istituzionale con copia del documento d'identità: per Biologia, Scienze e Tecnologie Biologiche e Health Biotechnology a rosanna.filice@unical.it; per Scienze Geologiche, Scienze Naturali e Ambientali, Biodiversità e Restauro a sergio.astorino@unical.it. Se non ti laurei più, avvisa gli stessi indirizzi.
+
+[tesi] Tesi in azienda: la convenzione con l'ente o l'azienda {op}
+? Voglio fare la tesi in azienda
+? Come si fa la convenzione per la tesi
+? La mia azienda vuole ospitare un tesista
+? Aziende convenzionate per la tesi
+? Convenzione di tesi
+= tesi in azienda, tesi esterna, convenzione tesi, azienda convenzionata, ente ospitante, tesista
+@ Aziende già convenzionate | aziende_convenzionate_tesi.php
+@ Richiedi una convenzione di tesi | richiedi_convenzione_tesi.php
+---
+Per svolgere la tesi presso un ente o un'azienda serve una **convenzione di tesi** con il Dipartimento. Se l'azienda è già convenzionata la trovi nell'elenco pubblico; altrimenti la convenzione si richiede online: l'azienda riceve un link personale, senza registrazione, compila i dati e segue l'iter fino alla firma del Direttore.
+
+Finché la convenzione non è firmata da entrambe le parti lo studente non può presentare la richiesta di tesi esterna.
+
+[tirocini] Tirocini curriculari: dove e come farli {op}
+? Dove posso fare il tirocinio
+? Come faccio il tirocinio curriculare
+? Elenco aziende per il tirocinio
+? Tirocinio presso un'azienda
+? Ho bisogno di un tirocinio
+? Cosa devo fare prima di chiedere il tirocinio
+? Come inizio il tirocinio
+= tirocinio, tirocini, stage, curriculare, azienda ospitante, tsp, tirocinio curriculare, laboratorio, ente, tutor accademico, requisiti
+@ Piattaforma TSP 2.0 | https://unical.tsp.esse3.cineca.it
+@ Guida per lo studente | https://www.unical.it/uuid-media/d1e3f73b-dcba-4a45-b247-beb3a6412ec8/
+@ Aziende convenzionate | tirocini.php
+@ Pagina del Dipartimento sul tirocinio | https://dibest.unical.it/didattica/orientamento-mobilita/tirocinio/
+---
+Tutto l'iter del tirocinio, **convenzione compresa**, si svolge sulla piattaforma **TSP 2.0** (unical.tsp.esse3.cineca.it), non con i moduli di uniTicket.
+
+**Prima di fare domanda:**
+
+1. completa con esito positivo il corso di formazione generale sulla sicurezza sul lavoro;
+2. individua l'ente o l'azienda esterna, oppure un laboratorio interno dell'Unical;
+3. contattalo e chiedi la disponibilità;
+4. se il tirocinio è esterno, scegli un **tutor accademico** tra i docenti del tuo corso di laurea e chiedine la disponibilità.
+
+Per cercare dove farlo puoi usare l'elenco delle aziende convenzionate (qui sul portale e in TSP, voce «Ricerca azienda») e, per i laboratori dell'Ateneo, la pagina delle strutture di ricerca. Requisiti e CFU dipendono dal tuo corso di laurea (regolamento didattico). Per dubbi: tirocini.dibest@unical.it.
+
+[tirocini] Tirocinio: come si avvia su TSP (proposta di stage e progetto formativo) {op}
+? Come faccio la proposta di stage
+? Quali sono i passaggi per avviare il tirocinio
+? Quando posso iniziare il tirocinio
+? Cosa significa stato confermato e avviato
+? Non vedo il tirocinio tra i miei stage
+= proposta di stage, progetto formativo, avviare tirocinio, avviato, confermato, i miei stage, tsp, iter tirocinio, iniziare
+@ Piattaforma TSP 2.0 | https://unical.tsp.esse3.cineca.it
+@ Guida per lo studente | https://www.unical.it/uuid-media/d1e3f73b-dcba-4a45-b247-beb3a6412ec8/
+---
+I passaggi per **avviare** il tirocinio sono questi:
+
+1. tu invii la **proposta di stage** (azienda, sede, tutor, date indicative, attività);
+2. l'ufficio Tirocini del DiBEST la approva;
+3. il tutor aziendale (o accademico, se è un laboratorio interno) compila il **progetto formativo**;
+4. tu lo confermi;
+5. il tutor accademico lo conferma (solo tirocini esterni);
+6. l'ufficio Tirocini conferma a sua volta.
+
+Lo stato passa da «confermato» ad **«avviato»** (lo vedi in «I miei stage»): **solo da quel momento puoi iniziare** le attività.
+
+Il tirocinio compare in «I miei stage» soltanto dopo che il tutor ha compilato il progetto formativo.
+
+[tirocini] La proposta di stage risulta rifiutata o non vedo il progetto formativo {op}
+? La mia proposta di stage è stata rifiutata
+? Ho due proposte e una è rifiutata
+? Devo inviare una nuova proposta di stage
+? Il tirocinio non compare tra i miei stage
+? Il progetto formativo non arriva
+? La piattaforma mi dice rifiutata ma l'ufficio dice che va bene
+= rifiutata, rifiutato, proposta rifiutata, nuova proposta, progetto formativo non compare, i miei stage, due proposte
+---
+Non inviare una nuova proposta. Una proposta può risultare «rifiutata» semplicemente perché **per quel tirocinio c'è già una domanda confermata**, che tu non vedi ancora perché l'azienda (o il docente, nei laboratori interni) deve **compilare il progetto formativo**.
+
+Quando l'ente lo compila, la domanda compare in «I miei stage»: lì lo controlli e lo confermi. Se dopo qualche giorno non compare, chiedi all'ente di verificare di aver compilato il progetto con l'account del tutor indicato, poi scrivi a tirocini.dibest@unical.it.
+
+[tirocini] Conferma del progetto formativo: tutor accademico e corso sulla sicurezza {op}
+? Cosa devo inserire quando confermo il progetto formativo
+? Dove carico l'attestato del corso sulla sicurezza
+? Chi è il tutor accademico
+? Come scelgo il tutor accademico
+? Il tutor accademico deve confermare il progetto
+= conferma progetto formativo, tutor accademico, corso sicurezza, attestato sicurezza, accetta il progetto formativo, valutazione pf
+@ Guida per lo studente | https://www.unical.it/uuid-media/d1e3f73b-dcba-4a45-b247-beb3a6412ec8/
+---
+Quando confermi il progetto formativo (voce «vedi» in «I miei stage») in fondo alla pagina devi indicare:
+
+- il **tutor accademico**, scelto tra i docenti del tuo corso di laurea: è fondamentale per il riconoscimento dei crediti, quindi chiedi prima la sua disponibilità;
+- che hai superato il **corso di base sulla sicurezza**, con l'ente che l'ha rilasciato (per esempio Università della Calabria) e la **data di superamento**.
+
+Poi premi «Accetta il progetto formativo». L'attestato non si carica: contano ente e data inseriti qui.
+
+Per il tirocinio esterno il tutor accademico deve confermarlo dalla sua area docente, alla voce «Valutazione PF / riconoscimento crediti»; infine conferma l'ufficio Tirocini.
+
+[tirocini] Corso sulla sicurezza sul lavoro per il tirocinio {op}
+? Dove faccio il corso sulla sicurezza
+? Qual è la chiave di iscrizione del corso sulla sicurezza
+? Il corso sulla sicurezza quanto vale
+? Ho già fatto il corso sulla sicurezza, devo rifarlo
+? Come ottengo l'attestato del corso sulla sicurezza
+= corso sicurezza, sicurezza sul lavoro, formazione generale, chiave iscrizione, mooc, attestato sicurezza, validità corso
+@ Corso sulla sicurezza (MOOC Unical) | https://mooc.unical.it/course/view.php?id=3
+---
+Prima di fare domanda di tirocinio devi completare con esito positivo il **corso di formazione generale in materia di salute e sicurezza sul lavoro**, che si svolge sulla piattaforma e-learning dell'Ateneo (MOOC). La chiave di iscrizione è indicata nelle guide del tirocinio.
+
+Il corso **ha validità 5 anni**: se l'hai già superato (anche in un altro corso di laurea) non devi rifarlo, basta indicare ente e data quando confermi il progetto formativo.
+
+[tirocini] L'azienda, l'ente o la scuola non è convenzionata: come si fa la convenzione {op}
+? L'azienda non è convenzionata
+? La scuola mi chiede la convenzione del Dipartimento
+? Come si stipula la convenzione per il tirocinio
+? Non trovo la mia azienda su TSP
+? Come si accredita un ente
+? Devo fare il tirocinio in una scuola o in una palestra
+= convenzione, convenzione tirocinio, azienda non convenzionata, scuola, accreditamento, accredito, ente ospitante, non trovo azienda, area disciplinare, scienze motorie
+@ Guida per enti e aziende | https://www.unical.it/uuid-media/a66bc9af-e7fb-4b91-b4af-b13037905774/
+@ Piattaforma TSP 2.0 | https://unical.tsp.esse3.cineca.it
+---
+Anche la **convenzione** si fa sulla piattaforma TSP 2.0, ed è l'ente (non lo studente) a gestirla:
+
+1. l'ente fa la **richiesta di accredito** sulla piattaforma, scegliendo come area disciplinare il Dipartimento di Biologia, Ecologia e Scienze della Terra, e carica la manifestazione di interesse;
+2. dopo l'approvazione propone la convenzione (una per area disciplinare);
+3. riceve il file via PEC, lo **scarica, lo firma digitalmente e lo carica** in piattaforma, nella sezione «Allegati della convenzione» (non basta rispondere alla PEC);
+4. quando l'Ateneo la porta in stato **«Istituita»**, tu puoi inviare la proposta di stage.
+
+**Solo dopo la stipula della convenzione** si può presentare la domanda di tirocinio. Se la scuola o l'azienda è già accreditata ma tu non la vedi, di solito non ha indicato il nostro Dipartimento tra le aree disciplinari: deve scrivere a tirocini@unical.it per farlo aggiungere. Una convenzione stipulata con un altro Dipartimento non vale per il DiBEST.
+
+[tirocini] Convenzione di tirocinio: firma digitale e password dell'azienda {op}
+? La firma digitale non risulta valida
+? Firma p7m o PAdES
+? L'azienda non ha la firma digitale
+? L'azienda non riesce ad accedere a TSP
+? La password non arriva all'azienda
+? Il link per recuperare la password è scaduto
+= firma digitale, pades, cades, p7m, password azienda, recupero password, credenziali azienda, accesso tsp, convenzione firmata
+@ Guida per enti e aziende | https://www.unical.it/uuid-media/a66bc9af-e7fb-4b91-b4af-b13037905774/
+---
+**Firma digitale:** il documento va firmato in formato **PAdES** (resta un PDF), non CAdES (il file .p7m, che non viene accettato). La firma deve essere di un certificato valido (per esempio Aruba, InfoCert).
+
+**Accesso dell'azienda:** le credenziali sono personali, legate a ogni contatto inserito (un nuovo nome genera nuove credenziali e un'email). Se la password non arriva o non funziona, si usa il recupero credenziali dal sito: **il link scade dopo poco**, quindi va usato non appena arriva l'email; riprova se è scaduto.
+
+La convenzione firmata si carica nella sezione «Convenzioni», alla voce «Allegati». Se il problema resta, scrivi a tirocini.dibest@unical.it.
+
+[tirocini] Tirocinio: registro presenze, questionario e relazione finale {op}
+? Cosa devo fare alla fine del tirocinio
+? Come compilo il registro delle presenze
+? Dove trovo il questionario di valutazione
+? Dove carico la relazione finale
+? La relazione finale deve essere firmata
+? Non riesco a compilare il questionario
+= fine tirocinio, registro presenze, questionario di valutazione, relazione finale, firmata digitalmente, tutor accademico, concludere tirocinio
+@ Guida per lo studente | https://www.unical.it/uuid-media/d1e3f73b-dcba-4a45-b247-beb3a6412ec8/
+---
+**Durante lo stage** compili ogni giorno il registro delle presenze (in «I miei stage», colonna «Periodi», icona del libro: orario di entrata, uscita e attività svolta).
+
+**Alla fine:**
+
+1. invii il registro al tutor per l'approvazione (pulsante «invia»);
+2. compili il **questionario di valutazione** (colonna «Valutazione» → nome del questionario);
+3. allegi la **relazione finale** in PDF **firmata digitalmente dal tutor accademico** (colonna «Allegati»), scegliendo come tipologia «Relazione finale»: la tipologia è determinante per l'iter.
+
+Se il questionario non risulta compilabile, scrivi all'ufficio Tirocini indicando lo stato del tirocinio che vedi in «I miei stage».
+
+[tirocini] Ho finito il tirocinio ma i crediti non sono in carriera {op}
+? Quando vedo i crediti del tirocinio in carriera
+? Il tirocinio non risulta convalidato su Esse3
+? Ho concluso il tirocinio ma non è sul libretto
+? Il tutor ha fatto tutto ma i crediti non arrivano
+? La pratica di tirocinio è ferma
+= crediti tirocinio, cfu tirocinio, convalida tirocinio, riconoscimento crediti, libretto, carriera, sostenuto, pratica ferma, tirocinio concluso
+---
+I crediti arrivano in carriera quando sono state completate **tutte** queste tappe:
+
+1. il tutor aziendale o accademico **approva il registro delle presenze**;
+2. il tutor compila il **questionario di valutazione**;
+3. la **relazione finale** è caricata in PDF con **firma digitale del tutor accademico** (una firma scansionata o una firma non digitale non basta);
+4. l'ufficio Tirocini autorizza il riconoscimento dei crediti;
+5. il tutor accademico **conferma il riconoscimento**.
+
+Poi il tirocinio compare in Esse3 come «sostenuto». Controlla soprattutto i punti 1–3: sono quelli che più spesso restano indietro. Ogni tanto l'aggiornamento del libretto attende anche le delibere dei Consigli sui piani di studio.
+
+[tirocini] Proroga o cambio della data di fine tirocinio {op}
+? Posso prorogare il tirocinio
+? Ho finito il tirocinio prima della data prevista
+? Voglio spostare la data di inizio o di fine
+? Come modifico le date del progetto formativo
+? Ritardo con l'inizio del tirocinio
+= proroga, prorogare, cambio data, data fine tirocinio, anticipare, posticipare, modifica progetto formativo, variazione tirocinio
+@ Variazione fine tirocinio | https://ticket.unical.it/tickets/new/13/321/
+---
+Se per ritardi nell'avvio sfori la data di fine del progetto formativo, puoi chiedere una **proroga**: scrivi a tirocini.dibest@unical.it indicando fino a quale data va spostata la fine. Se invece hai finito prima, puoi chiedere di anticipare la data di fine per poter inviare il registro: controlla che le ore registrate raggiungano il totale previsto.
+
+Esiste anche il modulo di uniTicket «Variazione fine tirocinio», quando è aperto.
+
+[tirocini] Tirocinio interno nei laboratori e tirocini a scelta dei corsi magistrali {op}
+? Come faccio il tirocinio in un laboratorio dell'Università
+? Non trovo i tirocini interni
+? Posso fare due tirocini nello stesso laboratorio
+? Quale tirocinio devo fare prima, 2 CFU o 6 CFU
+? Il tirocinio aggiuntivo nel piano di studi
+= tirocinio interno, laboratorio, tirocinio magistrale, tirocinio a scelta, 2 cfu, 6 cfu, tirocinio aggiuntivo, laboratori unical
+@ Laboratori dell'Ateneo | https://www.unical.it/ricerca/strutture-di-ricerca/laboratori/
+---
+Per il tirocinio **interno** devi prima metterti d'accordo con un docente e con il laboratorio (l'elenco è nella pagina delle strutture di ricerca); poi invii la proposta di stage su TSP, che richiama il laboratorio come sede. Se non trovi laboratori disponibili puoi chiedere aiuto al docente tutor che ti è stato assegnato all'immatricolazione.
+
+Per alcuni corsi magistrali (per esempio Biologia) il tirocinio da **2 CFU va svolto prima** di quello da 6 CFU; se possono svolgersi nello stesso laboratorio o con lo stesso tutor lo decide il coordinatore del corso di laurea. Un tirocinio **aggiuntivo** inserito nel piano di studi si svolge **dopo** il tirocinio curriculare.
+
+[tirocini] Assicurazione e polizze del tirocinio {op}
+? Dove trovo la polizza assicurativa del tirocinio
+? L'azienda chiede l'assicurazione
+? Chi mi assicura durante il tirocinio
+? Assicurazione sanitaria per il tirocinio
+= assicurazione, polizza, polizze, inail, rc, copertura assicurativa, tirocinio assicurazione
+---
+I riferimenti dell'assicurazione sono nella **parte 4 del progetto formativo**, che puoi scaricare in PDF dal tuo tirocinio su TSP. Se l'ente chiede le polizze, consegna loro quel documento; se non basta scrivi a tirocini.dibest@unical.it.
+
+[tirocini] Contatti dell'ufficio Tirocini e assistenza sulla piattaforma {op}
+? Come contatto l'ufficio tirocini
+? A chi scrivo per un problema con TSP
+? Email dell'ufficio tirocini
+? Assistenza tirocinio
+? Orari ufficio tirocini
+= ufficio tirocini, contatti tirocinio, assistenza tsp, email tirocini, problema piattaforma, orari tirocini
+@ Assistenza tirocinio e sistemi informatici (uniTicket) | https://ticket.unical.it/tickets/new/13/435/
+---
+**Ufficio Tirocini DiBEST** (Area Servizi Didattica e Studenti, Cubo 6C, quarto piano):
+
+- email: tirocini.dibest@unical.it;
+- ricevimento: martedì e giovedì dalle 10 alle 12;
+- per problemi tecnici sulla piattaforma c'è anche il modulo di uniTicket «Assistenza tirocinio e sistemi informatici».
+
+Per la convenzione di scuole e aziende che non vedi in piattaforma scrivi a tirocini@unical.it (ufficio centrale di Ateneo).
+
+[iscrizione] Ammissione al primo anno: bandi, test e immatricolazione {op}
+? Come mi iscrivo al primo anno
+? Quando escono i bandi di ammissione
+? Cos'è il TOLC
+? Come mi immatricolo
+? Posso iscrivermi dopo le graduatorie
+? Come funzionano gli scorrimenti
+= ammissione, immatricolazione, iscrizione primo anno, bando, graduatoria, scorrimento, tolc, test, numero programmato, matricola
+@ Ammissione al primo anno (Unical) | https://www.unical.it/ammissione
+@ Vademecum per immatricolati | https://www.unical.it/didattica/iscriversi-studiare-laurearsi/ammissione-1-anno/vademecum-immatricolati/
+@ Iscrizioni e ammissioni (DiBEST) | https://dibest.unical.it/didattica/iscriversi-studiare-laurearsi/iscrizioni/
+---
+I corsi di laurea del DiBEST hanno il **numero programmato**: possono iscriversi i diplomati di scuole superiori di quattro o cinque anni (o chi ha un titolo estero riconosciuto idoneo). Bandi, scadenze, fasi e scorrimenti delle graduatorie sono pubblicati ogni anno sulla pagina **Ammissione** dell'Ateneo: lì trovi il bando del tuo corso.
+
+Se risulti ammesso in una graduatoria provvisoria, attendi quella definitiva per immatricolarti. Per domande sulle immatricolazioni scrivi a ammissione@unical.it; per le future matricole c'è anche uno sportello online (lunedì e mercoledì 15–17; martedì, giovedì e venerdì 10–12).
+
+[iscrizione] Dopo l'immatricolazione: ISEE, email istituzionale e tessera {op}
+? Cosa devo fare dopo l'immatricolazione
+? Come attivo l'email istituzionale
+? Come ottengo la tessera studente
+? Devo consegnare l'ISEE
+? Come valido la foto
+= immatricolato, dopo immatricolazione, isee, email istituzionale, tessera studente, unical life, foto, vademecum
+@ Vademecum per immatricolati | https://www.unical.it/didattica/iscriversi-studiare-laurearsi/ammissione-1-anno/vademecum-immatricolati/
+---
+Dopo l'immatricolazione:
+
+- richiedi l'**ISEE Università** (l'Ateneo lo legge dall'INPS: non va consegnato). Senza ISEE si paga la contribuzione massima;
+- attiva l'**email istituzionale** nel formato codicefiscale@studenti.unical.it: serve per le comunicazioni ufficiali;
+- carica su Esse3 una foto tessera e **valida la foto** allo sportello dei Servizi Didattici o allo sportello virtuale; poi scarica l'app **Unical Life** e genera la Tessera Studenti;
+- se hai i requisiti, presenta domanda per **borsa di studio**, alloggio e mensa nei tempi del bando.
+
+[iscrizione] OFA: obblighi formativi aggiuntivi {op}
+? Cosa sono gli OFA
+? Ho l'OFA, cosa devo fare
+? Come estinguo l'OFA di matematica
+? Come estinguo l'OFA di biologia
+? Posso sostenere esami con l'OFA
+? Quando sono i pre-corsi
+= ofa, obblighi formativi aggiuntivi, tolc, matematica di base, pre-corsi, precorsi, recupero, estinguere ofa, test restauro
+@ Pagina OFA del Dipartimento | https://dibest.unical.it/didattica/iscriversi-studiare-laurearsi/ofa/
+@ Pre-corsi di Ateneo | https://www.unical.it/didattica/orientamento/pre-corsi/
+@ Pre-corsi del Dipartimento | https://dibest.unical.it/didattica/orientamento-mobilita/precorsi/
+---
+Gli **OFA** sono obblighi da soddisfare **entro il primo anno** quando la verifica d'ingresso non è positiva.
+
+- **OFA Matematica** (Biologia, Scienze e Tecnologie Biologiche, Scienze Geologiche, Scienze Naturali e Ambientali): punteggio inferiore a 7 in Matematica di base del TOLC-B o TOLC-S. Si assolve frequentando il corso di recupero di Ateneo e superando la prova di verifica.
+- **OFA Biologia** (Scienze e tecnologie per le attività motorie e sportive): punteggio inferiore a 3 in Biologia del TOLC-F. Si assolve con il corso di recupero del Dipartimento e la prova di verifica, che si prenota su Esse3 in Esami → Appelli.
+- **Restauro:** dopo il test d'ingresso può essere assegnato un OFA, da superare con la prova fissata dal Consiglio di Corso.
+
+**Finché l'OFA non è estinto** non puoi sostenere l'esame di Matematica (o gli esami dell'ambito biologico per Scienze motorie) e, se non lo assolvi entro il primo anno, nemmeno gli esami del 2° e 3° anno. Date dei corsi e delle prove sono pubblicate sulle pagine dei pre-corsi.
+
+[iscrizione] Tasse, rate, ISEE ed esoneri {op}
+? Quando si pagano le tasse
+? Quanto devo pagare di tasse
+? Come funziona l'esonero dalle tasse
+? Devo pagare la prima rata per iscrivermi
+? Problema con il pagamento delle tasse
+? Situazione tasse su Esse3
+= tasse, rate, prima rata, isee, esoneri, contribuzione, situazione tasse, pagamento tasse, regolamento tasse, pagopa
+@ Tasse, contributi ed esoneri | https://www.unical.it/didattica/iscriversi-studiare-laurearsi/tasse-ed-esoneri/
+@ Regolamento tasse | https://www.unical.it/media/medias/2022/Regolamento_tasse_con_allegati.pdf
+@ Helpdesk situazione tasse | https://ticket.unical.it/tickets/new/servizi-didattici/helpdesk-situazione-tasse/
+---
+L'**iscrizione agli anni successivi** si rinnova ogni anno pagando la **prima rata** delle tasse. Importi, scadenze ed esoneri (per reddito, merito o disabilità) sono nella pagina «Tasse, contributi ed esoneri» e nel Regolamento tasse: dipendono dall'ISEE Università e cambiano ogni anno, quindi consulta sempre quelli aggiornati.
+
+I pagamenti si fanno da Esse3, in **Segreteria → Situazione tasse** (PagoPA). Per problemi con una rata o con l'iscrizione c'è l'helpdesk su uniTicket.
+
+[iscrizione] Trasferimenti e passaggi di corso {op}
+? Voglio passare a un altro corso di laurea
+? Come mi trasferisco da un'altra università
+? Come mi trasferisco in un'altra università
+? Foglio di congedo
+? Passaggio di corso quando
+? Quanto costa il trasferimento
+= trasferimento, passaggio di corso, cambio corso, foglio di congedo, trasferimento in entrata, trasferimento in uscita, cambiare università
+@ Trasferimenti e passaggi | https://dibest.unical.it/didattica/iscriversi-studiare-laurearsi/trasferimenti-e-passaggi/
+@ Trasferimento in entrata | https://ticket.unical.it/tickets/new/13/112/
+---
+- **Trasferimento in entrata** (da un altro Ateneo): modulo di uniTicket, di norma dal **1° luglio al 31 agosto**; poi il Consiglio di Corso delibera entro il 15 settembre. Dopo la presentazione Esse3 genera un bollo da 16 €.
+- **Passaggio ad altro corso dell'Ateneo:** domanda su Esse3, di norma dal 1° luglio al 31 agosto, dopo aver pagato la prima rata; costo 50 € più 16 € di bollo.
+- **Trasferimento in uscita** (verso un altro Ateneo): domanda su Esse3 in qualunque momento dell'anno; bollo 16 € e 100 € di tassa di trasferimento; dalla presentazione non puoi sostenere esami finché non ritiri la domanda.
+
+Importi e date possono cambiare: la pagina «Trasferimenti e passaggi» è sempre aggiornata.
+
+[iscrizione] Rinuncia, sospensione, ricongiungimento e decadenza {op}
+? Come rinuncio agli studi
+? Posso sospendere gli studi
+? Ho smesso di iscrivermi e voglio riprendere
+? Cos'è il ricongiungimento di carriera
+? Decadenza dagli studi
+? Come riprendo gli studi dopo la rinuncia
+= rinuncia, sospensione, sospendere, ricongiungimento, decadenza, riprendere studi, interruzione, maternità, rientro
+@ Lasciare e riprendere gli studi | https://dibest.unical.it/didattica/iscriversi-studiare-laurearsi/lasciare-e-riprendere-studi/
+@ Sospensione temporanea | https://ticket.unical.it/tickets/new/servizi-didattici/sospensione-temporanea-degli-studi/
+@ Ricongiunzione | https://ticket.unical.it/tickets/new/servizi-didattici/modulo-di-richiesta-ricongiunzione/
+---
+- **Rinuncia:** si può fare in qualsiasi momento, fa perdere lo stato di studente ma non impedisce di reiscriversi a qualsiasi corso.
+- **Sospensione:** obbligatoria (percorsi incompatibili, come le scuole di specializzazione) o facoltativa (nascita o adozione di un figlio, grave infermità, visto non ottenuto…). Si chiede su uniTicket con un bollo da 16 €.
+- **Ricongiungimento:** se non hai rinnovato l'iscrizione e vuoi riprendere, modulo di uniTicket; si pagano 120 € per ogni anno non iscritto (fino a un massimo di 500 €) più il bollo.
+- **Decadenza:** avviene dopo 10 anni consecutivi senza esami (8 per i corsi abilitanti).
+- **Dopo rinuncia o decadenza** puoi chiedere il riconoscimento della carriera precedente entro il 31 agosto.
+
+Gli importi vanno verificati sulla pagina ufficiale.
+
+[iscrizione] Corsi singoli e abbreviazione di corso {op}
+? Come mi iscrivo a un corso singolo
+? Quanto costa un corso singolo
+? Ho già una laurea, posso abbreviare il corso
+? Abbreviazione di corso
+= corsi singoli, corso singolo, abbreviazione, abbreviazione di corso, già laureato, seconda laurea
+@ Iscrizioni e ammissioni | https://dibest.unical.it/didattica/iscriversi-studiare-laurearsi/iscrizioni/
+@ Abbreviazione di corso | https://ticket.unical.it/tickets/new/13/114/
+---
+- **Corsi singoli:** domanda su Esse3 (scegli poi gli insegnamenti), entro una settimana prima dell'inizio delle lezioni; decide il Consiglio di Dipartimento. Costo indicativo: 16,50 € più 15 € per ogni CFU, fino a 33 CFU l'anno. Hai diritto a cinque appelli subito dopo la frequenza.
+- **Abbreviazione di corso** (se hai già un titolo o una carriera universitaria): modulo di uniTicket, di norma dal 1° luglio al 31 agosto, con un bollo da 16 €; decide il Consiglio di Corso di Studio. Nelle magistrali non si convalidano i CFU usati per l'accesso.
+
+[iscrizione] Borse di studio, alloggi, mensa, disabilità e DSA {op}
+? Come chiedo la borsa di studio
+? Come ottengo un alloggio
+? Dove si mangia in università
+? Servizi per studenti con disabilità o DSA
+? Esonero dalle tasse per reddito
+= borsa di studio, borse, alloggio, residenze, mensa, disabilità, dsa, diritto allo studio, contributi, sussidi
+@ Borse di studio | https://www.unical.it/didattica/diritto-allo-studio/borse-di-studio/
+@ Alloggi | https://www.unical.it/didattica/diritto-allo-studio/servizio-alloggi/
+@ Mensa | https://www.unical.it/didattica/diritto-allo-studio/servizio-mensa/
+@ Diritto allo studio | https://www.unical.it/didattica/diritto-allo-studio/
+---
+Il **diritto allo studio** è gestito dall'Ateneo (ufficio Diritto allo studio, Centro Residenziale, primo piano: dirittoallostudio@unical.it, dal lunedì al venerdì 10–12).
+
+- **Borse di studio:** il bando esce ogni anno entro luglio e comprende contributo, alloggio, mensa ed esonero dalle tasse.
+- **Alloggi:** circa 2.500 posti nel campus e a Rende.
+- **Mensa:** cinque mense nel campus, con tariffe in base al reddito.
+- **Disabilità e DSA:** il supporto è nelle pagine del diritto allo studio.
+
+[iscrizione] Orientamento, pre-corsi e Career Service {op}
+? Dove trovo il servizio di orientamento
+? Vorrei un colloquio di counselling
+? Cosa sono il Career Service e il PLS
+? Orientamento per le scuole
+= orientamento, counselling, career service, pls, piano lauree scientifiche, precorsi, scuole, pcto
+@ Orientamento e mobilità (DiBEST) | https://dibest.unical.it/didattica/orientamento-mobilita/
+@ Counselling | https://dibest.unical.it/didattica/orientamento-mobilita/counselling/
+@ Career Service | https://dibest.unical.it/didattica/orientamento-mobilita/career-service/
+@ Piano Lauree Scientifiche | https://dibest.unical.it/pls/
+---
+Il Dipartimento offre: **orientamento in ingresso e in itinere** (con la delegata dedicata e il servizio di mentoring), **pre-corsi** di recupero, **counselling**, il **Career Service** e le attività del **Piano Lauree Scientifiche**. Per le scuole ci sono i progetti di Formazione Scuola Lavoro e gli eventi dedicati.
+
+[iscrizione] Dove e quando trovo l'ufficio didattico {op}
+? Dove si trova l'ufficio didattico
+? Orari di ricevimento della segreteria
+? Quando posso andare allo sportello
+? Contatti del Dipartimento
+? Numero di telefono del Dipartimento
+= ufficio didattico, segreteria, ricevimento, orari, dove si trova, cubo 6c, contatti dipartimento, telefono, sportello
+@ Informazioni sugli uffici | https://dibest.unical.it/didattica/iscriversi-studiare-laurearsi/macro-settore-servizi-didattica-studenti-dibest/
+---
+**Area Servizi Didattica e Studenti DiBEST:** Cubo 6C, quarto piano (Ponte Pietro Bucci), Università della Calabria, Rende. **Ricevimento: martedì e giovedì dalle 10 alle 12.**
+
+**Dipartimento DiBEST:** Cubo 4B, quarto piano; email dipartimento.best@unical.it; PEC dipartimento.best@pec.unical.it; telefono 0984 493901.
+
+Molte pratiche si fanno online (uniTicket, Esse3, TSP): se non sai da dove cominciare, descrivimi cosa ti serve.
+
+[accesso] Password dimenticata o accesso a Esse3 {op}
+? Ho dimenticato la password di Esse3
+? Non riesco ad accedere a Esse3
+? Come recupero la password
+? Qual è il mio indirizzo email istituzionale
+= password dimenticata, recupero password, esse3, credenziali, codice fiscale, email istituzionale, studenti.unical.it
+@ Recupero password Esse3 | https://unical.esse3.cineca.it/Anagrafica/PasswordDimenticata.do
+---
+Per recuperare la password di Esse3 usa la pagina «Password dimenticata» inserendo **solo il tuo codice fiscale**: la nuova password arriva sulla tua casella.
+
+L'indirizzo email istituzionale degli studenti ha il formato **codicefiscale@studenti.unical.it**. Se il problema persiste, parla con un operatore.
+
+[tutorato] Tutorato: chi sono i tutor e come trovare supporto {op}
+? Chi è il mio tutor
+? Come trovo il docente tutor
+? Cos'è il mentoring
+? Cos'è il peer tutoring
+? Ho bisogno di aiuto per gli esami
+= tutor, docente tutor, mentoring, mentor, peer tutoring, tutorato studenti, supporto allo studio, aiuto esami
+@ Tutorato (DiBEST) | https://dibest.unical.it/didattica/orientamento-mobilita/tutorato/
+---
+Il tuo riferimento è il **docente-tutor**, scelto tra i professori e ricercatori del corso (gli elenchi per corso di laurea sono nella pagina Tutorato del Dipartimento). Ci sono poi il **mentoring** per le matricole delle triennali, il **peer tutoring** per gli insegnamenti del primo anno con più difficoltà e i **tutor didattici** (studenti senior) per attività specifiche.
+
+Per l'orientamento in ingresso e in itinere puoi scrivere alla delegata, la prof.ssa Paolina Crocco: paolina.crocco@unical.it.
+
+[tutorato] Tutorato: accettazione dell'incarico, presa di servizio e rinuncia {op}
+? Ho vinto una selezione da tutor, cosa devo fare
+? Come accetto l'incarico di tutorato
+? Dove faccio la presa di servizio
+? Voglio rinunciare all'incarico di tutorato
+? Come divento tutor
+= tutor didattico, incarico tutorato, accettazione incarico, presa di servizio, rinuncia incarico, mentor, selezione tutor
+@ Accettazione e conferimento incarico di tutorato | https://ticket.unical.it/tickets/new/dibest/accettazione-e-conferimento-incarico-riguardante-attivita-di-tutorato-nonche-attivita-didattico-integrative-propedeutiche-e-di-recupero-art-1-co-1-lett-b-l-1702003/
+@ Presa di servizio tutoraggio orientamento | https://ticket.unical.it/tickets/new/dibest/presa-di-servizio-incarichi-di-tutoraggio-orientamento/
+@ Presa di servizio Mentor | https://ticket.unical.it/tickets/new/dibest/presa-di-servizio-mentor-per-le-esigenze-dei-corsi-di-laurea-del-dibest/
+@ Rinuncia all'incarico di tutorato | https://ticket.unical.it/tickets/new/dibest/rinuncia-incarico-riguardante-attivita-di-tutorato-nonche-attivita-didattico-integrative-propedeutiche-e-di-recupero-art-1-co-1-lett-b-l-1702003/
+---
+Le **selezioni** dei tutor didattici sono pubblicate ogni anno sul portale Amministrazione Trasparente dell'Ateneo. Se risulti vincitore, i passaggi si fanno online:
+
+- **accettazione e conferimento dell'incarico** con il modulo di uniTicket dedicato;
+- **presa di servizio** con il modulo del tuo tipo di incarico (tutoraggio, orientamento o mentor);
+- **rinuncia** con l'apposito modulo, se non puoi più svolgere l'attività.
+
+Per la lettera di incarico, il registro delle ore e il pagamento fai riferimento alla voce sul tutorato nel portale.

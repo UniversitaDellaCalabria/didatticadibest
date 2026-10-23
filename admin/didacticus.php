@@ -40,9 +40,9 @@ if (isset($_GET['scarica'])) {
     $righe_e = [];
     foreach ($voci_rep->tutte() as $v) {
         $link_e = implode("\n", array_map(fn($l) => $l['e'] . '|' . $l['u'], VociRepository::link($v)));
-        $righe_e[] = [CostD::nomeArgomento((string)$v['argomento']), $v['titolo'], $v['domande'], $v['parole_chiave'], $v['risposta'], $link_e, (int)$v['attiva'] ? 'sì' : 'no', (int)$v['usi'], (int)$v['utile'], (int)$v['non_utile']];
+        $righe_e[] = [CostD::nomeArgomento((string)$v['argomento']), $v['titolo'], $v['domande'], $v['parole_chiave'], $v['risposta'], $link_e, (int)$v['attiva'] ? 'sì' : 'no', (int)$v['usi'], (int)$v['utile'], (int)$v['non_utile'], (int)$v['proponi_operatore'] ? 'sì' : 'no', (int)$v['solo_login'] ? 'sì' : 'no'];
     }
-    (new \App\Infrastructure\Documenti\TabellaEsportabile('Didacticus: base di conoscenza', ['Argomento', 'Titolo', 'Domande', 'Parole chiave', 'Risposta', 'Link (etichetta|indirizzo)', 'Attiva', 'Usi', 'Utile', 'Non utile'], $righe_e, 'Esportata il ' . date('d/m/Y'), [1, 2, 2, 2, 4, 2, 1, 1, 1, 1]))
+    (new \App\Infrastructure\Documenti\TabellaEsportabile('Didacticus: base di conoscenza', ['Argomento', 'Titolo', 'Domande', 'Parole chiave', 'Risposta', 'Link (etichetta|indirizzo)', 'Attiva', 'Usi', 'Utile', 'Non utile', 'Propone operatore', 'Solo con accesso'], $righe_e, 'Esportata il ' . date('d/m/Y'), [1, 2, 2, 2, 4, 2, 1, 1, 1, 1, 1, 1]))
         ->scarica((string)$_GET['scarica'], 'didacticus_voci_' . date('Ymd'));
     exit;
 }
@@ -146,38 +146,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash_set('Scegli un file CSV (al massimo 3 MB), per esempio quello scaricato dalla scheda «Voci» in formato CSV.', 'danger');
             $redirect_d('scheda=voci');
         }
-        $testo_csv = (string)file_get_contents($tmp);
-        $testo_csv = ltrim($testo_csv, "\xEF\xBB\xBF");
-        if (!mb_check_encoding($testo_csv, 'UTF-8')) $testo_csv = mb_convert_encoding($testo_csv, 'UTF-8', 'Windows-1252');
-        $f = fopen('php://temp', 'r+');
-        fwrite($f, $testo_csv);
-        rewind($f);
-        $mappa_arg = array_flip(array_map(fn($a) => mb_strtolower($a['nome']), CostD::ARGOMENTI));
-        $per_titolo = [];
-        foreach ($voci_rep->tutte() as $v) $per_titolo[mb_strtolower((string)$v['titolo'])] = $v;
-        [$nuove, $aggiornate, $saltate] = [0, 0, 0];
-        $riga_n = 0;
-        while (($c = fgetcsv($f, 0, ';', '"', '\\')) !== false && $riga_n < 500) {
-            ++$riga_n;
-            if (count($c) < 5 || ($riga_n === 1 && mb_strtolower(trim((string)$c[0])) === 'argomento')) continue;
-            [$arg, $tit, $dom, $par, $ris] = [trim((string)$c[0]), trim((string)$c[1]), trim((string)$c[2]), trim((string)$c[3]), trim((string)$c[4])];
-            if ($tit === '' || $ris === '') { ++$saltate; continue; }
-            $arg = isset(CostD::ARGOMENTI[mb_strtolower($arg)]) ? mb_strtolower($arg) : ($mappa_arg[mb_strtolower($arg)] ?? CostD::ARGOMENTO_PREDEFINITO);
-            $link = [];
-            foreach (preg_split('/\R/u', (string)($c[5] ?? '')) ?: [] as $riga_l) {
-                [$e_l, $u_l] = array_pad(explode('|', $riga_l, 2), 2, '');
-                $u_l = trim($u_l) !== '' ? trim($u_l) : trim($e_l);
-                if (VociRepository::urlValido($u_l)) $link[] = ['e' => trim($e_l) !== '' && trim($u_l) !== trim($e_l) ? trim($e_l) : $u_l, 'u' => $u_l];
-            }
-            $esiste = $per_titolo[mb_strtolower($tit)] ?? null;
-            $voci_rep->salva((int)($esiste['id'] ?? 0), [
-                'argomento' => $arg, 'titolo' => $tit, 'domande' => $dom, 'parole_chiave' => $par, 'risposta' => $ris, 'link' => $link ?: ($esiste ? VociRepository::link($esiste) : []),
-                'allegati' => $esiste ? VociRepository::allegati($esiste) : [], 'solo_login' => (int)($esiste['solo_login'] ?? 0), 'proponi_operatore' => (int)($esiste['proponi_operatore'] ?? 0),
-                'attiva' => !isset($c[6]) || mb_strtolower(trim((string)$c[6])) !== 'no', 'ordine' => (int)($esiste['ordine'] ?? 0),
-            ], $adesso_d);
-            $esiste ? ++$aggiornate : ++$nuove;
-        }
-        fclose($f);
+        [$nuove, $aggiornate, $saltate] = $voci_rep->importaCsv((string)file_get_contents($tmp), $adesso_d);
         registra_log_audit($conn, 'Voci di Didacticus importate da CSV', ['Nuove' => $nuove, 'Aggiornate' => $aggiornate, 'Saltate' => $saltate]);
         flash_set("✅ Importazione fatta: $nuove voci nuove, $aggiornate aggiornate" . ($saltate ? ", $saltate saltate (mancava il titolo o la risposta)" : '') . '.');
         $redirect_d('scheda=voci');
@@ -273,7 +242,7 @@ $schede_d = ['voci' => ['Voci', 'fa-book-open'], 'mancate' => ['Domande senza ri
         <button type="button" class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#importa" aria-expanded="false"><i class="fa fa-file-import me-1" aria-hidden="true"></i>Importa da CSV</button></span>
 </div>
 <div class="collapse mb-3" id="importa"><form method="POST" enctype="multipart/form-data" action="<?php echo $h($url_scheda('voci')); ?>" class="card card-body border-0 shadow-sm"><?php csrf_field(); ?><input type="hidden" name="azione" value="importa">
-    <p class="small mb-2">Per scrivere tante voci in una volta: <strong>scarica l'elenco in CSV</strong>, aggiungi o modifica le righe in Excel (colonne: Argomento, Titolo, Domande, Parole chiave, Risposta, Link, Attiva) e caricalo qui. Le voci con lo stesso titolo si aggiornano, le altre si aggiungono; nel campo «Link» scrivi una riga per link nella forma <code>Testo|indirizzo</code>. Gli allegati si aggiungono dalla scheda della singola voce.</p>
+    <p class="small mb-2">Per scrivere tante voci in una volta: <strong>scarica l'elenco in CSV</strong>, aggiungi o modifica le righe in Excel (colonne: Argomento, Titolo, Domande, Parole chiave, Risposta, Link, Attiva e, facoltative, «Propone operatore» e «Solo con accesso» con sì/no) e caricalo qui. Le voci con lo stesso titolo si aggiornano, le altre si aggiungono; nel campo «Link» scrivi una riga per link nella forma <code>Testo|indirizzo</code>. Gli allegati si aggiungono dalla scheda della singola voce.</p>
     <div class="d-flex gap-2 flex-wrap"><label class="visually-hidden" for="csvfile">File CSV</label><input class="form-control" style="max-width:420px;" type="file" id="csvfile" name="csv" accept=".csv,text/csv" required><button class="btn btn-dark fw-bold" type="submit">Importa</button></div></form></div>
 
 <div class="card border-0 shadow-sm"><div class="table-responsive"><table class="table table-hover align-middle mb-0" id="tabVoci">
