@@ -416,9 +416,15 @@ if ($u_logged_header) {
                     $mob_href_s = (!empty($mob_sub->url) && $mob_sub->url !== '#') ? htmlspecialchars($mob_sub->url) : '#';
                     $mob_tgt_s  = $mob_sub->target();
                 ?>
-                    <a href="<?php echo $mob_href_s; ?>" <?php echo $mob_tgt_s; ?> class="mob-nav-link ps-3">
+                    <a href="<?php echo $mob_href_s; ?>" <?php echo $mob_tgt_s; ?> class="mob-nav-link ps-3"<?php echo $mob_sub->conSottovoci ? ' style="font-weight:700;"' : ''; ?>>
                         <i class="fa fa-chevron-right me-2" style="font-size:.65rem;color:#B30000;" aria-hidden="true"></i><?php echo htmlspecialchars($mob_sub->etichetta); ?>
                     </a>
+                    <?php if ($mob_sub->conSottovoci): // terzo livello: come nel menu a tendina del computer, sotto la voce di secondo livello
+                        foreach ($mob_sub->figli as $mob_subsub): ?>
+                            <a href="<?php echo htmlspecialchars((!empty($mob_subsub->url) && $mob_subsub->url !== '#') ? $mob_subsub->url : '#'); ?>" <?php echo $mob_subsub->target(); ?> class="mob-nav-link ps-5" style="font-size:.92em;">
+                                <i class="fa fa-minus me-2" style="font-size:.55rem;color:#B30000;" aria-hidden="true"></i><?php echo htmlspecialchars($mob_subsub->etichetta); ?>
+                            </a>
+                    <?php endforeach; endif; ?>
                 <?php endforeach; ?>
         <?php else: ?>
                 <a href="<?php echo htmlspecialchars($mob_m->url); ?>" <?php echo $mob_m->target(); ?> class="mob-nav-link"><?php echo htmlspecialchars($mob_m->etichetta); ?></a>
