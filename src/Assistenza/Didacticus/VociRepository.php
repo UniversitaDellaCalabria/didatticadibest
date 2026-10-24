@@ -64,10 +64,11 @@ final class VociRepository
             (string) $dati['argomento'], mb_substr((string) $dati['titolo'], 0, 200), (string) $dati['domande'], (string) $dati['parole_chiave'], (string) $dati['risposta'],
             (string) json_encode($dati['link'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), (string) json_encode($dati['allegati'], JSON_UNESCAPED_UNICODE),
             !empty($dati['solo_login']) ? 1 : 0, !empty($dati['proponi_operatore']) ? 1 : 0, !empty($dati['attiva']) ? 1 : 0, (int) ($dati['ordine'] ?? 0),
+            implode(',', Costanti::pubblici((string) ($dati['pubblico'] ?? 'studenti'))),
         ];
         if ($id > 0) {
             $this->db->esegui(
-                'UPDATE didacticus_voci SET argomento = ?, titolo = ?, domande = ?, parole_chiave = ?, risposta = ?, link_json = ?, allegati_json = ?, solo_login = ?, proponi_operatore = ?, attiva = ?, ordine = ?, aggiornato_il = ? WHERE id = ?',
+                'UPDATE didacticus_voci SET argomento = ?, titolo = ?, domande = ?, parole_chiave = ?, risposta = ?, link_json = ?, allegati_json = ?, solo_login = ?, proponi_operatore = ?, attiva = ?, ordine = ?, pubblico = ?, aggiornato_il = ? WHERE id = ?',
                 array_merge($valori, [$quando, $id])
             );
 
@@ -75,7 +76,7 @@ final class VociRepository
         }
 
         return $this->db->inserisci(
-            'INSERT INTO didacticus_voci (argomento, titolo, domande, parole_chiave, risposta, link_json, allegati_json, solo_login, proponi_operatore, attiva, ordine, creato_il) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO didacticus_voci (argomento, titolo, domande, parole_chiave, risposta, link_json, allegati_json, solo_login, proponi_operatore, attiva, ordine, pubblico, creato_il) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             array_merge($valori, [$quando])
         );
     }
@@ -95,7 +96,7 @@ final class VociRepository
         $f = fopen('php://temp', 'r+');
         fwrite($f, $testo);
         rewind($f);
-        $mappaArg = array_flip(array_map(fn ($a) => mb_strtolower($a['nome']), Costanti::ARGOMENTI));
+        $mappaArg = array_flip(array_map(fn ($a) => mb_strtolower($a['nome']), Costanti::argomenti()));
         $perTitolo = [];
         foreach ($this->tutte() as $v) {
             $perTitolo[mb_strtolower((string) $v['titolo'])] = $v;
@@ -112,7 +113,7 @@ final class VociRepository
                 ++$saltate;
                 continue;
             }
-            $arg = isset(Costanti::ARGOMENTI[mb_strtolower($arg)]) ? mb_strtolower($arg) : ($mappaArg[mb_strtolower($arg)] ?? Costanti::ARGOMENTO_PREDEFINITO);
+            $arg = isset(Costanti::argomenti()[mb_strtolower($arg)]) ? mb_strtolower($arg) : ($mappaArg[mb_strtolower($arg)] ?? Costanti::ARGOMENTO_PREDEFINITO);
             $link = [];
             foreach (preg_split('/\R/u', (string) ($c[5] ?? '')) ?: [] as $rigaL) {
                 [$e, $u] = array_pad(explode('|', $rigaL, 2), 2, '');
@@ -127,6 +128,7 @@ final class VociRepository
                 'argomento' => $arg, 'titolo' => $tit, 'domande' => $dom, 'parole_chiave' => $par, 'risposta' => $ris, 'link' => $link ?: ($esiste ? self::link($esiste) : []),
                 'allegati' => $esiste ? self::allegati($esiste) : [], 'solo_login' => $si(11, (int) ($esiste['solo_login'] ?? 0)), 'proponi_operatore' => $si(10, (int) ($esiste['proponi_operatore'] ?? 0)),
                 'attiva' => !isset($c[6]) || mb_strtolower(trim((string) $c[6])) !== 'no', 'ordine' => (int) ($esiste['ordine'] ?? 0),
+                'pubblico' => (string) ($esiste['pubblico'] ?? 'studenti'),
             ], $quando);
             $esiste ? ++$aggiornate : ++$nuove;
         }

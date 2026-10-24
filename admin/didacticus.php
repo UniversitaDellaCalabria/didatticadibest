@@ -20,6 +20,7 @@ use App\Assistenza\Didacticus\VociRepository;
 $app_d = \App\Core\App::per($conn);
 $voci_rep = $app_d->get(VociRepository::class);
 $manc_rep = $app_d->get(MancateRepository::class);
+$arg_rep = $app_d->get(\App\Assistenza\Didacticus\ArgomentiRepository::class);
 $imp_rep = $app_d->get(ImpostazioniDidacticus::class);
 $did = $app_d->get(ServizioDidacticus::class);
 $upload = $app_d->get(\App\Infrastructure\Storage\Upload::class);
@@ -33,7 +34,7 @@ const MIME_ALLEGATI = ['application/pdf', 'image/png', 'image/jpeg', 'applicatio
     'text/plain', 'application/zip', 'application/octet-stream'];
 const MAX_BYTE_ALLEGATO = 10 * 1024 * 1024;
 
-$scheda = in_array($_GET['scheda'] ?? '', ['voci', 'mancate', 'prova', 'impostazioni'], true) ? $_GET['scheda'] : 'voci';
+$scheda = in_array($_GET['scheda'] ?? '', ['voci', 'argomenti', 'mancate', 'prova', 'impostazioni'], true) ? $_GET['scheda'] : 'voci';
 
 // ----- Esportazione dell'elenco delle voci (Excel, PDF, CSV)
 if (isset($_GET['scarica'])) {
@@ -91,6 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'argomento' => CostD::argomentoValido((string)($_POST['argomento'] ?? '')), 'titolo' => $titolo, 'domande' => trim((string)($_POST['domande'] ?? '')),
             'parole_chiave' => trim((string)($_POST['parole_chiave'] ?? '')), 'risposta' => $risposta, 'link' => $link, 'allegati' => $allegati,
             'solo_login' => !empty($_POST['solo_login']), 'proponi_operatore' => !empty($_POST['proponi_operatore']), 'attiva' => !empty($_POST['attiva']), 'ordine' => (int)($esistente['ordine'] ?? 0),
+            'pubblico' => implode(',', array_map('strval', (array)($_POST['pubblico'] ?? []))),
         ], $adesso_d);
         if (!empty($_POST['mancata_id'])) $manc_rep->segna((int)$_POST['mancata_id'], MancateRepository::FATTA);
         registra_log_audit($conn, ($id_v ? 'Voce di Didacticus modificata' : 'Voce di Didacticus creata'), ['Voce' => $titolo, 'Id' => $id_salvato]);
@@ -112,6 +114,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         $redirect_d('scheda=voci' . (!empty($_POST['argomento_filtro']) ? '&argomento=' . urlencode((string)$_POST['argomento_filtro']) : ''));
+    }
+    if ($azione === 'salva_argomento') {
+        $err_a = $arg_rep->salva((string)($_POST['chiave'] ?? ''), (string)($_POST['nome'] ?? ''), (string)($_POST['icona'] ?? ''), (string)($_POST['aiuto'] ?? ''), (int)($_POST['ordine'] ?? 0));
+        if ($err_a !== '') { flash_set($err_a, 'danger'); } else { flash_set('✅ Argomento salvato.'); registra_log_audit($conn, 'Argomento di Didacticus salvato', ['Argomento' => (string)($_POST['nome'] ?? '')]); }
+        $redirect_d('scheda=argomenti');
+    }
+    if ($azione === 'elimina_argomento') {
+        if ($arg_rep->elimina((string)($_POST['chiave'] ?? ''))) { flash_set('✅ Argomento eliminato: le sue domande sono passate ad «Altro».'); registra_log_audit($conn, 'Argomento di Didacticus eliminato', ['Argomento' => (string)($_POST['chiave'] ?? '')]); }
+        else { flash_set('«Altro» serve sempre e non si può eliminare.', 'warning'); }
+        $redirect_d('scheda=argomenti');
     }
     if ($azione === 'mancata_segna') {
         $manc_rep->segna((int)($_POST['id'] ?? 0), (string)($_POST['stato'] ?? ''));
@@ -158,14 +170,14 @@ $conteggio_mancate = $manc_rep->contaDaVedere();
 $imp = $imp_rep->leggi();
 $n_attive = $voci_rep->contaAttive();
 $url_scheda = fn(string $s, string $extra = '') => 'didacticus.php?p_id=' . (int)$filtro_p . '&scheda=' . $s . $extra;
-$schede_d = ['voci' => ['Voci', 'fa-book-open'], 'mancate' => ['Domande senza risposta', 'fa-circle-question'], 'prova' => ['Prova', 'fa-flask'], 'impostazioni' => ['Impostazioni', 'fa-sliders']];
+$schede_d = ['voci' => ['Domande e risposte', 'fa-book-open'], 'argomenti' => ['Argomenti', 'fa-folder-tree'], 'mancate' => ['Domande senza risposta', 'fa-circle-question'], 'prova' => ['Prova', 'fa-flask'], 'impostazioni' => ['Impostazioni', 'fa-sliders']];
 ?>
 <style>.did-testo{white-space:pre-wrap;overflow-wrap:anywhere}</style>
 <div class="d-flex flex-wrap align-items-center gap-3 mb-2">
     <img src="../didacticus_file.php?avatar=1" alt="" width="64" height="64" class="rounded-circle shadow-sm" style="object-fit:cover;">
     <div>
-        <h1 class="h4 fw-bold text-dark mb-0">Didacticus <span class="badge <?php echo $imp['attivo'] && $n_attive ? 'bg-success' : 'bg-secondary'; ?> fs-6 align-middle"><?php echo $imp['attivo'] ? ($n_attive ? 'acceso' : 'acceso, senza voci') : 'spento'; ?></span></h1>
-        <p class="text-secondary mb-0">L'assistente virtuale dell'assistenza: risponde alle domande più comuni usando solo quello che scrivi qui, e passa la parola a un operatore quando non basta. <strong><?php echo $n_attive; ?></strong> voci attive.</p>
+        <h1 class="h4 fw-bold text-dark mb-0">Domande e risposte · Didacticus <span class="badge <?php echo $imp['attivo'] && $n_attive ? 'bg-success' : 'bg-secondary'; ?> fs-6 align-middle"><?php echo $imp['attivo'] ? ($n_attive ? 'acceso' : 'acceso, senza voci') : 'spento'; ?></span></h1>
+        <p class="text-secondary mb-0">Le domande frequenti pubblicate sul sito (pagina «Assistenza» › «Domande frequenti») e le risposte dell'assistente virtuale: scrivi qui domande, risposte, argomenti e a chi si rivolgono. Quando non basta, passa la parola a un operatore. <strong><?php echo $n_attive; ?></strong> voci attive.</p>
     </div>
 </div>
 <?php echo flash_html(); ?>
@@ -178,7 +190,7 @@ $schede_d = ['voci' => ['Voci', 'fa-book-open'], 'mancate' => ['Domande senza ri
 </ul>
 
 <?php if ($scheda === 'voci'):
-    $arg_filtro = isset(CostD::ARGOMENTI[$_GET['argomento'] ?? '']) ? $_GET['argomento'] : '';
+    $arg_filtro = isset(CostD::argomenti()[$_GET['argomento'] ?? '']) ? $_GET['argomento'] : '';
     $cerca_d = trim((string)($_GET['q'] ?? ''));
     $voce_sel = $_GET['voce'] ?? '';
     // Da una domanda rimasta senza risposta: la voce parte già con la domanda e, se c'era, la risposta data dall'operatore
@@ -187,7 +199,8 @@ $schede_d = ['voci' => ['Voci', 'fa-book-open'], 'mancate' => ['Domande senza ri
         $v_mod = (int)$voce_sel > 0 ? $voci_rep->perId((int)$voce_sel) : null;
         if ((int)$voce_sel > 0 && !$v_mod) { echo '<div class="alert alert-warning">Voce non trovata.</div>'; require_once 'admin_footer.php'; exit; }
         $d = $v_mod ?: ['id' => 0, 'argomento' => $da_mancata['argomento'] ?? 'altro', 'titolo' => $da_mancata ? mb_substr((string)$da_mancata['domanda'], 0, 120) : '', 'domande' => $da_mancata['domanda'] ?? '',
-            'parole_chiave' => '', 'risposta' => $da_mancata ? $manc_rep->rispostaOperatore((int)$da_mancata['conversazione_id']) : '', 'attiva' => 1, 'solo_login' => 0, 'proponi_operatore' => 0];
+            'parole_chiave' => '', 'risposta' => $da_mancata ? $manc_rep->rispostaOperatore((int)$da_mancata['conversazione_id']) : '', 'attiva' => 1, 'solo_login' => 0, 'proponi_operatore' => 0, 'pubblico' => 'studenti'];
+        $pubblici_voce = CostD::pubblici((string)($d['pubblico'] ?? ''));
         $link_form = $v_mod ? VociRepository::link($v_mod) : [];
         $allegati_form = $v_mod ? VociRepository::allegati($v_mod) : [];
         while (count($link_form) < 3) $link_form[] = ['e' => '', 'u' => ''];
@@ -199,7 +212,7 @@ $schede_d = ['voci' => ['Voci', 'fa-book-open'], 'mancate' => ['Domande senza ri
     <h5 class="fw-bold mb-3"><?php echo $v_mod ? 'Modifica la voce' : 'Nuova voce'; ?></h5>
     <div class="row g-3">
         <div class="col-md-8"><label class="form-label fw-bold" for="d-titolo">Titolo (come lo vedono gli utenti nei suggerimenti)</label><input class="form-control" id="d-titolo" name="titolo" maxlength="200" required value="<?php echo $h($d['titolo']); ?>"></div>
-        <div class="col-md-4"><label class="form-label fw-bold" for="d-arg">Argomento</label><select class="form-select" id="d-arg" name="argomento"><?php foreach (CostD::ARGOMENTI as $k_a => $a_a): ?><option value="<?php echo $k_a; ?>" <?php echo $d['argomento'] === $k_a ? 'selected' : ''; ?>><?php echo $h($a_a['nome']); ?></option><?php endforeach; ?></select></div>
+        <div class="col-md-4"><label class="form-label fw-bold" for="d-arg">Argomento</label><select class="form-select" id="d-arg" name="argomento"><?php foreach (CostD::argomenti() as $k_a => $a_a): ?><option value="<?php echo $k_a; ?>" <?php echo $d['argomento'] === $k_a ? 'selected' : ''; ?>><?php echo $h($a_a['nome']); ?></option><?php endforeach; ?></select></div>
         <div class="col-md-6"><label class="form-label fw-bold" for="d-dom">Domande che la persona potrebbe fare <span class="fw-normal text-secondary">(una per riga)</span></label>
             <textarea class="form-control" id="d-dom" name="domande" rows="6" placeholder="Come richiedo il certificato di iscrizione&#10;Ho bisogno di un certificato&#10;Dove trovo il modulo per il certificato"><?php echo $h($d['domande']); ?></textarea>
             <div class="form-text">Più modi diversi scrivi, meglio Didacticus capisce. Scrivile come le scriverebbe uno studente, anche con parole semplici.</div></div>
@@ -222,6 +235,9 @@ $schede_d = ['voci' => ['Voci', 'fa-book-open'], 'mancate' => ['Domande senza ri
                     <div class="col-md-3"><div class="form-check"><input class="form-check-input" type="checkbox" name="allegato_togli[]" value="<?php echo $i_a; ?>" id="tog<?php echo $i_a; ?>"><label class="form-check-label small" for="tog<?php echo $i_a; ?>">Elimina</label></div></div></div>
             <?php endforeach; ?>
             <label class="form-label small mb-1" for="d-file">Aggiungi file (puoi sceglierne più d'uno)</label><input class="form-control form-control-sm" type="file" id="d-file" name="allegati[]" multiple accept=".pdf,.png,.jpg,.jpeg,.docx,.doc,.xlsx,.xls,.odt,.ods,.txt"></div>
+        <div class="col-12"><fieldset><legend class="fw-bold fs-6 mb-1">A chi si rivolge <span class="fw-normal text-secondary">(nella pagina «Domande frequenti» si può filtrare per pubblico)</span></legend>
+            <div class="d-flex flex-wrap gap-4"><?php foreach (CostD::PUBBLICI as $k_p => $n_p): ?><div class="form-check"><input class="form-check-input" type="checkbox" name="pubblico[]" value="<?php echo $k_p; ?>" id="d-pub-<?php echo $k_p; ?>" <?php echo in_array($k_p, $pubblici_voce, true) ? 'checked' : ''; ?>><label class="form-check-label" for="d-pub-<?php echo $k_p; ?>"><?php echo $h($n_p); ?></label></div><?php endforeach; ?></div>
+            <div class="form-text">Per esempio la Formazione Scuola Lavoro: spunta solo «Scuole». Se non spunti nulla la domanda vale per tutti.</div></fieldset></div>
         <div class="col-12 d-flex flex-wrap gap-4">
             <div class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" id="d-att" name="attiva" value="1" <?php echo (int)$d['attiva'] ? 'checked' : ''; ?>><label class="form-check-label fw-bold" for="d-att">Attiva</label><div class="form-text">Spenta: Didacticus non la usa.</div></div>
             <div class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" id="d-log" name="solo_login" value="1" <?php echo (int)$d['solo_login'] ? 'checked' : ''; ?>><label class="form-check-label fw-bold" for="d-log">Solo per chi ha fatto l'accesso</label><div class="form-text">Gli esterni vengono invitati ad accedere.</div></div>
@@ -231,12 +247,15 @@ $schede_d = ['voci' => ['Voci', 'fa-book-open'], 'mancate' => ['Domande senza ri
     <div class="mt-3 d-flex gap-2"><button class="btn btn-danger fw-bold px-4" type="submit" style="background-color:#B80000;border:none;"><i class="fa fa-floppy-disk me-1" aria-hidden="true"></i>Salva la voce</button><a class="btn btn-outline-secondary" href="<?php echo $h($url_scheda('voci')); ?>">Annulla</a></div>
 </div></form>
 <?php else:
+    $pub_filtro = isset(CostD::PUBBLICI[$_GET['pubblico'] ?? '']) ? (string)$_GET['pubblico'] : '';
     $elenco_v = $voci_rep->tutte($arg_filtro ?: null, $cerca_d);
+    if ($pub_filtro !== '') { $elenco_v = array_values(array_filter($elenco_v, function ($v) use ($pub_filtro) { $p = CostD::pubblici((string)($v['pubblico'] ?? '')); return !$p || in_array($pub_filtro, $p, true); })); }
 ?>
 <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
     <a class="btn btn-danger fw-bold" style="background-color:#B80000;border:none;" href="<?php echo $h($url_scheda('voci', '&voce=nuova')); ?>"><i class="fa fa-plus me-1" aria-hidden="true"></i>Nuova voce</a>
     <form method="GET" class="d-flex flex-wrap gap-2 m-0" role="search"><input type="hidden" name="p_id" value="<?php echo (int)$filtro_p; ?>"><input type="hidden" name="scheda" value="voci">
-        <select name="argomento" class="form-select" style="width:auto;" aria-label="Filtra per argomento" onchange="this.form.submit()"><option value="">Tutti gli argomenti</option><?php foreach (CostD::ARGOMENTI as $k_a => $a_a): ?><option value="<?php echo $k_a; ?>" <?php echo $arg_filtro === $k_a ? 'selected' : ''; ?>><?php echo $h($a_a['nome']); ?></option><?php endforeach; ?></select>
+        <select name="argomento" class="form-select" style="width:auto;" aria-label="Filtra per argomento" onchange="this.form.submit()"><option value="">Tutti gli argomenti</option><?php foreach (CostD::argomenti() as $k_a => $a_a): ?><option value="<?php echo $k_a; ?>" <?php echo $arg_filtro === $k_a ? 'selected' : ''; ?>><?php echo $h($a_a['nome']); ?></option><?php endforeach; ?></select>
+        <select name="pubblico" class="form-select" style="width:auto;" aria-label="Filtra per pubblico" onchange="this.form.submit()"><option value="">Tutti i pubblici</option><?php foreach (CostD::PUBBLICI as $k_p => $n_p): ?><option value="<?php echo $k_p; ?>" <?php echo $pub_filtro === $k_p ? 'selected' : ''; ?>><?php echo $h($n_p); ?></option><?php endforeach; ?></select>
         <input type="search" name="q" class="form-control" style="max-width:240px;" placeholder="Cerca nelle voci" aria-label="Cerca nelle voci" value="<?php echo $h($cerca_d); ?>"><button class="btn btn-outline-secondary" type="submit">Cerca</button></form>
     <span class="ms-auto d-flex gap-2"><?php echo pn_scarica($url_scheda('voci')); ?>
         <button type="button" class="btn btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#importa" aria-expanded="false"><i class="fa fa-file-import me-1" aria-hidden="true"></i>Importa da CSV</button></span>
@@ -251,6 +270,7 @@ $schede_d = ['voci' => ['Voci', 'fa-book-open'], 'mancate' => ['Domande senza ri
     <?php foreach ($elenco_v as $v): $n_dom = count(Motore::righe((string)$v['domande'])); $n_l = count(VociRepository::link($v)); $n_f = count(VociRepository::allegati($v)); ?>
         <tr class="<?php echo (int)$v['attiva'] ? '' : 'table-secondary'; ?>">
             <td class="ps-3"><span class="badge bg-dark fw-normal"><?php echo $h(CostD::nomeArgomento((string)$v['argomento'])); ?></span> <strong><?php echo $h($v['titolo']); ?></strong>
+                <?php foreach (CostD::pubblici((string)($v['pubblico'] ?? '')) ?: ['tutti'] as $p_b): ?><span class="badge bg-light text-dark border fw-normal"><?php echo $h(CostD::PUBBLICI[$p_b] ?? 'Tutti'); ?></span> <?php endforeach; ?>
                 <div class="small text-secondary"><?php echo $n_dom; ?> domande<?php echo $n_l ? " · $n_l link" : ''; ?><?php echo $n_f ? " · $n_f allegati" : ''; ?><?php echo (int)$v['solo_login'] ? ' · solo con accesso' : ''; ?><?php echo (int)$v['proponi_operatore'] ? ' · propone operatore' : ''; ?></div></td>
             <td><?php echo (int)$v['usi']; ?></td>
             <td><?php $tot_e = (int)$v['utile'] + (int)$v['non_utile']; echo $tot_e ? '<span class="text-success">' . (int)$v['utile'] . ' 👍</span> <span class="text-danger">' . (int)$v['non_utile'] . ' 👎</span>' : '<span class="text-muted">—</span>'; ?></td>
@@ -264,6 +284,42 @@ $schede_d = ['voci' => ['Voci', 'fa-book-open'], 'mancate' => ['Domande senza ri
             </td></tr>
     <?php endforeach; ?></tbody></table></div></div>
 <?php endif; ?>
+
+<?php elseif ($scheda === 'argomenti'):
+    $elenco_arg = CostD::argomenti();
+    $usi_arg = $arg_rep->usi();
+    $mod_arg = $_GET['modifica'] ?? '';
+    $modulo_arg = function (string $chiave, array $a) use ($h, $url_scheda): string {
+        return '<form method="POST" action="' . $h($url_scheda('argomenti')) . '" class="row g-2">' . (new \App\Auth\Csrf(new \App\Auth\SessioneNativa()))->campo()
+            . '<input type="hidden" name="azione" value="salva_argomento"><input type="hidden" name="chiave" value="' . $h($chiave) . '">'
+            . '<div class="col-md-5"><label class="form-label fw-bold small" for="ag-n' . $h($chiave) . '">Nome dell\'argomento</label><input class="form-control" id="ag-n' . $h($chiave) . '" name="nome" maxlength="120" required value="' . $h($a['nome'] ?? '') . '"></div>'
+            . '<div class="col-md-7"><label class="form-label fw-bold small" for="ag-a' . $h($chiave) . '">Frase di spiegazione</label><input class="form-control" id="ag-a' . $h($chiave) . '" name="aiuto" maxlength="255" value="' . $h($a['aiuto'] ?? '') . '"></div>'
+            . '<div class="col-md-5"><label class="form-label fw-bold small" for="ag-i' . $h($chiave) . '">Icona <span class="fw-normal text-secondary">(nome Font Awesome, es. fa-briefcase)</span></label><input class="form-control" id="ag-i' . $h($chiave) . '" name="icona" maxlength="40" value="' . $h($a['icona'] ?? 'fa-circle-question') . '"></div>'
+            . '<div class="col-md-3"><label class="form-label fw-bold small" for="ag-o' . $h($chiave) . '">Posizione</label><input class="form-control" type="number" id="ag-o' . $h($chiave) . '" name="ordine" value="' . (int)($a['ordine'] ?? 0) . '"></div>'
+            . '<div class="col-md-4 d-flex align-items-end gap-2"><button class="btn btn-danger fw-bold" type="submit" style="background-color:#B80000;border:none;"><i class="fa fa-floppy-disk me-1" aria-hidden="true"></i>Salva</button><a class="btn btn-outline-secondary" href="' . $h($url_scheda('argomenti')) . '">Annulla</a></div></form>';
+    };
+?>
+<p class="text-secondary">Gli argomenti raggruppano le domande: li vedono i visitatori nella pagina «Domande frequenti» e chi apre una chat di assistenza. Cambia i nomi, l'ordine, aggiungine di nuovi (per esempio «Formazione Scuola Lavoro»). Se elimini un argomento, le sue domande passano ad «Altro».</p>
+<div class="mb-3"><a class="btn btn-danger fw-bold" style="background-color:#B80000;border:none;" href="<?php echo $h($url_scheda('argomenti', '&modifica=nuovo')); ?>"><i class="fa fa-plus me-1" aria-hidden="true"></i>Nuovo argomento</a></div>
+<?php if ($mod_arg === 'nuovo'): ?><div class="card border-0 shadow-sm mb-3"><div class="card-body"><h2 class="h5 fw-bold mb-3">Nuovo argomento</h2><?php echo $modulo_arg('', ['ordine' => count($elenco_arg) + 1]); ?></div></div><?php endif; ?>
+<div class="d-flex flex-column gap-2">
+<?php $pos_arg = 0; foreach ($elenco_arg as $k_a => $a_a): ++$pos_arg; $a_a['ordine'] = $pos_arg; ?>
+    <div class="card border-0 shadow-sm"><div class="card-body">
+    <?php if ($mod_arg === $k_a): ?><h2 class="h5 fw-bold mb-3">Modifica «<?php echo $h($a_a['nome']); ?>»</h2><?php echo $modulo_arg($k_a, $a_a); ?>
+    <?php else: ?>
+        <div class="d-flex flex-wrap align-items-center gap-3">
+            <span class="rounded-3 d-inline-flex align-items-center justify-content-center bg-light" style="width:44px;height:44px;"><i class="fa <?php echo $h($a_a['icona']); ?>" aria-hidden="true"></i></span>
+            <div class="flex-grow-1" style="min-width:220px;"><strong><?php echo $h($a_a['nome']); ?></strong><div class="small text-secondary"><?php echo $h($a_a['aiuto']); ?></div><div class="small"><?php echo (int)($usi_arg[$k_a] ?? 0); ?> domande</div></div>
+            <div class="d-flex gap-2">
+                <a class="btn btn-outline-dark fw-bold" href="<?php echo $h($url_scheda('argomenti', '&modifica=' . urlencode($k_a))); ?>"><i class="fa fa-pen me-1" aria-hidden="true"></i>Modifica</a>
+                <a class="btn btn-outline-secondary" href="<?php echo $h($url_scheda('voci', '&argomento=' . urlencode($k_a))); ?>">Vedi le domande</a>
+                <?php if ($k_a !== CostD::ARGOMENTO_PREDEFINITO): ?><form method="POST" action="<?php echo $h($url_scheda('argomenti')); ?>" class="m-0"><?php csrf_field(); ?><input type="hidden" name="azione" value="elimina_argomento"><input type="hidden" name="chiave" value="<?php echo $h($k_a); ?>"><button class="btn btn-outline-danger" type="submit" data-confirm="Eliminare l'argomento «<?php echo $h($a_a['nome']); ?>»? Le sue domande passano ad «Altro»." aria-label="Elimina «<?php echo $h($a_a['nome']); ?>»"><i class="fa fa-trash" aria-hidden="true"></i></button></form><?php endif; ?>
+            </div>
+        </div>
+    <?php endif; ?>
+    </div></div>
+<?php endforeach; ?>
+</div>
 
 <?php elseif ($scheda === 'mancate'):
     $archivio = ($_GET['elenco'] ?? '') === 'archivio';
@@ -286,14 +342,14 @@ $schede_d = ['voci' => ['Voci', 'fa-book-open'], 'mancate' => ['Domande senza ri
 
 <?php elseif ($scheda === 'prova'):
     $dom_prova = trim((string)($_GET['q'] ?? ''));
-    $arg_prova = isset(CostD::ARGOMENTI[$_GET['argomento'] ?? '']) ? $_GET['argomento'] : '';
+    $arg_prova = isset(CostD::argomenti()[$_GET['argomento'] ?? '']) ? $_GET['argomento'] : '';
     $esito_prova = $dom_prova !== '' ? $did->prova($dom_prova, $arg_prova ?: null) : null;
     $nomi_tipo = ['risposta' => ['Risponderebbe con la voce migliore', 'success'], 'suggerimenti' => ['Non è sicuro: proporrebbe delle voci', 'warning'], 'nessuna' => ['Non saprebbe rispondere', 'danger'], 'operatore' => ['Passerebbe la parola a un operatore', 'info'], 'saluto' => ['Risponderebbe con il saluto', 'secondary']];
 ?>
 <p class="text-secondary">Scrivi una domanda come la scriverebbe uno studente e guarda cosa risponderebbe Didacticus, con il punteggio di ogni voce. Sotto la soglia (<strong><?php echo $imp['soglia']; ?></strong>) non risponde. Se una domanda va male, aggiungi quella frase alle «Domande» della voce giusta, oppure una parola chiave.</p>
 <form method="GET" class="card card-body border-0 shadow-sm mb-3"><input type="hidden" name="p_id" value="<?php echo (int)$filtro_p; ?>"><input type="hidden" name="scheda" value="prova">
     <div class="row g-2"><div class="col-md-8"><label class="form-label fw-bold" for="pq">Domanda</label><input class="form-control" id="pq" name="q" maxlength="300" value="<?php echo $h($dom_prova); ?>" placeholder="Es. come faccio ad avere il certificato di laurea?" autofocus></div>
-        <div class="col-md-3"><label class="form-label fw-bold" for="pa">Argomento scelto</label><select class="form-select" id="pa" name="argomento"><option value="">(nessuno)</option><?php foreach (CostD::ARGOMENTI as $k_a => $a_a): ?><option value="<?php echo $k_a; ?>" <?php echo $arg_prova === $k_a ? 'selected' : ''; ?>><?php echo $h($a_a['nome']); ?></option><?php endforeach; ?></select></div>
+        <div class="col-md-3"><label class="form-label fw-bold" for="pa">Argomento scelto</label><select class="form-select" id="pa" name="argomento"><option value="">(nessuno)</option><?php foreach (CostD::argomenti() as $k_a => $a_a): ?><option value="<?php echo $k_a; ?>" <?php echo $arg_prova === $k_a ? 'selected' : ''; ?>><?php echo $h($a_a['nome']); ?></option><?php endforeach; ?></select></div>
         <div class="col-md-1 d-flex align-items-end"><button class="btn btn-dark fw-bold w-100" type="submit">Prova</button></div></div></form>
 <?php if ($esito_prova): [$et_p, $col_p] = $nomi_tipo[$esito_prova['tipo']] ?? [$esito_prova['tipo'], 'secondary']; ?>
     <div class="alert alert-<?php echo $col_p; ?> fw-bold"><?php echo $h($et_p); ?></div>

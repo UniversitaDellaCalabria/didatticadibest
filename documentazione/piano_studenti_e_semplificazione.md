@@ -11,7 +11,7 @@ Nato dall'analisi del 24/10/2026 (sito pubblico, 22 pagine admin misurate, 61 vo
 ## Blocco S — Sito pubblico per gli studenti
 | Step | Cosa | Contenuti nuovi da scrivere |
 |---|---|---|
-| **S1** | **Guida dello studente** (`guida_studente.php`): argomenti, ricerca, risposte in fisarmonica con link e allegati, «Non trovi risposta? Chiedi all'assistenza». Dalle voci di Didacticus. | nessuno |
+| **S1** | **Domande frequenti** (`domande_frequenti.php`, ex guida dello studente, dentro Assistenza): argomenti, ricerca, risposte in fisarmonica con link e allegati, «Non trovi risposta? Chiedi all'assistenza». Dalle voci di Didacticus. | nessuno |
 | S2 | Modulistica pubblicata e nel menu + **Contatti e uffici** («Chi contattare per cosa») dagli uffici del pannello | decidere quali moduli pubblicare; descrizioni degli uffici |
 | S3 | **Tesi e laurea** e **Tirocini** come percorsi a passi (1-2-3), con le pagine esistenti | testi dei passi (partire dalle voci Didacticus) |
 | S4 | **Docenti e ricevimento**: cerca un docente, prenota il ricevimento | solo attivare gli sportelli |
@@ -39,3 +39,4 @@ Principio: nessun restyling totale (lo stile attuale è coerente); interventi mi
 ## Registro di avanzamento
 - 24/10/2026: piano scritto. **S1 fatto in locale** (`guida_studente.php`, inserita nel catalogo pagine del menu e nella proposta «Studenti»; provata con 23 voci di partenza, ricerca e telefono OK). Da caricare; poi aggiungerla al menu dal pannello (Menu → pagine del portale). Prossimo: S2.
 - 24/10/2026: **S2 fatto in locale**: pagina pubblica `contatti.php` («Chi contattare per cosa») con gestione in Sito pubblico › «Contatti per gli studenti» (`admin/contatti.php`, tabella `contatti_studenti`, schema v90, cinque voci di esempio nascoste, recapiti scritti a mano: niente dai dati di uffici e persone). Modulistica: stato vuoto con rimandi a Guida e Contatti; i 22 moduli restano da pubblicare a scelta del Dipartimento (Moduli e documenti → Modifica → «Anteprima e pubblica»). Da fare dal pannello dopo il caricamento: aggiungere Guida, Contatti e Modulistica al menu. Prossimo: B2-B4 / B1 oppure S3.
+- 24/10/2026: **Guida → «Domande frequenti» dentro Assistenza** (su richiesta): pagina `domande_frequenti.php` (il vecchio `guida_studente.php` rimanda lì), blocco «Prima di scrivere, cerca la risposta» in `assistenza.php`. Dal pannello (voce «Domande e risposte», ex Didacticus) si modificano domande, risposte, **argomenti** (nuova scheda: nome, spiegazione, icona, ordine, nuovi/eliminati; tabella `didacticus_argomenti`) e **a chi si rivolge** ogni domanda (studenti, scuole, aziende, docenti; colonna `pubblico`); la pagina pubblica filtra per pubblico. Schema v91. Le domande su FSL/scuole sono segnate «Scuole» in automatico.

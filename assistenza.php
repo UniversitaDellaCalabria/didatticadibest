@@ -89,6 +89,18 @@ if ($pannello) {
 <?php if (!$pannello): ?>
     <h1 class="h3 fw-bold mb-1"><i class="fa fa-headset text-danger me-2" aria-hidden="true"></i>Assistenza</h1>
     <p class="text-secondary">Scrivici per qualsiasi dubbio su tirocini, certificati, pratiche, tutorato, tesi, eventi e accesso al portale: <?php echo $did_attivo ? 'ti risponde subito <strong>Didacticus</strong>, l’assistente virtuale, e se serve una persona dell’ufficio didattico.' : 'ti risponde una persona dell’ufficio didattico.'; ?></p>
+    <?php if ($mostra_modulo): ?>
+    <section class="card border-0 shadow-sm mb-4" style="border-radius:14px;background:#f8fafc;" aria-labelledby="as-faq"><div class="card-body">
+        <h2 class="h5 fw-bold mb-1" id="as-faq"><i class="fa fa-book-open text-danger me-2" aria-hidden="true"></i>Prima di scrivere, cerca la risposta</h2>
+        <p class="small text-secondary mb-2">Molte domande hanno già una risposta nelle <a href="domande_frequenti.php">domande frequenti</a>: è più veloce.</p>
+        <form method="GET" action="domande_frequenti.php" class="d-flex gap-2 mb-2" role="search">
+            <label class="visually-hidden" for="as-cerca">Cerca nelle domande frequenti</label>
+            <input class="form-control" id="as-cerca" name="q" placeholder="Per esempio: certificato, tasse, tirocinio, tesi" autocomplete="off">
+            <button class="btn btn-danger fw-bold" type="submit" style="background-color:#B80000;border:none;"><i class="fa fa-search" aria-hidden="true"></i><span class="visually-hidden"> Cerca</span></button>
+        </form>
+        <div class="d-flex flex-wrap gap-2"><?php foreach ($Cost::argomenti() as $k_f => $a_f): ?><a class="btn btn-sm btn-outline-secondary" href="domande_frequenti.php?argomento=<?php echo $h($k_f); ?>"><i class="fa <?php echo $h($a_f['icona']); ?> me-1" aria-hidden="true"></i><?php echo $h($a_f['nome']); ?></a><?php endforeach; ?></div>
+    </div></section>
+    <?php endif; ?>
 <?php endif; ?>
 
 <?php
@@ -110,7 +122,7 @@ if (!$servizio_attivo): ?>
 
 <?php if ($conv && !$mostra_modulo): ?>
     <!-- CHAT -->
-    <div class="card border-0 shadow-sm" id="ac-app" data-url="assistenza_ajax.php" data-csrf="<?php echo $h(csrf_token()); ?>" data-t="<?php echo $conv['canale'] === $Cost::CANALE_ESTERNO ? $h($token) : ''; ?>" data-chiusa="<?php echo $chiusa ? 1 : 0; ?>" data-chiave="<?php echo $h($push_pub->chiavePubblica()); ?>" data-avatar="didacticus_file.php?avatar=1" data-argomenti="<?php echo $h(json_encode(array_map(fn($k, $a) => ['k' => $k, 'n' => $a['nome'], 'i' => $a['icona']], array_keys($Cost::ARGOMENTI), $Cost::ARGOMENTI), JSON_UNESCAPED_UNICODE)); ?>">
+    <div class="card border-0 shadow-sm" id="ac-app" data-url="assistenza_ajax.php" data-csrf="<?php echo $h(csrf_token()); ?>" data-t="<?php echo $conv['canale'] === $Cost::CANALE_ESTERNO ? $h($token) : ''; ?>" data-chiusa="<?php echo $chiusa ? 1 : 0; ?>" data-chiave="<?php echo $h($push_pub->chiavePubblica()); ?>" data-avatar="didacticus_file.php?avatar=1" data-argomenti="<?php echo $h(json_encode(array_map(fn($k, $a) => ['k' => $k, 'n' => $a['nome'], 'i' => $a['icona']], array_keys($Cost::argomenti()), $Cost::argomenti()), JSON_UNESCAPED_UNICODE)); ?>">
         <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2 py-2">
             <div>
                 <div id="ac-intestazione" class="d-none"><span class="d-flex align-items-center gap-2 mb-1"><img src="didacticus_file.php?avatar=1" alt="" width="34" height="34" class="rounded-circle" style="object-fit:cover;"><strong>Didacticus</strong><span class="badge bg-light text-dark border">assistente virtuale</span></span></div>
@@ -175,7 +187,7 @@ if (!$servizio_attivo): ?>
         <?php endif; ?>
         <fieldset class="mb-3"><legend class="form-label fw-bold small">Di cosa hai bisogno?</legend>
             <div class="row g-2">
-                <?php foreach ($Cost::ARGOMENTI as $k_a => $a_a): ?>
+                <?php foreach ($Cost::argomenti() as $k_a => $a_a): ?>
                     <div class="col-6 col-md-4">
                         <input class="btn-check" type="radio" name="argomento" id="arg-<?php echo $k_a; ?>" value="<?php echo $k_a; ?>" <?php echo $k_a === $argomento_sel ? 'checked' : ''; ?> required>
                         <label class="btn btn-outline-secondary w-100 text-start h-100 py-2" for="arg-<?php echo $k_a; ?>" title="<?php echo $h($a_a['aiuto']); ?>"><i class="fa <?php echo $a_a['icona']; ?> me-1" aria-hidden="true"></i><span class="small fw-bold"><?php echo $h($a_a['nome']); ?></span></label>

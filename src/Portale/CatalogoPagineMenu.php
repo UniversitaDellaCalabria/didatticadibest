@@ -59,7 +59,7 @@ final class CatalogoPagineMenu
             [['Ricevimento dei docenti', 'ricevimento.php']]
         );
         $c['Formazione Scuola Lavoro'] = [['Programma FSL della scuola (attività da prenotare insieme)', 'programma_fsl.php']];
-        $c['Studenti'] = [['Guida dello studente: le risposte alle domande più frequenti', 'guida_studente.php'], ['Contatti: chi contattare per cosa', 'contatti.php'], ['Modulistica e moduli online', 'modulistica.php'], ['Le mie pratiche', 'pratiche.php'], ['Registro delle attività di tutorato', 'registro_tutorato.php'],
+        $c['Studenti'] = [['Domande frequenti (assistenza): le risposte per argomento e pubblico', 'domande_frequenti.php'], ['Contatti: chi contattare per cosa', 'contatti.php'], ['Modulistica e moduli online', 'modulistica.php'], ['Le mie pratiche', 'pratiche.php'], ['Registro delle attività di tutorato', 'registro_tutorato.php'],
             ['Tirocini curriculari: aziende e laboratori', 'tirocini.php'], ['Registra la presenza (scanner QR)', 'scanner_studente.php'], ['Come si fa: le guide per ruolo', 'guida.php']];
         $c['Tesi: enti e aziende'] = [['Aziende convenzionate per la tesi', 'aziende_convenzionate_tesi.php'], ['Convenzione di tesi per enti e aziende', 'richiedi_convenzione_tesi.php']];
         $c['Area riservata'] = [['Area personale', 'area_personale.php'], ['Il mio profilo', 'profilo.php'], ['Le mie risorse (responsabili di aule e mezzi)', 'risorse_responsabile.php'],

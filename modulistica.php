@@ -29,7 +29,7 @@ require_once 'header.php';
     <?php endforeach; ?>
     <form method="GET" class="mb-3" role="search"><label class="visually-hidden" for="modQ">Cerca un modulo</label>
         <div class="input-group" style="max-width:420px;"><input type="search" class="form-control" id="modQ" name="q" value="<?php echo $h($_GET['q'] ?? ''); ?>" placeholder="Cerca un modulo"><button class="btn btn-outline-secondary" aria-label="Cerca"><i class="fa fa-search" aria-hidden="true"></i></button></div></form>
-    <?php if (!$moduli): ?><div class="alert alert-info">Al momento non ci sono moduli pubblicati. Controlla la <a href="guida_studente.php">Guida dello studente</a> oppure guarda <a href="contatti.php">a chi rivolgerti</a>.</div><?php endif; ?>
+    <?php if (!$moduli): ?><div class="alert alert-info">Al momento non ci sono moduli pubblicati. Controlla le <a href="domande_frequenti.php">domande frequenti</a> oppure guarda <a href="contatti.php">a chi rivolgerti</a>.</div><?php endif; ?>
     <?php foreach ($moduli as $cat => $voci):
         if ($q !== '') $voci = array_filter($voci, fn($m) => str_contains(mb_strtolower($m['titolo'] . ' ' . strip_tags((string)$m['descrizione']) . ' ' . $cat), $q));
         if (!$voci) continue; ?>

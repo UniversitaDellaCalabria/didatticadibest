@@ -116,6 +116,8 @@ final class App
             $c->set(Config::class, static fn (): Config => Config::daFile(defined('FILE_ENV') ? (string) FILE_ENV : self::radice() . '/.env'));
         }
         $c->set(Sito::class, static fn (): Sito => new Sito(self::radice(), function_exists('env_valore') ? env_valore('URL_SITO') : null));
+        // Gli argomenti dell'assistenza si leggono dal database (scritti dal pannello) solo quando servono
+        \App\Assistenza\Costanti::sorgente(static fn (): array => $c->get(\App\Assistenza\Didacticus\ArgomentiRepository::class)->elenco());
         $c->set(Orologio::class, static fn (): Orologio => new OrologioDiSistema());
         $c->set(IndirizzoClient::class, static fn (): IndirizzoClient => new IndirizzoClientDaServer());
         // Email dei servizi: passano da inviaNotificaEmail() (stesso registro log_email, ambiente locale, intercettazione nelle prove automatiche)

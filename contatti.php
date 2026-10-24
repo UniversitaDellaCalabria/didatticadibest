@@ -17,7 +17,7 @@ require_once 'header.php';
 <div class="container my-4" style="max-width: 960px;">
     <nav aria-label="Percorso" class="mb-3 small"><a href="index.php">Home</a> <span class="text-secondary mx-1">/</span> Contatti</nav>
     <h1 class="fw-bold mb-1">Chi contattare per cosa</h1>
-    <p class="text-secondary">Scegli l'ufficio giusto per la tua richiesta. Prima di scrivere, controlla se la risposta è già nella <a href="guida_studente.php">Guida dello studente</a>: è più veloce.</p>
+    <p class="text-secondary">Scegli l'ufficio giusto per la tua richiesta. Prima di scrivere, controlla se la risposta è già nelle <a href="domande_frequenti.php">domande frequenti</a>: è più veloce.</p>
 
     <?php if (!$contatti): ?>
         <div class="alert alert-light border">I contatti sono in preparazione. Nel frattempo puoi <a href="assistenza.php">scrivere all'assistenza</a>.</div>

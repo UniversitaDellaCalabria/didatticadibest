@@ -65,13 +65,53 @@ final class Costanti
         'altro' => ['nome' => 'Altro', 'icona' => 'fa-circle-question', 'aiuto' => 'Una domanda che non rientra negli altri argomenti'],
     ];
 
+    /** A chi può rivolgersi una domanda frequente (chiave => nome); nessuno spuntato = tutti. */
+    public const PUBBLICI = ['studenti' => 'Studenti', 'scuole' => 'Scuole', 'aziende' => 'Aziende ed enti', 'docenti' => 'Docenti e personale'];
+
+    /** @var array<string, array{nome: string, icona: string, aiuto: string}>|null */
+    private static ?array $argomenti = null;
+    /** @var (callable(): array<string, array{nome: string, icona: string, aiuto: string}>)|null */
+    private static $sorgente = null;
+
+    /** Da dove leggere gli argomenti scritti dal pannello (la registra App alla creazione del container). */
+    public static function sorgente(?callable $sorgente): void
+    {
+        self::$sorgente = $sorgente;
+        self::$argomenti = null;
+    }
+
+    /** Gli argomenti in uso: quelli del pannello, o (se mancano) quelli di serie. @return array<string, array{nome: string, icona: string, aiuto: string}> */
+    public static function argomenti(): array
+    {
+        if (self::$argomenti === null) {
+            $letti = self::$sorgente !== null ? (self::$sorgente)() : [];
+            self::$argomenti = $letti ?: self::ARGOMENTI;
+            if (!isset(self::$argomenti[self::ARGOMENTO_PREDEFINITO])) {
+                self::$argomenti[self::ARGOMENTO_PREDEFINITO] = self::ARGOMENTI[self::ARGOMENTO_PREDEFINITO];
+            }
+        }
+
+        return self::$argomenti;
+    }
+
+    public static function dimentica(): void
+    {
+        self::$argomenti = null;
+    }
+
+    /** I pubblici di una voce come lista di chiavi valide (lista vuota = per tutti). @return list<string> */
+    public static function pubblici(string $csv): array
+    {
+        return array_values(array_filter(array_map('trim', explode(',', $csv)), fn (string $p) => isset(self::PUBBLICI[$p])));
+    }
+
     public static function argomentoValido(string $chiave): string
     {
-        return isset(self::ARGOMENTI[$chiave]) ? $chiave : self::ARGOMENTO_PREDEFINITO;
+        return isset(self::argomenti()[$chiave]) ? $chiave : self::ARGOMENTO_PREDEFINITO;
     }
 
     public static function nomeArgomento(string $chiave): string
     {
-        return self::ARGOMENTI[$chiave]['nome'] ?? self::ARGOMENTI[self::ARGOMENTO_PREDEFINITO]['nome'];
+        return self::argomenti()[$chiave]['nome'] ?? self::argomenti()[self::ARGOMENTO_PREDEFINITO]['nome'];
     }
 }

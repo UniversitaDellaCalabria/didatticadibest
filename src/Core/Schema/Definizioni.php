@@ -272,6 +272,11 @@ final class Definizioni
             proponi_operatore TINYINT(1) NOT NULL DEFAULT 0, attiva TINYINT(1) NOT NULL DEFAULT 1, ordine INT NOT NULL DEFAULT 0, usi INT NOT NULL DEFAULT 0, utile INT NOT NULL DEFAULT 0,
             non_utile INT NOT NULL DEFAULT 0, creato_il DATETIME DEFAULT CURRENT_TIMESTAMP, aggiornato_il DATETIME DEFAULT NULL, INDEX idx_attiva (attiva, argomento)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        // v91: gli argomenti delle domande frequenti (e della chat) si scrivono dal pannello; al primo uso si riempiono con quelli di serie
+        'didacticus_argomenti' => "CREATE TABLE IF NOT EXISTS didacticus_argomenti (
+            chiave VARCHAR(30) NOT NULL PRIMARY KEY, nome VARCHAR(120) NOT NULL DEFAULT '', icona VARCHAR(40) NOT NULL DEFAULT 'fa-circle-question', aiuto VARCHAR(255) NOT NULL DEFAULT '',
+            ordine INT NOT NULL DEFAULT 0
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         'didacticus_mancate' => "CREATE TABLE IF NOT EXISTS didacticus_mancate (
             id INT AUTO_INCREMENT PRIMARY KEY, conversazione_id INT DEFAULT NULL, domanda TEXT DEFAULT NULL, argomento VARCHAR(30) NOT NULL DEFAULT 'altro', tipo VARCHAR(12) NOT NULL DEFAULT 'nessuna',
             voce_id INT DEFAULT NULL, stato VARCHAR(12) NOT NULL DEFAULT 'da_vedere', creato_il DATETIME NOT NULL, INDEX idx_stato (stato, creato_il), INDEX idx_conv (conversazione_id)
@@ -525,6 +530,10 @@ final class Definizioni
     public static function colonne(): array
     {
     return [
+        // v91: a chi si rivolge una domanda frequente (pubblici separati da virgola: studenti, scuole, aziende, docenti; vuoto = tutti)
+        'didacticus_voci' => [
+            'pubblico' => ["ADD COLUMN pubblico VARCHAR(100) NOT NULL DEFAULT 'studenti'", "UPDATE didacticus_voci SET pubblico = 'scuole' WHERE titolo LIKE '%FSL%' OR titolo LIKE '%scuol%' OR titolo LIKE '%Formazione Scuola%'"],
+        ],
         // v89: le chat nascono con Didacticus (stato «bot»): quando passano a un operatore, se si sono risolte da sole, quante risposte di fila sono andate a vuoto
         'assistenza_conversazioni' => [
             'passata_il'      => "ADD COLUMN passata_il DATETIME DEFAULT NULL",
