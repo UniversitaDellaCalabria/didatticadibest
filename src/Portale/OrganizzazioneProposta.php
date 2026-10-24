@@ -88,9 +88,11 @@ final class OrganizzazioneProposta
                 ['Domande frequenti', 'domande_frequenti.php', []],
                 ['Contatti', 'contatti.php', []],
                 ['Modulistica e pratiche', 'modulistica.php', [['Modulistica', 'modulistica.php', []], ['Le mie pratiche', 'pratiche.php', []]]],
-                ['Ricevimento e sportelli', 'ricevimento.php', array_merge([['Ricevimento dei docenti', 'ricevimento.php', []]], array_map($link, $cal))],
+                ['Corsi di studio', 'corsi.php', []],
+                ['Ricevimento e sportelli', 'docenti.php', array_merge([['Docenti e ricevimento', 'docenti.php', []], ['Il mio ricevimento (per i docenti)', 'ricevimento.php', []]], array_map($link, $cal))],
+                ['Tirocini', 'percorso_tirocini.php', []],
                 ['Tutorato', 'registro_tutorato.php', [['Registro delle attività', 'registro_tutorato.php', []]]],
-                ['Tesi', 'aziende_convenzionate_tesi.php', [['Aziende convenzionate per la tesi', 'aziende_convenzionate_tesi.php', []], ['Convenzione di tesi per enti e aziende', 'richiedi_convenzione_tesi.php', []]]],
+                ['Tesi', 'percorso_tesi.php', [['Tesi e laurea: i passi', 'percorso_tesi.php', []], ['Aziende convenzionate per la tesi', 'aziende_convenzionate_tesi.php', []], ['Convenzione di tesi per enti e aziende', 'richiedi_convenzione_tesi.php', []]]],
             ]],
             ['Eventi e seminari', 'agenda.php', [
                 ['Agenda', 'agenda.php', array_merge(
