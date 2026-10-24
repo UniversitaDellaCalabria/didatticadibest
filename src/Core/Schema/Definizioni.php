@@ -19,6 +19,13 @@ final class Definizioni
     public static function tabelle(): array
     {
     return [
+        // v90: «Chi contattare per cosa» della pagina pubblica Contatti (admin/contatti.php): solo recapiti istituzionali scelti dal Dipartimento, mai le persone degli uffici
+        'contatti_studenti' => "CREATE TABLE IF NOT EXISTS contatti_studenti (
+            id INT AUTO_INCREMENT PRIMARY KEY, titolo VARCHAR(150) NOT NULL DEFAULT '', per_cosa VARCHAR(500) NOT NULL DEFAULT '', luogo VARCHAR(255) NOT NULL DEFAULT '',
+            orari VARCHAR(255) NOT NULL DEFAULT '', email VARCHAR(150) NOT NULL DEFAULT '', telefono VARCHAR(60) NOT NULL DEFAULT '', link_etichetta VARCHAR(100) NOT NULL DEFAULT '',
+            link_url VARCHAR(500) NOT NULL DEFAULT '', ordine INT NOT NULL DEFAULT 0, visibile TINYINT(1) NOT NULL DEFAULT 0, creato_il DATETIME DEFAULT CURRENT_TIMESTAMP,
+            INDEX idx_visibile (visibile, ordine)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         'slide_home' => "CREATE TABLE IF NOT EXISTS slide_home (
             id INT AUTO_INCREMENT PRIMARY KEY, immagine_path VARCHAR(255) NOT NULL, titolo VARCHAR(255) DEFAULT '',
             sottotitolo VARCHAR(255) DEFAULT '', link VARCHAR(500) DEFAULT '', ordine INT DEFAULT 0, attiva TINYINT(1) DEFAULT 1,

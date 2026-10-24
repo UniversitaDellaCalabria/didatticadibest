@@ -86,6 +86,7 @@ final class OrganizzazioneProposta
             ]],
             ['Studenti', 'guida_studente.php', [
                 ['Guida dello studente', 'guida_studente.php', []],
+                ['Contatti', 'contatti.php', []],
                 ['Modulistica e pratiche', 'modulistica.php', [['Modulistica', 'modulistica.php', []], ['Le mie pratiche', 'pratiche.php', []]]],
                 ['Ricevimento e sportelli', 'ricevimento.php', array_merge([['Ricevimento dei docenti', 'ricevimento.php', []]], array_map($link, $cal))],
                 ['Tutorato', 'registro_tutorato.php', [['Registro delle attività', 'registro_tutorato.php', []]]],

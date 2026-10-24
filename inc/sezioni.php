@@ -38,7 +38,7 @@ if (!defined('PAGINE_MODULO')) define('PAGINE_MODULO', [
     'fsl.php' => 'fsl', 'convenzione_file.php' => 'fsl', 'report_ambiti.php' => 'orientamento',
     'didattica.php' => 'didattica', 'tutorato.php' => 'didattica', 'convenzioni_tesi.php' => 'didattica', 'assistenza.php' => 'didattica', 'didacticus.php' => 'didattica', 'sostituzioni.php' => 'didattica', 'tirocini.php' => 'didattica',
     'email.php' => 'portale',
-    'testata.php' => 'portale', 'menu.php' => 'portale', 'utenti.php' => 'portale', 'sistema.php' => 'portale', 'audit_log.php' => 'portale',
+    'testata.php' => 'portale', 'menu.php' => 'portale', 'contatti.php' => 'portale', 'utenti.php' => 'portale', 'sistema.php' => 'portale', 'audit_log.php' => 'portale',
     'log_accessi.php' => 'portale', 'anagrafe_personale.php' => 'portale', 'anagrafe_docenti.php' => 'portale', 'anagrafe_pta.php' => 'portale',
     'anagrafe_insegnamenti.php' => 'portale', 'scuole.php' => 'portale', 'nuova_area.php' => 'portale', 'uffici.php' => 'portale', 'uffici_ateneo.php' => 'portale',
 ]);
