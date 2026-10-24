@@ -21,8 +21,8 @@ final class WidgetHome implements ConfigurazioneHome
             'slideshow' => 1, 'mia_prenotazione' => 1, 'annunci' => 0, 'card_aree' => 1,
             'ultimi_posti' => 0, 'prossimi_eventi' => 1, 'statistiche' => 0,
             // Widget dell'organizzazione per pubblico: spenti finché non si accendono o si applica la proposta
-            'percorsi' => 0, 'agenda' => 0, 'scadenze' => 0,
-            'ordine' => ['slideshow', 'percorsi', 'mia_prenotazione', 'annunci', 'agenda', 'scadenze', 'card_aree', 'ultimi_posti', 'prossimi_eventi', 'statistiche'],
+            'percorsi' => 0, 'agenda' => 0, 'scadenze' => 0, 'notizie' => 0,
+            'ordine' => ['slideshow', 'percorsi', 'mia_prenotazione', 'annunci', 'notizie', 'agenda', 'scadenze', 'card_aree', 'ultimi_posti', 'prossimi_eventi', 'statistiche'],
             'aree_colonne' => 2,         // 2 | 3 | 4 card per riga (desktop)
             'aree_max' => 0,             // 0 = tutte; altrimenti le altre si aprono con "Mostra tutte"
             'eventi_num' => 8,           // 4 | 8 | 12

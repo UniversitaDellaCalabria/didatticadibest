@@ -272,6 +272,13 @@ final class Definizioni
             proponi_operatore TINYINT(1) NOT NULL DEFAULT 0, attiva TINYINT(1) NOT NULL DEFAULT 1, ordine INT NOT NULL DEFAULT 0, usi INT NOT NULL DEFAULT 0, utile INT NOT NULL DEFAULT 0,
             non_utile INT NOT NULL DEFAULT 0, creato_il DATETIME DEFAULT CURRENT_TIMESTAMP, aggiornato_il DATETIME DEFAULT NULL, INDEX idx_attiva (attiva, argomento)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        // v92: comunicazioni del Dipartimento: notizie (con data) e pagine informative (senza), con pubblico, scadenza, allegati e link
+        'comunicazioni' => "CREATE TABLE IF NOT EXISTS comunicazioni (
+            id INT AUTO_INCREMENT PRIMARY KEY, tipo VARCHAR(10) NOT NULL DEFAULT 'notizia', titolo VARCHAR(200) NOT NULL DEFAULT '', sommario VARCHAR(400) NOT NULL DEFAULT '',
+            testo MEDIUMTEXT DEFAULT NULL, pubblico VARCHAR(100) NOT NULL DEFAULT '', data_pubblicazione DATE DEFAULT NULL, data_utile DATE DEFAULT NULL, valida_fino DATE DEFAULT NULL,
+            in_evidenza TINYINT(1) NOT NULL DEFAULT 0, pubblicata TINYINT(1) NOT NULL DEFAULT 0, link_json TEXT DEFAULT NULL, allegati_json TEXT DEFAULT NULL,
+            creato_il DATETIME DEFAULT CURRENT_TIMESTAMP, aggiornato_il DATETIME DEFAULT NULL, INDEX idx_pub (pubblicata, tipo, data_pubblicazione), INDEX idx_utile (data_utile)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         // v91: gli argomenti delle domande frequenti (e della chat) si scrivono dal pannello; al primo uso si riempiono con quelli di serie
         'didacticus_argomenti' => "CREATE TABLE IF NOT EXISTS didacticus_argomenti (
             chiave VARCHAR(30) NOT NULL PRIMARY KEY, nome VARCHAR(120) NOT NULL DEFAULT '', icona VARCHAR(40) NOT NULL DEFAULT 'fa-circle-question', aiuto VARCHAR(255) NOT NULL DEFAULT '',

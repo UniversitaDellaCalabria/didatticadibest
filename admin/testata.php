@@ -59,6 +59,7 @@ if (isset($_POST['save_widgets_home'])) {
         'percorsi'        => isset($_POST['w_percorsi'])        ? 1 : 0,
         'agenda'          => isset($_POST['w_agenda'])          ? 1 : 0,
         'scadenze'        => isset($_POST['w_scadenze'])        ? 1 : 0,
+        'notizie'         => isset($_POST['w_notizie'])         ? 1 : 0,
         'ordine'         => isset($_POST['ordine']) && is_array($_POST['ordine']) ? array_map('strval', $_POST['ordine']) : [],
         'aree_colonne'    => (int)($_POST['aree_colonne'] ?? 2),
         'aree_max'        => (int)($_POST['aree_max'] ?? 0),
@@ -464,6 +465,7 @@ $widgets_cur = get_widgets_home($cfg_w);
                 'statistiche'     => ['label' => 'Numeri del Dipartimento', 'desc' => 'Contatori: eventi in programma, aree attive, iscrizioni confermate.', 'icon' => 'fa-chart-bar', 'col' => 'info'],
                 'percorsi'         => ['label' => 'Cosa cerchi?', 'desc' => 'Quattro riquadri per pubblico: futuri studenti e scuole, studenti, eventi e seminari, area riservata.', 'icon' => 'fa-signs-post', 'col' => 'success'],
                 'agenda'           => ['label' => 'Agenda', 'desc' => 'Prossimi appuntamenti di tutte le aree con i filtri per ambito (orientamento, ricerca, public engagement…).', 'icon' => 'fa-calendar-days', 'col' => 'primary'],
+                'notizie'          => ['label' => 'Ultime notizie', 'desc' => 'Le notizie "in evidenza" scritte da Notizie e pagine, con il collegamento a tutte le notizie.', 'icon' => 'fa-newspaper', 'col' => 'danger'],
                 'scadenze'         => ['label' => 'Scadenze della didattica', 'desc' => 'Moduli online aperti con la data di chiusura (piani di studio, tesi…).', 'icon' => 'fa-hourglass-half', 'col' => 'success'],
             ];
             foreach ($widgets_cur['ordine'] as $key):

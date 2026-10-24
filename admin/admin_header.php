@@ -483,10 +483,11 @@ $colore_lato = $modulo_corrente === 'portale' ? '#64748b' : $colore_modulo; // l
                     <?php $chiudi_gruppo(); ?>
                     <?php if ($is_full_admin): ?>
                         <?php $voce_menu(['aree.php', 'nuova_area.php'], 'aree.php', 'fa-layer-group', 'Aree di tutti i moduli'); ?>
-                        <?php $apri_gruppo('sito', 'fa-globe', 'Sito pubblico', ['testata.php', 'menu.php', 'contatti.php']); ?>
+                        <?php $apri_gruppo('sito', 'fa-globe', 'Sito pubblico', ['testata.php', 'menu.php', 'contatti.php', 'comunicazioni.php']); ?>
                             <?php $voce_menu(['testata.php'], 'testata.php', 'fa-image', 'Testata e home'); ?>
                             <?php $voce_menu(['menu.php'], 'menu.php', 'fa-link', 'Menu'); ?>
                             <?php $voce_menu(['contatti.php'], 'contatti.php', 'fa-address-card', 'Contatti per gli studenti'); ?>
+                            <?php $voce_menu(['comunicazioni.php'], 'comunicazioni.php', 'fa-bullhorn', 'Notizie e pagine'); ?>
                         <?php $chiudi_gruppo(); ?>
                         <?php $voce_menu(['utenti.php'], 'utenti.php', 'fa-users-cog', 'Utenti e abilitazioni'); ?>
                         <?php $voce_menu(['uffici.php', 'uffici_ateneo.php'], 'uffici.php', 'fa-sitemap', 'Uffici e persone'); ?>

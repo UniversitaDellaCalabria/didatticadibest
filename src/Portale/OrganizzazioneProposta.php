@@ -34,11 +34,11 @@ final class OrganizzazioneProposta
     public static function homeProposta(array $attuale): array
     {
         $w = $attuale;
-        foreach (['slideshow' => 1, 'percorsi' => 1, 'mia_prenotazione' => 1, 'annunci' => (int) !empty($attuale['annunci']), 'agenda' => 1, 'scadenze' => 1,
+        foreach (['slideshow' => 1, 'percorsi' => 1, 'mia_prenotazione' => 1, 'annunci' => (int) !empty($attuale['annunci']), 'agenda' => 1, 'scadenze' => 1, 'notizie' => 1,
             'card_aree' => 1, 'ultimi_posti' => 0, 'prossimi_eventi' => 0, 'statistiche' => 0] as $k => $v) {
             $w[$k] = $v;
         }
-        $w['ordine'] = ['slideshow', 'annunci', 'mia_prenotazione', 'percorsi', 'agenda', 'scadenze', 'card_aree', 'ultimi_posti', 'prossimi_eventi', 'statistiche'];
+        $w['ordine'] = ['slideshow', 'annunci', 'mia_prenotazione', 'percorsi', 'notizie', 'agenda', 'scadenze', 'card_aree', 'ultimi_posti', 'prossimi_eventi', 'statistiche'];
         $w['aree_colonne'] = 3;
         $w['eventi_num'] = 8;
 
@@ -86,6 +86,7 @@ final class OrganizzazioneProposta
             ]],
             ['Studenti', 'domande_frequenti.php', [
                 ['Domande frequenti', 'domande_frequenti.php', []],
+                ['Notizie', 'comunicazioni.php', [['Notizie e comunicazioni', 'comunicazioni.php', []], ['Scadenze e date utili', 'scadenze.php', []]]],
                 ['Contatti', 'contatti.php', []],
                 ['Modulistica e pratiche', 'modulistica.php', [['Modulistica', 'modulistica.php', []], ['Le mie pratiche', 'pratiche.php', []]]],
                 ['Corsi di studio', 'corsi.php', []],

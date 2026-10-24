@@ -556,6 +556,30 @@ ob_start(); echo css_agenda(); ?>
 endif;
 endif;
 
+// ── ULTIME NOTIZIE (comunicazioni «in evidenza», scritte da admin/comunicazioni.php) ──────────────
+if (!empty($widgets['notizie'])):
+$notizie_home = \App\Core\App::get(\App\Portale\ComunicazioniRepository::class)->inEvidenza(3);
+if ($notizie_home):
+ob_start(); ?>
+<div class="container my-4" style="max-width:1200px;">
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+        <h2 class="h4 fw-bold mb-0"><i class="fa fa-newspaper me-2" style="color:#990000;" aria-hidden="true"></i>Ultime notizie</h2>
+        <a class="ms-auto small fw-bold" href="comunicazioni.php">Tutte le notizie <i class="fa fa-arrow-right" aria-hidden="true"></i></a>
+    </div>
+    <div class="row g-3">
+        <?php foreach ($notizie_home as $n_h): ?>
+        <div class="col-md-4"><a href="comunicazione.php?id=<?php echo (int)$n_h['id']; ?>" class="d-block h-100 p-3 bg-white border rounded-3 text-decoration-none" style="border-left:4px solid #990000 !important;">
+            <span class="d-block small text-secondary"><?php echo $n_h['data_pubblicazione'] ? htmlspecialchars(date('d/m/Y', strtotime($n_h['data_pubblicazione']))) : ''; ?></span>
+            <span class="d-block fw-bold text-dark"><?php echo htmlspecialchars($n_h['titolo']); ?></span>
+            <span class="d-block small text-secondary mt-1"><?php echo htmlspecialchars($n_h['sommario'] !== '' ? $n_h['sommario'] : \App\Portale\TestoSemplice::estratto((string)$n_h['testo'], 140)); ?></span>
+        </a></div>
+        <?php endforeach; ?>
+    </div>
+</div>
+<?php $blocchi['notizie'] = ob_get_clean();
+endif;
+endif;
+
 // ── SCADENZE DELLA DIDATTICA (moduli online con data di chiusura) ─────────────
 if (!empty($widgets['scadenze'])):
 $scad = \App\Core\App::get(\App\Portale\HomeRepository::class)->scadenzeDidattica();
