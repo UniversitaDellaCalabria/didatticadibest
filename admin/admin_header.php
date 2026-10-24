@@ -561,6 +561,7 @@ $colore_lato = $modulo_corrente === 'portale' ? '#64748b' : $colore_modulo; // l
                     <i class="fa fa-moon" id="themeIcon"></i>
                 </button>
                 <a href="scanner.php?p_id=<?php echo $filtro_p; ?>" class="btn btn-warning btn-sm fw-bold text-dark shadow-sm" title="Apri Scanner Check-in"><i class="fa fa-qrcode"></i> <span class="d-none d-sm-inline">Scanner</span></a>
+                <a href="../guida.php" target="_blank" rel="noopener" class="btn btn-outline-primary btn-sm fw-bold" title="Le guide passo passo: come si fa"><i class="fa fa-circle-question"></i> <span class="d-none d-sm-inline">Come si fa?</span></a>
                 <a href="../index.php" target="_blank" class="btn btn-outline-secondary btn-sm" title="Vai al sito"><i class="fa fa-external-link-alt"></i> <span class="d-none d-sm-inline">Visita Sito</span></a>
                 <a href="../esci.php" class="btn btn-danger btn-sm" title="Esci"><i class="fa fa-sign-out-alt"></i></a>
             </div>

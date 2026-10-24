@@ -663,6 +663,7 @@ $etichette_perm = ['full' => 'Admin area', 'eventi' => 'Eventi', 'iscritti' => '
 </div><!-- /usr-card -->
 <?php endforeach; ?>
 </div><!-- /listaUtenti -->
+<button type="button" id="mostraTuttiUtenti" class="btn btn-outline-secondary mt-2 mb-3" style="display:none;" onclick="window.utentiTutti = true; filtraUtenti(document.getElementById('cercaUtente').value);"></button>
 
 <?php if ($filtro_p > 0): ?>
 <!-- MODALE ABILITA UNA PERSONA (anagrafe di Ateneo o email) -->
@@ -782,15 +783,22 @@ document.addEventListener('change', function (e) {
 function filtraUtenti(q) {
     q = q.toLowerCase().trim();
     var solo = document.getElementById('soloAbilitati').checked;
-    var gruppo = document.getElementById('filtroGruppo').value, n = 0;
+    var gruppo = document.getElementById('filtroGruppo').value, n = 0, mostrati = 0;
+    // Senza ricerca né filtri si vedono i primi 25: gli altri con «Mostra tutti» (con una ricerca si cerca tra tutti)
+    var filtrando = !!(q || solo || gruppo), limite = (filtrando || window.utentiTutti) ? Infinity : 25;
     document.querySelectorAll('#listaUtenti .usr-card').forEach(function(card) {
         var ok = (!q || card.dataset.search.includes(q)) && (!solo || card.dataset.abil === '1')
               && (!gruppo || card.dataset.gruppi.indexOf(',' + gruppo + ',') !== -1);
-        card.style.display = ok ? '' : 'none';
         if (ok) n++;
+        var vedi = ok && mostrati < limite;
+        if (vedi) mostrati++;
+        card.style.display = vedi ? '' : 'none';
     });
     document.getElementById('contaUtenti').textContent = n;
+    var b = document.getElementById('mostraTuttiUtenti');
+    if (b) { b.style.display = (n > mostrati) ? '' : 'none'; b.textContent = 'Mostra tutti i ' + n + ' utenti'; }
 }
+document.addEventListener('DOMContentLoaded', function () { filtraUtenti(document.getElementById('cercaUtente').value); });
 </script>
 
 <?php require_once 'admin_footer.php'; ?>

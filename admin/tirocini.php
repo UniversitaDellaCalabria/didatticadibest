@@ -93,6 +93,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $cont = $az->conteggi();
 $elenco = $tab === 'esterni' ? $az->elenco($filtro, $cerca) : [];
+// Una riga per azienda: il modulo si apre solo per quella scelta («Apri»); l'elenco è a pagine di 40
+$apri = (int)($_GET['apri'] ?? 0);
+$per_pagina = 40;
+$n_trovate = count($elenco);
+$pag = max(1, min((int)($_GET['pag'] ?? 1), max(1, (int)ceil($n_trovate / $per_pagina))));
+if ($apri > 0 && ($pos_apri = array_search($apri, array_map('intval', array_column($elenco, 'id')), true)) !== false && !isset($_GET['pag'])) { $pag = intdiv($pos_apri, $per_pagina) + 1; }
+$elenco = array_slice($elenco, ($pag - 1) * $per_pagina, $per_pagina);
+$url_elenco = fn(array $extra = []) => $url('esterni', '&f=' . $filtro . ($cerca !== '' ? '&q=' . urlencode($cerca) : '')) . ($extra ? '&' . http_build_query($extra) : '');
 $labs = $tab === 'interni' ? $lab->tutti() : [];
 $province = \App\Tirocini\Province::tutte();
 $bozza = $_SESSION['tirocini_bozza'] ?? []; unset($_SESSION['tirocini_bozza']);
@@ -153,7 +161,8 @@ echo pn_schede([
         </div>
     </div>
 
-    <div class="row g-3 mb-3">
+    <details class="mb-3"><summary class="fw-bold" style="cursor:pointer;"><i class="fa fa-file-excel me-1 text-success" aria-hidden="true"></i>Caricare o completare l'elenco delle aziende (report del TSP, indirizzi)</summary>
+    <div class="row g-3 mt-1">
         <div class="col-lg-6"><form method="POST" enctype="multipart/form-data" class="border rounded p-3 bg-white h-100"><?php csrf_field(); ?>
             <h2 class="h6 fw-bold"><i class="fa fa-file-excel me-1 text-success" aria-hidden="true"></i>Carica il report del TSP</h2>
             <p class="small text-secondary mb-2">Il file «Albo aziende» scaricato dal TSP (.xlsx). Entrano le aziende con la «x» in «Esiste convenzione attiva»; chi l'ha persa esce dall'elenco ma conserva l'indirizzo. Si può caricare anche il file «da completare» con gli indirizzi: stesse regole, riconosciuto dalla colonna «Codice azienda».</p>
@@ -167,7 +176,7 @@ echo pn_schede([
             <form method="POST" class="d-inline"><?php csrf_field(); ?><button class="btn btn-outline-success btn-sm" name="conferma" value="1" type="submit" data-confirm="Confermare tutti gli indirizzi trovati sul web? Da quel momento le aziende si pubblicano.">Conferma i <?php echo (int)$cont['da_confermare']; ?> trovati sul web</button></form>
             <?php endif; ?>
         </div></div>
-    </div>
+    </div></details>
 
     <form method="GET" class="d-flex gap-2 mb-3" role="search"><input type="hidden" name="tab" value="esterni"><input type="hidden" name="f" value="<?php echo $h($filtro); ?>">
         <input class="form-control form-control-sm" name="q" value="<?php echo $h($cerca); ?>" placeholder="Cerca per nome, comune, partita IVA" aria-label="Cerca"><button class="btn btn-outline-secondary btn-sm" type="submit">Cerca</button></form>
@@ -177,6 +186,17 @@ echo pn_schede([
         $web = $a['origine'] === 'web' && !(int)$a['verificato'];
         $pub = (int)$a['pubblica'] && $a['comune'] !== '' && !$web;
         $manuale = $az->eManuale($a); ?>
+    <?php if ((int)$a['id'] !== $apri): // riga compatta: nome, dove, stato e «Apri» ?>
+    <div class="tir-riga<?php echo $pub ? '' : ' off'; ?> d-flex flex-wrap align-items-center gap-2" id="a<?php echo (int)$a['id']; ?>">
+        <div class="flex-grow-1" style="min-width:220px;"><h3><?php echo $h($a['nome']); ?><?php if ($manuale): ?> <span class="badge text-bg-info fw-normal align-middle">Inserita a mano</span><?php endif; ?></h3>
+            <div class="sub"><?php echo $h(implode(' · ', array_filter([$a['comune'] !== '' ? $a['comune'] . ($a['provincia'] !== '' ? ' (' . $a['provincia'] . ')' : '') : '', $a['partita_iva'] !== '' ? 'P.IVA ' . $a['partita_iva'] : '']))) ?: 'Senza indirizzo'; ?></div></div>
+        <?php if ($pub): ?><span class="badge text-bg-success">Pubblicata</span>
+        <?php elseif ($web): ?><span class="badge text-bg-warning">Indirizzo da confermare</span>
+        <?php elseif ($a['comune'] === ''): ?><span class="badge text-bg-secondary">Senza indirizzo</span>
+        <?php else: ?><span class="badge text-bg-secondary">Non pubblica</span><?php endif; ?>
+        <a class="btn btn-outline-dark btn-sm fw-bold" href="<?php echo $h($url_elenco(['apri' => (int)$a['id'], 'pag' => $pag]) . '#a' . (int)$a['id']); ?>"><i class="fa fa-pen me-1" aria-hidden="true"></i>Apri</a>
+    </div>
+    <?php continue; endif; ?>
     <div class="tir-riga<?php echo $pub ? '' : ' off'; ?>" id="a<?php echo (int)$a['id']; ?>">
         <form method="POST"><?php csrf_field(); ?><input type="hidden" name="id" value="<?php echo (int)$a['id']; ?>">
             <div class="d-flex flex-wrap justify-content-between gap-2 mb-2">
@@ -211,8 +231,16 @@ echo pn_schede([
                 <button class="btn btn-outline-success btn-sm py-0 ms-1" name="conferma" value="1" type="submit">È giusto: conferma</button>
                 <button class="btn btn-outline-danger btn-sm py-0" name="scarta" value="1" type="submit" data-confirm="Togliere l'indirizzo trovato sul web?">Toglilo</button></div><?php endif; ?>
         </form>
+        <div class="mt-2"><a class="btn btn-outline-secondary btn-sm" href="<?php echo $h($url_elenco(['pag' => $pag]) . '#a' . (int)$a['id']); ?>">Chiudi</a></div>
     </div>
     <?php endforeach; ?>
+    <?php if ($n_trovate > $per_pagina): $n_pag = (int)ceil($n_trovate / $per_pagina); ?>
+    <nav class="d-flex flex-wrap align-items-center gap-2 mt-3" aria-label="Pagine dell'elenco">
+        <?php if ($pag > 1): ?><a class="btn btn-outline-secondary btn-sm" href="<?php echo $h($url_elenco(['pag' => $pag - 1])); ?>"><i class="fa fa-arrow-left me-1" aria-hidden="true"></i>Precedenti</a><?php endif; ?>
+        <span class="small text-secondary">Pagina <?php echo $pag; ?> di <?php echo $n_pag; ?> · <?php echo $n_trovate; ?> aziende</span>
+        <?php if ($pag < $n_pag): ?><a class="btn btn-outline-secondary btn-sm" href="<?php echo $h($url_elenco(['pag' => $pag + 1])); ?>">Successive<i class="fa fa-arrow-right ms-1" aria-hidden="true"></i></a><?php endif; ?>
+    </nav>
+    <?php endif; ?>
 </section>
 <?php else: ?>
 <section class="scu-sez">

@@ -18,7 +18,7 @@ $funzioni_modulo = [
     // Referenti dei consigli: solo le sedute; Tutorato a chi ha il compito «Bandi» (o gestisce tutta la Didattica)
     'didattica'    => ($puo_didattica || $puo_conv_tesi || $puo_assistenza) ? array_values(array_filter([
         $puo_assistenza ? ['Assistenza', 'Le chat di studenti, personale e utenti esterni: da prendere, in carico a te, chiuse', 'fa-headset', 'assistenza.php'] : null,
-        $puo_assistenza ? ['Didacticus', 'L’assistente virtuale: istruiscilo con domande, risposte, link e allegati e guarda cosa non ha saputo rispondere', 'fa-robot', 'didacticus.php'] : null,
+        $puo_assistenza ? ['Domande e risposte', 'Le domande frequenti del sito e le risposte dell’assistente virtuale: argomenti, pubblico, link, allegati e domande a cui non ha saputo rispondere', 'fa-robot', 'didacticus.php'] : null,
         $puo_didattica_tutto ? ['Pratiche degli studenti', 'Moduli online, pratiche con stato, istruttoria e messaggi', 'fa-inbox', 'didattica.php?tab=pratiche'] : null,
         $puo_didattica ? ['Sedute e verbali', 'Consigli dei corsi di studio, presenze, convalide e piani di studio, verbale in Word ed Excel', 'fa-gavel', 'didattica.php?tab=sedute'] : null,
         $puo_didattica_tutto ? ['Moduli e documenti', 'Modulistica: documenti da scaricare e moduli online guidati', 'fa-file-lines', 'didattica.php?tab=moduli'] : null,
@@ -137,10 +137,30 @@ $nome_u = trim((string)($utente_admin['nome'] ?? ''));
 [data-bs-theme="dark"] .ini-num strong { color: #f1f5f9; }
 </style>
 
+<?php
+// «Cosa vuoi fare?»: i pulsanti grandi per le cose più comuni, solo quelle che la persona può fare (al massimo sei)
+$azioni_rapide = array_slice(array_values(array_filter([
+    $puo_assistenza ? ['Rispondere a una chat', 'Studenti e utenti che hanno scritto', 'fa-comments', 'assistenza.php'] : null,
+    $puo_didattica_tutto ? ['Controllare le pratiche', 'Moduli degli studenti da guardare', 'fa-inbox', 'didattica.php?tab=pratiche'] : null,
+    $is_full_admin ? ['Pubblicare una notizia', 'Titolo, testo e a chi si rivolge', 'fa-bullhorn', 'comunicazioni.php?modifica=0'] : null,
+    $puo_assistenza ? ['Scrivere una risposta frequente', 'Le domande che gli studenti fanno spesso', 'fa-book-open', 'didacticus.php?scheda=voci&voce=nuova'] : null,
+    $pagine_disponibili ? ['Vedere gli iscritti', 'Chi si è iscritto agli eventi', 'fa-users', 'iscritti.php'] : null,
+    $pagine_disponibili ? ['Creare un evento', 'Seminario, incontro, attività', 'fa-calendar-plus', 'eventi.php'] : null,
+])), 0, 6);
+?>
+
 <?php if (!$moduli_utente): ?>
     <div class="card border-0 shadow-sm"><div class="card-body text-center text-muted py-5">Non risulti assegnato a nessuna area o modulo.</div></div>
 <?php elseif ($sez_sel === null): ?>
     <?php echo pn_testata($saluto . ($nome_u !== '' ? ', ' . $nome_u : ''), 'fa-house', 'Oggi è ' . $giorni_it[(int)date('w')] . ' ' . date('j') . ' ' . $mesi_it[(int)date('n') - 1] . '. Ecco cosa ti aspetta; sotto trovi i tuoi moduli.'); ?>
+<?php if ($azioni_rapide): ?>
+    <h2 class="h6 fw-bold text-secondary text-uppercase mb-2" style="letter-spacing:.05em;font-size:.75rem;">Cosa vuoi fare?</h2>
+    <div class="pn-azioni">
+        <?php foreach ($azioni_rapide as [$t_az, $d_az, $i_az, $u_az]): ?>
+            <a class="pn-azione" href="<?php echo htmlspecialchars($u_az . (str_contains($u_az, '?') ? '&' : '?') . 'p_id=' . (int)$filtro_p); ?>"><i class="fa <?php echo $i_az; ?>" aria-hidden="true"></i><span><?php echo htmlspecialchars($t_az); ?><small><?php echo htmlspecialchars($d_az); ?></small></span></a>
+        <?php endforeach; ?>
+    </div>
+<?php endif; ?>
 
     <h2 class="h6 fw-bold text-secondary text-uppercase mb-2" style="letter-spacing:.05em;font-size:.75rem;">Cose da fare</h2>
     <div class="pn-cose mb-4">

@@ -291,3 +291,15 @@ body { background-color: var(--pn-sfondo); color: var(--pn-testo); }
 .pn-sezione > .fa { font-size: 1.2rem; color: var(--pn-mod); margin-top: 3px; width: 22px; text-align: center; }
 .pn-sezione strong { display: block; }
 .pn-sezione small { display: block; color: var(--pn-tenue); }
+
+/* 9. Testo e pulsanti più comodi per chi non è pratico ----------------------- */
+#page-content-wrapper { font-size: 1.0625rem; }
+#page-content-wrapper .btn:not(.btn-sm):not(.btn-close) { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: .25rem; }
+#page-content-wrapper .form-control:not(.form-control-sm), #page-content-wrapper .form-select:not(.form-select-sm) { min-height: 44px; font-size: 1rem; }
+
+/* «Cosa vuoi fare?»: pochi pulsanti grandi in linguaggio comune, in cima alla scrivania */
+.pn-azioni { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; margin-bottom: 1.5rem; }
+.pn-azione { display: flex; align-items: center; gap: 14px; padding: 18px 20px; border-radius: 16px; background: var(--pn-carta); border: 2px solid var(--pn-bordo); color: var(--pn-testo); text-decoration: none; font-weight: 700; font-size: 1.15rem; line-height: 1.25; min-height: 84px; transition: border-color .12s, box-shadow .12s; }
+.pn-azione:hover, .pn-azione:focus-visible { border-color: var(--pn-mod); box-shadow: 0 8px 20px rgba(15,23,42,.10); color: var(--pn-testo); }
+.pn-azione .fa { font-size: 1.6rem; color: var(--pn-mod); width: 36px; text-align: center; flex-shrink: 0; }
+.pn-azione small { display: block; font-weight: 400; color: var(--pn-tenue); font-size: .9rem; margin-top: 2px; }
