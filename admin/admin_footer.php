@@ -30,13 +30,38 @@
 <script src="<?php echo url_vendor('datatables/1.13.6/js/dataTables.bootstrap5.min.js'); ?>" integrity="sha384-PgPBH0hy6DTJwu7pTf6bkRqPlf/+pjUBExpr/eIfzszlGYFlF9Wi9VTAJODPhgCO" crossorigin="anonymous"></script>
 <script src="<?php echo url_vendor('jsdelivr/npm/chart.js@4.4.0/dist/chart.umd.min.js'); ?>" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous"></script>
 <script src="<?php echo url_vendor('jsdelivr/npm/select2@4.1.0-rc.0/dist/js/select2.min.js'); ?>" integrity="sha384-d3UHjPdzJkZuk5H3qKYMLRyWLAQBJbby2yr2Q58hXXtAGF8RSNO9jpLDlKKPv5v3" crossorigin="anonymous"></script>
-<script src="<?php echo url_vendor('cdnjs/ajax/libs/tinymce/6.8.3/tinymce.min.js'); ?>" integrity="sha384-1Miaw0hyo/w0cd9ZHUnc7Z8ACgtO+lphAEziGNW4z2C1h3nJfMVVEWA5MI031P+X" crossorigin="anonymous"></script>
+<script src="<?php echo url_vendor('tinymce/6.8.6/tinymce.min.js'); ?>"></script>
 <script src="../assets/js/campo-scuola.js?v=3"></script>
 <script src="../assets/js/ricerca-personale.js?v=1"></script>
 <script src="../assets/js/pannello.js?v=1"></script>
 
 <script>
-    tinymce.init({ selector: 'textarea.editor-html', plugins: 'table lists link code', toolbar: 'undo redo | bold italic underline | alignleft aligncenter alignright | bullist numlist | link code', menubar: false, height: 200 });
+    // Editor completo (TinyMCE 6, MIT): formattazione, titoli, elenchi, tabelle, link, immagini (caricate sul sito o incollate), video, emoji, cerca/sostituisci, schermo intero, codice HTML
+    tinymce.init({
+        selector: 'textarea.editor-html', language: 'it', language_url: '<?php echo url_vendor('tinymce/6.8.6/langs/it.js'); ?>',
+        base_url: '<?php echo url_vendor('tinymce/6.8.6'); ?>', suffix: '.min',
+        plugins: 'advlist autolink lists link image media table charmap anchor searchreplace visualblocks code codesample fullscreen insertdatetime preview emoticons wordcount autoresize help pagebreak nonbreaking directionality quickbars accordion',
+        menubar: 'file edit view insert format table tools help',
+        toolbar: 'undo redo | blocks | bold italic underline strikethrough | forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image media table | blockquote hr charmap emoticons | removeformat | fullscreen code help',
+        toolbar_mode: 'sliding', quickbars_selection_toolbar: 'bold italic | quicklink h2 h3 blockquote', quickbars_insert_toolbar: false,
+        block_formats: 'Paragrafo=p; Titolo 2=h2; Titolo 3=h3; Titolo 4=h4; Citazione=blockquote; Codice=pre',
+        min_height: 320, max_height: 900, autoresize_bottom_margin: 20, branding: false, promotion: false, resize: true,
+        relative_urls: false, convert_urls: false, link_default_target: '_blank', link_default_protocol: 'https', link_assume_external_targets: 'https',
+        image_caption: true, image_advtab: true, image_title: true, automatic_uploads: true, paste_data_images: true,
+        media_alt_source: false, media_poster: false, media_dimensions: true,
+        content_style: 'body{font-family:system-ui,Segoe UI,Arial,sans-serif;font-size:16px;line-height:1.6;padding:8px} img{max-width:100%;height:auto} table{border-collapse:collapse} td,th{border:1px solid #ccc;padding:4px 8px}',
+        images_upload_handler: function (blob) {
+            return new Promise(function (ok, no) {
+                var f = new FormData();
+                f.append('file', blob.blob(), blob.filename());
+                f.append('csrf_token', <?php echo json_encode((string)(new \App\Auth\Csrf(new \App\Auth\SessioneNativa()))->token()); ?>);
+                fetch('editor_upload.php', { method: 'POST', body: f, credentials: 'same-origin' })
+                    .then(function (r) { return r.json(); })
+                    .then(function (j) { if (j && j.location) ok(j.location); else no({ message: (j && j.errore) || 'Caricamento non riuscito.', remove: true }); })
+                    .catch(function () { no({ message: 'Caricamento non riuscito.', remove: true }); });
+            });
+        }
+    });
     // Campi brevi (card): solo formattazione in linea; il contatore conta il testo visibile
     tinymce.init({
         selector: 'textarea.editor-breve', menubar: false, statusbar: false, height: 130,

@@ -87,8 +87,8 @@ $modulo = function (array $c) use ($h): string {
     $altre = $id > 0 && ((string)($c['data_utile'] ?? '') !== '' || (string)($c['valida_fino'] ?? '') !== '' || $allegati || array_filter(array_column($link, 'u')) || (int)($c['in_evidenza'] ?? 0) || ($c['tipo'] ?? '') === 'pagina');
     $o = '<form method="POST" enctype="multipart/form-data" class="row g-3">' . (new \App\Auth\Csrf(new \App\Auth\SessioneNativa()))->campo();
     $o .= '<div class="col-12"><label class="form-label fw-bold fs-5" for="cm-titolo">Titolo</label><input class="form-control form-control-lg" id="cm-titolo" name="titolo" maxlength="200" required value="' . $h($c['titolo'] ?? '') . '"></div>';
-    $o .= '<div class="col-12"><label class="form-label fw-bold fs-5" for="cm-testo">Testo</label><textarea class="form-control" id="cm-testo" name="testo" rows="9" required>' . $h($c['testo'] ?? '') . '</textarea>'
-        . '<div class="form-text">Riga vuota = nuovo paragrafo · righe che iniziano con «- » = elenco puntato · <code>**testo**</code> = grassetto · gli indirizzi web diventano link da soli.</div></div>';
+    $o .= '<div class="col-12"><label class="form-label fw-bold fs-5" for="cm-testo">Testo</label><textarea class="form-control editor-html" id="cm-testo" name="testo" rows="12">' . $h($c['testo'] ?? '') . '</textarea>'
+        . '<div class="form-text">Scrivi come in Word: titoli, grassetto, elenchi, tabelle, link. Per una foto: pulsante immagine (o trascinala/incollala nel testo). Anche il vecchio testo semplice continua a funzionare.</div></div>';
     $o .= '<div class="col-12"><fieldset><legend class="fw-bold fs-6 mb-1">A chi si rivolge</legend><div class="d-flex flex-wrap gap-4">';
     foreach (CostC::PUBBLICI as $k => $n) { $o .= '<div class="form-check"><input class="form-check-input" type="checkbox" name="pubblico[]" value="' . $k . '" id="cm-p-' . $k . '"' . (in_array($k, $pubblici, true) ? ' checked' : '') . '><label class="form-check-label" for="cm-p-' . $k . '">' . $h($n) . '</label></div>'; }
     $o .= '</div><div class="form-text">Se non spunti nulla vale per tutti.</div></fieldset></div>';

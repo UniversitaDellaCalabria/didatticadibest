@@ -24,7 +24,7 @@ $software = [
     ['SortableJS', 'https://sortablejs.github.io/Sortable/', 'MIT', 'Ordinamento con trascinamento'],
     ['Chart.js', 'https://www.chartjs.org/', 'MIT', 'Grafici delle statistiche'],
     ['FullCalendar', 'https://fullcalendar.io/', 'MIT', 'Calendario delle attività'],
-    ['TinyMCE', 'https://www.tiny.cloud/', 'MIT', 'Editor dei testi'],
+    ['TinyMCE 6.8.6', 'https://www.tiny.cloud/', 'MIT', 'Editor dei testi (con la traduzione italiana tinymce-i18n)'],
     ['qrcode-generator', 'https://github.com/kazuhikoarase/qrcode-generator', 'MIT', 'Codici QR di ricevute, badge e attestati'],
     ['html5-qrcode', 'https://github.com/mebjas/html5-qrcode', 'Apache 2.0', 'Lettura dei QR per il check-in'],
     ['html2canvas, jsPDF, JSZip', 'https://github.com/parallax/jsPDF', 'MIT', 'Attestati in PDF e archivio ZIP'],

@@ -31,7 +31,7 @@ $alleg = \App\Assistenza\Didacticus\VociRepository::allegati($c);
 $page_cfg['titolo'] = (string)$c['titolo'];
 require_once 'header.php';
 ?>
-<style>.cm-testo { line-height: 1.7; font-size: 1.05rem; } .cm-testo p { margin-bottom: 1rem; } .cm-testo ul { margin-bottom: 1rem; }</style>
+<style>.cm-testo { line-height: 1.7; font-size: 1.05rem; } .cm-testo p { margin-bottom: 1rem; } .cm-testo ul, .cm-testo ol { margin-bottom: 1rem; } .cm-testo img { max-width: 100%; height: auto; } .cm-testo table { border-collapse: collapse; max-width: 100%; margin-bottom: 1rem; } .cm-testo td, .cm-testo th { border: 1px solid #cbd5e1; padding: .35rem .6rem; } .cm-testo blockquote { border-left: 4px solid #cbd5e1; padding-left: 1rem; color: #475569; } .cm-testo iframe, .cm-testo video { max-width: 100%; }</style>
 <div class="container my-4" style="max-width: 780px;">
     <nav aria-label="Percorso" class="mb-3 small"><a href="index.php">Home</a> <span class="text-secondary mx-1">/</span> <a href="comunicazioni.php">Notizie</a> <span class="text-secondary mx-1">/</span> <?php echo $h($c['titolo']); ?></nav>
     <?php if ($anteprima): ?><div class="alert alert-warning py-2"><i class="fa fa-eye me-1" aria-hidden="true"></i>Anteprima: i visitatori non vedono ancora questa comunicazione (non è pubblicata, o la data non è arrivata, o non è più valida).</div><?php endif; ?>
