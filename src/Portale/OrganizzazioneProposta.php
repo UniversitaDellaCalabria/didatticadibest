@@ -84,7 +84,8 @@ final class OrganizzazioneProposta
                 ['Futuri studenti', 'orientamento.php', array_merge(array_map($link, $or), [['Prossimi appuntamenti', 'agenda.php?ambito=orientamento', []]])],
                 ['Per le scuole', $fsl ? $fsl[0]['slug'] . '.php' : 'agenda.php?scuole=1', array_merge(array_map($link, $fsl), [['Tutte le attività per le scuole', 'agenda.php?scuole=1', []]])],
             ]],
-            ['Studenti', 'modulistica.php', [
+            ['Studenti', 'guida_studente.php', [
+                ['Guida dello studente', 'guida_studente.php', []],
                 ['Modulistica e pratiche', 'modulistica.php', [['Modulistica', 'modulistica.php', []], ['Le mie pratiche', 'pratiche.php', []]]],
                 ['Ricevimento e sportelli', 'ricevimento.php', array_merge([['Ricevimento dei docenti', 'ricevimento.php', []]], array_map($link, $cal))],
                 ['Tutorato', 'registro_tutorato.php', [['Registro delle attività', 'registro_tutorato.php', []]]],
