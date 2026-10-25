@@ -82,8 +82,8 @@ final class VerificaPdfFirmato
 
     /**
      * Controlla il PDF firmato rispetto alla versione precedente: deve essere un PDF (non un .p7m CAdES), cominciare esattamente
-     * con la versione precedente (firma aggiunta senza modificare il documento), avere una firma PAdES in più che copre tutto il file,
-     * integra; se il certificato ha il codice fiscale e quello di chi deve firmare è noto, devono coincidere.
+     * con la versione precedente (firma aggiunta senza modificare il documento), avere una firma PAdES in più che copre tutto il file.
+     * Il certificato non blocca: integrità e codice fiscale del firmatario, se non tornano, finiscono solo in $info['avviso'].
      * Ritorna [errore | null, dati della firma].
      *
      * @return array{0: string|null, 1: array<string, mixed>}
@@ -108,13 +108,17 @@ final class VerificaPdfFirmato
         if (!$nuova['valida_struttura'] || !$nuova['copre_tutto']) {
             return ["La firma non copre tutto il documento.", []];
         }
+        // Controllo minimo: la firma PAdES c'è ed è fatta bene nella struttura. Se il certificato dà problemi (non verificabile,
+        // algoritmo non letto da OpenSSL, firmatario diverso da quello atteso) il file passa lo stesso: l'esito resta in 'avviso'
+        // e la verifica della catena dei certificatori la fa chi protocolla.
         $info = $this->analizza($dopo);
+        $info['avviso'] = '';
         if ($info['integra'] === false) {
-            return ["La firma digitale non è integra: il documento risulta modificato dopo la firma.", $info];
+            $info['avviso'] = 'Il controllo automatico del certificato non è riuscito: verifica la firma con gli strumenti di Ateneo.';
         }
         $cfAtteso = strtoupper(trim($cfAtteso));
         if ($cfAtteso !== '' && $info['cf'] !== '' && $info['cf'] !== $cfAtteso) {
-            return ["La firma è di " . ($info['nome'] ?: 'un\'altra persona') . " (codice fiscale " . $info['cf'] . "), non di chi deve firmare la lettera.", $info];
+            $info['avviso'] = trim($info['avviso'] . ' Il certificato è di ' . ($info['nome'] ?: 'un\'altra persona') . ' (codice fiscale ' . $info['cf'] . '), diverso da chi doveva firmare.');
         }
         return [null, $info];
     }
