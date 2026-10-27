@@ -129,7 +129,7 @@ if (isset($_GET['esito']) && !empty($_SESSION['programma_esito'])) {
         <?php endif; ?>
         <div class="d-flex flex-wrap gap-2 mb-5">
             <a href="index.php" class="btn btn-outline-secondary fw-bold">Torna al portale</a>
-            <a href="area_personale.php#programma-fsl" class="btn btn-outline-secondary fw-bold"><i class="fa fa-id-card me-1" aria-hidden="true"></i>Il mio programma FSL (Area personale)</a>
+            <a href="miei_eventi.php#programma-fsl" class="btn btn-outline-secondary fw-bold"><i class="fa fa-id-card me-1" aria-hidden="true"></i>Il mio programma FSL (Area personale)</a>
         </div>
     </div>
     <?php

@@ -8,6 +8,12 @@
     var BASE = script.src.replace(/assets\/js\/assistenza-widget\.js.*$/, '');
 
     function leggiToken() { try { return localStorage.getItem('assistenza_t') || ''; } catch (e) { return ''; } }
+    // Chi ha il login parte sempre da una chat nuova; durante la stessa visita (scheda del browser) riprende solo quella che ha appena iniziato
+    function leggiChat() { try { return (sessionStorage.getItem('assistenza_c') || '').replace(/\D/g, ''); } catch (e) { return ''; } }
+    function indirizzo() {
+        var t = leggiToken(), c = leggiChat();
+        return BASE + 'assistenza.php?pannello=1' + (t ? '&t=' + encodeURIComponent(t) : '') + (c ? '&c=' + c : '');
+    }
 
     var stile = document.createElement('style');
     stile.textContent =
@@ -46,8 +52,7 @@
             if (!iframe) {
                 iframe = document.createElement('iframe');
                 iframe.title = 'Chat di assistenza';
-                var t = leggiToken();
-                iframe.src = BASE + 'assistenza.php?pannello=1' + (t ? '&t=' + encodeURIComponent(t) : '');
+                iframe.src = indirizzo();
                 pannello.appendChild(iframe);
             }
             pallino.hidden = true;
@@ -72,8 +77,7 @@
 
     // Apri in una finestra separata (popup): la stessa chat, con tutto lo spazio che serve, anche su un secondo schermo
     w.querySelector('.aw-popup').addEventListener('click', function () {
-        var t = leggiToken();
-        var f = window.open(BASE + 'assistenza.php?pannello=1' + (t ? '&t=' + encodeURIComponent(t) : ''), 'assistenza_didacticus', 'popup=yes,width=560,height=780,resizable=yes,scrollbars=yes');
+        var f = window.open(indirizzo(), 'assistenza_didacticus', 'popup=yes,width=560,height=780,resizable=yes,scrollbars=yes');
         if (f) { f.focus(); apri(false); } else { grande(true); }   // popup bloccato dal browser: si ingrandisce la finestrella
     });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && w.classList.contains('aperto')) apri(false); });

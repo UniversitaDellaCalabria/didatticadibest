@@ -441,6 +441,33 @@ consumaToken($t, $sedutaId)    // vale una sola volta, per quel verbale''')
         + '<h3>Prove</h3><p><code>strumenti/prove/oop/assistenza.php</code> (chat, operatori, limiti, orari, conservazione), <code>assistenza_push.php</code> e <code>assistenza_push_db.php</code> (cifratura contro la RFC, firma, invio, iscrizioni, preferenze, integrazione con la chat), <code>assistenza_didacticus.php</code> (motore su domande vere, risposte, passaggi all\'operatore, domande senza risposta, statistiche). Scenario di dimostrazione e schermate: <code>strumenti/locale/scenario_assistenza.php</code>, <code>schermate_assistenza.php</code>.</p>'
     )))
 
+    # 13b ----------------------------------------------------------------------------------------------
+    S.append(('area', 'Area personale per profilo', sezione('area', '13b', 'Area personale per profilo',
+        'L\'area personale mostra i riquadri giusti a chi ha accesso: studente, docente, direttore, personale e uffici, gestore, amministratore, esterno (una persona può averne più d\'uno). I riquadri e il loro ordine li sceglie l\'amministratore da pannello (<em>Sito › Area personale</em>). Schema v93–v94. L\'area è un cruscotto a tessere: ogni tessera è un argomento con le novità in evidenza e porta alla pagina specifica.',
+        '<h3>Dati</h3>'
+        + tab(['Tabella', 'Contenuto'], [
+            ['<code>area_riquadri</code>', 'un riquadro per riga: <code>chiave</code> (vuota per quelli scritti dall\'amministratore, unica per quelli di sistema), titolo, testo, icona, colore, fino a due pulsanti, <code>profili</code> (elenco separato da virgole), <code>ordine</code>, <code>attivo</code>. I riquadri di sistema mancanti si seminano alla migrazione; quelli già presenti (anche spenti o cambiati) non si toccano'],
+        ])
+        + '<h3>Classi (<code>src/Portale/Area/</code>)</h3>'
+        + tab(['Classe', 'Compito'], [
+            ['<code>Profili</code>', 'i sette profili, i nomi e le icone; <code>da()</code> e <code>inCsv()</code> per l\'elenco salvato'],
+            ['<code>ProfiliPersona</code>', 'di quali profili fa parte una persona: ruolo, matricola, anagrafe di Ateneo (gruppo), uffici, Direzione, abilitazioni; chi non rientra in nessuno è «esterno»'],
+            ['<code>CatalogoRiquadri</code>', 'i riquadri di sistema: tipo <em>speciale</em> (li disegna il codice con i dati della persona) o <em>scheda</em> (titolo, testo e due pulsanti modificabili), profili e ordine di partenza'],
+            ['<code>RiquadriRepository</code>', 'elenco per profilo, salvataggio con controlli (titolo, testo, indirizzi, icona, colore), interruttore, su/giù, eliminazione dei soli riquadri personalizzati'],
+        ])
+        + '<h3>Pagine e file</h3>'
+        + tab(['File', 'Ruolo'], [
+            ['<code>area_personale.php</code>', 'il cruscotto: testata con i profili, filtro <code>?p=</code> per chi ha più profili, «vedi come» <code>?come=</code> per l\'amministratore, poi la griglia delle tessere nell\'ordine scelto. I vecchi indirizzi <code>?conferma_posto=</code> (link nelle email) e <code>?cancella_prenotazione=</code> rimandano a <code>miei_eventi.php</code>'],
+            ['<code>inc/area/&lt;chiave&gt;.php</code>', 'una tessera per riquadro di sistema (da_fare a tutta larghezza, cruscotto_direttore, direttore_assente, pratiche, assistenza, tutorato_mio, tutorato_registro, tutorato_pagamenti, ricevimento, risorse_responsabile, risorse_prenotate, eventi, profilo, guida); <code>_tessera.php</code> è la funzione <code>area_tessera()</code> (titolo, riga di stato, novità in rosso, pulsanti); <code>_generico.php</code> disegna le schede e i riquadri scritti dall\'amministratore; <code>_tutorato_tappe.php</code> le tappe del tutor'],
+            ['<code>miei_eventi.php</code>', 'prenotazioni in programma (modifica, annulla, chat, posto liberato), storico e attestati, programma FSL, sondaggi, aule e appuntamenti prenotati, scanner QR'],
+            ['<code>profilo.php</code>', 'dati personali, scheda di Ateneo ed email modificabili'],
+            ['<code>il_mio_tutorato.php</code>', 'a che punto è ogni incarico del tutor e i suoi documenti'],
+            ['<code>admin/area_personale.php</code>', 'pannello: profili con il numero di riquadri, elenco in ordine, Spegni/Accendi, su/giù, modifica, nuovo riquadro, elimina (solo i personalizzati)'],
+        ])
+        + '<h3>Regole</h3><p>I tirocini non si gestiscono nel portale ma sulla piattaforma TSP 2.0: nell\'area personale c\'è solo la scheda con la guida (<code>percorso_tirocini.php</code>) e il collegamento. I pagamenti del tutorato sono spenti (riquadro «Ufficio pagamenti del tutorato» spento, e le tappe dei pagamenti spariscono da «Il mio tutorato»): si riaccendono dal pannello.</p>'
+        + '<h3>Prove</h3><p><code>strumenti/prove/oop/area_personale.php</code> (profili, catalogo, archivio, pannello, file dei riquadri).</p>'
+    )))
+
     # 14 -----------------------------------------------------------------------------------------------
     S.append(('cron', 'Job pianificati', sezione('cron', '14', 'Job pianificati (cron)',
         'Quattro script, avviabili da riga di comando o via URL con <code>CRON_KEY</code> (≥ 16 caratteri).',

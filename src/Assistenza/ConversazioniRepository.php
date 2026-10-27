@@ -57,6 +57,12 @@ final class ConversazioniRepository
         return Righe::riga($this->db->riga("SELECT * FROM assistenza_conversazioni WHERE utente_id = ? AND stato <> 'chiusa' ORDER BY id DESC LIMIT 1", [$utenteId]));
     }
 
+    /** La conversazione non chiusa di una persona collegata che è già in mano all'ufficio (da prendere o in carico), non quella rimasta con Didacticus. @return array<string, string|null>|null */
+    public function apertaConOperatoreDi(int $utenteId): ?array
+    {
+        return Righe::riga($this->db->riga("SELECT * FROM assistenza_conversazioni WHERE utente_id = ? AND stato IN ('nuova', 'assegnata') ORDER BY id DESC LIMIT 1", [$utenteId]));
+    }
+
     /**
      * Le conversazioni di una persona collegata, dalla più recente.
      *
@@ -65,6 +71,23 @@ final class ConversazioniRepository
     public function diUtente(int $utenteId, int $limite = 20): array
     {
         return Righe::testo($this->db->righe('SELECT * FROM assistenza_conversazioni WHERE utente_id = ? ORDER BY id DESC LIMIT ' . max(1, $limite), [$utenteId]));
+    }
+
+    /**
+     * Lo storico di una persona collegata, dalla più recente: ogni conversazione con la prima domanda, quanti messaggi ha e quante risposte non ha ancora letto.
+     *
+     * @return list<array<string, string|null>>
+     */
+    public function storicoDi(int $utenteId, int $limite = 100): array
+    {
+        return Righe::testo($this->db->righe(
+            "SELECT c.*,
+                    (SELECT m.testo FROM assistenza_messaggi m WHERE m.conversazione_id = c.id AND m.da = 'utente' AND m.tipo = 'messaggio' ORDER BY m.id LIMIT 1) AS primo_testo,
+                    (SELECT COUNT(*) FROM assistenza_messaggi m WHERE m.conversazione_id = c.id AND m.tipo = 'messaggio' AND m.da <> 'sistema') AS n_messaggi,
+                    (SELECT COUNT(*) FROM assistenza_messaggi m WHERE m.conversazione_id = c.id AND m.tipo = 'messaggio' AND m.da <> 'utente' AND m.letto_il IS NULL) AS non_letti
+               FROM assistenza_conversazioni c WHERE c.utente_id = ? ORDER BY c.id DESC LIMIT " . max(1, $limite),
+            [$utenteId]
+        ));
     }
 
     public function assegna(int $id, ?int $operatoreId, string $operatoreNome, string $stato): void

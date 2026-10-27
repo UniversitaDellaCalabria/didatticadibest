@@ -13,7 +13,7 @@ $r2 = $http('/eventi/seminari.php', null, $jar2);
 prova(!str_contains($r2['corpo'], 'name="captcha_id"') && str_contains($r2['corpo'], 'name="invia_prenotazione"') || str_contains($r2['corpo'], 'modPrenota'), "con l'accesso la domanda di controllo non serve");
 
 // Area personale, ricevuta e check-in
-foreach (['area_personale.php', 'area_personale.php?conferma_posto=99999', 'scanner_studente.php'] as $pag) {
+foreach (['area_personale.php', 'miei_eventi.php', 'miei_eventi.php?conferma_posto=99999', 'profilo.php', 'il_mio_tutorato.php', 'scanner_studente.php'] as $pag) {
     prova($senza_errori_isc($http("/eventi/$pag", null, $jar2)), "$pag da docente: 200 senza errori PHP");
 }
 prova($http('/eventi/area_personale.php')['codice'] === 302, "area_personale.php senza accesso: rimando al login");

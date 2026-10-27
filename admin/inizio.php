@@ -33,6 +33,7 @@ $funzioni_modulo = [
         $is_full_admin ? ['Testata e home', 'Logo, testata, carosello e widget della home', 'fa-image', 'testata.php'] : null,
         $is_full_admin ? ['Menu del sito', 'Voci del menu di navigazione del sito pubblico', 'fa-link', 'menu.php'] : null,
         $is_full_admin ? ['Notizie e pagine', 'Pubblica una notizia per studenti, scuole, aziende o docenti: titolo, testo e a chi si rivolge', 'fa-bullhorn', 'comunicazioni.php'] : null,
+        $is_full_admin ? ['Area personale', 'Cosa trova ogni profilo (studente, docente, Direttore, personale, gestore, amministratore, esterno) nella sua Area personale: riquadri da accendere, spostare e scrivere', 'fa-table-cells-large', 'area_personale.php'] : null,
         $is_full_admin ? ['Contatti per gli studenti', 'La pagina «Chi contattare per cosa»: recapiti, orari e dove si trovano gli uffici', 'fa-address-card', 'contatti.php'] : null,
         $is_full_admin ? ['Utenti e abilitazioni', 'Amministratori, abilitati per area, per modulo e per la FSL', 'fa-users-cog', 'utenti.php'] : null,
         $is_full_admin ? ['Uffici e persone', 'Uffici del Dipartimento e di Ateneo (Direzione, protocollo, corsi di studio, pagamenti…) con le persone scelte dall’anagrafe: si richiamano in pratiche, tutorato, risorse e convenzioni', 'fa-sitemap', 'uffici.php'] : null,

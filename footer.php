@@ -92,7 +92,7 @@ if (isset($conn) && $conn instanceof mysqli) {
 $widget_assistenza = basename($_SERVER['PHP_SELF']) !== 'assistenza.php' && env_valore('ASSISTENZA_WIDGET') !== '0';
 if ($widget_assistenza) { try { $widget_assistenza = class_exists(\App\Assistenza\OrariAssistenza::class) && \App\Core\App::get(\App\Assistenza\OrariAssistenza::class)->attiva(); } catch (\Throwable $e_as) { $widget_assistenza = false; } } ?>
 <?php if ($widget_assistenza): ?>
-<script src="<?php echo htmlspecialchars(rtrim((string)parse_url(url_base_sito(), PHP_URL_PATH), '/')); ?>/assets/js/assistenza-widget.js?v=3" defer></script>
+<script src="<?php echo htmlspecialchars(rtrim((string)parse_url(url_base_sito(), PHP_URL_PATH), '/')); ?>/assets/js/assistenza-widget.js?v=4" defer></script>
 <?php endif; ?>
 <?php if (!empty($GLOBALS['usa_campo_scuola'])): // campo "Scuola" con ricerca nell'anagrafe ?>
 <script src="<?php echo htmlspecialchars(rtrim((string)parse_url(url_base_sito(), PHP_URL_PATH), '/')); ?>/assets/js/campo-scuola.js?v=4"></script>

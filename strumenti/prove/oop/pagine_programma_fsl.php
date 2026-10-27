@@ -44,7 +44,7 @@ $r = $http('/eventi/', null, $jar_prg);
 prova($r['codice'] === 200 && str_contains($r['corpo'], 'href="programma_fsl.php"') && str_contains($r['corpo'], 'class="programma-fsl-n"'), "l'icona del programma compare in tutte le pagine");
 
 // Area personale: il programma in preparazione si vede e si riapre
-$r = $http('/eventi/area_personale.php', null, $jar_prg);
+$r = $http('/eventi/miei_eventi.php', null, $jar_prg);
 prova($r['codice'] === 200 && $senza_errori($r['corpo']) && str_contains($r['corpo'], 'id="pills-fsl"') && str_contains($r['corpo'], 'Il programma in preparazione (1)') && str_contains($r['corpo'], 'href="programma_fsl.php"'), "Area personale: scheda «Programma FSL» con il programma in preparazione");
 
 // Aggiunta non valida: attività non FSL (un turno qualsiasi di un'area non FSL) → messaggio
@@ -110,7 +110,7 @@ $r = $http('/eventi/programma_fsl.php?esito=1', null, $jar_prg);
 prova(str_contains($r['corpo'], 'Il programma FSL della scuola') && !str_contains($r['corpo'], 'richiesta registrata'), "l'esito si vede una volta sola");
 $r = $http('/eventi/programma_fsl.php', null, $jar_prg);
 prova(str_contains($r['corpo'], 'Il programma è vuoto') && !str_contains($r['corpo'], 'class="programma-fsl-n"'), "dopo la conferma il programma è vuoto");
-$r = $http('/eventi/area_personale.php', null, $jar_prg);
+$r = $http('/eventi/miei_eventi.php', null, $jar_prg);
 prova($r['codice'] === 200 && $senza_errori($r['corpo']) && str_contains($r['corpo'], 'id="pills-fsl"') && !str_contains($r['corpo'], 'Il programma in preparazione') && preg_match('/convenzione_online\\.php\\?t=[a-f0-9]{32}&amp;scarica=allegato_pdf/', $r['corpo']) && str_contains($r['corpo'], 'scarica=convenzione_sola') && str_contains($r['corpo'], 'Geologia sul campo'),
     "Area personale: dopo la conferma, Allegato A e Convenzione sempre disponibili");
 

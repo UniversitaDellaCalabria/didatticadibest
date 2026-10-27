@@ -127,7 +127,7 @@ $voci_rep->elimina($id_all);
 foreach (["DELETE FROM didacticus_mancate", "DELETE FROM assistenza_messaggi", "DELETE FROM assistenza_conversazioni", "DELETE FROM uffici_persone WHERE email = 'op-d989@example.org'", "DELETE FROM utenti WHERE id BETWEEN 98931 AND 98949", "UPDATE didacticus_voci SET usi = 0, utile = 0, non_utile = 0"] as $sql) $q($sql);
 $q("INSERT INTO utenti (id, nome, cognome, email, ruolo_id, ruoli_secondari) VALUES (98931, 'Dora', 'Operatrice', 'op-d989@example.org', 5, ''), (98932, 'Stella', 'Studente', 'stud-d989@example.org', 3, ''), (98933, 'Admin', 'Didacticus', 'adm-d989@example.org', 1, '')");
 $stu = [];
-foreach ([1, 2, 4, 6, 7, 9] as $n) {
+foreach ([1, 2, 4, 5, 6, 7, 9] as $n) {
     $q("INSERT INTO utenti (id, nome, cognome, email, ruolo_id, ruoli_secondari) VALUES (9894$n, 'Studente', 'Numero$n', 'stud$n-d989@example.org', 3, '')");
     $stu[$n] = ['id' => (int) "9894$n", 'nome' => 'Studente', 'cognome' => "Numero$n", 'email' => "stud$n-d989@example.org"];
 }
@@ -245,8 +245,23 @@ $srv_d->rispondi($ricarica($c9), $op_d, 'Ciao, ci penso io.');
 $c9r = $ricarica($c9);
 prova($c9r['stato'] === 'assegnata' && $c9r['passata_il'] !== null && (int) $c9r['operatore_id'] === 98931, "operatore: se risponde a una chat con Didacticus la prende e risulta «passata»");
 
+// 8b. Ogni richiesta nuova parte da zero: le chat lasciate con Didacticus si chiudono e restano nello storico
+$rep_cv = $cont_di->get(\App\Assistenza\ConversazioniRepository::class);
+[$d1] = $srv_d->apriDaUtente($stu[5], 'certificati', 'Come richiedo il certificato di iscrizione?', null, '10.9.89.115');
+[$d2, $err_d2] = $srv_d->apriDaUtente($stu[5], 'tesi', 'Come chiedo la tesi?', null, '10.9.89.115');
+$d1r = $ricarica($d1);
+prova($err_d2 === null && (int) $d2['id'] !== (int) $d1['id'] && $d2['stato'] === 'bot' && $d1r['stato'] === 'chiusa' && $d1r['chiusa_da'] === 'sistema' && (int) $d1r['risolta_da_bot'] === 0,
+    "storico: una chat rimasta con Didacticus non si riprende, la nuova richiesta parte da zero e la vecchia si chiude (non conta come risolta da Didacticus)", json_encode([$d1r['stato'], $d1r['chiusa_da'], $d2['id'], $d1['id']]));
+prova($rep_cv->apertaConOperatoreDi(98945) === null && (int) $rep_cv->apertaDi(98945)['id'] === (int) $d2['id'], "storico: la chat con Didacticus non è «in mano all'ufficio»");
+$st_d1 = $rep_cv->storicoDi(98945);
+prova(count($st_d1) === 2 && (int) $st_d1[0]['id'] === (int) $d2['id'] && str_starts_with((string) $st_d1[0]['primo_testo'], 'Come chiedo la tesi') && (int) $st_d1[0]['n_messaggi'] >= 2 && (int) $st_d1[0]['non_letti'] >= 1
+    && str_contains(implode('|', array_column($srv_d->messaggi($d1r, 0, false), 'testo')), 'hai iniziato una nuova richiesta') && $rep_cv->storicoDi(98931) === [], "storico: elenco dalla più recente con prima domanda, numero di messaggi e risposte da leggere (solo le proprie)");
+$srv_d->azioneBot($ricarica($d2), 'operatore');
+[$d3, $err_d3] = $srv_d->apriDaUtente($stu[5], 'altro', 'Un altro messaggio', null, '10.9.89.115');
+prova($err_d3 === null && (int) $d3['id'] === (int) $d2['id'] && (int) $rep_cv->apertaConOperatoreDi(98945)['id'] === (int) $d2['id'] && count($rep_cv->storicoDi(98945)) === 2, "storico: una richiesta già in mano all'ufficio continua lì (nessuna seconda conversazione)");
+
 // 9. Le statistiche
-$stat = $cont_di->get(\App\Assistenza\StatisticheAssistenza::class)->riepilogo('2026-10-01', '2026-10-31');
+$stat =$cont_di->get(\App\Assistenza\StatisticheAssistenza::class)->riepilogo('2026-10-01', '2026-10-31');
 prova($stat['totale'] >= 9 && $stat['risolte_da_didacticus'] === 1 && $stat['passate_a_operatore'] >= 5 && $stat['esterni'] >= 3 && $stat['con_login'] >= 6 && $stat['chiuse'] >= 1, "statistiche: totale, risolte da Didacticus, passate agli operatori, esterni e con accesso", json_encode(array_slice($stat, 0, 12)));
 $arg_tesi = array_values(array_filter($stat['per_argomento'], fn($x) => $x['argomento'] === 'tesi'))[0] ?? null;
 prova($arg_tesi !== null && $arg_tesi['nome'] === 'Tesi e laurea' && $arg_tesi['n'] >= 1 && $stat['per_argomento'][0]['n'] >= $stat['per_argomento'][count($stat['per_argomento']) - 1]['n'], "statistiche: per argomento, dal più frequente");

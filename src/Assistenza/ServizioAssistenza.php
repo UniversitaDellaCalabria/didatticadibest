@@ -68,7 +68,8 @@ final class ServizioAssistenza
     }
 
     /**
-     * Una persona con il login chiede aiuto. Se ha già una conversazione aperta il messaggio va lì (ne ha una sola alla volta).
+     * Una persona con il login chiede aiuto. Se ha già una richiesta in mano all'ufficio il messaggio va lì (ne ha una sola alla volta); altrimenti parte una
+     * conversazione nuova e quelle rimaste solo con Didacticus si chiudono (restano nello storico).
      *
      * @param array<string, mixed> $utente id, nome, cognome, email
      * @param array{tipo: string, id: int, testo: string}|null $contesto la pratica o la prenotazione di cui si parla
@@ -84,7 +85,7 @@ final class ServizioAssistenza
             return [null, $err];
         }
         $uid = (int) ($utente['id'] ?? 0);
-        $aperta = $uid > 0 ? $this->conversazioni->apertaDi($uid) : null;
+        $aperta = $uid > 0 ? $this->conversazioni->apertaConOperatoreDi($uid) : null; // la richiesta già in mano all'ufficio continua lì; una chat rimasta solo con Didacticus no
         if ($aperta !== null) {
             $err = $this->scriviComeUtente($aperta, $testo);
 
@@ -97,8 +98,21 @@ final class ServizioAssistenza
             return [null, 'Hai aperto molte richieste nell\'ultima ora: attendi la risposta o riprova più tardi.'];
         }
         $nome = trim(trim((string) ($utente['nome'] ?? '')) . ' ' . trim((string) ($utente['cognome'] ?? ''))) ?: (string) ($utente['email'] ?? 'Utente');
+        $this->chiudiRimasteConBot($uid); // la nuova richiesta parte da zero: le chat lasciate con Didacticus restano nello storico, chiuse
 
         return [$this->nuova(Costanti::CANALE_UTENTE, $uid, $nome, (string) ($utente['email'] ?? ''), $argomento, $testo, $contesto, $ip, $conOperatore), null];
+    }
+
+    /** Chiude da sistema le chat di una persona che sono ancora con Didacticus (nessun operatore le ha viste): restano leggibili nello storico. */
+    private function chiudiRimasteConBot(int $utenteId): void
+    {
+        $quando = $this->adesso();
+        foreach ($this->conversazioni->diUtente($utenteId, 20) as $c) {
+            if ($c['stato'] === Costanti::STATO_BOT) {
+                $this->conversazioni->chiudi((int) $c['id'], Costanti::DA_SISTEMA, $quando);
+                $this->messaggi->aggiungi((int) $c['id'], Costanti::DA_SISTEMA, Costanti::TIPO_MESSAGGIO, 'Conversazione chiusa: hai iniziato una nuova richiesta.', '', $quando);
+            }
+        }
     }
 
     /**

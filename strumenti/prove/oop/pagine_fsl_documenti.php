@@ -56,7 +56,7 @@ prova($http('/eventi/' . $file_aut)['codice'] === 403 && $http('/eventi/uploads/
 // Il gestore vede lo stato nel pannello Iscrizioni
 $r = $http('/eventi/admin/iscritti.php?p_id=2', null, $jar);
 prova($r['codice'] === 200 && str_contains($r['corpo'], 'Autorizzazione ricevuta') && str_contains($r['corpo'], 'autorizzazione_scuola.php?code=FS-DOCPAG') && !preg_match('/<b>(Fatal error|Warning)<\/b>/', $r['corpo']), "Iscrizioni: badge dei documenti e link all'autorizzazione");
-$r = $http('/eventi/area_personale.php', null, $jar2);
+$r = $http('/eventi/miei_eventi.php', null, $jar2);
 prova($r['codice'] === 200 && str_contains($r['corpo'], 'Carica elenco') && !preg_match('/<b>(Fatal error|Warning)<\/b>/', $r['corpo']), "Area personale: pulsante per completare i documenti");
 
 // Elenco degli studenti prima dell'attività, poi la scuola toglie l'autorizzazione

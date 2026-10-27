@@ -187,7 +187,7 @@ ob_start(); ?>
 
             <div class="d-flex flex-wrap gap-2 flex-shrink-0">
                 <?php if ($mp['stato'] === 'richiesta_conferma'): ?>
-                    <a href="area_personale.php?conferma_posto=<?php echo (int)$mp['id']; ?>" class="btn btn-success fw-bold"><i class="fa fa-check me-1"></i>Conferma il posto</a>
+                    <a href="miei_eventi.php?conferma_posto=<?php echo (int)$mp['id']; ?>" class="btn btn-success fw-bold"><i class="fa fa-check me-1"></i>Conferma il posto</a>
                 <?php elseif ($mp['stato'] === 'confermata'): ?>
                     <button type="button" class="btn fw-bold" style="background:<?php echo $col_mp; ?>;color:<?php echo $txt_mp; ?>;" data-bs-toggle="modal" data-bs-target="#modBigliettoHome"><i class="fa fa-qrcode me-1" aria-hidden="true"></i>Ricevuta</button>
                     <a href="<?php echo $url_ricevuta; ?>" target="_blank" class="btn fw-bold" style="border:2px solid #17334F;color:#17334F;"><i class="fa fa-file-pdf me-1" aria-hidden="true"></i>Scarica PDF</a>

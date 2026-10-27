@@ -25,13 +25,19 @@ $api = $app->get(\App\Assistenza\ChatApi::class);
 // La conversazione di chi chiama
 $token = strtolower(trim((string)($_REQUEST['t'] ?? '')));
 $conv = null;
+$cid = (int)($_REQUEST['c'] ?? 0);
 if ($token !== '') {
     $c = $srv->perToken($token);
     $conv = $c && $c['canale'] === \App\Assistenza\Costanti::CANALE_ESTERNO ? $c : null;
 }
 if (!$conv && !empty($_SESSION['utente_id'])) { // senza link valido (o con uno vecchio ricordato dal browser) vale la chat di chi ha il login
-    $mie = $app->get(\App\Assistenza\ConversazioniRepository::class)->diUtente((int)$_SESSION['utente_id'], 1);
-    $conv = $mie[0] ?? null;
+    $repo_c = $app->get(\App\Assistenza\ConversazioniRepository::class);
+    if ($cid > 0) { // la chat indicata dalla pagina, solo se è sua
+        $c = $repo_c->perId($cid);
+        $conv = $c && (int)$c['utente_id'] === (int)$_SESSION['utente_id'] ? $c : null;
+    } else { // senza indicazione (il pallino «hai una risposta» del pulsante) vale la più recente
+        $conv = $repo_c->diUtente((int)$_SESSION['utente_id'], 1)[0] ?? null;
+    }
 }
 $azione = (string)($_REQUEST['azione'] ?? 'chat');
 
@@ -46,7 +52,14 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     if ($azione === 'stato') {
         // Solo i numeri, senza segnare nulla come letto: il pannello chiuso li usa per il pallino «hai una risposta»
         $repo = $app->get(\App\Assistenza\MessaggiAssistenzaRepository::class);
-        $rispondi(['ok' => true, 'attiva' => $conv['stato'] !== \App\Assistenza\Costanti::STATO_CHIUSA, 'non_letti' => $repo->nonLetti((int)$conv['id'], \App\Assistenza\Costanti::DA_UTENTE)]);
+        $da_leggere = $repo->nonLetti((int)$conv['id'], \App\Assistenza\Costanti::DA_UTENTE);
+        if ($cid === 0 && !empty($_SESSION['utente_id']) && $conv['canale'] === \App\Assistenza\Costanti::CANALE_UTENTE) { // chi ha il login può avere più chat: il pallino le conta tutte (le ultime)
+            $da_leggere = 0;
+            foreach ($app->get(\App\Assistenza\ConversazioniRepository::class)->diUtente((int)$_SESSION['utente_id'], 5) as $c_r) {
+                if ($c_r['stato'] !== \App\Assistenza\Costanti::STATO_CHIUSA) $da_leggere += $repo->nonLetti((int)$c_r['id'], \App\Assistenza\Costanti::DA_UTENTE);
+            }
+        }
+        $rispondi(['ok' => true, 'attiva' => $conv['stato'] !== \App\Assistenza\Costanti::STATO_CHIUSA, 'non_letti' => $da_leggere]);
     }
     $rispondi($api->chatUtente($conv, (int)($_GET['dopo'] ?? 0)));
 }

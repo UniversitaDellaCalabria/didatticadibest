@@ -24,10 +24,15 @@ if ($token !== '') {
     $c_tok = $srv->perToken($token);
     $conv = $c_tok && $c_tok['canale'] === $Cost::CANALE_ESTERNO ? $c_tok : null;
 }
-if (!$conv && $utente) { // senza link valido (o con un link vecchio ricordato dal browser) vale la chat di chi ha il login
-    $conv = ($repo->diUtente((int)$utente['id'], 1)[0] ?? null);
+$in_corso = null; // una richiesta già in mano all'ufficio: se ne parla sopra il modulo
+if (!$conv && $utente) { // senza link valido (o con un link vecchio ricordato dal browser) si parte da una chat nuova; quelle già fatte si aprono dallo storico (?c=)
+    $c_id = (int)($_GET['c'] ?? $_POST['c'] ?? 0);
+    $c_sel = $c_id > 0 ? $repo->perId($c_id) : null;
+    $conv = $c_sel && (int)$c_sel['utente_id'] === (int)$utente['id'] ? $c_sel : null; // solo le proprie
+    $in_corso = $repo->apertaConOperatoreDi((int)$utente['id']);
     $token = '';
 }
+$c_url = $utente && $conv && $conv['canale'] === $Cost::CANALE_UTENTE ? (int)$conv['id'] : ''; // per tornare alla chat dopo «Nuova richiesta»
 $url_pagina = function (array $extra = []) use ($qs_pannello): string {
     $q = array_filter(($qs_pannello ? ['pannello' => 1] : []) + $extra, fn($v) => $v !== '' && $v !== null);
     return 'assistenza.php' . ($q ? '?' . http_build_query($q) : '');
@@ -48,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['azione'] ?? '') === 'nuova
         $contesto = $app->get(\App\Assistenza\Contesti::class)->pratica((int)($_POST['pratica'] ?? 0), (int)$utente['id'])
             ?? $app->get(\App\Assistenza\Contesti::class)->prenotazione((int)($_POST['prenotazione'] ?? 0), (int)$utente['id']);
         [$nuova, $errore] = $srv->apriDaUtente($utente, $argomento, $testo, $contesto, $ip, !empty($_POST['con_operatore']));
-        if ($nuova) { header('Location: ' . $url_pagina()); exit; }
+        if ($nuova) { header('Location: ' . $url_pagina(['c' => (int)$nuova['id']])); exit; }
     } else {
         $errore = captcha_verifica((string)($_POST['captcha_id'] ?? ''), (string)($_POST['captcha_risposta'] ?? ''));
         if ($errore === null) {
@@ -122,7 +127,7 @@ if (!$servizio_attivo): ?>
 
 <?php if ($conv && !$mostra_modulo): ?>
     <!-- CHAT -->
-    <div class="card border-0 shadow-sm" id="ac-app" data-url="assistenza_ajax.php" data-csrf="<?php echo $h(csrf_token()); ?>" data-t="<?php echo $conv['canale'] === $Cost::CANALE_ESTERNO ? $h($token) : ''; ?>" data-chiusa="<?php echo $chiusa ? 1 : 0; ?>" data-chiave="<?php echo $h($push_pub->chiavePubblica()); ?>" data-avatar="didacticus_file.php?avatar=1" data-argomenti="<?php echo $h(json_encode(array_map(fn($k, $a) => ['k' => $k, 'n' => $a['nome'], 'i' => $a['icona']], array_keys($Cost::argomenti()), $Cost::argomenti()), JSON_UNESCAPED_UNICODE)); ?>">
+    <div class="card border-0 shadow-sm" id="ac-app" data-url="assistenza_ajax.php" data-csrf="<?php echo $h(csrf_token()); ?>" data-t="<?php echo $conv['canale'] === $Cost::CANALE_ESTERNO ? $h($token) : ''; ?>" data-c="<?php echo $c_url; ?>" data-chiusa="<?php echo $chiusa ? 1 : 0; ?>" data-chiave="<?php echo $h($push_pub->chiavePubblica()); ?>" data-avatar="didacticus_file.php?avatar=1" data-argomenti="<?php echo $h(json_encode(array_map(fn($k, $a) => ['k' => $k, 'n' => $a['nome'], 'i' => $a['icona']], array_keys($Cost::argomenti()), $Cost::argomenti()), JSON_UNESCAPED_UNICODE)); ?>">
         <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2 py-2">
             <div>
                 <div id="ac-intestazione" class="d-none"><span class="d-flex align-items-center gap-2 mb-1"><img src="didacticus_file.php?avatar=1" alt="" width="34" height="34" class="rounded-circle" style="object-fit:cover;"><strong>Didacticus</strong><span class="badge bg-light text-dark border">assistente virtuale</span></span></div>
@@ -130,7 +135,7 @@ if (!$servizio_attivo): ?>
                 <div class="small text-secondary" id="ac-stato" role="status"></div>
             </div>
             <div class="d-flex gap-1">
-                <a class="btn btn-outline-secondary btn-sm" href="<?php echo $h($url_pagina(['t' => $token, 'nuova' => 1])); ?>" title="Inizia una nuova richiesta su un altro argomento"><i class="fa fa-plus <?php echo $pannello ? '' : 'me-1'; ?>" aria-hidden="true"></i><span class="<?php echo $pannello ? 'visually-hidden' : ''; ?>">Nuova richiesta</span></a>
+                <a class="btn btn-outline-secondary btn-sm" href="<?php echo $h($url_pagina(['t' => $token, 'nuova' => 1, 'c' => $c_url])); ?>" title="Inizia una nuova richiesta su un altro argomento"><i class="fa fa-plus <?php echo $pannello ? '' : 'me-1'; ?>" aria-hidden="true"></i><span class="<?php echo $pannello ? 'visually-hidden' : ''; ?>">Nuova richiesta</span></a>
                 <button type="button" class="btn btn-outline-secondary btn-sm" id="ac-chiudi" title="Chiudi la conversazione"><i class="fa fa-check <?php echo $pannello ? '' : 'me-1'; ?>" aria-hidden="true"></i><span class="<?php echo $pannello ? 'visually-hidden' : ''; ?>">Ho risolto</span></button>
             </div>
         </div>
@@ -158,9 +163,11 @@ if (!$servizio_attivo): ?>
         </form>
         <noscript><div class="alert alert-warning m-2">Per la chat serve JavaScript. Puoi comunque aspettare la risposta: ti arriva per email.</div></noscript>
     </div>
-    <?php if ($chiusa && !$pannello): ?><p class="small text-secondary mt-2">La conversazione è chiusa: se scrivi di nuovo si riapre, oppure inizia una <a href="<?php echo $h($url_pagina(['t' => $token, 'nuova' => 1])); ?>">nuova richiesta</a>.</p><?php endif; ?>
+    <?php if ($chiusa && !$pannello): ?><p class="small text-secondary mt-2">La conversazione è chiusa: se scrivi di nuovo si riapre, oppure inizia una <a href="<?php echo $h($url_pagina(['t' => $token, 'nuova' => 1, 'c' => $c_url])); ?>">nuova richiesta</a>.</p><?php endif; ?>
+    <?php if ($utente && !$pannello): ?><p class="small mt-2"><a href="assistenza_storico.php"><i class="fa fa-clock-rotate-left me-1" aria-hidden="true"></i>Le mie conversazioni</a></p><?php endif; ?>
+    <?php if ($c_url !== ''): ?><script>try { sessionStorage.setItem('assistenza_c', '<?php echo $c_url; ?>'); } catch (e) {}</script><?php endif; ?>
     <?php if ($push_pub->attivo()): ?><script src="assets/js/assistenza-push.js?v=1"></script><?php endif; ?>
-    <script src="assets/js/assistenza-chat.js?v=4"></script>
+    <script src="assets/js/assistenza-chat.js?v=5"></script>
     <?php if ($conv['canale'] === $Cost::CANALE_ESTERNO): ?>
         <script>try { localStorage.setItem('assistenza_t', <?php echo json_encode($token, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>); } catch (e) {}</script>
     <?php endif; ?>
@@ -172,6 +179,14 @@ if (!$servizio_attivo): ?>
             <span><i class="fa fa-id-card me-1" aria-hidden="true"></i><strong>Studente o personale Unical?</strong> Accedi: ritroverai le tue conversazioni e le pratiche.</span>
             <a class="btn btn-primary btn-sm fw-bold ms-md-auto" target="_top" href="saml_login.php?redirect=<?php echo urlencode('assistenza.php'); ?>"><i class="fa fa-right-to-bracket me-1" aria-hidden="true"></i>Accedi</a>
         </div>
+    <?php else: ?>
+        <script>try { sessionStorage.removeItem('assistenza_c'); } catch (e) {}</script>
+        <?php if ($in_corso && (!$conv || (int)$in_corso['id'] !== (int)$conv['id'])): ?>
+            <div class="alert alert-warning py-2 d-flex flex-wrap align-items-center gap-2" role="status">
+                <span><i class="fa fa-comments me-1" aria-hidden="true"></i>Hai già una richiesta in corso con l'ufficio («<?php echo $h($Cost::nomeArgomento((string)$in_corso['argomento'])); ?>»): se scrivi qui sotto, il messaggio va in quella conversazione.</span>
+                <a class="btn btn-sm btn-outline-dark fw-bold ms-md-auto" href="<?php echo $h($url_pagina(['c' => (int)$in_corso['id']])); ?>">Riprendila</a>
+            </div>
+        <?php endif; ?>
     <?php endif; ?>
     <form method="POST" action="<?php echo $h($url_pagina()); ?>" class="card border-0 shadow-sm"><div class="card-body">
         <?php csrf_field(); ?>
@@ -214,8 +229,9 @@ if (!$servizio_attivo): ?>
             <div style="position:absolute; left:-10000px; width:1px; height:1px; overflow:hidden;" aria-hidden="true"><label>Sito web <input type="text" name="sito_web" tabindex="-1" autocomplete="off"></label></div>
         <?php endif; ?>
         <button class="btn btn-danger fw-bold" type="submit" style="background-color:#B80000;border:none;"><i class="fa fa-paper-plane me-1" aria-hidden="true"></i>Invia la richiesta</button>
-        <?php if ($conv): ?><a class="btn btn-link" href="<?php echo $h($url_pagina(['t' => $token])); ?>">Torna alla chat</a><?php endif; ?>
+        <?php if ($conv): ?><a class="btn btn-link" href="<?php echo $h($url_pagina(['t' => $token, 'c' => $c_url])); ?>">Torna alla chat</a><?php endif; ?>
     </div></form>
+    <?php if ($utente): ?><p class="small mt-3"><a href="assistenza_storico.php" target="_top"><i class="fa fa-clock-rotate-left me-1" aria-hidden="true"></i>Le mie conversazioni</a></p><?php endif; ?>
 <?php endif; ?>
 
 <?php

@@ -1645,8 +1645,8 @@ if (getenv('PROVE_SOLO_FUNZIONI') || !function_exists('curl_init') || $http('/ev
         $err_php = preg_match('/<b>(Fatal error|Parse error|Warning)<\/b>|Uncaught /', $r['corpo']);
         prova($r['codice'] === 200 && !$err_php && str_contains($r['corpo'], '</html>'), "pannello: $pag", "risposta " . $r['codice'] . ($err_php ? ' con errore PHP' : ''));
     }
-    $r = $http('/eventi/area_personale.php', null, $jar);
-    prova($r['codice'] === 200 && !preg_match('/<b>(Fatal error|Parse error|Warning)<\/b>|Uncaught /', $r['corpo']) && str_contains($r['corpo'], 'pills-profilo-tab'), "Area personale (con la scheda Profilo)");
+    $r = $http('/eventi/miei_eventi.php', null, $jar);
+    prova($r['codice'] === 200 && !preg_match('/<b>(Fatal error|Parse error|Warning)<\/b>|Uncaught /', $r['corpo']) && str_contains($r['corpo'], 'pills-attive-tab'), "Eventi e prenotazioni (con i tab)");
     // Iscrizione completa a un progetto FSL (docente di prova, scuola dall'anagrafe) e pulizia
     // (dati di esempio di strumenti/locale: utente 4, progetto 20 edizione 2 = turno 201; scuola di prova ZZPR00000P sempre senza convenzione)
     $loc = new mysqli('127.0.0.1', 'root', '', (parse_ini_file($SITO . '/.env.locale')['DB_NAME'] ?? 'eventi_locale'));
@@ -1690,8 +1690,8 @@ if (getenv('PROVE_SOLO_FUNZIONI') || !function_exists('curl_init') || $http('/ev
     prova(in_array($r['codice'], [302, 303], true) && ($pc['stato'] ?? '') === 'confermata' && ($pc['fine'] ?? '') === "$dom 12:00:00", "prenotazione dalla pagina pubblica", json_encode($pc));
     $r = $http('/eventi/risorsa_ics.php?code=' . urlencode($pc['codice'] ?? ''));
     prova($r['codice'] === 200 && str_contains($r['corpo'], 'BEGIN:VCALENDAR'), "file .ics della prenotazione");
-    $r = $http('/eventi/area_personale.php', null, $jar2);
-    prova(str_contains($r['corpo'], 'Aula delle prove'), "prenotazione nell'Area personale");
+    $r = $http('/eventi/miei_eventi.php', null, $jar2);
+    prova(str_contains($r['corpo'], 'Aula delle prove'), "prenotazione in miei_eventi.php");
     foreach (["dashboard.php?p_id=$pid_c", "prenotazioni_risorse.php?p_id=$pid_c&periodo=tutte", "risorse.php?p_id=$pid_c", "risorse.php?p_id=$pid_c&modifica=$rid_c"] as $pag) {
         $r = $http('/eventi/admin/' . $pag, null, $jar);
         $err_php = preg_match('/<b>(Fatal error|Parse error|Warning)<\/b>|Uncaught /', $r['corpo']);

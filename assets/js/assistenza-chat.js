@@ -6,7 +6,7 @@
     var app = document.getElementById('ac-app');
     if (!app) return;
 
-    var URL = app.dataset.url, CSRF = app.dataset.csrf, TOKEN = app.dataset.t || '';
+    var URL = app.dataset.url, CSRF = app.dataset.csrf, TOKEN = app.dataset.t || '', CHAT = app.dataset.c || '';
     var el = function (id) { return document.getElementById(id); };
     var stato = { ultimoId: 0, chiusa: app.dataset.chiusa === '1', valutata: false, bot: false, titolo: document.title, nuovi: 0, ultimoBot: null };
     var AVATAR = app.dataset.avatar || '', ARGOMENTI = [];
@@ -29,6 +29,7 @@
         var opzioni = { credentials: 'same-origin', cache: 'no-store' };
         var url = URL;
         if (TOKEN) parametri.t = TOKEN;
+        if (CHAT) parametri.c = CHAT; // chi ha il login può avere più chat: questa è quella aperta nella pagina
         if (post) {
             var fd = new FormData();
             Object.keys(parametri).forEach(function (k) { fd.append(k, parametri[k]); });
@@ -137,6 +138,7 @@
         else s.textContent = 'In attesa di un operatore: ti risponderemo il prima possibile';
         stato.chiusa = c.chiusa;
         stato.valutata = c.valutata;
+        if (c.chiusa) { try { sessionStorage.removeItem('assistenza_c'); } catch (e) {} } // chiusa: alla prossima apertura della finestrella si riparte da una chat nuova
         el('ac-chiudi').classList.toggle('d-none', c.chiusa);
         el('ac-valuta').classList.toggle('d-none', !(c.chiusa && !c.valutata));
     }

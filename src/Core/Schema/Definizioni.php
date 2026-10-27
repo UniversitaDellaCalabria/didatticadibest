@@ -272,6 +272,15 @@ final class Definizioni
             proponi_operatore TINYINT(1) NOT NULL DEFAULT 0, attiva TINYINT(1) NOT NULL DEFAULT 1, ordine INT NOT NULL DEFAULT 0, usi INT NOT NULL DEFAULT 0, utile INT NOT NULL DEFAULT 0,
             non_utile INT NOT NULL DEFAULT 0, creato_il DATETIME DEFAULT CURRENT_TIMESTAMP, aggiornato_il DATETIME DEFAULT NULL, INDEX idx_attiva (attiva, argomento)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        // v93: riquadri dell'area personale per profilo. chiave = riquadro di sistema (catalogo in App\Portale\Area\CatalogoRiquadri), NULL = scritto dall'amministratore;
+        // profili = elenco «studente,docente…»; ordine e interruttore li cambia il pannello (Gestione del portale → Area personale)
+        'area_riquadri' => "CREATE TABLE IF NOT EXISTS area_riquadri (
+            id INT AUTO_INCREMENT PRIMARY KEY, chiave VARCHAR(40) DEFAULT NULL, titolo VARCHAR(120) NOT NULL DEFAULT '', testo TEXT DEFAULT NULL,
+            icona VARCHAR(40) NOT NULL DEFAULT 'fa-circle-info', colore VARCHAR(7) NOT NULL DEFAULT '#0056B3',
+            link VARCHAR(500) NOT NULL DEFAULT '', etichetta_link VARCHAR(80) NOT NULL DEFAULT '', link2 VARCHAR(500) NOT NULL DEFAULT '', etichetta_link2 VARCHAR(80) NOT NULL DEFAULT '',
+            profili VARCHAR(150) NOT NULL DEFAULT '', ordine INT NOT NULL DEFAULT 0, attivo TINYINT(1) NOT NULL DEFAULT 1, creato_il DATETIME DEFAULT NULL, aggiornato_il DATETIME DEFAULT NULL,
+            UNIQUE KEY uq_chiave (chiave), INDEX idx_attivo (attivo, ordine)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         // v92: comunicazioni del Dipartimento: notizie (con data) e pagine informative (senza), con pubblico, scadenza, allegati e link
         'comunicazioni' => "CREATE TABLE IF NOT EXISTS comunicazioni (
             id INT AUTO_INCREMENT PRIMARY KEY, tipo VARCHAR(10) NOT NULL DEFAULT 'notizia', titolo VARCHAR(200) NOT NULL DEFAULT '', sommario VARCHAR(400) NOT NULL DEFAULT '',

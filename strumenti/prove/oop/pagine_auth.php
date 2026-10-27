@@ -13,7 +13,7 @@ prova(!str_contains($r['corpo'], 'tabellaAudit'), "admin/audit_log.php: il docen
 $anon = $http('/eventi/admin/utenti.php');
 prova($anon['codice'] === 302 && str_contains($anon['dove'], 'saml_login.php'), "senza accesso il pannello rimanda al login");
 $r = $http('/eventi/profilo.php', null, $jar);
-prova($r['codice'] === 302 && str_contains($r['dove'], 'area_personale.php'), "profilo.php rimanda all'area personale");
+prova($r['codice'] === 200 && str_contains($r['corpo'], 'Il mio profilo') && str_contains($r['corpo'], 'name="aggiorna_email"'), "profilo.php: la pagina del profilo con il modulo dell'email");
 $r = $http('/eventi/admin/cron_backup.php');
 prova($r['codice'] === 403, "cron_backup.php senza chiave né accesso: 403");
 prova($http('/eventi/admin/sistema.php', ['save_system_settings' => '1', 'csrf_token' => 'sbagliato'], $jar)['codice'] === 403, "salvataggio impostazioni con token CSRF sbagliato: 403");
