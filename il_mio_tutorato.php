@@ -20,13 +20,16 @@ try {
 
 $page_cfg['titolo'] = 'Il mio tutorato';
 require_once 'header.php';
+echo ui_tema_script();
 ?>
 
 <div class="container my-4" style="max-width: 900px;">
-    <nav aria-label="Percorso" class="mb-3 small"><a href="area_personale.php"><i class="fa fa-arrow-left me-1" aria-hidden="true"></i>Area personale</a></nav>
-    <h1 class="fw-bold h3 mb-3">Il mio tutorato</h1>
+    <div class="d-flex flex-wrap align-items-start justify-content-between gap-2">
+        <?php echo ui_intestazione('Il mio tutorato'); ?>
+        <div class="d-print-none"><?php echo ui_tema_pulsante(); ?></div>
+    </div>
     <?php if (!$mio_tutorato): ?>
-        <div class="alert alert-light border text-secondary">Non risultano incarichi di tutorato a tuo nome.</div>
+        <?php echo ui_vuoto('fa-user-graduate', 'Nessun incarico di tutorato', 'Non risultano incarichi di tutorato a tuo nome. Se pensi che ci sia un errore, scrivici dall\'assistenza.', 'assistenza.php', 'Chiedi assistenza', '#0f766e'); ?>
     <?php endif; ?>
 <?php
 foreach ($mio_tutorato as $mt):

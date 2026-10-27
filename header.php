@@ -17,6 +17,7 @@ if (session_status() === PHP_SESSION_NONE) { session_start(); }
 
 if (file_exists(__DIR__ . '/functions.php')) {
     require_once __DIR__ . '/functions.php';
+    require_once __DIR__ . '/inc/ui.php';
     $pagina_corrente = basename($_SERVER['PHP_SELF']);
     if (function_exists('sync_sso_user') && !defined('PAGINA_SENZA_SSO') && $pagina_corrente !== 'logout-success.php' && $pagina_corrente !== 'esci.php') {
         sync_sso_user($conn);
@@ -91,6 +92,7 @@ if ($u_logged_header) {
     <link href="<?php echo url_vendor('fonts/titillium-lora.css'); ?>" rel="stylesheet">
     <link rel="stylesheet" href="<?php echo url_vendor('jsdelivr/npm/bootstrap-italia@2.8.3/dist/css/bootstrap-italia.min.css'); ?>">
     <link rel="stylesheet" href="<?php echo url_vendor('cdnjs/ajax/libs/font-awesome/6.4.0/css/all.min.css'); ?>">
+    <link rel="stylesheet" href="assets/css/portale-ui.css?v=<?php echo (int)@filemtime(__DIR__ . '/assets/css/portale-ui.css'); ?>">
 
     <style>
         html { transition: font-size 0.2s ease; }
@@ -389,7 +391,7 @@ if ($u_logged_header) {
                         <div class="it-right-zone">
                             <div class="it-search-wrapper d-flex align-items-center">
                                 <form action="ricerca.php" method="GET" class="header-search-box d-none d-md-flex" role="search">
-                                    <input type="text" name="q" placeholder="Cerca eventi, aule..." aria-label="Cerca nel portale" required>
+                                    <input type="text" name="q" placeholder="Cerca nel portale..." aria-label="Cerca nel portale" required>
                                     <button type="submit" aria-label="Avvia ricerca"><i class="fa fa-search" aria-hidden="true"></i></button>
                                 </form>
                             </div>
@@ -415,7 +417,7 @@ if ($u_logged_header) {
     <div class="mob-nav-body">
         <form action="ricerca.php" method="GET" class="mob-nav-search" role="search">
             <div class="input-group">
-                <input type="text" name="q" class="form-control" placeholder="Cerca eventi..." required aria-label="Cerca nel portale">
+                <input type="text" name="q" class="form-control" placeholder="Cerca nel portale..." required aria-label="Cerca nel portale">
                 <button class="btn btn-danger" type="submit" aria-label="Avvia ricerca"><i class="fa fa-search" aria-hidden="true"></i></button>
             </div>
         </form>

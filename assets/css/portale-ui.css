@@ -1,0 +1,121 @@
+/* =========================================================================
+   Stile comune del portale (sito pubblico e pannello): colori e componenti usati da tutte le pagine.
+   - Colori degli stati: cinque, sempre gli stessi (ok · attesa · azione · info · neutro), anche per i badge di Bootstrap.
+   - Tessere, testata di persona, intestazione di pagina, numeri, stati vuoti.
+   - Tema scuro: solo per le pagine che lo prevedono (body.ui-scuro-ok), con html[data-tema="scuro"].
+   Si usa con le funzioni di inc/ui.php (ui_stato, ui_vuoto, ui_intestazione).
+   ========================================================================= */
+:root {
+    --ui-rosso: #B30000;
+    --ui-rosso-testo: #B30000;
+    --ui-testo: #1e293b;
+    --ui-testo-2: #64748b;
+    --ui-bordo: #e8ebf0;
+    --ui-card: #ffffff;
+    --ui-lieve: #f8fafc;
+    --ui-ombra: rgba(15, 23, 42, .06);
+    /* stati: sfondo, testo */
+    --ui-ok-bg: #dcfce7;      --ui-ok-fg: #166534;
+    --ui-attesa-bg: #fef3c7;  --ui-attesa-fg: #92400e;
+    --ui-azione-bg: #fee2e2;  --ui-azione-fg: #991b1b;
+    --ui-info-bg: #dbeafe;    --ui-info-fg: #1e40af;
+    --ui-neutro-bg: #f1f5f9;  --ui-neutro-fg: #475569;
+}
+
+/* ---- Stati ------------------------------------------------------------ */
+.ui-stato { display: inline-flex; align-items: center; gap: 5px; padding: 2px 10px; border-radius: 999px; font-size: .78rem; font-weight: 700; line-height: 1.5; white-space: nowrap; }
+.ui-stato.ok { background: var(--ui-ok-bg); color: var(--ui-ok-fg); }
+.ui-stato.attesa { background: var(--ui-attesa-bg); color: var(--ui-attesa-fg); }
+.ui-stato.azione { background: var(--ui-azione-bg); color: var(--ui-azione-fg); }
+.ui-stato.info { background: var(--ui-info-bg); color: var(--ui-info-fg); }
+.ui-stato.neutro { background: var(--ui-neutro-bg); color: var(--ui-neutro-fg); }
+
+/* I badge di Bootstrap seguono la stessa palette: verde = fatto, ambra = in attesa, rosso = serve un'azione, blu = informazione, grigio = chiuso.
+   (Non in modalità alto contrasto, che ha i suoi colori.) */
+body:not(.high-contrast) .badge.bg-success, body:not(.high-contrast) .badge.text-bg-success { background: var(--ui-ok-bg) !important; color: var(--ui-ok-fg) !important; }
+body:not(.high-contrast) .badge.bg-warning, body:not(.high-contrast) .badge.text-bg-warning { background: var(--ui-attesa-bg) !important; color: var(--ui-attesa-fg) !important; }
+body:not(.high-contrast) .badge.bg-danger, body:not(.high-contrast) .badge.text-bg-danger { background: var(--ui-azione-bg) !important; color: var(--ui-azione-fg) !important; }
+body:not(.high-contrast) .badge.bg-info, body:not(.high-contrast) .badge.text-bg-info,
+body:not(.high-contrast) .badge.bg-primary, body:not(.high-contrast) .badge.text-bg-primary { background: var(--ui-info-bg) !important; color: var(--ui-info-fg) !important; }
+body:not(.high-contrast) .badge.bg-secondary, body:not(.high-contrast) .badge.text-bg-secondary { background: var(--ui-neutro-bg) !important; color: var(--ui-neutro-fg) !important; }
+
+/* ---- Testata di persona (area personale) -------------------------------- */
+.ui-testata { display: flex; align-items: center; gap: 18px; padding: 20px 22px; background: var(--ui-card); border: 1px solid var(--ui-bordo); border-top: 4px solid var(--ui-rosso); border-radius: 14px; box-shadow: 0 2px 10px var(--ui-ombra); }
+.ui-avatar { flex: 0 0 64px; width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--ui-azione-bg); color: var(--ui-rosso-testo); font-weight: 700; font-size: 1.4rem; letter-spacing: .02em; }
+.ui-etichetta { font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ui-rosso-testo); }
+.ui-nome { font-size: 1.55rem; font-weight: 700; margin: 0; color: var(--ui-testo); overflow-wrap: anywhere; }
+.ui-chip { display: inline-flex; align-items: center; font-size: .8rem; font-weight: 600; padding: 3px 12px; border-radius: 999px; background: var(--ui-neutro-bg); color: var(--ui-neutro-fg); border: 1px solid var(--ui-bordo); }
+@media (max-width: 575px) { .ui-testata { flex-direction: column; text-align: center; } .ui-testata .d-flex { justify-content: center; } }
+
+/* ---- Intestazione delle pagine interne ------------------------------------ */
+.ui-pagina-testa { margin-bottom: 1rem; }
+.ui-pagina-testa .ui-indietro { color: var(--ui-rosso-testo); font-size: .9rem; font-weight: 600; text-decoration: none; }
+.ui-pagina-testa h1 { font-size: 1.6rem; font-weight: 700; margin: .35rem 0 0; color: var(--ui-testo); }
+.ui-pagina-testa p { margin: .25rem 0 0; color: var(--ui-testo-2); }
+
+/* ---- Tessere del cruscotto ------------------------------------------------- */
+.ui-tessera { position: relative; display: flex; gap: 14px; align-items: flex-start; height: 100%; padding: 16px; background: var(--ui-card); border: 1px solid var(--ui-bordo); border-radius: 14px; box-shadow: 0 1px 6px var(--ui-ombra); transition: box-shadow .15s, transform .15s, border-color .15s; }
+.ui-tessera:hover { box-shadow: 0 6px 18px rgba(15, 23, 42, .10); transform: translateY(-1px); border-color: var(--tc, var(--ui-rosso)); }
+.ui-tessera.ha-novita { border-color: #f0b4b4; }
+.ui-tessera-icona { flex: 0 0 46px; width: 46px; height: 46px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; color: var(--tc, var(--ui-rosso)); background: color-mix(in srgb, var(--tc, var(--ui-rosso)) 14%, var(--ui-card)); }
+.ui-tessera-corpo { min-width: 0; }
+.ui-tessera-titolo { font-weight: 700; color: var(--ui-testo); text-decoration: none; font-size: 1rem; }
+.ui-tessera-testo { font-size: .85rem; color: var(--ui-testo-2); margin-top: 2px; overflow-wrap: anywhere; }
+.ui-novita { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; padding: 2px 10px; border-radius: 999px; background: var(--ui-rosso); color: #fff; font-size: .75rem; font-weight: 700; }
+.ui-tessera-extra { position: relative; z-index: 2; }
+
+/* ---- Numeri in fila (eventi, presenze, attestati) --------------------------- */
+.ui-numeri { display: flex; flex-wrap: wrap; align-items: stretch; gap: 12px; margin-bottom: 20px; }
+.ui-numero { flex: 1 1 110px; text-align: center; padding: 12px 10px; background: var(--ui-lieve); border: 1px solid var(--ui-bordo); border-radius: 12px; }
+.ui-numero .val { font-size: 1.7rem; font-weight: 700; line-height: 1; color: var(--ui-testo); }
+.ui-numero .lbl { font-size: .7rem; color: var(--ui-testo-2); text-transform: uppercase; letter-spacing: .05em; margin-top: 4px; }
+.ui-numero.ui-azione { background: var(--ui-rosso); border-color: var(--ui-rosso); color: #fff; flex-basis: 220px; display: flex; flex-direction: column; justify-content: center; text-decoration: none; }
+
+/* ---- Stato vuoto: un cerchio leggero con l'icona, il messaggio e, se serve, il pulsante ---- */
+.ui-vuoto { text-align: center; padding: 2.25rem 1.25rem; background: var(--ui-lieve); border: 1px dashed var(--ui-bordo); border-radius: 16px; color: var(--ui-testo-2); }
+.ui-vuoto-figura { position: relative; width: 84px; height: 84px; margin: 0 auto 1rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.9rem; color: var(--tc, var(--ui-neutro-fg)); background: color-mix(in srgb, var(--tc, var(--ui-neutro-fg)) 12%, var(--ui-card)); }
+.ui-vuoto-figura::before { content: ""; position: absolute; inset: -9px; border-radius: 50%; border: 2px dotted color-mix(in srgb, var(--tc, var(--ui-neutro-fg)) 35%, transparent); }
+.ui-vuoto h2, .ui-vuoto h3 { font-size: 1.1rem; font-weight: 700; color: var(--ui-testo); margin: 0 0 .35rem; }
+.ui-vuoto p { margin: 0 auto; max-width: 36rem; font-size: .92rem; }
+.ui-vuoto .btn { margin-top: 1rem; }
+
+/* ---- Tema scuro: solo le pagine che lo prevedono ------------------------------ */
+html[data-tema="scuro"] {
+    color-scheme: dark;
+}
+html[data-tema="scuro"] body.ui-scuro-ok {
+    --ui-testo: #e2e8f0; --ui-testo-2: #9fb0c6; --ui-bordo: #334155; --ui-card: #1e293b; --ui-lieve: #162033; --ui-ombra: rgba(0, 0, 0, .35);
+    --ui-ok-bg: #14532d;     --ui-ok-fg: #bbf7d0;
+    --ui-attesa-bg: #78350f; --ui-attesa-fg: #fde68a;
+    --ui-azione-bg: #7f1d1d; --ui-azione-fg: #fecaca;
+    --ui-info-bg: #1e3a8a;   --ui-info-fg: #bfdbfe;
+    --ui-neutro-bg: #334155; --ui-neutro-fg: #cbd5e1;
+    --ui-rosso-testo: #ff9a9a;
+    background-color: #0f172a !important; color: var(--ui-testo);
+}
+html[data-tema="scuro"] body.ui-scuro-ok main, html[data-tema="scuro"] body.ui-scuro-ok #main-content { background: transparent !important; }
+html[data-tema="scuro"] body.ui-scuro-ok .card, html[data-tema="scuro"] body.ui-scuro-ok .modal-content, html[data-tema="scuro"] body.ui-scuro-ok .list-group-item,
+html[data-tema="scuro"] body.ui-scuro-ok .dropdown-menu { background-color: var(--ui-card) !important; color: var(--ui-testo); border-color: var(--ui-bordo) !important; }
+html[data-tema="scuro"] body.ui-scuro-ok .card-header, html[data-tema="scuro"] body.ui-scuro-ok .modal-footer, html[data-tema="scuro"] body.ui-scuro-ok .bg-light,
+html[data-tema="scuro"] body.ui-scuro-ok .alert-light { background-color: var(--ui-lieve) !important; color: var(--ui-testo) !important; border-color: var(--ui-bordo) !important; }
+html[data-tema="scuro"] body.ui-scuro-ok .bg-white { background-color: var(--ui-card) !important; }
+html[data-tema="scuro"] body.ui-scuro-ok .text-dark, html[data-tema="scuro"] body.ui-scuro-ok h1, html[data-tema="scuro"] body.ui-scuro-ok h2, html[data-tema="scuro"] body.ui-scuro-ok h3,
+html[data-tema="scuro"] body.ui-scuro-ok h4, html[data-tema="scuro"] body.ui-scuro-ok h5, html[data-tema="scuro"] body.ui-scuro-ok h6 { color: var(--ui-testo) !important; }
+html[data-tema="scuro"] body.ui-scuro-ok .text-secondary, html[data-tema="scuro"] body.ui-scuro-ok .text-muted { color: var(--ui-testo-2) !important; }
+html[data-tema="scuro"] body.ui-scuro-ok .border, html[data-tema="scuro"] body.ui-scuro-ok .border-bottom, html[data-tema="scuro"] body.ui-scuro-ok .border-top { border-color: var(--ui-bordo) !important; }
+html[data-tema="scuro"] body.ui-scuro-ok .form-control, html[data-tema="scuro"] body.ui-scuro-ok .form-select, html[data-tema="scuro"] body.ui-scuro-ok textarea,
+html[data-tema="scuro"] body.ui-scuro-ok input:not([type=checkbox]):not([type=radio]):not([type=hidden]) { background-color: #0f172a; color: var(--ui-testo); border-color: var(--ui-bordo); }
+html[data-tema="scuro"] body.ui-scuro-ok .nav-pills.bg-light { background-color: var(--ui-lieve) !important; }
+html[data-tema="scuro"] body.ui-scuro-ok .custom-tabs .nav-link { color: var(--ui-testo-2); }
+html[data-tema="scuro"] body.ui-scuro-ok .custom-tabs .nav-link:hover { background: var(--ui-card); color: #fff; }
+html[data-tema="scuro"] body.ui-scuro-ok .table { color: var(--ui-testo); --bs-table-bg: transparent; border-color: var(--ui-bordo); }
+html[data-tema="scuro"] body.ui-scuro-ok a:not(.btn):not(.nav-link):not(.ui-tessera-titolo):not(.dropdown-item) { color: #7cb7ff; }
+html[data-tema="scuro"] body.ui-scuro-ok .btn-outline-secondary { color: var(--ui-testo); border-color: #64748b; }
+html[data-tema="scuro"] body.ui-scuro-ok .btn-outline-secondary:hover { background: #334155; color: #fff; }
+html[data-tema="scuro"] body.ui-scuro-ok .btn-close { filter: invert(1); }
+html[data-tema="scuro"] body.ui-scuro-ok [style*="background:#f8fafc"], html[data-tema="scuro"] body.ui-scuro-ok [style*="background: #f8fafc"] { background: var(--ui-lieve) !important; }
+
+/* interruttore del tema */
+.ui-tema-btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--ui-bordo); background: var(--ui-card); color: var(--ui-testo); border-radius: 999px; padding: 4px 12px; font-size: .82rem; font-weight: 600; cursor: pointer; }
+.ui-tema-btn:hover { border-color: var(--ui-rosso); }
+.ui-tema-btn[hidden] { display: none; }

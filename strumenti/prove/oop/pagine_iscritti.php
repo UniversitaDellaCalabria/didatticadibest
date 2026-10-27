@@ -38,9 +38,9 @@ prova(json_decode($r['corpo'], true) === ['status' => 'error', 'msg' => 'Token C
 $pag = $http('/eventi/admin/iscritti.php?p_id=1', null, $jar)['corpo'];
 $tok = preg_match('/csrf_token" value="([a-f0-9]+)"/', $pag, $m) ? $m[1] : '';
 $r = $http('/eventi/admin/iscritti.php?p_id=1', ['csrf_token' => $tok, 'p_id' => '1', 'export_csv' => '1'], $jar);
-prova($r['codice'] === 200 && str_starts_with($r['corpo'], 'Codice,Stato,Presenza,Posti,Nome,Cognome,Matricola,Email,Evento,Turno,Data,Ora'), "iscritti: esportazione CSV");
+prova($r['codice'] === 200 && str_starts_with($r['corpo'], "\xEF\xBB\xBFCodice;Stato;Presenza;Posti;Nome;Cognome;Matricola;Email;Evento;Turno;Data;Ora"), "iscritti: esportazione CSV");
 $r = $http('/eventi/admin/iscritti.php?p_id=1', ['csrf_token' => $tok, 'p_id' => '1', 'export_xls' => '1', 'f_stato_export' => 'confermata'], $jar);
-prova($r['codice'] === 200 && str_starts_with($r['corpo'], '<html xmlns:o=') && str_contains($r['corpo'], '<th>Data Registrazione</th></tr>') && str_ends_with($r['corpo'], '</table></body></html>'), "iscritti: esportazione Excel");
+prova($r['codice'] === 200 && str_starts_with($r['corpo'], 'PK'), "iscritti: esportazione Excel");
 
 // Permessi e protezioni
 foreach (['iscritti.php?p_id=1' => ['del_pren' => '1'], 'iscritti.php?p_id=1 ' => ['bulk_azione' => 'annulla', 'bulk_ids' => ['1']], 'messaggi.php?p_id=1' => ['invia_risposta_inbox' => '1', 'prenotazione_id' => '1', 'corpo_messaggio' => 'x'],

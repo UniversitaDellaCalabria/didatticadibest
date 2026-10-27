@@ -443,7 +443,7 @@ consumaToken($t, $sedutaId)    // vale una sola volta, per quel verbale''')
 
     # 13b ----------------------------------------------------------------------------------------------
     S.append(('area', 'Area personale per profilo', sezione('area', '13b', 'Area personale per profilo',
-        'L\'area personale mostra i riquadri giusti a chi ha accesso: studente, docente, direttore, personale e uffici, gestore, amministratore, esterno (una persona può averne più d\'uno). I riquadri e il loro ordine li sceglie l\'amministratore da pannello (<em>Sito › Area personale</em>). Schema v93–v94. L\'area è un cruscotto a tessere: ogni tessera è un argomento con le novità in evidenza e porta alla pagina specifica.',
+        'L\'area personale mostra i riquadri giusti a chi ha accesso: studente, docente, direttore, personale e uffici, gestore, amministratore, esterno (una persona può averne più d\'uno). I riquadri e il loro ordine li sceglie l\'amministratore da pannello (<em>Sito › Area personale</em>). Schema v93–v95. L\'area è un cruscotto a tessere: ogni tessera è un argomento con le novità in evidenza e porta alla pagina specifica.',
         '<h3>Dati</h3>'
         + tab(['Tabella', 'Contenuto'], [
             ['<code>area_riquadri</code>', 'un riquadro per riga: <code>chiave</code> (vuota per quelli scritti dall\'amministratore, unica per quelli di sistema), titolo, testo, icona, colore, fino a due pulsanti, <code>profili</code> (elenco separato da virgole), <code>ordine</code>, <code>attivo</code>. I riquadri di sistema mancanti si seminano alla migrazione; quelli già presenti (anche spenti o cambiati) non si toccano'],
@@ -466,6 +466,35 @@ consumaToken($t, $sedutaId)    // vale una sola volta, per quel verbale''')
         ])
         + '<h3>Regole</h3><p>I tirocini non si gestiscono nel portale ma sulla piattaforma TSP 2.0: nell\'area personale c\'è solo la scheda con la guida (<code>percorso_tirocini.php</code>) e il collegamento. I pagamenti del tutorato sono spenti (riquadro «Ufficio pagamenti del tutorato» spento, e le tappe dei pagamenti spariscono da «Il mio tutorato»): si riaccendono dal pannello.</p>'
         + '<h3>Prove</h3><p><code>strumenti/prove/oop/area_personale.php</code> (profili, catalogo, archivio, pannello, file dei riquadri).</p>'
+    )))
+
+    # 13c ----------------------------------------------------------------------------------------------
+    S.append(('area', 'Calendario, ricerca, stile comune', sezione('area', '13c', 'Calendario personale, ricerca unica, stile comune',
+        'Quattro pezzi comuni a tutto il portale: il <b>calendario personale</b> (eventi, aule, ricevimenti, scadenze con il file .ics e l\'abbonamento del telefono), il <b>riepilogo settimanale con l\'agenda</b> (lo accende l\'amministratore), la <b>ricerca unica</b> raggruppata e la <b>libreria di stile</b> (stati, stati vuoti, tema scuro). Schema v95.',
+        '<h3>Dati</h3>'
+        + tab(['Tabella / colonna', 'Contenuto'], [
+            ['<code>calendario_token</code>', 'il codice segreto di ogni persona (40 caratteri) con cui il telefono legge <code>calendario_ics.php?t=…</code>; si rigenera dalla pagina e il vecchio link smette di funzionare'],
+            ['<code>impostazioni_sistema.riepilogo_agenda*</code>', 'interruttore del riepilogo con l\'agenda (spento di partenza), chi e quando lo ha acceso'],
+        ])
+        + '<h3>Classi (<code>src/Portale/</code>)</h3>'
+        + tab(['Classe', 'Compito'], [
+            ['<code>CalendarioPersonale</code>', '<code>voci()</code>: eventi prenotati (e lista d\'attesa), aule e laboratori, ricevimento di chi ha uno sportello, scadenze (posto da confermare), in ordine di tempo; <code>ics()</code>; il token di abbonamento; <code>emailConAgenda()</code> per il riepilogo'],
+            ['<code>RiepilogoAgenda</code>', 'l\'interruttore (Gestione del portale → Email e promemoria): da acceso, <code>RiepilogoPersone</code> aggiunge l\'agenda dei sette giorni all\'email «Da fare per te» e la manda anche a chi ha solo qualcosa in agenda (testo «La tua settimana», modello <code>riepilogo_agenda</code>)'],
+            ['<code>RicercaGlobale</code>', 'eventi e progetti, notizie e pagine (<code>ComunicazioniRepository::cerca</code>), guide «Come si fa», docenti, risposte di Didacticus (le riservate solo dopo l\'accesso); ogni parola deve comparire; estratto senza HTML'],
+        ])
+        + '<h3>Pagine e file</h3>'
+        + tab(['File', 'Ruolo'], [
+            ['<code>calendario.php</code>', 'il calendario dei prossimi 90 giorni a giorni, con filtri per tipo, il file .ics, il link di abbonamento (webcal, Google Calendar) e «Nuovo link»'],
+            ['<code>calendario_ics.php</code>', 'il file .ics: scaricato da chi ha fatto l\'accesso oppure letto dal telefono con <code>?t=</code> (404 se il codice è sbagliato)'],
+            ['<code>ricerca.php</code>', 'la ricerca unica: gruppi con collegamenti rapidi, stato vuoto con il pulsante per Didacticus'],
+            ['<code>assets/css/portale-ui.css</code> · <code>inc/ui.php</code>', 'stile comune: i cinque colori degli stati (anche per i badge di Bootstrap), tessere, testata, numeri, stato vuoto, tema scuro (<code>html[data-tema="scuro"]</code> sulle pagine con <code>body.ui-scuro-ok</code>, scelta in <code>localStorage</code> <code>tema_dibest</code>); funzioni <code>ui_stato</code>, <code>ui_vuoto</code>, <code>ui_intestazione</code>, <code>ui_tema_script</code>, <code>ui_tema_pulsante</code>'],
+            ['<code>manifest.json</code> · <code>sw.js</code> · <code>footer.php</code>', 'app installabile: scorciatoie (area personale, calendario, eventi, cerca), icone «any» e «maskable», pulsante «Installa l\'app» (<code>beforeinstallprompt</code>; su iPhone/iPad spiega «Aggiungi alla schermata Home»)'],
+        ])
+        + '<h3>Regole</h3><p>La testata del sito (banner e menu) non cambia. Il tema scuro vale solo per l\'area personale e le sue pagine (cruscotto, eventi, profilo, tutorato, calendario). Il riepilogo con l\'agenda è spento finché l\'amministratore non lo accende; chi riceve l\'email può disiscriversi dal link (lo stesso del riepilogo «Da fare per te»).</p>'
+        + gal(fig('map_calendario', '<b>Calendario personale</b> · <code>calendario.php</code> → <code>CalendarioPersonale</code>, <code>calendario_ics.php</code>.'),
+              fig('map_pub_ricerca_gruppi', '<b>Ricerca unica</b> · <code>ricerca.php</code> → <code>RicercaGlobale</code>.'),
+              fig('map_area_studente_scuro', '<b>Tema scuro</b> · <code>assets/css/portale-ui.css</code>, <code>html[data-tema="scuro"]</code>.'))
+        + '<h3>Prove</h3><p><code>strumenti/prove/oop/calendario.php</code> e <code>pagine_calendario.php</code> (voci, .ics, abbonamento, riepilogo, ricerca, libreria di stile, pagine, manifest).</p>'
     )))
 
     # 14 -----------------------------------------------------------------------------------------------

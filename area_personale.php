@@ -34,26 +34,8 @@ try {
 require_once __DIR__ . '/inc/area/_tessera.php';
 $page_cfg['titolo'] = 'Area personale';
 require_once 'header.php';
+echo ui_tema_script();
 ?>
-
-<style>
-    .area-testata { display: flex; align-items: center; gap: 18px; padding: 20px 22px; background: #fff; border: 1px solid #e8ebf0; border-top: 4px solid #B30000; border-radius: 14px; box-shadow: 0 2px 10px rgba(15,23,42,.05); }
-    .area-avatar { flex: 0 0 64px; width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #fdecec; color: #B30000; font-weight: 700; font-size: 1.4rem; letter-spacing: .02em; }
-    .area-etichetta { font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #B30000; }
-    .area-nome { font-size: 1.55rem; font-weight: 700; margin: 0; color: #1e293b; overflow-wrap: anywhere; }
-    .area-profilo { display: inline-flex; align-items: center; font-size: .8rem; font-weight: 600; padding: 3px 12px; border-radius: 999px; background: #f1f5f9; color: #334155; border: 1px solid #e2e8f0; }
-    @media (max-width: 575px) { .area-testata { flex-direction: column; text-align: center; } .area-testata .d-flex { justify-content: center; } }
-
-    .area-tessera { position: relative; display: flex; gap: 14px; align-items: flex-start; height: 100%; padding: 16px; background: #fff; border: 1px solid #e8ebf0; border-radius: 14px; box-shadow: 0 1px 6px rgba(15,23,42,.04); transition: box-shadow .15s, transform .15s, border-color .15s; }
-    .area-tessera:hover { box-shadow: 0 6px 18px rgba(15,23,42,.10); transform: translateY(-1px); border-color: var(--tc); }
-    .area-tessera.ha-novita { border-color: #f0b4b4; }
-    .area-tessera-icona { flex: 0 0 46px; width: 46px; height: 46px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem; color: var(--tc); background: color-mix(in srgb, var(--tc) 12%, #fff); }
-    .area-tessera-corpo { min-width: 0; }
-    .area-tessera-titolo { font-weight: 700; color: #1e293b; text-decoration: none; font-size: 1rem; }
-    .area-tessera-testo { font-size: .85rem; color: #64748b; margin-top: 2px; overflow-wrap: anywhere; }
-    .area-novita { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; padding: 2px 10px; border-radius: 999px; background: #B30000; color: #fff; font-size: .75rem; font-weight: 700; }
-    .area-tessera-extra { position: relative; z-index: 2; }
-</style>
 
 <div class="container my-4" style="max-width: 1040px;">
 
@@ -65,11 +47,11 @@ require_once 'header.php';
     $matr_ap = (string)($user_info['matricola_studente'] ?: ($user_info['matricola_dipendente'] ?? ''));
     $iniziali_ap = mb_strtoupper(mb_substr((string)$user_info['nome'], 0, 1) . mb_substr((string)$user_info['cognome'], 0, 1));
     ?>
-    <div class="area-testata mb-4">
-        <div class="area-avatar" aria-hidden="true"><?php echo htmlspecialchars($iniziali_ap !== '' ? $iniziali_ap : '?'); ?></div>
+    <div class="ui-testata mb-4">
+        <div class="ui-avatar" aria-hidden="true"><?php echo htmlspecialchars($iniziali_ap !== '' ? $iniziali_ap : '?'); ?></div>
         <div class="flex-grow-1" style="min-width:0;">
-            <div class="area-etichetta">Area personale</div>
-            <h1 class="area-nome"><?php echo htmlspecialchars($user_info['nome'] . ' ' . $user_info['cognome']); ?></h1>
+            <div class="ui-etichetta">Area personale</div>
+            <h1 class="ui-nome"><?php echo htmlspecialchars($user_info['nome'] . ' ' . $user_info['cognome']); ?></h1>
             <?php if ($voci_ap || $matr_ap !== ''): ?>
                 <div class="small text-secondary mt-1">
                     <?php if ($voci_ap): ?><i class="fa fa-address-book me-1" aria-hidden="true"></i><?php echo htmlspecialchars(implode(' · ', $voci_ap)); ?><?php endif; ?>
@@ -78,10 +60,11 @@ require_once 'header.php';
             <?php endif; ?>
             <div class="d-flex flex-wrap gap-2 mt-2" aria-label="I tuoi profili">
                 <?php foreach ($profili_mostrati as $p_h): ?>
-                    <span class="area-profilo"><i class="fa <?php echo \App\Portale\Area\Profili::ICONE[$p_h]; ?> me-1" aria-hidden="true"></i><?php echo htmlspecialchars(\App\Portale\Area\Profili::NOMI[$p_h]); ?></span>
+                    <span class="ui-chip"><i class="fa <?php echo \App\Portale\Area\Profili::ICONE[$p_h]; ?> me-1" aria-hidden="true"></i><?php echo htmlspecialchars(\App\Portale\Area\Profili::NOMI[$p_h]); ?></span>
                 <?php endforeach; ?>
             </div>
         </div>
+        <div class="align-self-start d-print-none d-flex flex-column gap-2 align-items-end"><?php echo ui_tema_pulsante(); ?><button type="button" class="ui-tema-btn" data-installa-app hidden onclick="installaApp()"><i class="fa fa-mobile-screen" aria-hidden="true"></i><span>Installa l'app</span></button></div>
     </div>
 
     <?php if ($vedi_come !== null): ?>

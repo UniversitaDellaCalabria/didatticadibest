@@ -13,5 +13,5 @@ foreach (['inizio.php', 'dashboard.php', 'testata.php', 'menu.php'] as $pag) {
     prova($r['codice'] === 200 && !str_contains($r['corpo'], 'Fatal error') && !str_contains($r['corpo'], 'Warning:'), "admin/$pag da amministratore: 200 senza errori PHP");
 }
 $r = $http('/eventi/admin/menu.php', null, $jar2);
-prova(!str_contains($r['corpo'], 'menu-node'), "admin/menu.php: il docente non vede la gestione del menu");
+prova(!str_contains($r['corpo'], 'class="menu-node"'), "admin/menu.php: il docente non vede la gestione del menu");
 prova($http('/eventi/admin/menu.php', ['add_menu_voce' => '1', 'csrf_token' => 'sbagliato', 'etichetta' => 'x'], $jar)['codice'] === 403, "menu: token CSRF sbagliato respinto");

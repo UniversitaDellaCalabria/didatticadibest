@@ -51,11 +51,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['aggiorna_scheda_atene
 
 $page_cfg['titolo'] = 'Il mio profilo';
 require_once 'header.php';
+echo ui_tema_script();
 ?>
 
 <div class="container my-4" style="max-width: 900px;">
-    <nav aria-label="Percorso" class="mb-3 small"><a href="area_personale.php"><i class="fa fa-arrow-left me-1" aria-hidden="true"></i>Area personale</a></nav>
-    <h1 class="fw-bold h3 mb-3">Il mio profilo</h1>
+    <div class="d-flex flex-wrap align-items-start justify-content-between gap-2">
+        <?php echo ui_intestazione('Il mio profilo'); ?>
+        <div class="d-print-none"><?php echo ui_tema_pulsante(); ?></div>
+    </div>
 
     <?php
     if (isset($_SESSION['msg_area_pers'])) {

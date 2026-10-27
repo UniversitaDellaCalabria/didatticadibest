@@ -9,7 +9,7 @@ prova(str_contains(impagina_email('<p>Ciao</p>', 'Titolo', '#112233'), '#112233'
 
 // Widget della home
 $w = get_widgets_home(['widgets_home' => json_encode(['slideshow' => 0, 'aree_colonne' => 7, 'eventi_num' => 12, 'ordine' => ['statistiche', 'x']])]);
-prova($w['slideshow'] === 0 && $w['aree_colonne'] === 2 && $w['eventi_num'] === 12 && end($w['ordine']) === 'statistiche' && count($w['ordine']) === 10, "get_widgets_home(): valori non validi riportati ai predefiniti, ordine completo");
+prova($w['slideshow'] === 0 && $w['aree_colonne'] === 2 && $w['eventi_num'] === 12 && end($w['ordine']) === 'statistiche' && count($w['ordine']) === count(\App\Portale\WidgetHome::predefiniti()['ordine']), "get_widgets_home(): valori non validi riportati ai predefiniti, ordine completo");
 prova(widgets_home_default()['eventi_layout'] === 'scroll' && get_widgets_home(null) === get_widgets_home([]), "widgets_home_default() e configurazione assente");
 
 // Configurazione del portale con cache su file

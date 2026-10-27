@@ -43,7 +43,10 @@ def costruisci():
         )
         + gal(fig('map_area_studente', '<b>Area personale dello studente.</b> Prenotazioni, pratiche, attestati e le cose da fare.'),
               fig('map_area_docente', '<b>Area personale del docente.</b> In più le conferme da dare, le risorse di cui si occupa e il «Da fare per te».'))
+        + gal(fig('map_area_studente_scuro', '<b>Tema scuro.</b> Con un pulsante l\'area personale cambia colori; il portale ricorda la scelta.'),
+              fig('map_miei_eventi', '<b>Eventi, attestati e sondaggi.</b> Prenotazioni, storico, attestati e scanner QR in una pagina.'))
         + fig('map_profilo', '<b>Il profilo.</b> I dati arrivano dal login di Ateneo; si può aggiungere un\'email personale.')
+        + fig('map_calendario', '<b>Il mio calendario.</b> Eventi, aule, ricevimenti e scadenze in un posto solo, con il file .ics e il link per abbonare il telefono.')
     )))
 
     # 4 ----------------------------------------------------------------------------------------------
@@ -52,6 +55,7 @@ def costruisci():
         gal(fig('map_pub_agenda', '<b>L\'agenda unica.</b> Eventi e seminari con filtri per ambito, ricerca e calendario da aggiungere a Google o Outlook.'),
             fig('map_pub_orientamento', '<b>La vetrina dell\'Orientamento.</b> Per i futuri studenti e per le scuole.'),
             fig('map_pub_ricerca', '<b>La ricerca.</b> Trova eventi, attività e aule per parola.'),
+            fig('map_pub_ricerca_gruppi', '<b>La ricerca unica.</b> Eventi, notizie, guide, docenti e risposte di Didacticus, raggruppati.'),
             fig('map_pub_avvisi', '<b>Gli avvisi per email.</b> Ci si iscrive per argomento e si riceve un riepilogo dei nuovi eventi.'))
         + '<p>Ogni area ha il suo colore e il suo aspetto, scelto da chi la gestisce (griglia, lista, calendario, timeline, agenda, gruppi, progetti). Le pagine sono pensate anche per il telefono e rispettano le regole di accessibilità.</p>'    )))
 
@@ -324,7 +328,7 @@ def costruisci():
         + '<h3>Sistema e controlli</h3>'
         + fig('map_adm_portale_home', '<b>Gestione del portale:</b> in alto i controlli da guardare (controlli del sito, email non partite, persone non più in anagrafe, Direttore), poi tutte le sezioni.')
         + gal(fig('map_adm_sistema', '<b>Email e controlli:</b> invio, backup, controllo notturno del sito.'),
-              fig('map_adm_sistema_promemoria', '<b>Promemoria:</b> si possono sospendere per Direttore e uffici durante l\'avvio, e riattivare.'),
+              fig('map_adm_sistema_promemoria', '<b>Promemoria e riepilogo con l\'agenda:</b> i promemoria si sospendono per Direttore e uffici; il riepilogo settimanale con l\'agenda parte spento e lo accende l\'amministratore.'),
               fig('map_adm_audit', '<b>Il registro operazioni</b>: chi ha fatto cosa e quando.'))
     )))
 

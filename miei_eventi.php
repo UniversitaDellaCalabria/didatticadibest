@@ -190,22 +190,13 @@ $mie_risorse = \App\Core\App::get(\App\Iscrizioni\AreaPersonaleRepository::class
 
 $page_cfg['titolo'] = 'Eventi, attestati e sondaggi';
 require_once 'header.php';
+echo ui_tema_script();
 ?>
 
 <style>
     .custom-tabs .nav-link { color: #475569; transition: all 0.2s ease; }
     .custom-tabs .nav-link:hover { color: #0d6efd; background-color: #f8f9fa; }
     .custom-tabs .nav-link.active { background-color: #0d6efd !important; color: #ffffff !important; }
-    .area-testata { display: flex; align-items: center; gap: 18px; padding: 20px 22px; background: #fff; border: 1px solid #e8ebf0; border-top: 4px solid #B30000; border-radius: 14px; box-shadow: 0 2px 10px rgba(15,23,42,.05); }
-    .area-avatar { flex: 0 0 64px; width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: #fdecec; color: #B30000; font-weight: 700; font-size: 1.4rem; letter-spacing: .02em; }
-    .area-etichetta { font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #B30000; }
-    .area-nome { font-size: 1.55rem; font-weight: 700; margin: 0; color: #1e293b; overflow-wrap: anywhere; }
-    .area-profilo { display: inline-flex; align-items: center; font-size: .8rem; font-weight: 600; padding: 3px 12px; border-radius: 999px; background: #f1f5f9; color: #334155; border: 1px solid #e2e8f0; }
-    .area-numeri { display: flex; flex-wrap: wrap; align-items: stretch; gap: 12px; margin-bottom: 20px; }
-    .area-numero { flex: 1 1 110px; text-align: center; padding: 12px 10px; background: #f8fafc; border: 1px solid #e8ebf0; border-radius: 12px; }
-    .area-numero .val { font-size: 1.7rem; font-weight: 700; line-height: 1; color: #1e293b; }
-    .area-numero .lbl { font-size: .7rem; color: #64748b; text-transform: uppercase; letter-spacing: .05em; margin-top: 4px; }
-    @media (max-width: 575px) { .area-testata { flex-direction: column; text-align: center; } .area-testata .d-flex { justify-content: center; } }
     .countdown-badge { font-size: 0.7rem; font-weight: 600; padding: 3px 10px; border-radius: 20px; letter-spacing: .02em; }
     .card-evento-attivo { border-radius: 12px; border: none; border-left: 5px solid #dee2e6; }
     .card-evento-passato { border-radius: 12px; border: none; border-left: 5px solid #dee2e6; opacity: .92; }
@@ -215,8 +206,10 @@ require_once 'header.php';
 </style>
 
 <div class="container my-4" style="max-width: 900px;">
-    <nav aria-label="Percorso" class="mb-3 small"><a href="area_personale.php"><i class="fa fa-arrow-left me-1" aria-hidden="true"></i>Area personale</a></nav>
-    <h1 class="fw-bold h3 mb-3">Eventi, attestati e sondaggi</h1>
+    <div class="d-flex flex-wrap align-items-start justify-content-between gap-2">
+        <?php echo ui_intestazione('Eventi, attestati e sondaggi'); ?>
+        <div class="d-print-none"><?php echo ui_tema_pulsante(); ?></div>
+    </div>
 
     <?php
     if (isset($_SESSION['msg_area_pers'])) {
@@ -249,11 +242,11 @@ require_once 'header.php';
     <?php endif; ?>
 
     <!-- NUMERI E SCANNER: solo nella parte degli eventi -->
-    <div class="area-numeri">
-        <div class="area-numero"><div class="val"><?php echo count($prenotazioni_attive); ?></div><div class="lbl">Prossimi</div></div>
-        <div class="area-numero"><div class="val"><?php echo $stat_presenze; ?></div><div class="lbl">Presenze</div></div>
-        <div class="area-numero"><div class="val"><?php echo $stat_attestati; ?></div><div class="lbl">Attestati</div></div>
-        <a href="scanner_studente.php" class="area-numero text-decoration-none d-flex flex-column justify-content-center" style="flex-basis:220px;background:#B30000;border-color:#B30000;color:#fff;">
+    <div class="ui-numeri">
+        <div class="ui-numero"><div class="val"><?php echo count($prenotazioni_attive); ?></div><div class="lbl">Prossimi</div></div>
+        <div class="ui-numero"><div class="val"><?php echo $stat_presenze; ?></div><div class="lbl">Presenze</div></div>
+        <div class="ui-numero"><div class="val"><?php echo $stat_attestati; ?></div><div class="lbl">Attestati</div></div>
+        <a href="scanner_studente.php" class="ui-numero text-decoration-none d-flex flex-column justify-content-center" style="flex-basis:220px;background:#B30000;border-color:#B30000;color:#fff;">
             <span class="fw-bold"><i class="fa fa-camera me-2" aria-hidden="true"></i>Registra presenza</span>
             <span class="small" style="opacity:.85;">Inquadra il QR Code in aula</span>
         </a>
@@ -294,12 +287,7 @@ require_once 'header.php';
         <!-- TAB 1: PRENOTAZIONI ATTIVE -->
         <div class="tab-pane fade show active" id="pills-attive" role="tabpanel" tabindex="0">
             <?php if (empty($prenotazioni_attive)): ?>
-                <div class="alert alert-light text-center border p-5 shadow-sm rounded-4 text-muted">
-                    <i class="fa fa-ticket-alt fs-1 d-block mb-3 opacity-50"></i>
-                    <h5 class="fw-bold">Nessuna prenotazione futura</h5>
-                    <p class="m-0">Non hai ancora prenotato eventi imminenti. Visita la Home per scoprire i prossimi appuntamenti.</p>
-                    <a href="index.php" class="btn btn-primary fw-bold mt-3 px-4 shadow-sm rounded-pill">Sfoglia Eventi</a>
-                </div>
+                <?php echo ui_vuoto('fa-ticket-alt', 'Nessuna prenotazione futura', 'Non hai ancora prenotato eventi imminenti. Guarda i prossimi appuntamenti nella home.', 'index.php', 'Sfoglia gli eventi', '#0d6efd'); ?>
             <?php else: ?>
                 <div class="d-flex flex-column gap-3">
                     <?php foreach ($prenotazioni_attive as $pr): ?>
@@ -549,11 +537,7 @@ require_once 'header.php';
         <!-- TAB 2: STORICO E ATTESTATI -->
         <div class="tab-pane fade" id="pills-passate" role="tabpanel" tabindex="0">
             <?php if (empty($prenotazioni_passate)): ?>
-                <div class="alert alert-light text-center border p-5 shadow-sm rounded-4 text-muted">
-                    <i class="fa fa-history fs-1 d-block mb-3 opacity-50"></i>
-                    <h5 class="fw-bold">Nessun evento passato</h5>
-                    <p class="m-0">Il tuo storico delle attività è vuoto.</p>
-                </div>
+                <?php echo ui_vuoto('fa-history', 'Nessun evento passato', 'Qui compariranno gli eventi a cui hai partecipato, con presenze e attestati.', 'index.php', 'Vai agli eventi', '#7c3aed'); ?>
             <?php else: ?>
                 <div class="d-flex flex-column gap-3">
                     <?php foreach ($prenotazioni_passate as $pr): ?>
@@ -678,11 +662,7 @@ require_once 'header.php';
             ?>
 
             <?php if ($sondaggi_disponibili === 0): ?>
-                <div class="alert alert-light text-center border p-5 shadow-sm rounded-4 text-muted">
-                    <i class="fa fa-poll-h fs-1 d-block mb-3 opacity-50"></i>
-                    <h5 class="fw-bold">Nessun sondaggio attivo</h5>
-                    <p class="m-0">Non ci sono questionari da compilare al momento per gli eventi a cui hai partecipato (oppure li hai già completati tutti).</p>
-                </div>
+                <?php echo ui_vuoto('fa-poll-h', 'Nessun sondaggio da compilare', 'Non ci sono questionari aperti per gli eventi a cui hai partecipato (oppure li hai già compilati tutti). Grazie!', '', '', '#0891b2'); ?>
             <?php else: ?>
                 <div class="d-flex flex-column gap-3">
                     <div class="alert alert-info border-0 border-start border-5 border-info shadow-sm mb-2">
@@ -780,11 +760,7 @@ require_once 'header.php';
         <!-- TAB: AULE, LABORATORI E APPUNTAMENTI PRENOTATI -->
         <div class="tab-pane fade" id="pills-aule" role="tabpanel" tabindex="0">
             <?php if (!$mie_risorse): ?>
-                <div class="alert alert-light text-center border p-5 shadow-sm rounded-4 text-muted">
-                    <i class="fa fa-door-open fs-1 d-block mb-3 opacity-50"></i>
-                    <h5 class="fw-bold">Nessuna prenotazione di aule o laboratori</h5>
-                    <p class="m-0">Le prenotazioni di aule, laboratori e appuntamenti compaiono qui, con la possibilità di annullarle.</p>
-                </div>
+                <?php echo ui_vuoto('fa-door-open', 'Nessuna prenotazione di aule o laboratori', 'Le prenotazioni di aule, laboratori e appuntamenti compaiono qui, con la possibilità di annullarle.', 'index.php', 'Vai al calendario delle risorse', '#0d9488'); ?>
             <?php else: ?>
             <div class="card border-0 shadow-sm" style="border-radius: 12px;"><div class="card-body">
                 <ul class="list-unstyled mb-0 small">

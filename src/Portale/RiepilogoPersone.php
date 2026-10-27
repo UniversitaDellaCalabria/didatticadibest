@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Portale;
 
+use App\Auth\UtenteRepository;
+use App\Risorse\Costanti;
 use App\Uffici\Direzione;
 use App\Core\Database;
 use App\Core\Orologio;
@@ -16,6 +18,8 @@ use App\Sistema\FileEnv;
  * attestati, firme, registri del tutorato, schede FSL, elenchi degli studenti, prenotazioni da approvare, verbali, pratiche da lavorare); il Direttore ci trova
  * anche il suo cruscotto. Non parte se non c'è nulla da fare. Ogni email ha il link per non riceverlo più (e per riattivarlo). Si spegne del tutto con
  * RIEPILOGO_PERSONE=0 nel file .env. Si manda al massimo una volta per settimana di calendario e solo dal lunedì al venerdì, dalle 7.
+ * Se l'amministratore accende «il riepilogo con l'agenda» (RiepilogoAgenda, spento di partenza) l'email porta anche i sette giorni a venire (eventi, aule,
+ * ricevimenti, scadenze: CalendarioPersonale) e arriva pure a chi ha qualcosa in agenda ma nulla da fare, studenti compresi.
  */
 final class RiepilogoPersone
 {
@@ -31,7 +35,10 @@ final class RiepilogoPersone
         private Orologio $orologio,
         private FileEnv $env,
         private Direzione $direzione,
-        private SospensionePromemoria $sospensione
+        private SospensionePromemoria $sospensione,
+        private CalendarioPersonale $calendario,
+        private RiepilogoAgenda $agenda,
+        private UtenteRepository $utenti
     ) {
     }
 
@@ -86,7 +93,8 @@ final class RiepilogoPersone
         }
         $n = DaFarePersona::totale($gruppi);
         $nCru = DaFarePersona::totale($cru);
-        if ($n + $nCru === 0) {
+        $voci = $this->agenda->attivo() ? $this->vociDellaSettimana($email) : [];
+        if ($n + $nCru === 0 && !$voci) {
             return null;
         }
         $h = static fn ($s): string => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
@@ -104,7 +112,7 @@ final class RiepilogoPersone
 
             return $o . '</ul>';
         };
-        $elenco = '';
+        $elenco = $voci ? $this->bloccoAgenda($voci, $base) : '';
         foreach ($gruppi as $g) {
             $elenco .= $blocco($g);
         }
@@ -114,15 +122,61 @@ final class RiepilogoPersone
                 $elenco .= $blocco($g);
             }
         }
+        $disiscrizione = '<p style="margin-top:22px;font-size:12px;color:#64748b;">Ricevi questa email una volta a settimana, solo quando c\'è qualcosa da fare' . ($voci ? ' o in agenda' : '') . '. '
+            . '<a href="' . $h($base . '/riepilogo_persone.php?t=' . $token) . '">Non voglio più riceverla</a>.</p>';
+        if ($n + $nCru === 0) {
+            // niente da fare, solo l'agenda (chi la riceve senza essere in nessun elenco di lavoro, come gli studenti)
+            $p = $this->invio->prepara('riepilogo_agenda', [
+                'quante' => count($voci) === 1 ? '1 appuntamento' : count($voci) . ' appuntamenti',
+                'elenco' => $elenco,
+                'disiscrizione' => $disiscrizione,
+            ], $base . '/calendario.php');
+
+            return [$p['oggetto'], $p['corpo']];
+        }
         $p = $this->invio->prepara('riepilogo_persone', [
             'quante' => ($n + $nCru) === 1 ? '1 cosa' : ($n + $nCru) . ' cose',
             'quante_testo' => $n . ($n === 1 ? ' cosa' : ' cose'),
             'elenco' => $elenco,
-            'disiscrizione' => '<p style="margin-top:22px;font-size:12px;color:#64748b;">Ricevi questa email una volta a settimana, solo quando c\'è qualcosa da fare. '
-                . '<a href="' . $h($base . '/riepilogo_persone.php?t=' . $token) . '">Non voglio più riceverla</a>.</p>',
+            'disiscrizione' => $disiscrizione,
         ], $base . '/area_personale.php');
 
         return [$p['oggetto'], $p['corpo']];
+    }
+
+    /**
+     * L'agenda dei sette giorni di chi ha questa email (vuota se non è una persona registrata).
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function vociDellaSettimana(string $email): array
+    {
+        $u = $this->utenti->perEmailOPersona($email, '');
+        $utente = $u ? $this->utenti->perId((int) $u['id']) : null;
+        if (!$utente) {
+            return [];
+        }
+        $oggi = $this->orologio->adesso();
+
+        return $this->calendario->voci($utente, $oggi->format('Y-m-d'), $oggi->modify('+6 days')->format('Y-m-d'));
+    }
+
+    /** @param list<array<string, mixed>> $voci */
+    private function bloccoAgenda(array $voci, string $base): string
+    {
+        $h = static fn ($s): string => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
+        $o = '<h3 style="margin:18px 0 6px;font-size:15px;color:#0d6efd;">Questa settimana in agenda (' . count($voci) . ')</h3><ul style="margin:0;padding-left:18px;">';
+        foreach (array_slice($voci, 0, 10) as $v) {
+            $t = (int) strtotime((string) $v['inizio']);
+            $quando = Costanti::GIORNI[(int) date('N', $t)] . ' ' . date('d/m', $t) . ($v['tutto_giorno'] ? '' : ' ' . date('H:i', $t));
+            $o .= '<li style="margin-bottom:4px;"><a href="' . $h($base . '/' . ltrim((string) $v['link'], '/')) . '">' . $h($v['titolo']) . '</a><br><span style="color:#64748b;font-size:13px;">'
+                . $h($quando . ($v['luogo'] !== '' ? ' · ' . $v['luogo'] : '') . ' · ' . $v['stato_et']) . '</span></li>';
+        }
+        if (count($voci) > 10) {
+            $o .= '<li style="color:#64748b;">… e altri ' . (count($voci) - 10) . '</li>';
+        }
+
+        return $o . '</ul>';
     }
 
     /**
@@ -138,6 +192,9 @@ final class RiepilogoPersone
         $candidati = $this->daFare->candidati();
         if ($dir !== '' && filter_var($dir, FILTER_VALIDATE_EMAIL)) {
             $candidati[] = $dir;
+        }
+        if ($this->agenda->attivo()) {
+            $candidati = array_merge($candidati, $this->calendario->emailConAgenda($adesso->format('Y-m-d'), $adesso->modify('+6 days')->format('Y-m-d')));
         }
         $inviati = 0;
         $saltati = 0;

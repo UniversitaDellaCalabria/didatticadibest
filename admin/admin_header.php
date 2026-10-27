@@ -7,6 +7,7 @@ error_reporting(E_ALL);
 
 require_once '../config.php'; // apre la sessione con i parametri sicuri del cookie
 require_once '../functions.php';
+require_once __DIR__ . '/../inc/ui.php';
 
 // 1. SINCRONIZZAZIONE SSO E CONTROLLO ACCESSO
 sync_sso_user($conn);
@@ -248,6 +249,7 @@ $unread_count = \App\Core\App::get(\App\Iscritti\CasellaMessaggi::class)->nonLet
     <link href="<?php echo url_vendor('datatables/1.13.6/css/dataTables.bootstrap5.min.css'); ?>" rel="stylesheet">
     <link href="<?php echo url_vendor('jsdelivr/npm/select2@4.1.0-rc.0/dist/css/select2.min.css'); ?>" rel="stylesheet" />
     <link rel="stylesheet" href="<?php echo url_vendor('cdnjs/ajax/libs/font-awesome/6.4.0/css/all.min.css'); ?>">
+    <link rel="stylesheet" href="../assets/css/portale-ui.css?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/css/portale-ui.css'); ?>">
     <link rel="stylesheet" href="../assets/css/pannello.css?v=<?php echo (int)@filemtime(__DIR__ . '/../assets/css/pannello.css'); ?>">
     <script src="<?php echo url_vendor('jquery/jquery-3.7.1.min.js'); ?>" integrity="sha384-1H217gwSVyLSIfaLxHbE7dRb3v4mYCKbpQvzx0cegeju1MVsGrX5xXxAvs/HgeFs" crossorigin="anonymous"></script>
     <script>

@@ -46,3 +46,14 @@ Su richiesta dell'utente l'area personale non mostra più i tab degli eventi in 
 | `il_mio_tutorato.php` | tappe e documenti dell'incarico del tutor |
 
 Nuovo riquadro di sistema «Il mio profilo» (schema v94). I link delle email (`area_personale.php?conferma_posto=…`) continuano a funzionare: rimandano a `miei_eventi.php`.
+
+## Stile comune, calendario, ricerca, app (28/10/2026)
+
+Su approvazione dell'utente (la testata del sito non si tocca):
+
+- **Libreria di stile** (`assets/css/portale-ui.css`, `inc/ui.php`): cinque colori fissi per gli stati (fatto, in attesa, serve un'azione, informazione, chiuso) usati anche dai badge di Bootstrap; tessere, intestazioni, numeri; stati vuoti con illustrazione leggera e pulsante utile; **tema scuro** per l'area personale e le sue pagine, con pulsante e scelta ricordata.
+- **Calendario personale** (`calendario.php`, schema v95): eventi, aule, ricevimenti e scadenze in un posto solo; file .ics e abbonamento del telefono con link segreto (si rigenera); tessera nel cruscotto.
+- **Riepilogo settimanale con l'agenda**: l'email «Da fare per te» porta anche i sette giorni a venire e arriva a chi ha solo qualcosa in agenda (studenti compresi). **Spento di partenza: lo accende l'amministratore** da Gestione del portale → Email e promemoria.
+- **Ricerca unica** (`ricerca.php`): eventi, notizie e pagine, guide, docenti, risposte di Didacticus, raggruppati.
+- **App installabile**: la PWA c'era già; ora ha le scorciatoie (area personale, calendario, eventi, cerca), le icone «maskable» e il pulsante «Installa l'app» nell'area personale (su iPhone/iPad spiega come fare).
+- Prove: `strumenti/prove/oop/calendario.php` e `pagine_calendario.php`. Sistemate anche le 18 prove che fallivano da prima (erano prove vecchie, nessun errore nel portale).

@@ -63,6 +63,16 @@ if (isset($_POST['sospendi_promemoria'])) {
     admin_redirect("sistema.php?p_id=$filtro_p&r=" . time() . "#promemoria");
 }
 
+// 1g. RIEPILOGO SETTIMANALE CON L'AGENDA: lo accende l'amministratore (spento di partenza)
+if (isset($_POST['riepilogo_agenda'])) {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    $acceso_ra = $_POST['riepilogo_agenda'] === '1';
+    \App\Core\App::per($conn)->get(\App\Portale\RiepilogoAgenda::class)->imposta($acceso_ra, trim((string)($utente_admin['nome'] ?? '') . ' ' . (string)($utente_admin['cognome'] ?? '')) ?: (string)($utente_admin['email'] ?? ''));
+    if (function_exists('registra_log_audit')) registra_log_audit($conn, $acceso_ra ? "Riepilogo settimanale con l'agenda acceso" : "Riepilogo settimanale con l'agenda spento", []);
+    flash_set($acceso_ra ? "Riepilogo con l'agenda acceso: dal prossimo passaggio del sistema chi ha qualcosa in agenda nei sette giorni a venire riceve l'email settimanale." : "Riepilogo con l'agenda spento: l'email settimanale torna quella di sempre, solo per chi ha cose da fare.", $acceso_ra ? 'success' : 'warning');
+    admin_redirect("sistema.php?p_id=$filtro_p&r=" . time() . "#riepilogo-agenda");
+}
+
 // 2. SALVATAGGIO CONFIGURAZIONI SMTP E TEMPLATE
 if (isset($_POST['save_system_settings'])) {
     csrf_verify($_POST['csrf_token'] ?? '');
@@ -112,6 +122,20 @@ if (isset($_POST['save_system_settings'])) {
             <button type="submit" name="sospendi_promemoria" value="0" class="btn btn-success fw-bold" data-confirm="Riattivare i promemoria? Al prossimo passaggio partono quelli ancora dovuti."><i class="fa fa-bell me-1"></i>Riattiva i promemoria</button>
         <?php else: ?>
             <button type="submit" name="sospendi_promemoria" value="1" class="btn btn-warning fw-bold" data-confirm="Sospendere i promemoria al Direttore e agli uffici?"><i class="fa fa-bell-slash me-1"></i>Sospendi i promemoria al Direttore e agli uffici</button>
+        <?php endif; ?>
+    </form>
+</div>
+
+<?php $ra_st = \App\Core\App::per($conn)->get(\App\Portale\RiepilogoAgenda::class)->stato(); ?>
+<div class="card shadow-sm border-0 p-4 mb-4" id="riepilogo-agenda" style="border-left:6px solid <?php echo $ra_st['attivo'] ? '#15803d' : '#94a3b8'; ?> !important;">
+    <h5 class="fw-bold text-primary border-bottom pb-2 mb-3"><i class="fa fa-calendar-week me-1"></i> Riepilogo settimanale con l'agenda <?php echo $ra_st['attivo'] ? '<span class="badge bg-success">acceso</span>' : '<span class="badge bg-secondary">spento</span>'; ?></h5>
+    <p class="small text-secondary mb-2">Se lo accendi, l'email settimanale «Da fare per te» porta anche l'<strong>agenda dei sette giorni</strong> (eventi prenotati, aule e laboratori, ricevimenti, scadenze) e parte anche per <strong>chi ha qualcosa in agenda ma nulla da fare</strong>, studenti compresi, con un testo suo («La tua settimana»). Ognuno può disiscriversi dal link in fondo all'email. Da spento (com'è di partenza) l'email resta quella di sempre, solo per chi ha cose da fare. I testi si modificano in <strong>Email</strong>.</p>
+    <form method="POST" class="d-flex flex-wrap gap-2 align-items-center"><?php csrf_field(); ?>
+        <?php if ($ra_st['attivo']): ?>
+            <span class="small text-secondary">Acceso<?php echo $ra_st['da'] !== '' ? ' da ' . htmlspecialchars($ra_st['da']) : ''; ?><?php echo $ra_st['il'] ? ' il ' . htmlspecialchars(date('d/m/Y H:i', strtotime($ra_st['il']))) : ''; ?>.</span>
+            <button type="submit" name="riepilogo_agenda" value="0" class="btn btn-outline-secondary fw-bold" data-confirm="Spegnere il riepilogo con l'agenda? L'email settimanale tornerà quella di sempre."><i class="fa fa-toggle-off me-1"></i>Spegni il riepilogo con l'agenda</button>
+        <?php else: ?>
+            <button type="submit" name="riepilogo_agenda" value="1" class="btn btn-success fw-bold" data-confirm="Accendere il riepilogo settimanale con l'agenda? Dal prossimo passaggio del sistema riceveranno l'email anche studenti e altre persone con qualcosa in agenda."><i class="fa fa-toggle-on me-1"></i>Accendi il riepilogo con l'agenda</button>
         <?php endif; ?>
     </form>
 </div>

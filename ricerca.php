@@ -1,101 +1,71 @@
 <?php
-// ricerca.php - Motore di Ricerca Globale Frontend
+// ricerca.php - La ricerca unica del sito: eventi e progetti, notizie e pagine, guide «Come si fa», docenti, risposte di Didacticus, raggruppati per genere.
+// Logica in src/Portale/RicercaGlobale.php.
 require_once 'config.php';
 require_once 'functions.php';
 
-// Disabilita il titolo dinamico dell'header
-$page_cfg['titolo'] = "Ricerca Eventi";
+$page_cfg['titolo'] = "Ricerca";
 
 require_once 'header.php';
 
-// Recupero e sanificazione della query
 $q_raw = trim($_GET['q'] ?? '');
 $q_safe = htmlspecialchars($q_raw);
-$q_like = '%' . $q_raw . '%';
-
-$risultati = !empty($q_raw) ? cerca_eventi($conn, $q_raw) : [];
+$gruppi = $q_raw !== '' ? \App\Core\App::per($conn)->get(\App\Portale\RicercaGlobale::class)->cerca($q_raw, !empty($_SESSION['utente_id'])) : [];
+$totale = \App\Portale\RicercaGlobale::totale($gruppi);
+$h = static fn ($s): string => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
 ?>
 
-<div class="container my-5">
-    
-    <!-- Intestazione Ricerca -->
-    <div class="mb-5 border-bottom pb-4">
-        <h1 class="fw-bold text-dark display-5" style="letter-spacing: -1px;">
-            <i class="fa fa-search text-primary me-2"></i> Risultati della ricerca
-        </h1>
-        <?php if (!empty($q_raw)): ?>
-            <p class="text-secondary fs-5 mt-2">
-                Hai cercato: <strong>"<?php echo $q_safe; ?>"</strong>. 
-                Trovati <strong><?php echo count($risultati); ?></strong> risultati.
-            </p>
+<div class="container my-5" style="max-width: 900px;">
+
+    <div class="mb-4 border-bottom pb-4">
+        <h1 class="fw-bold display-6" style="letter-spacing: -1px;"><i class="fa fa-search text-primary me-2" aria-hidden="true"></i>Cerca nel portale</h1>
+        <form action="ricerca.php" method="GET" class="mt-3" role="search">
+            <div class="input-group input-group-lg shadow-sm">
+                <input type="search" name="q" class="form-control border-primary" placeholder="Eventi, notizie, guide, docenti, domande…" value="<?php echo $q_safe; ?>" aria-label="Cosa cerchi" required minlength="2">
+                <button class="btn btn-primary fw-bold px-4" type="submit">Cerca</button>
+            </div>
+        </form>
+        <?php if ($q_raw !== ''): ?>
+            <p class="text-secondary mt-3 mb-0">Hai cercato <strong>«<?php echo $q_safe; ?>»</strong>: <strong><?php echo $totale; ?></strong> <?php echo $totale === 1 ? 'risultato' : 'risultati'; ?>.</p>
         <?php else: ?>
-            <p class="text-secondary fs-5 mt-2">Inserisci una parola chiave per cercare un evento, un laboratorio o un'aula.</p>
-            
-            <form action="ricerca.php" method="GET" class="mt-4" style="max-width: 500px;">
-                <div class="input-group input-group-lg shadow-sm">
-                    <input type="text" name="q" class="form-control border-primary" placeholder="Cerca..." required>
-                    <button class="btn btn-primary fw-bold px-4" type="submit">Cerca</button>
-                </div>
-            </form>
+            <p class="text-secondary mt-3 mb-0">Una ricerca sola per gli eventi, le notizie, le guide, i docenti e le risposte di Didacticus.</p>
         <?php endif; ?>
     </div>
 
-    <!-- Risultati -->
-    <?php if (!empty($q_raw) && empty($risultati)): ?>
-        <div class="alert alert-light text-center border p-5 shadow-sm rounded-4">
-            <i class="fa fa-search-minus fs-1 text-muted mb-3 d-block"></i>
-            <h5 class="fw-bold text-dark">Nessun evento trovato</h5>
-            <p class="text-secondary m-0">Non abbiamo trovato alcun evento o laboratorio che corrisponda a "<?php echo $q_safe; ?>". Prova con termini più generici.</p>
-        </div>
-    <?php elseif (!empty($risultati)): ?>
-        
-        <div class="row g-4">
-            <?php foreach ($risultati as $ev): 
-                $is_archived = ($ev['archiviato'] == 1);
-                $col_area = $ev['colore_primario'] ?? '#0056b3';
-                
-                // Determinare il link corretto (Pagina Attiva o Archivio Storico)
-                $link_destinazione = $is_archived ? ($ev['slug_area'] . '_archivio.php') : ($ev['slug_area'] . '.php');
-                if (!$is_archived) $link_destinazione .= (($ev['tipo'] ?? '') === 'progetto' ? '?progetto=' : '?evento=') . (int)$ev['id']; // scheda del progetto o dell'evento
-            ?>
-                <div class="col-md-6 col-lg-4">
-                    <div class="card shadow-sm border-0 h-100 bg-white" style="border-radius: 8px; overflow: hidden; <?php echo $is_archived ? 'filter: grayscale(40%);' : ''; ?>">
-                        
-                        <div style="height: 5px; background-color: <?php echo $col_area; ?>;"></div>
-                        
-                        <div class="card-body p-4 d-flex flex-column">
-                            
-                            <div class="d-flex justify-content-between align-items-start mb-2">
-                                <span class="badge" style="background-color: <?php echo $col_area; ?>;">
-                                    <?php echo htmlspecialchars($ev['nome_area']); ?>
-                                </span>
-                                <?php if ($is_archived): ?>
-                                    <span class="badge bg-secondary">Archiviato</span>
-                                <?php endif; ?>
-                            </div>
-                            
-                            <h5 class="fw-bold text-dark mt-2 mb-3"><?php echo htmlspecialchars($ev['titolo']); ?></h5>
-                            
-                            <?php if (!empty($ev['luogo'])): ?>
-                                <small class="text-muted fw-bold d-block mb-3"><i class="fa fa-map-marker-alt me-1 text-danger"></i> <?php echo htmlspecialchars($ev['luogo']); ?></small>
-                            <?php endif; ?>
-
-                            <div class="text-secondary mb-4 flex-grow-1" style="font-size: 0.9rem; line-height: 1.5;">
-                                <?php echo mb_strimwidth(strip_tags($ev['descrizione'] ?? ''), 0, 120, '...'); ?>
-                            </div>
-                            
-                            <div class="mt-auto">
-                                <a href="<?php echo htmlspecialchars($link_destinazione); ?>" class="btn btn-outline-primary btn-sm fw-bold w-100" style="border-color: <?php echo $col_area; ?>; color: <?php echo $col_area; ?>;">
-                                    Vai alla pagina <i class="fa fa-arrow-right ms-1"></i>
-                                </a>
-                            </div>
-                        </div>
-
-                    </div>
-                </div>
+    <?php if ($q_raw !== '' && !$gruppi): ?>
+        <?php echo ui_vuoto('fa-search-minus', 'Non abbiamo trovato niente', 'Nessun risultato per «' . $q_raw . '». Prova con parole più semplici o chiedi a Didacticus.', 'assistenza.php', 'Chiedi a Didacticus', '#0891b2'); ?>
+    <?php elseif ($gruppi): ?>
+        <div class="d-flex flex-wrap gap-2 mb-4" aria-label="Vai al gruppo">
+            <?php foreach ($gruppi as $g): ?>
+                <a href="#g-<?php echo $h($g['chiave']); ?>" class="ui-chip text-decoration-none"><i class="fa <?php echo $h($g['icona']); ?> me-1" style="color:<?php echo $h($g['colore']); ?>;" aria-hidden="true"></i><?php echo $h($g['titolo']); ?> (<?php echo count($g['voci']); ?>)</a>
             <?php endforeach; ?>
         </div>
-
+        <?php foreach ($gruppi as $g): ?>
+            <section class="mb-5" id="g-<?php echo $h($g['chiave']); ?>">
+                <h2 class="h5 fw-bold mb-3"><i class="fa <?php echo $h($g['icona']); ?> me-2" style="color:<?php echo $h($g['colore']); ?>;" aria-hidden="true"></i><?php echo $h($g['titolo']); ?></h2>
+                <div class="d-flex flex-column gap-2">
+                    <?php foreach ($g['voci'] as $v): ?>
+                        <div class="ui-tessera" style="--tc: <?php echo $h($g['colore']); ?>; height:auto;">
+                            <div class="ui-tessera-corpo flex-grow-1">
+                                <?php if ($v['risposta'] === ''): ?>
+                                    <a href="<?php echo $h($v['link']); ?>" class="ui-tessera-titolo stretched-link"><?php echo $h($v['titolo']); ?></a>
+                                <?php else: ?>
+                                    <div class="ui-tessera-titolo"><?php echo $h($v['titolo']); ?></div>
+                                <?php endif; ?>
+                                <?php if ($v['meta'] !== ''): ?><div class="small text-secondary"><?php echo $h($v['meta']); ?></div><?php endif; ?>
+                                <?php if ($v['testo'] !== ''): ?><div class="ui-tessera-testo"><?php echo $h($v['testo']); ?></div><?php endif; ?>
+                                <?php if ($v['risposta'] !== ''): ?>
+                                    <details class="mt-1" style="position:relative; z-index:2;"><summary class="small fw-bold" style="cursor:pointer;">Leggi la risposta</summary>
+                                        <div class="small mt-2"><?php echo nl2br($h(\App\Portale\RicercaGlobale::estratto($v['risposta'], $q_raw, 700))); ?></div>
+                                        <a href="assistenza.php" class="small fw-bold">Hai ancora un dubbio? Chiedi a Didacticus</a>
+                                    </details>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            </section>
+        <?php endforeach; ?>
     <?php endif; ?>
 
 </div>

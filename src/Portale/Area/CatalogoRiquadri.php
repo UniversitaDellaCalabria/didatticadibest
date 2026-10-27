@@ -55,6 +55,8 @@ final class CatalogoRiquadri
                 'profili' => self::TUTTI, 'ordine' => 90],
             'eventi' => ['tipo' => self::SPECIALE, 'titolo' => 'Eventi, attestati e sondaggi', 'descrizione' => 'Prenotazioni, presenze, attestati, sondaggi, aule prenotate e scanner QR (pagina miei_eventi.php); sulla tessera si vede se c\'è un posto liberato da confermare', 'icona' => 'fa-calendar-check', 'colore' => '#0d6efd',
                 'profili' => self::TUTTI, 'ordine' => 100],
+            'calendario' => ['tipo' => self::SPECIALE, 'titolo' => 'Il mio calendario', 'descrizione' => 'Eventi, aule, ricevimenti e scadenze in un posto solo, con il file .ics e il calendario del telefono (pagina calendario.php)', 'icona' => 'fa-calendar-days', 'colore' => '#0891b2',
+                'profili' => self::TUTTI, 'ordine' => 102],
             'profilo' => ['tipo' => self::SPECIALE, 'titolo' => 'Il mio profilo', 'descrizione' => 'Dati personali, email e scheda di Ateneo modificabili (pagina profilo.php)', 'icona' => 'fa-user-pen', 'colore' => '#475569',
                 'profili' => self::TUTTI, 'ordine' => 105],
             'guida' => ['tipo' => self::SPECIALE, 'titolo' => 'Come si fa', 'descrizione' => 'Guide brevi con le schermate, una per ruolo', 'icona' => 'fa-circle-question', 'colore' => '#64748b',

@@ -210,8 +210,9 @@ if (!$servizio_attivo): ?>
                 <?php endforeach; ?>
             </div>
         </fieldset>
-        <label class="form-label fw-bold small" for="as-testo">Scrivi la tua domanda</label>
-        <textarea class="form-control mb-1" id="as-testo" name="testo" rows="4" maxlength="<?php echo $Cost::MAX_CARATTERI; ?>" required><?php echo $h($_POST['testo'] ?? ''); ?></textarea>
+        <style>#as-testo{border:2px solid #475569;background:#fff;color:#1e293b;min-height:9rem;font-size:1rem;box-shadow:inset 0 1px 3px rgba(0,0,0,.12)} #as-testo:focus{border-color:#B30000;outline:3px solid #ffbf47;outline-offset:1px} label[for="as-testo"]{font-size:1rem !important}</style>
+        <label class="form-label fw-bold" for="as-testo">Scrivi la tua domanda</label>
+        <textarea class="form-control mb-1" id="as-testo" name="testo" rows="6" placeholder="Scrivi qui la tua domanda…" maxlength="<?php echo $Cost::MAX_CARATTERI; ?>" required><?php echo $h($_POST['testo'] ?? ''); ?></textarea>
         <?php if ($did_attivo): ?>
             <div class="d-flex align-items-start gap-2 p-2 rounded border bg-light mb-2">
                 <img src="didacticus_file.php?avatar=1" alt="" width="40" height="40" class="rounded-circle flex-shrink-0" style="object-fit:cover;">

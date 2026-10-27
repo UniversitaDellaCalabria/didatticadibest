@@ -112,6 +112,12 @@ Ogni area ha un **tipo** (`pagine_eventi.tipo_area`: fsl, eventi, gruppi, calend
 - **PWA-ready** (manifest + service worker + offline fallback): le pagine arrivano sempre dal server, in cache solo le librerie statiche
 - **Configurazione portale** da pannello admin (logo, colori, SMTP, email template)
 - **Assistenza e Didacticus** (`assistenza.php`, pulsante «Serve aiuto?» su ogni pagina pubblica, `admin/assistenza.php`, `admin/didacticus.php`, `src/Assistenza/`): chat per studenti, personale ed esterni (link personale, senza registrazione) con le persone dell'ufficio fisso «Assistenza»; risponde prima **Didacticus**, l'assistente virtuale a regole (nessun servizio esterno né IA generativa: confronta la domanda con le voci scritte dal pannello, con link e allegati, e passa all'operatore quando non basta); notifiche a finestrella (**Web Push** in PHP puro, cifratura RFC 8291, chiavi in `.env`: `php strumenti/genera_chiavi_push.php email@unical.it`), orari, statistiche con Excel/PDF/CSV, conservazione 12 mesi (`CONSERVAZIONE_ASSISTENZA_MESI`)
+- **Area personale a cruscotto per profilo** (`area_personale.php`, `src/Portale/Area/`, pannello `admin/area_personale.php`, schema v93-94): studente, docente, Direttore, personale, gestore, amministratore ed esterno vedono tessere diverse, una per argomento (pratiche, assistenza, tutorato, eventi, profilo, calendario…) con le novità in rosso (cose da firmare, richieste, messaggi, posto liberato); ogni tessera porta alla sua pagina (`miei_eventi.php`, `profilo.php`, `il_mio_tutorato.php`, `calendario.php`). Tessere e ordine li sceglie l'amministratore dal pannello; i tirocini rimandano alla piattaforma TSP 2.0
+- **Calendario personale** (`calendario.php`, `calendario_ics.php`, `src/Portale/CalendarioPersonale.php`, schema v95): eventi prenotati, aule e laboratori, ricevimenti e scadenze in un posto solo, con file `.ics` e **abbonamento del telefono** (link segreto personale, rigenerabile)
+- **Riepilogo settimanale con l'agenda** (`src/Portale/RiepilogoAgenda.php`): l'email «Da fare per te» porta anche gli appuntamenti dei sette giorni e arriva a chi ha solo qualcosa in agenda (studenti compresi); **spento di partenza, lo accende l'amministratore** da Gestione del portale → Email e promemoria
+- **Ricerca unica** (`ricerca.php`, `src/Portale/RicercaGlobale.php`): eventi e progetti, notizie e pagine, guide «Come si fa», docenti e risposte di Didacticus, raggruppati
+- **Stile comune e tema scuro** (`assets/css/portale-ui.css`, `inc/ui.php`): cinque colori fissi per gli stati, stati vuoti con pulsante utile, tema chiaro/scuro per l'area personale e le sue pagine
+- **App installabile (PWA)**: manifest con scorciatoie, service worker, pulsante «Installa l'app» nell'area personale (su iPhone/iPad spiega «Aggiungi alla schermata Home»)
 
 ---
 
@@ -304,7 +310,11 @@ eventidibest-cms/
 ├── master_template.php # Motore dei layout delle pagine area (le pagine area lo includono)
 ├── checkin.php         # Esito del QR letto con la fotocamera del telefono (admin)
 ├── self_checkin.php    # Self check-in studente
-├── area_personale.php  # Area utente loggato (prenotazioni, messaggi)
+├── area_personale.php  # Cruscotto a tessere per profilo (tessere in inc/area/, classi in src/Portale/Area/)
+├── miei_eventi.php     # Prenotazioni, storico e attestati, programma FSL, sondaggi, aule prenotate, scanner QR
+├── calendario.php      # Calendario personale (eventi, aule, ricevimenti, scadenze) con .ics e abbonamento
+├── calendario_ics.php  # File .ics del calendario personale (accesso o link segreto ?t=)
+├── ricerca.php         # Ricerca unica raggruppata
 ├── elenco_studenti.php # Elenco degli studenti inserito dal docente (progetti per le scuole)
 ├── attestati_gruppo.php # Attestati della classe, uno per pagina
 ├── verifica_attestato.php # Verifica pubblica di un attestato dal codice o dal QR
@@ -323,7 +333,8 @@ eventidibest-cms/
 ├── giustifica.php      # Giustificazione dell'assenza da una seduta (link personale della convocazione)
 ├── firma_verbale.php   # Verbale della seduta: firma PAdES del segretario e del coordinatore (Aruba o PDF firmato)
 ├── cerca_insegnamenti.php # Catalogo di Ateneo per i campi Insegnamento dei moduli (JSON)
-├── profilo.php         # Profilo utente: dati SSO e modifica email
+├── profilo.php         # Profilo utente: dati personali, scheda di Ateneo ed email modificabili
+├── il_mio_tutorato.php # Tappe e documenti degli incarichi di tutorato
 ├── sw.js               # Service Worker (PWA)
 └── manifest.json       # Web App Manifest (PWA)
 ```

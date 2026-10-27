@@ -91,8 +91,8 @@ $msg = AppIsc::per($conn)->get(\App\Iscritti\ServizioMessaggi::class);
 $op1 = new Operatore(1, 'prova@example.org', '127.0.0.1');
 prova($msg->rispondiDaInbox(9905, '<p>Ok <b>si</b><script>x()</script></p>', $op1) && !$msg->rispondiDaInbox(9905, ' ', $op1), "rispondiDaInbox(): invia, ignora il testo vuoto");
 $mm = $conn->query("SELECT * FROM messaggi_prenotazioni WHERE prenotazione_id = 9905")->fetch_assoc();
-prova($mm['messaggio'] === '<p>Ok <b>si</b>x()</p>' && (int)$mm['letto'] === 1 && ($EMAIL[0]['a'] ?? '') === 'elena99@prova.it' && str_contains($EMAIL[0]['oggetto'], 'Nuovo messaggio da ') && str_contains($EMAIL[0]['corpo'], "\n                <p>Hai ricevuto un nuovo messaggio da"), "rispondiDaInbox(): testo ripulito, già letto, email con lo stesso corpo di prima");
-prova($msg->inviaDaIscritti(9905, 'Ciao', $op1) && (int)$conn->query("SELECT letto FROM messaggi_prenotazioni WHERE prenotazione_id = 9905 AND messaggio = 'Ciao'")->fetch_assoc()['letto'] === 0 && str_contains($EMAIL[1]['corpo'], "\n                    <p>Hai ricevuto un nuovo messaggio da"), "inviaDaIscritti(): messaggio da leggere, corpo con il rientro di iscritti.php");
+prova($mm['messaggio'] === '<p>Ok <b>si</b>x()</p>' && (int)$mm['letto'] === 1 && ($EMAIL[0]['a'] ?? '') === 'elena99@prova.it' && str_contains($EMAIL[0]['oggetto'], 'Nuovo messaggio da ') && str_contains($EMAIL[0]['corpo'], "Hai ricevuto un nuovo messaggio da <strong>"), "rispondiDaInbox(): testo ripulito, già letto, email con lo stesso corpo di prima");
+prova($msg->inviaDaIscritti(9905, 'Ciao', $op1) && (int)$conn->query("SELECT letto FROM messaggi_prenotazioni WHERE prenotazione_id = 9905 AND messaggio = 'Ciao'")->fetch_assoc()['letto'] === 0 && str_contains($EMAIL[1]['corpo'], "Hai ricevuto un nuovo messaggio da <strong>"), "inviaDaIscritti(): messaggio da leggere, corpo con il rientro di iscritti.php");
 $msg->segnaLetti(9901);
 prova($msg->nonLetti($area) >= 0 && (int)$conn->query("SELECT COUNT(*) AS n FROM messaggi_prenotazioni WHERE prenotazione_id = 9901 AND letto = 0")->fetch_assoc()['n'] === 0, "segnaLetti() e nonLetti()");
 
@@ -160,15 +160,17 @@ prova(!array_filter($EMAIL, fn($e) => $e['a'] === 'elena99@prova.it'), "promemor
 
 // Cron: email dopo l'evento, auto-archiviazione, conservazione
 $cron = AppIsc::per($conn)->get(\App\Iscritti\ServizioCron::class);
-$sys0 = $conn->query("SELECT email_attestato_oggetto, email_attestato_corpo, email_sondaggio_oggetto, email_sondaggio_corpo FROM impostazioni_sistema WHERE id = 1")->fetch_assoc();
-$q("UPDATE impostazioni_sistema SET email_attestato_oggetto = 'Att {TITOLO_EVENTO}', email_attestato_corpo = '<p>Att {NOME}</p>', email_sondaggio_oggetto = 'Son {TITOLO_EVENTO}', email_sondaggio_corpo = '<p>Son {NOME} {LINK_AREA_PERSONALE}</p>' WHERE id = 1");
+// I testi di attestato e sondaggio stanno nei modelli di email (facoltativi: senza testo non partono)
+$mod_ap = AppIsc::per($conn)->get(\App\Email\ModelliEmail::class);
+$mod_ap->salva('evento_attestato', 'Att {TITOLO_EVENTO}', '<p>Att {NOME}</p>', '', 'prova');
+$mod_ap->salva('evento_sondaggio', 'Son {TITOLO_EVENTO}', '<p>Son {NOME} {LINK_AREA_PERSONALE}</p>', '', 'prova');
 $q("INSERT INTO turni (id, evento_id, nome_turno, data_turno, orario_fine, max_posti) VALUES (99014, 9901, 'Ieri', '2000-01-01', '12:00:00', 50)");
 $q("INSERT INTO prenotazioni (id, turno_id, codice_prenotazione, stato, presente, nome, cognome, email, email_post_evento_inviata) VALUES (9950, 99014, 'PRV99F', 'confermata', 1, 'Vera', 'Ieri', 'vera99@prova.it', 0)");
 $EMAIL = [];
 $riga = $cron->emailPostEvento(date('Y-m-d H:i:s'), 'https://x.it/eventi');
 $mie = array_values(array_filter($EMAIL, fn($e) => $e['a'] === 'vera99@prova.it'));
 prova(str_contains($riga, 'Inviate ') && count($mie) === 2 && $mie[0]['oggetto'] === 'Att Prova Iscritti OOP' && str_contains($mie[1]['corpo'], "<a href='https://x.it/eventi/area_personale.php'") && (int)$conn->query("SELECT email_post_evento_inviata FROM prenotazioni WHERE id = 9950")->fetch_assoc()['email_post_evento_inviata'] === 1, "cron: email di attestato e sondaggio dopo l'evento, una volta sola");
-$q("UPDATE impostazioni_sistema SET email_attestato_oggetto = " . ($sys0['email_attestato_oggetto'] === null ? 'NULL' : "'" . $conn->real_escape_string($sys0['email_attestato_oggetto']) . "'") . ", email_attestato_corpo = " . ($sys0['email_attestato_corpo'] === null ? 'NULL' : "'" . $conn->real_escape_string($sys0['email_attestato_corpo']) . "'") . ", email_sondaggio_oggetto = " . ($sys0['email_sondaggio_oggetto'] === null ? 'NULL' : "'" . $conn->real_escape_string($sys0['email_sondaggio_oggetto']) . "'") . ", email_sondaggio_corpo = " . ($sys0['email_sondaggio_corpo'] === null ? 'NULL' : "'" . $conn->real_escape_string($sys0['email_sondaggio_corpo']) . "'") . " WHERE id = 1");
+$mod_ap->ripristina('evento_attestato'); $mod_ap->ripristina('evento_sondaggio');
 prova(preg_match('/^- Auto-archiviati \d+ eventi scaduti\.\n$/', $cron->autoArchiviazione()) === 1, "cron: auto-archiviazione");
 $q("UPDATE prenotazioni SET dati_custom_json = '{\"a\":\"b\"}' WHERE id = 9950");
 prova(str_contains($cron->conservazionePrenotazioni(1), '- Conservazione prenotazioni: ') && $conn->query("SELECT nome, email, dati_custom_json FROM prenotazioni WHERE id = 9950")->fetch_assoc() === ['nome' => 'V.', 'email' => '', 'dati_custom_json' => null], "cron: conservazione, prenotazione anonimizzata");

@@ -1267,12 +1267,14 @@ prova(registra_firma_incarico($conn, $it, 'docente', "0\x82\x01\x00p7m") !== nul
 prova(registra_firma_incarico($conn, $it, 'direttore', $firma_pades($pdf1, $cert_doc)) !== null, "il direttore non firma prima del docente");
 $pdf_doc = $firma_pades($pdf1, $cert_doc);
 $alterato = $pdf_doc; $alterato[strlen($pdf1) + 20] = 'X';
-prova(registra_firma_incarico($conn, $it, 'docente', $firma_pades(str_replace('%%EOF', '%%EOF ', $pdf1), $cert_doc)) !== null && verifica_pdf_firmato($pdf1, $alterato)[0] !== null, "PDF modificato o firma non integra rifiutati");
+[$err_alt, $info_alt] = verifica_pdf_firmato($pdf1, $alterato);
+prova(registra_firma_incarico($conn, $it, 'docente', $firma_pades(str_replace('%%EOF', '%%EOF ', $pdf1), $cert_doc)) !== null && ($err_alt === null ? !empty($info_alt['avviso']) : true), "PDF modificato rifiutato; firma non integra: controllo minimo, passa con un avviso", json_encode([$err_alt, $info_alt['avviso'] ?? null]));
 prova(analizza_firma_pdf($pdf_doc)['integra'] === true && analizza_firma_pdf($pdf_doc)['cf'] === 'RFRRTI80A41D086K' && analizza_firma_pdf($pdf_doc)['nome'] === 'Rita Referente', "firma PAdES integra, firmatario e codice fiscale dal certificato");
 $EMAIL = [];
 prova(registra_firma_incarico($conn, $it, 'docente', $pdf_doc, 'caricato') === null && incarico_tutorato($conn, $it)['stato'] === 'firmata_docente' && array_column($EMAIL, 'a') === ['otto.ord@unical.it'], "firma del docente: la lettera va al direttore", json_encode(array_column($EMAIL, 'a')));
 $inc = incarico_tutorato($conn, $it);
-prova(registra_firma_incarico($conn, $it, 'direttore', $firma_pades($pdf_doc, $crea_cert('Altra Persona', 'LTRPRS70A01D086Q'))) !== null, "firma di un certificato diverso da quello del direttore rifiutata");
+[$err_div, $info_div] = verifica_pdf_firmato($pdf_doc, $firma_pades($pdf_doc, $crea_cert('Altra Persona', 'LTRPRS70A01D086Q')), 'RDNTTO60A01D086Z');
+prova($err_div === null && str_contains((string)($info_div['avviso'] ?? ''), 'Altra Persona'), "firma di un certificato diverso da quello del direttore: non blocca, resta in avviso", json_encode([$err_div, $info_div['avviso'] ?? null]));
 $pdf_fin = $firma_pades($pdf_doc, $crea_cert('Otto Ordinario', 'RDNTTO60A01D086Z'));
 $EMAIL = [];
 prova(registra_firma_incarico($conn, $it, 'direttore', $pdf_fin, 'firma remota Aruba') === null && incarico_tutorato($conn, $it)['stato'] === 'firmata' && in_array('carla.car@unical.it', array_column($EMAIL, 'a'), true), "firma del direttore: email all'operatore per il protocollo");
@@ -1314,8 +1316,8 @@ $pdf_f = (string)file_get_contents(pdf_fine_corrente($inc));
 [, $spazi_f] = pdf_fine_attivita($inc, registro_incarico($conn, $it), 12.0);
 prova(str_starts_with($pdf_f, '%PDF') && isset($spazi_f['docente']) && firme_pades_pdf($pdf_f) === [], "PDF della dichiarazione con lo spazio per la firma del docente");
 $conn->query("UPDATE tutorato_incarichi SET docente_cf = 'RFRRTI80A41D086K' WHERE id = $it");
-$e1 = registra_firma_fine($conn, $it, $firma_pades($pdf_f, $crea_cert("Altra Persona", "LTRPRS70A01D086Q"))); $e2 = registra_firma_fine($conn, $it, $pdf_f);
-prova($e1 !== null && $e2 !== null, "dichiarazione: firma di un altro certificato o senza firma rifiutata", json_encode([$e1, $e2]));
+[$e1, $i1] = verifica_pdf_firmato($pdf_f, $firma_pades($pdf_f, $crea_cert("Altra Persona", "LTRPRS70A01D086Q")), 'RFRRTI80A41D086K'); $e2 = registra_firma_fine($conn, $it, $pdf_f);
+prova($e1 === null && str_contains((string)($i1['avviso'] ?? ''), 'Altra Persona') && $e2 !== null, "dichiarazione: senza firma rifiutata; firma di un altro certificato: passa con un avviso", json_encode([$e1, $i1['avviso'] ?? null, $e2]));
 $EMAIL = [];
 $e3 = registra_firma_fine($conn, $it, $firma_pades($pdf_f, $cert_doc), "caricato");
 prova($e3 === null && incarico_tutorato($conn, $it)['fine_stato'] === 'firmata'
@@ -1611,7 +1613,9 @@ $conn->query("DROP TABLE prova_oop");
 prova(\App\Core\App::get(\App\Core\Config::class) instanceof \App\Core\Config, "configurazione disponibile dal container");
 
 // Prove dei moduli migrati a classi (una per modulo, strumenti/prove/oop/<modulo>.php: stesse variabili e funzioni di qui)
-foreach (glob(__DIR__ . '/oop/*.php') ?: [] as $__prova_oop) if (!str_starts_with(basename($__prova_oop), 'pagine_')) require $__prova_oop;
+// PROVE_SOLO=iscritti,portale limita i moduli eseguiti (per cercare un guasto senza rifare tutta la suite)
+$__solo = array_filter(explode(',', (string) getenv('PROVE_SOLO')));
+foreach (glob(__DIR__ . '/oop/*.php') ?: [] as $__prova_oop) if (!str_starts_with(basename($__prova_oop), 'pagine_') && (!$__solo || in_array(basename($__prova_oop, '.php'), $__solo, true))) require $__prova_oop;
 
 // ---------------------------------------------------------------------------
 // Prove delle pagine sull'ambiente locale (se acceso)
@@ -1754,7 +1758,7 @@ if (getenv('PROVE_SOLO_FUNZIONI') || !function_exists('curl_init') || $http('/ev
         $__fx_pren = (int)$loc->insert_id;
     }
     // Pagine dei moduli migrati a classi (strumenti/prove/oop/pagine_<modulo>.php: possono usare $http, $jar (amministratore), $jar2)
-    foreach (glob(__DIR__ . '/oop/pagine_*.php') ?: [] as $__prova_oop) require $__prova_oop;
+    foreach (glob(__DIR__ . '/oop/pagine_*.php') ?: [] as $__prova_oop) if (!$__solo || in_array(basename($__prova_oop, '.php'), $__solo, true)) require $__prova_oop;
     if ($__fx_pren) {
         $loc->query("DELETE FROM prenotazioni WHERE id = $__fx_pren");
         $loc->query("DELETE FROM turni WHERE evento_id = $__fx_ev_att");

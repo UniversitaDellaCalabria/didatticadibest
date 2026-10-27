@@ -17,19 +17,19 @@
 
     var stile = document.createElement('style');
     stile.textContent =
-        '#assistenza-widget{position:fixed;right:16px;bottom:16px;z-index:1090;font-family:inherit}' +
+        '#assistenza-widget{position:fixed;right:16px;bottom:16px;z-index:2000;font-family:inherit}' +
         '#assistenza-widget .aw-btn{display:flex;align-items:center;gap:8px;border:0;border-radius:28px;background:#B30000;color:#fff;font-weight:700;padding:12px 18px;box-shadow:0 4px 14px rgba(0,0,0,.3);cursor:pointer;font-size:1rem}' +
         '#assistenza-widget .aw-btn:hover,#assistenza-widget .aw-btn:focus{background:#8a0000;outline:3px solid #ffbf47;outline-offset:2px}' +
         '#assistenza-widget .aw-pallino{position:absolute;top:-4px;right:-2px;min-width:20px;height:20px;border-radius:10px;background:#ffbf47;color:#000;border:2px solid #fff;font-size:.7rem;line-height:16px;text-align:center;font-weight:700;padding:0 4px}' +
-        '#assistenza-widget .aw-pannello{position:absolute;right:0;bottom:64px;width:400px;max-width:calc(100vw - 32px);height:640px;max-height:calc(100vh - 100px);background:#fff;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.35);overflow:hidden;display:none;flex-direction:column;border:1px solid #cbd5e1}' +
+        '#assistenza-widget .aw-pannello{position:absolute;right:0;bottom:64px;width:400px;max-width:calc(100vw - 32px);height:640px;max-height:calc(100vh - 160px);background:#fff;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.35);overflow:hidden;display:none;flex-direction:column;border:1px solid #cbd5e1}' +
         '#assistenza-widget.aperto .aw-pannello{display:flex}' +
-        '#assistenza-widget.grande .aw-pannello{width:760px;max-width:calc(100vw - 32px);height:calc(100vh - 100px);max-height:none}' +
+        '#assistenza-widget.grande .aw-pannello{width:760px;max-width:calc(100vw - 32px);height:calc(100vh - 160px);max-height:none}' +
         '#assistenza-widget .aw-azioni{display:flex;align-items:center;gap:2px}' +
         '#assistenza-widget .aw-testa{background:#333;color:#fff;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;font-weight:700}' +
         '#assistenza-widget .aw-chiudi,#assistenza-widget .aw-icona{background:transparent;border:0;color:#fff;font-size:1.3rem;line-height:1;cursor:pointer;padding:4px 7px;border-radius:6px}' +
         '#assistenza-widget .aw-icona{font-size:1rem}#assistenza-widget .aw-chiudi:hover,#assistenza-widget .aw-icona:hover,#assistenza-widget .aw-chiudi:focus,#assistenza-widget .aw-icona:focus{background:rgba(255,255,255,.2);outline:2px solid #ffbf47}' +
         '#assistenza-widget iframe{border:0;width:100%;flex:1}' +
-        '@media (max-width:575px){#assistenza-widget .aw-pannello{position:fixed;right:8px;left:8px;bottom:76px;width:auto;max-width:none;height:calc(100vh - 100px)}#assistenza-widget .aw-btn span.aw-testo{display:none}#assistenza-widget .aw-btn{padding:14px}}' +
+        '@media (max-width:575px){#assistenza-widget .aw-pannello{position:fixed;right:8px;left:8px;bottom:76px;width:auto;max-width:none;height:calc(100vh - 160px)}#assistenza-widget .aw-btn span.aw-testo{display:none}#assistenza-widget .aw-btn{padding:14px}}' +
         '@media (prefers-reduced-motion:no-preference){#assistenza-widget .aw-pannello{animation:aw-su .15s ease-out}@keyframes aw-su{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}}';
     document.head.appendChild(stile);
 

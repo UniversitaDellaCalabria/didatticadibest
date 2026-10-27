@@ -248,7 +248,7 @@ $base_t_ = function (string $tipo, array $extra) use ($tp_) {
 $r_ = array_column($r_, null, 'etichetta');
 prova(!empty($r_['Progetto formativo']['nascosto']) && !empty($r_['Nuovo progetto formativo']['nascosto']) && empty($r_['Nuovo laboratorio']['nascosto']) && !empty($r_['Crediti acquisiti']['nascosto'])
     && $r_['Relatore/trice']['valore'] === 'Rossi Mario' && $e_ === [], "Tesi: per una variazione servono numero e data della richiesta e solo i campi di ciò che cambia" . ($e_ ? ' – ' . implode('; ', $e_) : ''));
-[, $e_] = $ct_->leggi($tcm_, $base_t_('Richiesta tesi', ['Crediti acquisiti' => '150', 'Progetto formativo' => 'Studio X', 'Sede del lavoro di tesi' => 'Esterna']), [], false);
+[, $e_] = $ct_->leggi($tcm_, $base_t_('Richiesta tesi', ['Crediti acquisiti' => '150', 'Progetto formativo' => 'Studio X', 'Sede del lavoro di tesi' => 'Esterna', 'Azienda o ente' => 'Azienda prova']), [], false);
 prova($e_ === [], "Tesi: la richiesta di tesi interna o esterna si compila senza i campi dell'altro tipo" . ($e_ ? ' – ' . implode('; ', $e_) : ''));
 [, $e_] = $ct_->leggi($tcm_, $base_t_('Richiesta tesi LMCU Conservazione e Restauro dei Beni Culturali', ['Anno di corso' => '4° anno', 'Progetto formativo' => 'Restauro Y', 'Relatore prova teorico-metodologica (1)' => 'Bianchi Anna', 'Area (1)' => 'A',
     'Relatore prova teorico-metodologica (2)' => 'Verdi Luca', 'Area (2)' => 'B']), [], false);

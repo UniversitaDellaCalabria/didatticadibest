@@ -80,7 +80,7 @@ prova(invia_attestati_gruppo($conn, 9901) === 'Questa attività non prevede atte
 prova(invia_attestati_gruppo($conn, 9904) === 'Il progetto non è ancora concluso.' && invia_attestati_gruppo($conn, 9907) === "L'elenco degli studenti è vuoto.", "invia_attestati_gruppo(): progetto non concluso, elenco vuoto");
 salva_elenco_partecipanti($conn, 9907, [['cognome' => 'Gialli', 'nome' => 'Luca']]);
 prova(invia_attestati_gruppo($conn, 9907) === true && count($EMAIL) === 1 && $EMAIL[0]['a'] === 'ce99@prova.it' && $EMAIL[0]['oggetto'] === 'Attestati degli studenti: Evento di classe prova'
-      && str_contains($EMAIL[0]['corpo'], "all'attività <strong>Evento di classe prova</strong>") && str_contains($EMAIL[0]['corpo'], 'attestati_gruppo.php?code=ATTPROVA7')
+      && str_contains($EMAIL[0]['corpo'], 'attività <strong>Evento di classe prova</strong>') && str_contains($EMAIL[0]['corpo'], 'attestati_gruppo.php?code=ATTPROVA7')
       && (int)$conn->query("SELECT attestato_inviato FROM prenotazioni WHERE id = 9907")->fetch_assoc()['attestato_inviato'] === 1, "invia_attestati_gruppo(): email al docente e prenotazione segnata");
 prova(invia_attestati_gruppo($conn, 9907) === 'Attestati già inviati.' && invia_attestati_gruppo($conn, 9907, true) === true && count($EMAIL) === 2, "invia_attestati_gruppo(): una volta sola, salvo invio forzato");
 

@@ -92,7 +92,7 @@ if (isset($conn) && $conn instanceof mysqli) {
 $widget_assistenza = basename($_SERVER['PHP_SELF']) !== 'assistenza.php' && env_valore('ASSISTENZA_WIDGET') !== '0';
 if ($widget_assistenza) { try { $widget_assistenza = class_exists(\App\Assistenza\OrariAssistenza::class) && \App\Core\App::get(\App\Assistenza\OrariAssistenza::class)->attiva(); } catch (\Throwable $e_as) { $widget_assistenza = false; } } ?>
 <?php if ($widget_assistenza): ?>
-<script src="<?php echo htmlspecialchars(rtrim((string)parse_url(url_base_sito(), PHP_URL_PATH), '/')); ?>/assets/js/assistenza-widget.js?v=4" defer></script>
+<script src="<?php echo htmlspecialchars(rtrim((string)parse_url(url_base_sito(), PHP_URL_PATH), '/')); ?>/assets/js/assistenza-widget.js?v=5" defer></script>
 <?php endif; ?>
 <?php if (!empty($GLOBALS['usa_campo_scuola'])): // campo "Scuola" con ricerca nell'anagrafe ?>
 <script src="<?php echo htmlspecialchars(rtrim((string)parse_url(url_base_sito(), PHP_URL_PATH), '/')); ?>/assets/js/campo-scuola.js?v=4"></script>
@@ -128,6 +128,23 @@ if ('serviceWorker' in navigator) {
             });
     });
 }
+</script>
+
+<!-- App installabile: i pulsanti con data-installa-app (nell'area personale) compaiono solo se il browser permette di installarla; su iPhone/iPad spiegano come fare -->
+<script>
+(function () {
+    var evento = null;
+    var installata = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true;
+    var ios = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+    function mostra(si) { document.querySelectorAll('[data-installa-app]').forEach(function (b) { b.hidden = !si; }); }
+    window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); evento = e; mostra(!installata); });
+    window.addEventListener('appinstalled', function () { evento = null; mostra(false); });
+    if (ios && !installata) mostra(true);
+    window.installaApp = function () {
+        if (evento) { evento.prompt(); evento.userChoice.then(function () { evento = null; mostra(false); }); }
+        else { alert("Per installare l'app su iPhone o iPad: tocca «Condividi» in Safari e poi «Aggiungi alla schermata Home»."); }
+    };
+})();
 </script>
 
 <!-- BANNER COOKIE NATIVO -->

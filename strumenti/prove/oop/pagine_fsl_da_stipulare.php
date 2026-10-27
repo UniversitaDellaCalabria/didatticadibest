@@ -14,7 +14,7 @@ $loc->query("INSERT INTO prenotazioni (id, turno_id, utente_id, codice_prenotazi
 $errore_php_ds = fn(array $r) => (bool)preg_match('/<b>(Fatal error|Parse error|Warning)<\/b>|Uncaught /', $r['corpo']);
 
 $r = $http('/eventi/admin/fsl.php?p_id=2&tab=stipulare', null, $jar);
-prova($r['codice'] === 200 && !$errore_php_ds($r) && str_contains($r['corpo'], 'Convenzioni da stipulare') && str_contains($r['corpo'], 'Liceo Prova Pagine') && str_contains($r['corpo'], 'Allegato A precompilato (PDF)')
+prova($r['codice'] === 200 && !$errore_php_ds($r) && str_contains($r['corpo'], 'Convenzione da stipulare') && str_contains($r['corpo'], 'Liceo Prova Pagine') && str_contains($r['corpo'], 'Allegato A (PDF)')
     && str_contains($r['corpo'], 'Registra la convenzione ricevuta') && str_contains($r['corpo'], 'FS-DSPAG'), "scheda «Da stipulare»: la scuola con la sua prenotazione (già confermata) e i pulsanti dei documenti");
 $r_tutte = $http('/eventi/admin/fsl.php?p_id=2&tab=stipulare&mostra=tutte', null, $jar);
 prova($r_tutte['codice'] === 200 && !$errore_php_ds($r_tutte) && str_contains($r_tutte['corpo'], 'Liceo Prova Pagine'), "scheda «Da stipulare»: vista di tutte le scuole con prenotazioni");

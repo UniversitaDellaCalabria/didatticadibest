@@ -4,7 +4,7 @@
 // In cache solo le librerie in assets/vendor e assets/js (percorsi con la versione: Cache-First) e la pagina offline.
 // Cambiare SW_VERSION fa cancellare ai browser tutte le cache delle versioni precedenti.
 
-const SW_VERSION = 'dibest-v8';
+const SW_VERSION = 'dibest-v9';
 
 const CACHE_STATIC  = SW_VERSION + '-static';   // CSS, JS, font e icone delle librerie
 const CACHE_OFFLINE = SW_VERSION + '-offline';  // Solo offline.html

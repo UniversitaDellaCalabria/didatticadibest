@@ -52,6 +52,18 @@ final class ComunicazioniRepository
         return array_slice(array_values(array_filter($righe, fn (array $r): bool => $this->perPubblico($r, $pubblico) && $this->contiene($r, $cerca))), 0, max(1, $limite));
     }
 
+    /**
+     * Notizie e pagine informative visibili che contengono tutte le parole cercate (per la ricerca unica del sito).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function cerca(string $cerca, int $limite = 20): array
+    {
+        $righe = $this->db->righe('SELECT * FROM comunicazioni WHERE tipo IN (?, ?) AND ' . self::VISIBILE . ' ORDER BY in_evidenza DESC, IFNULL(data_pubblicazione, DATE(creato_il)) DESC, id DESC LIMIT 400', [self::NOTIZIA, self::PAGINA]);
+
+        return array_slice(array_values(array_filter($righe, fn (array $r): bool => $this->contiene($r, $cerca))), 0, max(1, $limite));
+    }
+
     /** @return list<array<string, mixed>> pagine informative visibili */
     public function pagine(): array
     {

@@ -30,10 +30,14 @@ $elenco = [
     $pub('map_pub_risorse.png', 5, 'aule-laboratori.php', 900),
     $pub('map_pub_programma_fsl.png', 6, 'programma_fsl.php', 800),
     $pub('map_pub_registro_tutorato.png', 5, 'registro_tutorato.php', 760),
-    $pub('map_area_studente.png', 5, 'area_personale.php', 900),
-    $pub('map_area_docente.png', 6, 'area_personale.php', 1100),
-    $pub('map_area_direttore.png', 7, 'area_personale.php', 900),
-    $pub('map_profilo.png', 5, 'profilo.php', 760),
+    $pub('map_area_studente.png', 6, 'area_personale.php', 900),
+    $pub('map_area_docente.png', 3, 'area_personale.php', 1100),
+    $pub('map_area_direttore.png', 1, 'area_personale.php?come=direttore', 900),
+    $pub('map_profilo.png', 6, 'profilo.php', 760),
+    $pub('map_miei_eventi.png', 6, 'miei_eventi.php', 800),
+    $pub('map_calendario.png', 6, 'calendario.php', 1000),
+    $pub('map_area_studente_scuro.png', 6, 'area_personale.php', 900), // tema scuro: Chrome dichiara la preferenza del sistema (vedi sotto)
+    $pub('map_pub_ricerca_gruppi.png', 6, 'ricerca.php?q=tesi', 1000),
     $pan('map_adm_inizio.png', 1, 'admin/inizio.php'),
     $pan('map_adm_aree.png', 1, 'admin/aree.php'),
     $pan('map_adm_dashboard.png', 1, 'admin/dashboard.php?p_id=1', 900),
@@ -106,7 +110,8 @@ foreach ($elenco as $v) {
     @unlink($tmp);
     $h = $v['y'] + $v['alt'] + 130; // oltre il ritaglio: il banner dei cookie sta in fondo alla finestra
     $url = $v['u'] ? "$BASE/__accesso?u={$v['u']}&vai=" . urlencode($v['url']) : $BASE . $v['url']; // utente 0 = senza accesso
-    $cmd = sprintf('"%s" --headless=new --disable-gpu --hide-scrollbars --force-device-scale-factor=1 --lang=it-IT --user-data-dir=%s --window-size=1280,%d --virtual-time-budget=5000 --screenshot=%s %s 2>&1',
+    $scuro = '--blink-settings=preferredColorScheme=' . (getenv('SCHERMATE_SCURO_VALORE') !== false ? (str_contains($v['n'], '_scuro') ? getenv('SCHERMATE_SCURO_VALORE') : (1 - (int)getenv('SCHERMATE_SCURO_VALORE'))) : '1') . ' ';
+    $cmd = sprintf('"%s" --headless=new ' . $scuro . '--disable-gpu --hide-scrollbars --force-device-scale-factor=1 --lang=it-IT --user-data-dir=%s --window-size=1280,%d --virtual-time-budget=5000 --screenshot=%s %s 2>&1',
         $CHROME, "\"$profilo\"", $h, "\"$tmp\"", "\"$url\""); // senza escapeshellarg: su Windows toglie i «%» dell'indirizzo
     exec($cmd);
     if (!is_file($tmp)) { echo "MANCA {$v['n']}\n"; continue; }
