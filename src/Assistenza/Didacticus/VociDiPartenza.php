@@ -89,7 +89,7 @@ final class VociDiPartenza
 
 Per i requisiti del tuo corso di studi (CFU, periodi, tutor) fai riferimento all'ordinamento; per dubbi sul tuo caso parla con un operatore.",
                 'link' => [['e' => 'Tirocini', 'u' => 'tirocini.php']], 'proponi_operatore' => true],
-            ['argomento' => 'tirocini', 'titolo' => 'Scuole: Formazione Scuola Lavoro e convenzione online',
+            ['argomento' => 'fsl', 'titolo' => 'Scuole: Formazione Scuola Lavoro e convenzione online',
                 'domande' => "Come iscrivo la mia classe a un progetto\nConvenzione per la Formazione Scuola Lavoro\nCome funziona il programma FSL\nPCTO con il Dipartimento\nCome stipulare la convenzione come scuola",
                 'parole_chiave' => "fsl, pcto, formazione scuola lavoro, scuola, classe, convenzione scuola, programma fsl, docente referente, alternanza",
                 'risposta' => "Il docente referente sceglie le attività dalle pagine della Formazione Scuola Lavoro e le aggiunge al «Programma FSL» (accedendo con SPID o CIE). Dal programma si invia la richiesta: la scuola riceve per email il link personale della convenzione online, la compila, carica la copia firmata e segue l'iter fino alla conferma.\n\nGli studenti si inseriscono poi nell'elenco della classe e, a conclusione, il docente scarica gli attestati.",

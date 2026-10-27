@@ -53,7 +53,8 @@ final class Costanti
 
     /** Argomenti tra cui scegliere (chiave => nome, icona Font Awesome, frase di aiuto). */
     public const ARGOMENTI = [
-        'tirocini' => ['nome' => 'Tirocini e Formazione Scuola Lavoro', 'icona' => 'fa-briefcase', 'aiuto' => 'Tirocini, convenzioni con scuole e aziende, FSL'],
+        'tirocini' => ['nome' => 'Tirocini', 'icona' => 'fa-briefcase', 'aiuto' => 'Tirocini curriculari degli studenti su TSP 2.0, convenzioni con aziende ed enti'],
+        'fsl' => ['nome' => 'Formazione Scuola Lavoro', 'icona' => 'fa-school', 'aiuto' => 'Per scuole e docenti: attività FSL (PCTO) e Open Lab, convenzione, elenco studenti, attestati'],
         'certificati' => ['nome' => 'Certificati e attestati', 'icona' => 'fa-certificate', 'aiuto' => 'Certificato di iscrizione o di laurea, attestati, Diploma Supplement'],
         'pratiche' => ['nome' => 'Pratiche e moduli', 'icona' => 'fa-file-signature', 'aiuto' => 'Piano di studi, convalide, esoneri, cambi di corso, mobilità'],
         'iscrizione' => ['nome' => 'Iscrizione, tasse e orientamento', 'icona' => 'fa-id-card', 'aiuto' => 'Ammissione, immatricolazione, tasse, OFA, trasferimenti, borse di studio'],

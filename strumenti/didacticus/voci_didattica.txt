@@ -776,3 +776,330 @@ Le **selezioni** dei tutor didattici sono pubblicate ogni anno sul portale Ammin
 - **rinuncia** con l'apposito modulo, se non puoi più svolgere l'attività.
 
 Per la lettera di incarico, il registro delle ore e il pagamento fai riferimento alla voce sul tutorato nel portale.
+
+# ===== Formazione Scuola Lavoro (FSL, ex PCTO): per scuole e docenti. Non sono i tirocini degli studenti universitari (argomento «Tirocini»). =====
+
+[fsl] Cos'è la Formazione Scuola Lavoro (FSL) del DiBEST e come si prenota {op}
+? Cos'è la Formazione Scuola Lavoro
+? Come prenoto un'attività FSL per la mia classe
+? Come iscrivo la mia classe a un percorso del Dipartimento
+? Dove trovo le attività FSL
+? Cos'è il PCTO con il DiBEST
+? Quali percorsi offre il Dipartimento alle scuole
+? FSL e PCTO sono la stessa cosa
+= fsl, pcto, alternanza, formazione scuola lavoro, scuola, classe, prenotare, prenotazione, attività, percorsi, progetti, docente referente, istituto
+@ Attività FSL (prenotazione) | https://dibest2.unical.it/eventi/fsl.php
+@ Il DiBEST per le scuole | https://dibest.unical.it/scuole/
+---
+La **Formazione Scuola Lavoro (FSL)**, già PCTO o alternanza scuola-lavoro, è il percorso con cui il Dipartimento accoglie studenti delle scuole superiori in laboratori, musei e attività di ricerca, in presenza o online.
+
+**Come si prenota (docente referente della scuola):**
+
+1. apri l'elenco delle attività FSL e scegli quella (o quelle) adatte alla classe: ogni scheda indica ore, periodo, posti disponibili, luogo e docente responsabile;
+2. accedi con SPID o CIE e aggiungila al «Programma FSL»;
+3. invia la richiesta: la scuola riceve per email il link personale per la **convenzione online** (la convenzione è obbligatoria e vale un anno);
+4. a prenotazione e convenzione a posto, il docente inserisce l'elenco degli studenti e, alla fine, scarica gli attestati.
+
+Le attività si prenotano indipendentemente dalle altre iniziative per le scuole (Open Lab, orientamento in ingresso, Aule aperte). I **tirocini** degli studenti universitari sono una cosa diversa e si fanno su TSP 2.0.
+
+[fsl] Convenzione FSL: come si compila, si firma e si invia {op}
+? Come stipulo la convenzione per la FSL
+? La scuola deve fare una convenzione con l'Unical
+? Dove trovo la convenzione e l'Allegato A
+? Chi deve firmare la convenzione della scuola
+? Non ho ricevuto il link per la convenzione
+? Come invio la convenzione firmata
+? Posso inviare la convenzione via PEC
+= convenzione, convenzione scuola, allegato a, dirigente scolastico, firma digitale, pades, link personale, pec, convenzione fsl, stipulare
+@ Guida per le scuole | guida.php?r=scuola
+@ Programma FSL | programma_fsl.php
+---
+Per le scuole la convenzione si fa **online**, senza registrarsi:
+
+1. dopo la richiesta di prenotazione arriva alla scuola un'**email con il link personale** (se non la trovi controlla lo spam; il link si può riaprire anche con il codice della prenotazione);
+2. nella pagina si compilano i dati della scuola (codice meccanografico, codice fiscale, PEC), del **Dirigente Scolastico** e, per ogni attività dell'**Allegato A**, il numero di studenti e il docente tutor;
+3. si scaricano l'**Allegato A (PDF)** e la **Convenzione (Word)**: eventuali correzioni si fanno nel Word, poi si salva in PDF;
+4. il Dirigente firma la convenzione **digitalmente in PAdES** (un PDF firmato; il file .p7m non è accettato) e **dopo la firma il file non va più modificato né risalvato**; l'Allegato A si carica in PDF anche senza firma;
+5. si caricano i file nella stessa pagina (oppure si inviano dalla PEC della scuola alla PEC del Dipartimento, indicata nella guida).
+
+Poi pensa a tutto il Dipartimento: protocollo in entrata, firma del Direttore e protocollo definitivo. A ogni passaggio la scuola riceve una email.
+
+[fsl] La convenzione FSL è stata rifiutata o non conforme {op}
+? La convenzione inviata via PEC non è stata accettata
+? Perché è stata rifiutata la convenzione
+? Devo rifare la convenzione
+? Posso usare un formato diverso da quello scaricato
+? Ho modificato il file dopo la firma
+? Convenzione da correggere
+= convenzione rifiutata, convenzione scuola rifiutata, non conforme, file modificato, formato, convenzione da correggere, firma grafica
+@ Come inviare correttamente la convenzione | guida.php?r=scuola
+---
+La convenzione viene rifiutata, di solito, per uno di questi motivi:
+
+- **non è firmata digitalmente in PAdES** (la firma grafica, cioè l'immagine della firma, non basta; il .p7m non è accettato);
+- **non è nel formato scaricato dalla piattaforma**: bisogna usare i documenti prodotti dalla pagina della convenzione (Convenzione e Allegato A) e non un modello diverso;
+- il file è stato **modificato o salvato di nuovo dopo la firma**, quindi la firma non risulta più integra.
+
+**Che fare:** scarica di nuovo i documenti dalla pagina personale della convenzione (il link è nell'email ricevuta; il Dipartimento può reinviarlo), correggi, fai firmare in PAdES e carica il file **direttamente in piattaforma** (oppure invialo dalla PEC della scuola). Quando l'ufficio rifiuta un file spiega il motivo nell'email «Convenzione da correggere». Se non sai come riparare, scrivi a orientamento.dibest@unical.it.
+
+[fsl] Ho prenotato ma la prenotazione risulta in attesa {op}
+? La mia prenotazione è in attesa
+? La prenotazione FSL non è confermata
+? Quando viene confermata la prenotazione
+? Posso partecipare senza convenzione
+? Come so se la convenzione è attiva
+= in attesa, prenotazione non confermata, convenzione attiva, conferma prenotazione, stato prenotazione
+@ La mia Area personale | area_personale.php
+---
+Se la scuola non ha ancora una **convenzione valida**, la prenotazione resta **«in attesa»**: è normale, non è un errore. Si **conferma da sola** quando la convenzione diventa attiva, cioè dopo il protocollo definitivo del Dipartimento; la scuola riceve l'email «Convenzione attiva».
+
+Per far arrivare prima il momento basta completare subito la convenzione online (dati, firma PAdES, caricamento). Lo stato lo vedi nella scheda «Programma FSL» della tua Area personale.
+
+[fsl] Rinnovo o scadenza della convenzione FSL {op}
+? La convenzione FSL è scaduta
+? Quanto dura la convenzione
+? Devo rinnovare la convenzione ogni anno
+? Dove ritrovo la convenzione firmata
+= scadenza, rinnovo, validità, un anno, convenzione scaduta, rinnovare, convenzione in vigore
+@ Programma FSL | programma_fsl.php
+---
+La convenzione FSL vale **un anno**. Poco prima della scadenza il Dipartimento avvisa la scuola e si ripete lo stesso percorso (dati, firma PAdES del Dirigente, caricamento) con una nuova convenzione; quelle scadute restano consultabili.
+
+La convenzione in vigore, con protocollo e validità, e l'Allegato A si scaricano dalla scheda **«Programma FSL»** dell'Area personale: li vedono tutti i docenti collegati alla scuola.
+
+[fsl] Elenco degli studenti e autorizzazione della scuola {op}
+? Come inserisco l'elenco degli studenti
+? Dove carico l'elenco dei partecipanti
+? Cos'è l'autorizzazione della scuola
+? Posso caricare l'elenco da Excel
+? Devo aggiungere o togliere uno studente
+? Posso aumentare il numero di partecipanti
+? Entro quando devo consegnare l'elenco
+= elenco studenti, partecipanti, autorizzazione, excel, modello, nominativi, studenti fsl, carica elenco, numero studenti
+@ La mia Area personale | area_personale.php
+---
+Il docente inserisce l'elenco **da solo**, dopo l'accesso con le credenziali usate per la prenotazione:
+
+1. Area personale → nella prenotazione premi **«Carica elenco e autorizzazione»** (accanto trovi la scadenza «entro il …»);
+2. scrivi **cognome e nome** di ogni studente (oppure scarica il modello Excel, compilalo e caricalo: **sostituisce** l'elenco attuale) e premi **«Salva l'elenco»**;
+3. carica l'**autorizzazione della scuola** in PDF (al massimo 10 MB).
+
+Il contatore in alto mostra gli studenti inseriti sul totale iscritto: non puoi inserirne più di quanti indicati nella prenotazione. Per **aumentare il numero**, correggere un nome dopo l'invio degli attestati o fare altre modifiche scrivi a orientamento.dibest@unical.it. Se la scadenza si avvicina il portale manda promemoria.
+
+[fsl] Attestati FSL e certificazione delle ore {op}
+? Quando arrivano gli attestati FSL
+? Come scarico l'attestato di Formazione Scuola Lavoro
+? Come si certificano le ore FSL
+? L'attestato ha un nome sbagliato
+? Posso avere un attestato per un'attività online
+? Come verifico un attestato
+= attestato fsl, attestati, certificazione ore, ore svolte, presenze, attestato di partecipazione, nome sbagliato, verifica attestato
+@ La mia Area personale | area_personale.php
+---
+Gli **attestati di partecipazione** si generano con i nomi dell'elenco e partono **dopo l'attività**, per le classi con presenza registrata; il docente li scarica dall'Area personale. Ogni attestato riporta le ore dell'attività e si può verificare con il codice.
+
+- **Nome sbagliato:** dopo l'invio l'elenco non è più modificabile dal docente: scrivi a orientamento.dibest@unical.it e l'ufficio corregge e rigenera l'attestato.
+- **Ore aggiuntive:** le ore svolte in autonomia a scuola (per esempio con un compito di realtà) possono essere certificate dalla scuola; l'attestato del Dipartimento certifica le ore dell'attività svolta con noi.
+
+[fsl] Quante ore dura un percorso FSL: unire più attività e raggiungere 20 o 40 ore {op}
+? Quante ore fa fare il percorso
+? La scuola ha bisogno di 40 ore, come si fa
+? Posso unire più attività in un unico percorso
+? Si possono aggiungere ore di lavoro in autonomia
+? Posso fare una sola attività da 8 ore
+? Le attività possono essere online
+= ore, 20 ore, 40 ore, unire attività, unico percorso, percorso, lavoro autonomo, monte ore, più attività
+@ Attività FSL | https://dibest2.unical.it/eventi/fsl.php
+---
+Ogni attività FSL ha le **sue ore** (di norma 8 ore, in presenza o online, indicate nella scheda). Se la scuola ha bisogno di più ore, ci sono due strade:
+
+- **unire più attività** in un unico percorso, scegliendole dall'elenco e prenotandole insieme (per esempio aree diverse del Dipartimento);
+- **aggiungere ore di lavoro in autonomia** a scuola (relazione, abstract, storytelling, compito di realtà), concordandole con il docente responsabile dell'attività: queste ore le certifica la scuola.
+
+Per un percorso su misura (periodo, classi insieme o separate, ore) scrivi a orientamento.dibest@unical.it indicando **quali attività**, quanti studenti e il periodo desiderato.
+
+[fsl] Numero di partecipanti, gruppi e turni nelle attività FSL {op}
+? Possiamo venire in più di una classe
+? Quanti studenti possono partecipare
+? Le classi vengono insieme o separate
+? Possiamo avere più turni
+? L'attività è aperta a una sola scuola
+? Voglio più posti o modificare l'attività
+= partecipanti, numero studenti, posti, turni, gruppi, classi insieme, capienza, laboratori, una sola scuola, ampliare
+---
+Molte attività si svolgono in **laboratori e musei con capienza limitata**, quindi si organizzano a gruppi e turni (per esempio gruppi da 7-8 studenti a rotazione nella stessa giornata). Il numero massimo di posti è indicato nella scheda dell'attività, e alcune sono riservate a **una sola scuola**.
+
+Per più studenti, per portare insieme più classi o per cambiare l'attività scrivi a orientamento.dibest@unical.it con scuola, classi, numero di studenti e periodo: il docente responsabile valuta turni e disponibilità e, se serve, l'ufficio **modifica l'attività sulla piattaforma** (poi la scuola aggiorna convenzione e Allegato A dalla sua pagina).
+
+[fsl] Open Lab, Aule aperte e FSL: la scuola vuole una convenzione per l'Open Lab {op}
+? Cos'è l'Open Lab
+? Come prenoto l'Open Lab
+? Voglio fare l'Open Lab con la mia classe
+? Mi serve una convenzione per l'Open Lab
+? L'Open Lab è un percorso FSL
+= open lab, openlab, aule aperte, laboratorio scuole, classe, convenzione open lab, esplora il futuro, per-corsi
+@ Il DiBEST per le scuole | https://dibest.unical.it/scuole/
+@ Prenotazione attività | https://dibest2.unical.it/eventi/
+---
+L'**Open Lab** è un'attività del DiBEST in cui le classi sperimentano in laboratorio (per esempio genetica molecolare), in presenza o online. Si prenota dal sito delle attività come le altre.
+
+Se la scuola vuole che le ore contino come **percorso FSL**, serve la **convenzione**: si prenota l'attività, si riceve il link e si completa la convenzione online come per le altre attività FSL. Per Open Lab e visite di orientamento senza FSL la richiesta è più semplice: il docente inserisce solo l'elenco degli studenti nella sua Area personale.
+
+Per informazioni scrivi a orientamento.dibest@unical.it.
+
+[fsl] Docenti Unical: proporre, modificare o accorpare un'attività FSL {op}
+? Voglio proporre un'attività FSL
+? Posso modificare la mia attività sulla piattaforma
+? Come accorpo due attività in una sola
+? Come apro l'attività a due scuole
+? Chi aggiorna le schede delle attività
+= docente responsabile, proporre attività, modificare attività, accorpare, due scuole, scheda attività, nuovo progetto fsl, programma
+---
+Le schede delle attività FSL le **gestisce l'ufficio** (Area Servizi Didattica e Studenti) a partire dal programma che invia il docente responsabile.
+
+Per **proporre una nuova attività** manda il programma (titolo, ore, periodo, luogo, numero di studenti, accompagnatori) a orientamento.dibest@unical.it. Per **modificare o accorpare** attività già pubblicate, o per aprirle a più scuole, scrivi all'ufficio indicando che cosa cambiare: la modifica la fa l'ufficio sulla piattaforma. Prima di pubblicare conviene controllare insieme le informazioni inserite.
+
+[fsl] Contatti per le scuole: orientamento e Formazione Scuola Lavoro {op}
+? Con chi parlo per la FSL
+? A chi scrivo per l'orientamento
+? Qual è l'indirizzo email per le scuole
+? Dove si trova l'ufficio
+= contatti scuole, orientamento, email orientamento, delegata orientamento, referente fsl, ufficio, scuole contatti
+@ Il DiBEST per le scuole | https://dibest.unical.it/scuole/
+---
+Per **FSL, Open Lab e orientamento in ingresso** scrivi a **orientamento.dibest@unical.it**. La delegata all'orientamento in ingresso e in itinere del Dipartimento è la Prof.ssa Paolina Crocco.
+
+L'Area Servizi Didattica e Studenti è al Cubo 6C, 4° piano (Università della Calabria, Arcavacata di Rende), con ricevimento il martedì e il giovedì dalle 10 alle 12.
+
+# ===== Tirocini (studenti): voci nuove dalle domande di ottobre 2026 =====
+
+[tirocini] Tirocinio o Formazione Scuola Lavoro: che differenza c'è {op}
+? Il tirocinio è la stessa cosa della FSL
+? Sono una studentessa universitaria, devo fare la FSL
+? Sono uno studente universitario, posso partecipare alle attività FSL
+? Sono una scuola, come faccio il tirocinio
+? Dove si prenotano le attività per le scuole
+= differenza tirocinio fsl, fsl o tirocinio, pcto, tirocinio studenti, scuole superiori, alternanza, che cosa è il tirocinio
+@ Guida per lo studente (TSP 2.0) | https://www.unical.it/uuid-media/d1e3f73b-dcba-4a45-b247-beb3a6412ec8/
+@ Formazione Scuola Lavoro | https://dibest2.unical.it/eventi/fsl.php
+---
+Sono **due cose diverse**:
+
+- **Tirocinio curriculare:** per gli studenti **universitari** iscritti a un corso di laurea. Dà CFU e si fa su **TSP 2.0** (unical.tsp.esse3.cineca.it) con le credenziali Esse3, in azienda, ente o laboratorio dell'Ateneo.
+- **Formazione Scuola Lavoro (FSL, ex PCTO):** per le **scuole superiori**. È il docente della scuola che prenota le attività del Dipartimento e stipula la convenzione dal portale; non dà CFU e non si fa su TSP.
+
+Se sei uno studente universitario e cerchi il tirocinio, continua qui; se sei un docente di una scuola, chiedimi della FSL.
+
+[tirocini] Due tirocini nel piano di studi (curriculare e tirocinio 2): ordine e stesso laboratorio {op}
+? Il piano prevede due tirocini
+? Posso fare i due tirocini insieme
+? Posso fare il secondo tirocinio prima del primo
+? Posso fare entrambi i tirocini nello stesso laboratorio
+? Quante ore sono i due tirocini
+= due tirocini, secondo tirocinio, tirocinio 2, stesso laboratorio, tirocinio contemporaneo, 2 cfu, 6 cfu, magistrale, ordine tirocini
+---
+Su TSP 2.0 entrambi i tirocini si chiedono partendo dal **tirocinio curriculare**. Vale questa regola: prima si svolge e si chiude il **tirocinio curriculare** e solo dopo si può fare domanda per il **tirocinio 2**. **Non si possono fare in contemporanea** e non si può chiedere prima il secondo.
+
+Se puoi svolgerli **nello stesso laboratorio** dipende dal **tuo corso di laurea**, non dall'ufficio tirocini: scrivi alla coordinatrice o al coordinatore del corso (e all'ufficio didattico del corso) e chiedi conferma prima di impostare i progetti formativi. In ogni caso servono due progetti formativi separati, in periodi distinti.
+
+[tirocini] Non trovo un laboratorio o un'azienda per il tirocinio: come cercare {op}
+? Non trovo posto per il tirocinio
+? Non trovo un laboratorio per il tirocinio
+? Non trovo un laboratorio disponibile
+? Non so dove fare il tirocinio
+? I laboratori dell'Unical sono pieni
+? Posso fare il tirocinio in un'azienda sperimentale o agricola
+? Come trovo un docente tutor
+? Posso proporre io un'azienda
+? Elenco di tutti gli enti convenzionati
+= trovare laboratorio, non trovo un laboratorio, non trovo laboratorio, non trovo tirocinio, nessuna disponibilità, azienda sperimentale, elenco enti convenzionati, tutor aziendale, tutor accademico, proporre azienda, proposta di stage
+@ Aziende convenzionate | tirocini.php
+@ Piattaforma TSP 2.0 | https://unical.tsp.esse3.cineca.it
+---
+**Dove cercare:**
+
+- **l'elenco degli enti convenzionati**: qui sul portale (pagina «Tirocini», accedendo con le credenziali Unical) e in TSP alla voce «Ricerca azienda», con filtri per regione, provincia, comune e settore;
+- i **laboratori interni** dell'Ateneo (docenti del Dipartimento e di altri Dipartimenti, scrivendo direttamente a chi ti interessa);
+- oppure puoi **proporre tu un'azienda o un ente**.
+
+**Se scegli un'azienda o un ente tuo (anche sperimentale o agricolo):**
+
+1. prima **accordati con l'azienda** e fatti indicare un **tutor aziendale**;
+2. chiedi la disponibilità a un **docente Unical** del tuo corso come **tutor accademico**;
+3. poi invii la **proposta di stage** su TSP 2.0. Se l'ente non è convenzionato deve fare lui la convenzione sulla piattaforma (vedi la voce sulla convenzione).
+
+[tirocini] La convenzione risulta «in lavorazione» su TSP: cosa succede dopo {op}
+? La convenzione è in lavorazione
+? Inviata a Titulus per la firma digitale
+? Cosa deve fare ora la scuola o l'azienda
+? Il documento arriva via PEC
+? Dove carico la convenzione firmata
+? L'ente è accreditato ma non lo vedo
+= convenzione in lavorazione, titulus, firma digitale ateneo, istituita, pec, gestione documenti, allegati convenzione, area disciplinare
+@ Piattaforma TSP 2.0 | https://unical.tsp.esse3.cineca.it
+---
+Lo stato **«In lavorazione [Inviata a Titulus per la firma digitale]»** significa che la convenzione è alla **firma dell'Ateneo**: l'ente non deve fare nulla finché non riceve il documento.
+
+Quando è pronto, il documento arriva **via PEC all'indirizzo dell'ente**: l'ente lo **scarica, lo firma digitalmente (PAdES) e lo carica su TSP**, nella sezione **«Gestione documenti»** (convenzioni → allegati), non basta rispondere alla PEC. Quando l'Ateneo porta la convenzione in stato **«Istituita»**, puoi inviare la proposta di stage.
+
+Se l'ente è già accreditato ma tu non lo vedi, di solito manca l'**area disciplinare del DiBEST** nella sua anagrafica: l'ufficio competente (Orientamento, Inclusione e Counseling, tramite il ticket di Ateneo) la aggiunge.
+
+[tirocini] Non ho ricevuto l'email per il corso sulla sicurezza del tirocinio {op}
+? Non mi è arrivata l'email del corso di sicurezza
+? Gli altri studenti hanno ricevuto il link e io no
+? Come accedo al corso sulla sicurezza senza email
+= email corso sicurezza, link corso sicurezza, non ricevuto, mooc, sicurezza tirocinio
+@ Corso sulla sicurezza (MOOC Unical) | https://mooc.unical.it/course/view.php?id=3
+@ Guida per lo studente (TSP 2.0) | https://www.unical.it/uuid-media/d1e3f73b-dcba-4a45-b247-beb3a6412ec8/
+---
+L'email con il link è un messaggio automatico e può non arrivare per un problema temporaneo dei sistemi: **non è un problema della tua carriera**. Il corso è comunque aperto a tutti: ci arrivi **direttamente dalla piattaforma e-learning dell'Ateneo (MOOC)** e le istruzioni complete sono nella guida del tirocinio. Cerca anche nella cartella dello spam.
+
+Il corso va **superato prima di avviare il tirocinio** e ha validità cinque anni. Se non riesci ad accedere scrivi a tirocini.dibest@unical.it.
+
+# ===== Certificati, accesso e ammissione =====
+
+[certificati] Diploma Supplement e documenti per l'estero dopo la laurea {op}
+? Sono laureato da anni, come ottengo il Diploma Supplement
+? Mi serve la documentazione per un'università straniera
+? Ho bisogno del programma degli esami tradotto in inglese
+? Come ottengo il certificato con gli esami sostenuti per l'estero
+? Valutazione del titolo italiano all'estero
+? Non vivo in Italia, come faccio la richiesta
+= diploma supplement, laureato, ex studente, università straniera, estero, certificato in inglese, piano di studi in inglese, dichiarazione di valore, laurea 2022, titolo di studio
+@ Diploma Supplement | https://ticket.unical.it/tickets/new/13/118/
+@ Certificati e pergamene | https://dibest.unical.it/didattica/iscriversi-studiare-laurearsi/certificati-pergamene/
+---
+Anche a **carriera chiusa** e da **fuori Italia** puoi fare tutto online, con le credenziali Esse3 o con SPID, sui moduli di **uniTicket**:
+
+- **Diploma Supplement:** lo rilascia l'Ateneo solo per i titoli dell'ordinamento **DM 270/2004**; modulo su uniTicket, **senza bollo**; lo trovi sulla piattaforma.
+- **Certificato di laurea** e **certificato con gli esami sostenuti**: due marche da bollo da 16 € (richiesta e certificato). Per gli enti esteri i certificati per uso estero hanno un modulo apposito (16 € di istanza più 16 € per ogni certificato).
+- **Attestazioni ANIS** con SPID o CIE: subito, verificabili tramite QR code.
+
+Le università straniere chiedono spesso il Diploma Supplement e il certificato con gli esami: indica chiaramente l'uso all'estero nella richiesta. La **pergamena** si ritira allo sportello o per delega (online o cartacea). Per dubbi scrivi a un operatore.
+
+[accesso] Email istituzionale: primo accesso e password {op}
+? Non ho la password della mail istituzionale
+? Come attivo la mail Unical
+? Il link mi dice che la password deve darmela l'ufficio
+? Non mi arriva la password della mail studenti
+? Ho dimenticato la password della posta
+= email istituzionale, mail unical, studenti.unical.it, password posta, primo accesso, outlook, resetpassword365, teams, mail studente
+@ Posta elettronica studenti | https://www.unical.it/servizi-ict/servizi-digitali-studenti/posta-elettronica-studenti/
+---
+La casella **nome@studenti.unical.it** (indirizzo con il tuo codice fiscale) si crea in automatico circa **24 ore dopo l'assegnazione della matricola**. Le istruzioni per il primo accesso vengono mandate all'**indirizzo personale indicato su Esse3**: controlla anche lo spam e verifica che l'indirizzo su Esse3 sia corretto.
+
+Al primo accesso (outlook.com, con l'indirizzo istituzionale) cambi la password con una personale. Se non ricevi le istruzioni o l'ufficio didattico non può comunicarti la password, **non serve aspettare il Dipartimento**: l'assistenza informatica di Ateneo (helpdesk.ict@unical.it, 0984 494886) o un ticket su uniTicket con SPID gestiscono reset e attivazione. Se l'avevi già e l'hai persa, usa «Password dimenticata» nella pagina di accesso Microsoft.
+
+[iscrizione] Ammissione alle lauree magistrali: elenchi dei candidati, colloquio e riapertura dei bandi {op}
+? Dove vedo l'elenco dei candidati al colloquio
+? Quando c'è il colloquio per la magistrale
+? Dove si svolge il colloquio, su Teams
+? Il bando di ammissione alla magistrale è riaperto
+? Non mi hanno convocato al colloquio
+? Come vedo l'esito dell'ammissione alla magistrale
+= magistrale, ammissione magistrale, colloquio, bando, riapertura, elenchi idonei, teams, graduatoria, lm, concorso di ammissione
+@ Ammissione alle lauree magistrali | https://www.unical.it/didattica/iscriversi-studiare-laurearsi/ammissione-1-anno/ammissione-lauree-magistrali/
+---
+Per le lauree magistrali del DiBEST l'ammissione avviene con **concorso**, che di norma ha una prima sessione e una **riapertura in autunno** (nel 2026 a ottobre). Gli **elenchi degli idonei** che devono sostenere il **colloquio**, le date e i **link alle riunioni pubbliche su Microsoft Teams** si trovano nella **news del concorso** sulla pagina di Ateneo dedicata alle ammissioni alle lauree magistrali; la stessa informazione è inviata agli studenti per email.
+
+Il colloquio è pubblico e si svolge online sul link indicato per il tuo corso. Se non risulti nell'elenco o l'email non ti è arrivata, controlla di aver completato la domanda e scrivi a didattica.dibest@unical.it.

@@ -318,6 +318,14 @@ $casi_did = [
     'ho dimenticato la password di esse3' => 'Password dimenticata', 'come funziona l erasmus' => 'Mobilità internazionale', 'come divento tutor' => 'Tutorato: accettazione',
     'cos è il mentoring' => 'Tutorato: chi sono i tutor', 'quando posso iscrivermi al primo anno' => 'Ammissione al primo anno', 'come cambio curriculum' => 'Come modifico il piano di studi',
     'devo pagare la prima rata' => 'Tasse, rate', 'come funziona il part time' => 'Attività aggiuntive, part-time',
+    'come prenoto un attività fsl per la mia classe' => "Cos'è la Formazione Scuola Lavoro", 'chi deve firmare la convenzione della scuola' => 'Convenzione FSL: come si compila',
+    'la convenzione inviata via pec non è stata accettata' => 'La convenzione FSL è stata rifiutata', 'la prenotazione fsl è in attesa' => 'Ho prenotato ma la prenotazione risulta in attesa',
+    'come inserisco l elenco degli studenti della classe' => 'Elenco degli studenti e autorizzazione', 'la scuola ha bisogno di 40 ore di fsl' => 'Quante ore dura un percorso FSL',
+    'quando arrivano gli attestati fsl' => 'Attestati FSL', 'la convenzione fsl è scaduta' => 'Rinnovo o scadenza della convenzione FSL',
+    'sono uno studente universitario devo fare la fsl' => 'Tirocinio o Formazione Scuola Lavoro', 'posso fare i due tirocini insieme' => 'Due tirocini nel piano di studi',
+    'non trovo un laboratorio per il tirocinio' => 'Non trovo un laboratorio', 'la convenzione risulta in lavorazione inviata a titulus' => 'La convenzione risulta «in lavorazione»',
+    'ho bisogno del diploma supplement per l università straniera' => 'Diploma Supplement e documenti per l\'estero', 'non ho la password della mail istituzionale' => 'Email istituzionale: primo accesso',
+    'quando è il colloquio per la magistrale' => 'Ammissione alle lauree magistrali',
 ];
 foreach ($casi_did as $domanda => $atteso) {
     $t = $top_did($domanda);

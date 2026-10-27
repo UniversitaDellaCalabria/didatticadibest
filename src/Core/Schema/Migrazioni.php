@@ -16,8 +16,8 @@ use Closure;
  */
 final class Migrazioni
 {
-    /** 95: calendario personale (tabella calendario_token) e interruttore del riepilogo settimanale con l'agenda (colonne riepilogo_agenda* di impostazioni_sistema). 94: area personale a cruscotto (riquadro «Il mio profilo»). 93: area personale per profilo (tabella area_riquadri e riquadri di sistema di partenza). 89: Didacticus (tabelle didacticus_voci e didacticus_mancate, colonne dell'assistenza e voci di partenza). 88: notifiche push (tabella push_sottoscrizioni). 87: assistenza acceso/spento e orari (colonne assistenza_attiva e assistenza_orari di impostazioni_sistema). 86: assistenza (tabelle assistenza_conversazioni e assistenza_messaggi, ufficio fisso «assistenza»). 82: testi delle email modificabili dal pannello (tabella email_modelli). 80: verbali pubblici in sola visualizzazione, download con le credenziali di Ateneo (ufficio «verbali_scarico»). 75: dati del Direttore nel testo della convenzione di tesi (colonne tesi_direttore_* di impostazioni_sistema). 74: nella richiesta di tesi la sede esterna sceglie l'azienda tra le convenzionate (aggiorna il modulo già creato). 73: convenzioni di tesi con enti e aziende (tabella convenzioni_tesi e ufficio «convenzioni_tesi»). 72: interruttore per sospendere i promemoria al Direttore e agli uffici. 71: uffici di Dipartimento e di Ateneo in un'unica anagrafe (tabelle uffici e uffici_persone): la migrazione copia i dati delle quattro tabelle di prima. */
-    public const VERSIONE = 95;
+    /** 96: Didacticus separa i tirocini (studenti) dalla Formazione Scuola Lavoro (scuole): nuovo argomento «fsl». 95: calendario personale (tabella calendario_token) e interruttore del riepilogo settimanale con l'agenda (colonne riepilogo_agenda* di impostazioni_sistema). 94: area personale a cruscotto (riquadro «Il mio profilo»). 93: area personale per profilo (tabella area_riquadri e riquadri di sistema di partenza). 89: Didacticus (tabelle didacticus_voci e didacticus_mancate, colonne dell'assistenza e voci di partenza). 88: notifiche push (tabella push_sottoscrizioni). 87: assistenza acceso/spento e orari (colonne assistenza_attiva e assistenza_orari di impostazioni_sistema). 86: assistenza (tabelle assistenza_conversazioni e assistenza_messaggi, ufficio fisso «assistenza»). 82: testi delle email modificabili dal pannello (tabella email_modelli). 80: verbali pubblici in sola visualizzazione, download con le credenziali di Ateneo (ufficio «verbali_scarico»). 75: dati del Direttore nel testo della convenzione di tesi (colonne tesi_direttore_* di impostazioni_sistema). 74: nella richiesta di tesi la sede esterna sceglie l'azienda tra le convenzionate (aggiorna il modulo già creato). 73: convenzioni di tesi con enti e aziende (tabella convenzioni_tesi e ufficio «convenzioni_tesi»). 72: interruttore per sospendere i promemoria al Direttore e agli uffici. 71: uffici di Dipartimento e di Ateneo in un'unica anagrafe (tabelle uffici e uffici_persone): la migrazione copia i dati delle quattro tabelle di prima. */
+    public const VERSIONE = 96;
 
     /**
      * @param list<string> $gruppiPersonale gruppi assegnati al login in base al ruolo in Ateneo (GRUPPI_PERSONALE)
@@ -123,6 +123,15 @@ final class Migrazioni
             \App\Assistenza\Didacticus\VociDiPartenza::inserisci($this->db);
             $this->db->esegui('UPDATE impostazioni_sistema SET didacticus_seminato = 1 WHERE id = 1');
         }
+
+        // 4a2b. v96: Didacticus separa i tirocini degli studenti dalla Formazione Scuola Lavoro delle scuole (argomento «fsl»; la voce di partenza sulle scuole passa lì)
+        if ((int) ($this->db->valore("SELECT COUNT(*) FROM didacticus_argomenti WHERE chiave = 'tirocini'") ?? 0) === 1) {
+            $this->db->esegui("UPDATE didacticus_argomenti SET nome = 'Tirocini', aiuto = ? WHERE chiave = 'tirocini' AND nome = 'Tirocini e Formazione Scuola Lavoro'", [\App\Assistenza\Costanti::ARGOMENTI['tirocini']['aiuto']]);
+            if ((int) ($this->db->valore("SELECT COUNT(*) FROM didacticus_argomenti WHERE chiave = 'fsl'") ?? 1) === 0) {
+                $this->db->esegui('INSERT INTO didacticus_argomenti (chiave, nome, icona, aiuto, ordine) VALUES (?, ?, ?, ?, ?)', ['fsl', \App\Assistenza\Costanti::ARGOMENTI['fsl']['nome'], 'fa-school', \App\Assistenza\Costanti::ARGOMENTI['fsl']['aiuto'], 1 + (int) ($this->db->valore('SELECT COALESCE(MAX(ordine), 0) FROM didacticus_argomenti') ?? 0)]);
+            }
+        }
+        $this->db->esegui("UPDATE didacticus_voci SET argomento = 'fsl' WHERE argomento = 'tirocini' AND titolo = 'Scuole: Formazione Scuola Lavoro e convenzione online'");
 
         // 4a3. v93-94: i riquadri di sistema dell'area personale (quelli che mancano: i presenti, anche spenti o cambiati dal pannello, non si toccano)
         (new \App\Portale\Area\RiquadriRepository($this->db))->semina(date('Y-m-d H:i:s'));

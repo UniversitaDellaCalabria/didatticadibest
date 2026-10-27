@@ -54,7 +54,7 @@ function leggi_voci_didattica(string $file): array
 /** Il testo del CSV (UTF-8 con BOM, separatore «;») con le voci lette dal file. @param list<array<string, mixed>> $voci */
 function csv_da_voci(array $voci): string
 {
-    $nomi = ['tirocini' => 'Tirocini e Formazione Scuola Lavoro', 'certificati' => 'Certificati e attestati', 'pratiche' => 'Pratiche e moduli', 'tutorato' => 'Tutorato', 'tesi' => 'Tesi e laurea',
+    $nomi = ['tirocini' => 'Tirocini', 'fsl' => 'Formazione Scuola Lavoro','certificati' => 'Certificati e attestati', 'pratiche' => 'Pratiche e moduli', 'tutorato' => 'Tutorato', 'tesi' => 'Tesi e laurea',
         'eventi' => 'Eventi e prenotazioni', 'accesso' => 'Accesso e account', 'iscrizione' => 'Iscrizione, tasse e orientamento', 'esami' => 'Esami e piano di studi', 'altro' => 'Altro'];
     $f = fopen('php://temp', 'r+');
     fputcsv($f, ['Argomento', 'Titolo', 'Domande', 'Parole chiave', 'Risposta', 'Link (etichetta|indirizzo)', 'Attiva', 'Usi', 'Utile', 'Non utile', 'Propone operatore', 'Solo con accesso'], ';', '"', '');
