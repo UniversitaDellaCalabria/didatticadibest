@@ -1,20 +1,10 @@
 <?php // Riquadro «lavoro» dell'area personale: lo include area_personale.php, quindi usa le variabili della pagina ($conn, $user_info, $u_id, $is_full_admin…).
 // Una tessera per ogni postazione che la persona può usare (stessi permessi del pannello, admin/admin_header.php); le azioni si fanno nelle pagine del pannello.
+require_once __DIR__ . '/_permessi_lavoro.php';
 $lav_app = \App\Core\App::per($conn);
 $lav_uid = (int)$u_id;
 $lav_admin = !empty($is_full_admin);
-$lav_did_tutto = $lav_admin || ha_modulo($conn, $lav_uid, 'didattica') || utente_operatore_ufficio($conn, $user_info);
-$lav_fsl = $lav_admin || ha_modulo($conn, $lav_uid, 'fsl');
-$lav_perm = [
-    'admin' => $lav_admin,
-    'didattica_tutto' => $lav_did_tutto,
-    'didattica' => $lav_did_tutto || (bool)consigli_referente($conn, $user_info),
-    'conv_tesi' => $lav_did_tutto || $lav_app->get(\App\ConvenzioniTesi\ServizioConvenzioniTesi::class)->utenteDellUfficio($user_info),
-    'tutorato' => $lav_admin || ha_modulo($conn, $lav_uid, 'didattica') || utente_operatore_ufficio($conn, $user_info, 'bandi'),
-    'fsl_convenzioni' => $lav_fsl || ha_ambito($conn, $lav_uid, 'fsl_convenzioni') || $lav_app->get(\App\Uffici\ServizioUffici::class)->utenteMembro($user_info, 'convenzioni_fsl'),
-    'assistenza' => $lav_app->get(\App\Assistenza\OperatoriAssistenza::class)->eOperatore($user_info),
-    'aree' => $lav_admin || utente_ha_abilitazioni($conn, $lav_uid),
-];
+$lav_perm = area_permessi_lavoro($conn, $user_info, $lav_uid, $lav_admin);
 $lav_cose = $lav_app->get(\App\Portale\CoseDaFare::class);
 $lav_num = [];
 // Ogni numero è a sé: se una tabella manca (installazione non aggiornata) la tessera compare lo stesso, senza numero
@@ -60,6 +50,13 @@ if ($lav_perm['aree']) $lav_conta('aree', function () use (&$lav_aree, $lav_app,
         $lav_aree[] = $voce;
     }
 });
-foreach (\App\Portale\Area\PostazioniLavoro::elenco($lav_perm, $lav_num, $lav_aree) as $lav_p) {
-    area_tessera($lav_p['icona'], $lav_p['colore'], $lav_p['titolo'], $lav_p['testo'], $lav_p['href'], $lav_p['novita'], $lav_p['novita_et'], $lav_p['altri']);
+// Chi non gestisce niente (e non è di un ufficio) non vede questa parte; chi ha qualcosa da fare ha le righe in cima, le altre dopo
+$lav_post = \App\Portale\Area\PostazioniLavoro::elenco($lav_perm, $lav_num, $lav_aree);
+if ($lav_post) {
+    $lav_con = array_values(array_filter($lav_post, static fn (array $x): bool => $x['novita'] > 0));
+    $lav_senza = array_values(array_filter($lav_post, static fn (array $x): bool => $x['novita'] <= 0));
+    echo '<div class="col-12"><h2 class="ui-sezione"><i class="fa fa-briefcase me-1" aria-hidden="true"></i>Il mio lavoro</h2></div>';
+    foreach (array_merge($lav_con, $lav_senza) as $lav_p) {
+        area_riga($lav_p['icona'], $lav_p['colore'], $lav_p['titolo'], $lav_p['testo'], $lav_p['href'], $lav_p['novita'], $lav_p['altri']);
+    }
 }

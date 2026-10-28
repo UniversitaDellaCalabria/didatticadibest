@@ -10,9 +10,14 @@
                     <span class="badge rounded-pill text-bg-warning fs-6"><?php echo $da_fare_n; ?></span>
                 </div>
                 <p class="small text-secondary mb-3">Le cose che aspettano te nel portale, con il link per farle. Una volta a settimana ti arriva anche per email.</p>
+                <div class="d-flex flex-wrap gap-2 mb-3" aria-label="Vai al gruppo">
+                <?php foreach ($da_fare_gr as $g_df): ?>
+                    <a href="#df-<?php echo htmlspecialchars((string)$g_df['chiave']); ?>" class="btn btn-sm btn-outline-danger fw-bold"><?php echo htmlspecialchars($g_df['titolo']); ?> <span class="ui-badge-rosso ms-1"><?php echo (int)$g_df['n']; ?></span></a>
+                <?php endforeach; ?>
+                </div>
                 <div class="row g-3">
                 <?php foreach ($da_fare_gr as $g_df): ?>
-                    <div class="col-lg-6"><div class="h-100 rounded-3 p-3" style="background:#f8fafc;border-left:4px solid <?php echo htmlspecialchars($g_df['colore']); ?>;">
+                    <div class="col-lg-6" id="df-<?php echo htmlspecialchars((string)$g_df['chiave']); ?>"><div class="h-100 rounded-3 p-3" style="background:#f8fafc;border-left:4px solid <?php echo htmlspecialchars($g_df['colore']); ?>;">
                         <div class="fw-bold small mb-1"><i class="fa <?php echo htmlspecialchars($g_df['icona']); ?> me-1" style="color:<?php echo htmlspecialchars($g_df['colore']); ?>;" aria-hidden="true"></i><?php echo htmlspecialchars($g_df['titolo']); ?> <span class="badge text-bg-secondary"><?php echo (int)$g_df['n']; ?></span></div>
                         <?php foreach (array_slice($g_df['righe'], 0, 4) as $r_df): ?>
                             <a class="d-block text-decoration-none text-dark py-1 border-top" href="<?php echo htmlspecialchars($r_df['link']); ?>">

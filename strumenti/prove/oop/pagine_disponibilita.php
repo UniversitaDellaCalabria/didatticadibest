@@ -12,3 +12,5 @@ $r = $http('/eventi/la_mia_disponibilita.php', null, $jar);
 prova($r['codice'] === 200 && str_contains($r['corpo'], 'La mia disponibilità') && str_contains($r['corpo'], 'name="posti"') && str_contains($r['corpo'], 'name="corsi[]"') && !str_contains($r['corpo'], 'Fatal error'), "la_mia_disponibilita.php: il form per tesi e tirocinio (amministratore)");
 $r = $http('/eventi/admin/menu.php', null, $jar);
 prova($r['codice'] === 200 && str_contains($r['corpo'], 'data-nota="') && str_contains($r['corpo'], 'value="disponibilita_tesi.php"') && str_contains($r['corpo'], 'value="ricerca.php"') && !str_contains($r['corpo'], 'Fatal error'), "admin/menu.php: il menu a tendina elenca tutte le pagine del sito, con le note");
+$r = $http('/eventi/area_personale.php', null, $jar);
+prova($r['codice'] === 200 && str_contains($r['corpo'], 'class="ui-icona') && str_contains($r['corpo'], 'class="ui-riga') && !str_contains($r['corpo'], 'Fatal error'), "area_personale.php: icone di servizio in alto e righe di lavoro per chi gestisce");

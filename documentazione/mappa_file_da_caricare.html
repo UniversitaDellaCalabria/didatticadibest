@@ -1815,6 +1815,43 @@ var PACCHETTI = [
     ],
     nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
     commit: "Menu: tutte le pagine del sito selezionabili con una nota su cosa sono, anche le due nuove della disponibilità dei docenti; nel catalogo ricerca, assistenza, calendario, miei eventi, tutorato"
+  },
+  {
+    id: "area-personale-icone-righe",
+    titolo: "Pacchetto 40 · Area personale: icone di servizio e righe di lavoro",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare",
+    schema: "v99 (nessuna tabella nuova: si aggiungono da soli i riquadri «messaggi» e «cerca»)",
+    riassunto: "L'<strong>area personale</strong> cambia disposizione. In alto le <strong>icone di servizio, tre per riga</strong>, con la scritta sotto e il numero in rosso: Assistenza, <strong>Messaggi</strong> (per chi gestisce), disponibilità, eventi e attestati, calendario, profilo, risorse, ricerca, «Come si fa». Sotto «Da fare per te» (le firme e le approvazioni dei docenti: tutorato, tesi, valutazioni) con un pulsante per gruppo e il numero in rosso. Poi «Il mio lavoro», <strong>solo per chi gestisce qualcosa o è di un ufficio</strong>: una riga per postazione, con i pulsanti d'azione in fila e il numero in rosso su ognuno; in cima le righe con qualcosa da fare.",
+    passi: [["A1", "Icone di servizio a tre per riga"], ["A2", "Righe di lavoro con pulsanti e numeri"], ["A3", "Da fare per te con i pulsanti dei gruppi"], ["A4", "Prove e mappe"]],
+    cartelle: [
+      { cartella: "/ (radice del portale)", file: [
+        ["area_personale.php", "mod", "A1", "icone in alto, poi le tessere e le righe"]
+      ]},
+      { cartella: "inc/area/", file: [
+        ["inc/area/_tessera.php", "mod", "A1 A2", "le funzioni area_icona e area_riga"],
+        ["inc/area/_permessi_lavoro.php", "nuovo", "A2", "i permessi di lavoro, condivisi"],
+        ["inc/area/lavoro.php", "mod", "A2", "righe di lavoro, solo per chi gestisce"],
+        ["inc/area/messaggi.php", "nuovo", "A1", "icona dei messaggi da leggere"],
+        ["inc/area/cerca.php", "nuovo", "A1", "icona della ricerca"],
+        ["inc/area/da_fare.php", "mod", "A3", "pulsanti dei gruppi col numero"],
+        ["inc/area/assistenza.php · calendario.php · eventi.php · disponibilita.php · profilo.php · guida.php · risorse_responsabile.php", "mod", "A1", "diventano icone"]
+      ]},
+      { cartella: "src/", file: [
+        ["src/Portale/Area/CatalogoRiquadri.php", "mod", "A1", "forma «icona» e i riquadri messaggi e cerca"],
+        ["src/Portale/Area/PostazioniLavoro.php", "mod", "A2", "i numeri sui pulsanti, «Verbali da firmare»"],
+        ["src/Core/Schema/Migrazioni.php", "mod", "A1", "versione 99"]
+      ]},
+      { cartella: "assets/css/", file: [
+        ["assets/css/portale-ui.css", "mod", "A1 A2", "stile di icone e righe"]
+      ]}
+    ],
+    dopo: [
+      "Apri l'<strong>Area personale</strong>: lo schema v99 aggiunge i riquadri «Messaggi» e «Cerca nel sito». Chi aveva già personalizzato l'ordine dei riquadri trova le icone nell'ordine che aveva scelto.",
+      "Da <strong>Sito → Area personale</strong> si può ancora cambiare l'ordine e spegnere ogni icona."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Area personale: icone di servizio a tre per riga (assistenza, messaggi, calendario, profilo, ricerca…), «Il mio lavoro» solo per chi gestisce con righe e pulsanti col numero in rosso, «Da fare per te» con i pulsanti dei gruppi (schema v99)"
   }
 ];
 

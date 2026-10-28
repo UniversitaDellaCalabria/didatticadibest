@@ -25,7 +25,7 @@ final class PostazioniLavoro
      * @param array<string, bool> $p permessi (vedi PERMESSI)
      * @param array<string, int> $n numeri (vedi NUMERI)
      * @param list<array<string, mixed>> $aree le aree che la persona gestisce (vedi area())
-     * @return list<array{chiave: string, titolo: string, testo: string, icona: string, colore: string, href: string, novita: int, novita_et: string, altri: list<array{0: string, 1: string, 2?: bool, 3?: bool}>}>
+     * @return list<array{chiave: string, titolo: string, testo: string, icona: string, colore: string, href: string, novita: int, novita_et: string, altri: list<array{0: string, 1: string, 2?: bool, 3?: bool, 4?: int}>}>
      */
     public static function elenco(array $p, array $n, array $aree = []): array
     {
@@ -37,7 +37,7 @@ final class PostazioniLavoro
             $ferma = $n['smistare_giorni'] >= self::GIORNI_FERMA;
             $out[] = self::voce('pratiche', 'Pratiche degli studenti', 'Le domande arrivate con i moduli online: da assegnare, da lavorare, da portare in consiglio.', 'fa-inbox', '#047857',
                 'admin/didattica.php?tab=pratiche', $n['smistare'], 'da assegnare', [
-                    ['Da assegnare', 'admin/didattica.php?tab=pratiche&carico=smistare', false, $ferma],
+                    ['Da assegnare', 'admin/didattica.php?tab=pratiche&carico=smistare', false, $ferma, $n['smistare']],
                     ['Assegnate a me', 'admin/didattica.php?tab=pratiche&carico=me'],
                     ['Seguite da me', 'admin/didattica.php?tab=pratiche&carico=seguite'],
                     ['Tutte', 'admin/didattica.php?tab=pratiche&stato=tutte'],
@@ -47,18 +47,21 @@ final class PostazioniLavoro
                 ]);
             if ($n['protocollare'] > 0) {
                 $out[] = self::voce('protocollo', 'Ufficio protocollo', 'Pratiche arrivate all\'ufficio protocollo: registra il numero e la data e la pratica prosegue.', 'fa-stamp', '#b45309',
-                    'admin/didattica.php?tab=pratiche&carico=ufficio', $n['protocollare'], 'da protocollare');
+                    'admin/didattica.php?tab=pratiche&carico=ufficio', $n['protocollare'], 'da protocollare', [
+                        ['Da protocollare', 'admin/didattica.php?tab=pratiche&carico=ufficio', false, true, $n['protocollare']],
+                    ]);
             }
         }
         if ($p['didattica']) {
             $out[] = self::voce('sedute', $p['didattica_tutto'] ? 'Sedute e verbali' : 'Le sedute dei miei consigli', 'Consigli dei corsi di studio: ordine del giorno, presenze, decisioni sulle pratiche e verbali da firmare.', 'fa-gavel', '#7c3aed',
                 'admin/didattica.php?tab=sedute', $n['verbali'], $n['verbali'] === 1 ? 'verbale in firma' : 'verbali in firma', array_merge([
                     ['Nuova seduta', 'admin/didattica.php?tab=sedute&nuova=1'],
-                ], $p['didattica_tutto'] ? [['Archivio verbali', 'admin/didattica.php?tab=sedute&archivio=1']] : []));
+                ], $n['verbali'] > 0 ? [['Verbali da firmare', 'admin/didattica.php?tab=sedute', false, true, $n['verbali']]] : [], $p['didattica_tutto'] ? [['Archivio verbali', 'admin/didattica.php?tab=sedute&archivio=1']] : []));
         }
         if ($p['conv_tesi']) {
             $out[] = self::voce('convenzioni_tesi', 'Convenzioni di tesi', 'Convenzioni con enti e aziende per svolgere la tesi: modifiche, protocollo, firma del Direttore.', 'fa-handshake', '#0e7490',
                 'admin/convenzioni_tesi.php', $n['conv_tesi'], 'da seguire', [
+                    ['Da seguire', 'admin/convenzioni_tesi.php', false, $n['conv_tesi'] > 0, $n['conv_tesi']],
                     ['In vigore', 'admin/convenzioni_tesi.php?vista=valide'],
                     ['Scadute', 'admin/convenzioni_tesi.php?vista=scadute'],
                 ]);
@@ -66,14 +69,14 @@ final class PostazioniLavoro
         if ($p['tutorato']) {
             $out[] = self::voce('tutorato', 'Tutorato · lettere di incarico', 'Bandi e lettere dei vincitori, firme del docente e del Direttore, protocollo e validazione.', 'fa-user-graduate', '#0f766e',
                 'admin/tutorato.php', $n['tutorato'], 'da validare', [
-                    ['Da validare', 'admin/tutorato.php?vista=validare', false, $n['tutorato'] > 0],
+                    ['Da validare', 'admin/tutorato.php?vista=validare', false, $n['tutorato'] > 0, $n['tutorato']],
                     ['Nuovo bando', 'admin/tutorato.php?nuovo_bando=1'],
                 ]);
         }
         if ($p['fsl_convenzioni']) {
             $out[] = self::voce('fsl_convenzioni', 'Convenzioni FSL con le scuole', 'Convenzioni caricate dalle scuole: da prendere in carico, far firmare e registrare.', 'fa-school', '#0369a1',
                 'admin/fsl.php', $n['conv_fsl'], 'da seguire', [
-                    ['Da stipulare', 'admin/fsl.php?tab=stipulare'],
+                    ['Da stipulare', 'admin/fsl.php?tab=stipulare', false, $n['conv_fsl'] > 0, $n['conv_fsl']],
                     ['Convenzioni', 'admin/fsl.php?tab=convenzioni'],
                     ['Verifica iscrizioni', 'admin/fsl.php?tab=verifica'],
                     ['Riepilogo', 'admin/fsl.php?tab=riepilogo'],
@@ -83,8 +86,8 @@ final class PostazioniLavoro
             $pre = $n['assistenza_prendere'];
             $out[] = self::voce('assistenza', 'Chat di assistenza da gestire', 'Le chat di studenti e personale: da prendere, in carico a te, chiuse.', 'fa-headset', '#B30000',
                 'admin/assistenza.php', $pre + $n['assistenza_mie'], $pre > 0 ? 'da prendere o aperte' : 'aperte in carico a te', [
-                    ['Da prendere', 'admin/assistenza.php?vista=da_prendere', false, $pre > 0],
-                    ['Le mie', 'admin/assistenza.php?vista=mie'],
+                    ['Da prendere', 'admin/assistenza.php?vista=da_prendere', false, $pre > 0, $pre],
+                    ['Le mie', 'admin/assistenza.php?vista=mie', false, false, $n['assistenza_mie']],
                 ]);
         }
         if ($p['aree'] && ($p['admin'] || !$aree)) {
@@ -123,14 +126,14 @@ final class PostazioniLavoro
         if (!empty($a['calendario'])) {
             return self::voce('area_' . $id, (string) $a['titolo'], (int) ($a['risorse'] ?? 0) . ' risorse · ' . (int) ($a['prossime'] ?? 0) . ' prenotazioni in arrivo', 'fa-door-open', $colore,
                 'admin/prenotazioni_risorse.php' . $q, $appr, 'da approvare', [
-                    ['Prenotazioni', 'admin/prenotazioni_risorse.php' . $q, false, $appr > 0],
+                    ['Prenotazioni', 'admin/prenotazioni_risorse.php' . $q, false, $appr > 0, $appr],
                     ['Risorse e orari', 'admin/risorse.php' . $q],
                 ]);
         }
         $altri = [
-            ['Iscritti e presenze', 'admin/iscritti.php' . $q, false, $appr > 0],
+            ['Iscritti e presenze', 'admin/iscritti.php' . $q, false, $appr > 0, $appr],
             ['Scanner presenze', 'admin/scanner.php' . $q],
-            ['Messaggi' . ($mess > 0 ? ' (' . $mess . ')' : ''), 'admin/messaggi.php' . $q, false, $mess > 0],
+            ['Messaggi', 'admin/messaggi.php' . $q, false, $mess > 0, $mess],
             ['Eventi e turni', 'admin/eventi.php' . $q],
             ['Sondaggi', 'admin/sondaggi.php' . $q],
             ['Statistiche', 'admin/statistiche.php' . $q],
@@ -147,8 +150,8 @@ final class PostazioniLavoro
     }
 
     /**
-     * @param list<array{0: string, 1: string, 2?: bool, 3?: bool}> $altri
-     * @return array{chiave: string, titolo: string, testo: string, icona: string, colore: string, href: string, novita: int, novita_et: string, altri: list<array{0: string, 1: string, 2?: bool, 3?: bool}>}
+     * @param list<array{0: string, 1: string, 2?: bool, 3?: bool, 4?: int}> $altri
+     * @return array{chiave: string, titolo: string, testo: string, icona: string, colore: string, href: string, novita: int, novita_et: string, altri: list<array{0: string, 1: string, 2?: bool, 3?: bool, 4?: int}>}
      */
     private static function voce(string $chiave, string $titolo, string $testo, string $icona, string $colore, string $href, int $novita, string $novitaEt, array $altri = []): array
     {

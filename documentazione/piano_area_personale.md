@@ -61,3 +61,7 @@ Su approvazione dell'utente (la testata del sito non si tocca):
 ## Il mio lavoro (28/10/2026, schema v97)
 
 Piano completo in `piano_lavoro_area_personale.md`. Nuovo riquadro di sistema «Il mio lavoro» (`inc/area/lavoro.php`, regole in `src/Portale/Area/PostazioniLavoro.php`): una tessera per ogni postazione che la persona gestisce (pratiche, protocollo, sedute, convenzioni di tesi, tutorato, convenzioni FSL, assistenza, aree), con i numeri di `CoseDaFare` e i pulsanti sulla vista giusta. Le azioni restano nelle pagine del pannello (stessi permessi e registro); nel pannello c'è il pulsante «Area personale».
+
+## Disposizione a icone e righe (28/10/2026, schema v99)
+
+Icone di servizio a tre per riga in alto (assistenza, messaggi, calendario, eventi, disponibilità, risorse, profilo, ricerca, guida), «Da fare per te» sotto, «Il mio lavoro» a righe solo per chi gestisce. Dettagli in `piano_lavoro_area_personale.md`.

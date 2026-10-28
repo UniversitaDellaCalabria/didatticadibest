@@ -98,19 +98,28 @@ echo ui_tema_script();
     <?php if (!$riquadri): ?>
         <div class="alert alert-light border text-secondary">Per ora non c'è niente da mostrare qui.</div>
     <?php endif; ?>
-    <div class="row g-3 mb-4">
     <?php
     // I riquadri della persona, nell'ordine scelto dal pannello (Sito > Area personale): quelli di sistema stanno in inc/area/<chiave>.php,
-    // quelli scritti dall'amministratore (e le schede) li disegna inc/area/_generico.php. Ognuno stampa una tessera (una colonna della griglia).
+    // quelli scritti dall'amministratore (e le schede) li disegna inc/area/_generico.php. Ognuno stampa una colonna della griglia.
+    // Le icone di servizio (assistenza, messaggi, calendario, profilo…) vanno in alto, tre per riga; poi «Da fare per te», le righe del lavoro e le altre tessere.
+    $html_icone = '';
+    $html_tessere = '';
     foreach ($riquadri as $riq) {
+        ob_start();
         if ($riq['tipo'] === \App\Portale\Area\CatalogoRiquadri::SPECIALE) {
             $file_riq = __DIR__ . '/inc/area/' . $riq['chiave'] . '.php';
             if (is_file($file_riq)) include $file_riq;
         } else {
             include __DIR__ . '/inc/area/_generico.php';
         }
+        $pezzo = (string)ob_get_clean();
+        if ($riq['tipo'] === \App\Portale\Area\CatalogoRiquadri::SPECIALE && \App\Portale\Area\CatalogoRiquadri::eIcona((string)$riq['chiave'])) $html_icone .= $pezzo;
+        else $html_tessere .= $pezzo;
     }
+    if ($html_icone !== '') echo '<div class="row g-2 mb-4">' . $html_icone . '</div>';
     ?>
+    <div class="row g-3 mb-4">
+    <?php echo $html_tessere; ?>
     </div>
 </div>
 

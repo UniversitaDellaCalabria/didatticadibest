@@ -11,5 +11,5 @@ foreach (\App\Disponibilita\DisponibilitaRepository::TIPI as $dsp_tipo => $dsp_n
     $dsp_righe[] = $dsp_nome . ': ' . mb_strtolower($dsp_s['etichetta']) . ($dsp_s['dettaglio'] !== '' && !$dsp_s['scaduta'] ? ' (' . $dsp_s['dettaglio'] . ')' : '');
     if ($dsp_s['scaduta'] && !empty($dsp_d['accetta'])) $dsp_da_riconfermare++;
 }
-area_tessera('fa-traffic-light', '#0e7490', 'La mia disponibilità per tesi e tirocini', implode("\n", $dsp_righe), 'la_mia_disponibilita.php', $dsp_da_riconfermare, 'da riconfermare',
-    [['Pagina delle tesi', 'disponibilita_tesi.php'], ['Pagina dei tirocini', 'disponibilita_tirocini.php']]);
+area_icona('fa-traffic-light', '#0e7490', 'La mia disponibilità', 'la_mia_disponibilita.php', $dsp_da_riconfermare,
+    implode(' · ', $dsp_righe) . ($dsp_da_riconfermare ? ' · da riconfermare' : ''));

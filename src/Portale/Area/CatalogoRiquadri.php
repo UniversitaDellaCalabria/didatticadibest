@@ -17,6 +17,9 @@ final class CatalogoRiquadri
     public const SPECIALE = 'speciale';
     public const SCHEDA = 'scheda';
 
+    /** Forma «icona»: una piccola tessera (tre per riga, in alto) per i servizi che si usano spesso; le altre sono tessere grandi. */
+    public const ICONA = 'icona';
+
     private const TUTTI = [Profili::STUDENTE, Profili::DOCENTE, Profili::DIRETTORE, Profili::PERSONALE, Profili::GESTORE, Profili::AMMINISTRATORE, Profili::ESTERNO];
 
     /**
@@ -37,8 +40,10 @@ final class CatalogoRiquadri
                 'profili' => [Profili::DIRETTORE, Profili::PERSONALE, Profili::AMMINISTRATORE], 'ordine' => 30],
             'pratiche' => ['tipo' => self::SPECIALE, 'titolo' => 'Le mie pratiche', 'descrizione' => 'Le richieste fatte con i moduli online, con lo stato di ognuna', 'icona' => 'fa-folder-open', 'colore' => '#047857',
                 'profili' => [Profili::STUDENTE, Profili::DOCENTE, Profili::PERSONALE, Profili::AMMINISTRATORE], 'ordine' => 40],
-            'assistenza' => ['tipo' => self::SPECIALE, 'titolo' => 'Serve aiuto?', 'descrizione' => 'La chat con Didacticus e con gli operatori, e lo storico delle conversazioni', 'icona' => 'fa-headset', 'colore' => '#B30000',
+            'assistenza' => ['tipo' => self::SPECIALE, 'forma' => self::ICONA, 'titolo' => 'Serve aiuto?', 'descrizione' => 'La chat con Didacticus e con gli operatori, e lo storico delle conversazioni', 'icona' => 'fa-headset', 'colore' => '#B30000',
                 'profili' => self::TUTTI, 'ordine' => 50],
+            'messaggi' => ['tipo' => self::SPECIALE, 'forma' => self::ICONA, 'titolo' => 'Messaggi', 'descrizione' => 'La casella unica di chi gestisce (aree, convenzioni FSL, assistenza) con i messaggi da leggere; compare solo a chi ha una di queste postazioni', 'icona' => 'fa-envelope', 'colore' => '#1d4ed8',
+                'profili' => [Profili::DOCENTE, Profili::DIRETTORE, Profili::PERSONALE, Profili::GESTORE, Profili::AMMINISTRATORE], 'ordine' => 52],
             'tirocini' => ['tipo' => self::SCHEDA, 'titolo' => 'Tirocini', 'descrizione' => 'Guida sui tirocini e collegamento alla piattaforma esterna TSP 2.0 (i tirocini non si gestiscono nel portale)', 'icona' => 'fa-briefcase', 'colore' => '#0e7490',
                 'profili' => [Profili::STUDENTE, Profili::DOCENTE, Profili::ESTERNO, Profili::AMMINISTRATORE], 'ordine' => 60,
                 'testo' => 'I tirocini si gestiscono sulla piattaforma TSP 2.0 di Ateneo, non in questo portale. La guida spiega i passi, dalla proposta alla relazione finale.',
@@ -49,23 +54,31 @@ final class CatalogoRiquadri
                 'profili' => [Profili::STUDENTE, Profili::DOCENTE, Profili::AMMINISTRATORE], 'ordine' => 72],
             'tutorato_pagamenti' => ['tipo' => self::SPECIALE, 'titolo' => 'Ufficio pagamenti del tutorato', 'descrizione' => 'Per le persone dell\'ufficio pagamenti: spento finché i pagamenti non passano dal portale', 'icona' => 'fa-euro-sign', 'colore' => '#15803d',
                 'profili' => [Profili::PERSONALE, Profili::AMMINISTRATORE], 'ordine' => 74, 'attivo' => 0],
-            'disponibilita' => ['tipo' => self::SPECIALE, 'titolo' => 'La mia disponibilità per tesi e tirocini', 'descrizione' => 'Per i docenti: posti per tesisti e tirocinanti, corsi di laurea, attività e obiettivi; compaiono sulle pagine pubbliche con un semaforo', 'icona' => 'fa-traffic-light', 'colore' => '#0e7490',
+            'disponibilita' => ['tipo' => self::SPECIALE, 'forma' => self::ICONA, 'titolo' => 'La mia disponibilità per tesi e tirocini', 'descrizione' => 'Per i docenti: posti per tesisti e tirocinanti, corsi di laurea, attività e obiettivi; compaiono sulle pagine pubbliche con un semaforo', 'icona' => 'fa-traffic-light', 'colore' => '#0e7490',
                 'profili' => [Profili::DOCENTE, Profili::AMMINISTRATORE], 'ordine' => 82],
             'ricevimento' => ['tipo' => self::SPECIALE, 'titolo' => 'Il mio ricevimento', 'descrizione' => 'Giorni, orari, assenze e appuntamenti in programma', 'icona' => 'fa-user-clock', 'colore' => '#7c3aed',
                 'profili' => [Profili::DOCENTE, Profili::PERSONALE, Profili::AMMINISTRATORE], 'ordine' => 80],
-            'risorse_responsabile' => ['tipo' => self::SPECIALE, 'titolo' => 'Le mie risorse', 'descrizione' => 'Per i responsabili di aule e laboratori: richieste da approvare e prenotazioni in arrivo', 'icona' => 'fa-user-shield', 'colore' => '#0f766e',
+            'risorse_responsabile' => ['tipo' => self::SPECIALE, 'forma' => self::ICONA, 'titolo' => 'Le mie risorse', 'descrizione' => 'Per i responsabili di aule e laboratori: richieste da approvare e prenotazioni in arrivo', 'icona' => 'fa-user-shield', 'colore' => '#0f766e',
                 'profili' => [Profili::DOCENTE, Profili::PERSONALE, Profili::GESTORE, Profili::AMMINISTRATORE], 'ordine' => 85],
             'risorse_prenotate' => ['tipo' => self::SPECIALE, 'titolo' => 'Aule, laboratori e appuntamenti', 'descrizione' => 'Le risorse prenotate dalla persona, con l\'annullamento', 'icona' => 'fa-door-open', 'colore' => '#0056B3',
                 'profili' => self::TUTTI, 'ordine' => 90],
-            'eventi' => ['tipo' => self::SPECIALE, 'titolo' => 'Eventi, attestati e sondaggi', 'descrizione' => 'Prenotazioni, presenze, attestati, sondaggi, aule prenotate e scanner QR (pagina miei_eventi.php); sulla tessera si vede se c\'è un posto liberato da confermare', 'icona' => 'fa-calendar-check', 'colore' => '#0d6efd',
+            'eventi' => ['tipo' => self::SPECIALE, 'forma' => self::ICONA, 'titolo' => 'Eventi, attestati e sondaggi', 'descrizione' => 'Prenotazioni, presenze, attestati, sondaggi, aule prenotate e scanner QR (pagina miei_eventi.php); sulla tessera si vede se c\'è un posto liberato da confermare', 'icona' => 'fa-calendar-check', 'colore' => '#0d6efd',
                 'profili' => self::TUTTI, 'ordine' => 100],
-            'calendario' => ['tipo' => self::SPECIALE, 'titolo' => 'Il mio calendario', 'descrizione' => 'Eventi, aule, ricevimenti e scadenze in un posto solo, con il file .ics e il calendario del telefono (pagina calendario.php)', 'icona' => 'fa-calendar-days', 'colore' => '#0891b2',
+            'calendario' => ['tipo' => self::SPECIALE, 'forma' => self::ICONA, 'titolo' => 'Il mio calendario', 'descrizione' => 'Eventi, aule, ricevimenti e scadenze in un posto solo, con il file .ics e il calendario del telefono (pagina calendario.php)', 'icona' => 'fa-calendar-days', 'colore' => '#0891b2',
                 'profili' => self::TUTTI, 'ordine' => 102],
-            'profilo' => ['tipo' => self::SPECIALE, 'titolo' => 'Il mio profilo', 'descrizione' => 'Dati personali, email e scheda di Ateneo modificabili (pagina profilo.php)', 'icona' => 'fa-user-pen', 'colore' => '#475569',
+            'profilo' => ['tipo' => self::SPECIALE, 'forma' => self::ICONA, 'titolo' => 'Il mio profilo', 'descrizione' => 'Dati personali, email e scheda di Ateneo modificabili (pagina profilo.php)', 'icona' => 'fa-user-pen', 'colore' => '#475569',
                 'profili' => self::TUTTI, 'ordine' => 105],
-            'guida' => ['tipo' => self::SPECIALE, 'titolo' => 'Come si fa', 'descrizione' => 'Guide brevi con le schermate, una per ruolo', 'icona' => 'fa-circle-question', 'colore' => '#64748b',
+            'cerca' => ['tipo' => self::SPECIALE, 'forma' => self::ICONA, 'titolo' => 'Cerca nel sito', 'descrizione' => 'Scorciatoia alla ricerca unica del sito (eventi, notizie, guide, docenti, risposte)', 'icona' => 'fa-magnifying-glass', 'colore' => '#334155',
+                'profili' => self::TUTTI, 'ordine' => 108],
+            'guida' => ['tipo' => self::SPECIALE, 'forma' => self::ICONA, 'titolo' => 'Come si fa', 'descrizione' => 'Guide brevi con le schermate, una per ruolo', 'icona' => 'fa-circle-question', 'colore' => '#64748b',
                 'profili' => self::TUTTI, 'ordine' => 110],
         ];
+    }
+
+    /** Se il riquadro è una tessera piccola «icona» (vedi ICONA). */
+    public static function eIcona(string $chiave): bool
+    {
+        return (self::sistema()[$chiave]['forma'] ?? '') === self::ICONA;
     }
 
     /** @return array<string, mixed>|null */

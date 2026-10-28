@@ -42,3 +42,10 @@ Nessuno per le fasi fatte. Per la fase 2: quali azioni i colleghi fanno più spe
 - **Ogni tessera elenca tutte le azioni** che la persona può fare (non solo la coda): ogni pulsante apre la pagina del pannello già sulla vista o sul modulo giusto.
 - **Eventi e progetti:** la creazione resta nel pannello (modulo lungo con turni, campi, attestati) ma si raggiunge con «Nuovo evento» e «Nuovo progetto» dalla tessera dell'area, solo a chi può crearli. Le cose che si fanno ogni giorno (iscritti, presenze, scanner, messaggi, sondaggi, statistiche) sono tutte sulla tessera.
 - **Una regola sola per le aree:** `AreeGestite` decide quali aree gestisce una persona e lo usano sia il menu del pannello sia l'area personale. L'amministratore vede una tessera solo per le aree con qualcosa da guardare.
+
+## Decisioni del 28/10/2026 (terza parte): disposizione dell'area personale (schema v99)
+
+- **Icone di servizio in alto, tre per riga**, con la scritta sotto e il numero in rosso: Assistenza, **Messaggi** (la casella unica di chi gestisce, solo per chi ha aree, convenzioni FSL o assistenza), disponibilità, eventi e attestati, calendario, profilo, risorse, ricerca, «Come si fa». Forma `icona` in `CatalogoRiquadri`; la riga di stato sta nel suggerimento.
+- **«Da fare per te» subito sotto**, per tutti: ci sono le firme del docente (registri e lettere del tutorato, firme sulle pratiche di tesi, valutazioni, convenzioni di tesi); sopra l'elenco un pulsante per ogni gruppo col numero in rosso.
+- **«Il mio lavoro» solo per chi gestisce qualcosa o è di un ufficio:** una riga per postazione a tutta larghezza, i pulsanti d'azione in fila a destra, ognuno col suo numero in rosso; le righe con qualcosa da fare stanno in cima.
+- Regole dei permessi in `inc/area/_permessi_lavoro.php`, usate dal riquadro «lavoro» e dall'icona «messaggi».

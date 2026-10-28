@@ -201,7 +201,7 @@ prova(in_array('Seguite da me', $az_ap, true) && in_array('Moduli e documenti', 
 $ar_ap = PostazioniLavoro::elenco(['aree' => true], [], [['id' => 7, 'titolo' => 'OpenLab', 'colore' => '#0056B3', 'calendario' => false, 'intera' => true, 'crea_eventi' => true, 'crea_progetti' => true, 'eventi' => 3, 'progetti' => 1, 'iscritti' => 40, 'messaggi' => 2, 'da_approvare' => 5]]);
 $et_ap = array_column($ar_ap[0]['altri'] ?? [], 0);
 prova(count($ar_ap) === 1 && $ar_ap[0]['chiave'] === 'area_7' && $ar_ap[0]['novita'] === 7 && $ar_ap[0]['testo'] === '3 eventi · 1 progetti · 40 iscritti', "il mio lavoro: il gestore vede una tessera per area con eventi, iscritti e le cose da guardare (2 messaggi + 5 iscrizioni)");
-prova(in_array('Iscritti e presenze', $et_ap, true) && in_array('Scanner presenze', $et_ap, true) && in_array('Messaggi (2)', $et_ap, true) && in_array('Nuovo evento', $et_ap, true) && in_array('Nuovo progetto', $et_ap, true), "il mio lavoro: la tessera dell'area ha iscritti, presenze, messaggi e la scorciatoia per creare eventi e progetti");
+prova(in_array('Iscritti e presenze', $et_ap, true) && in_array('Scanner presenze', $et_ap, true) && in_array('Messaggi', $et_ap, true) && in_array('Nuovo evento', $et_ap, true) && in_array('Nuovo progetto', $et_ap, true), "il mio lavoro: la tessera dell'area ha iscritti, presenze, messaggi e la scorciatoia per creare eventi e progetti");
 $ar2_ap = PostazioniLavoro::elenco(['aree' => true], [], [['id' => 8, 'titolo' => 'Solo un evento', 'intera' => false, 'eventi' => 1]]);
 prova(!in_array('Nuovo evento', array_column($ar2_ap[0]['altri'], 0), true) && !in_array('Nuovo progetto', array_column($ar2_ap[0]['altri'], 0), true), "il mio lavoro: chi gestisce solo alcune attività non vede «Nuovo evento» né «Nuovo progetto»");
 $ar3_ap = PostazioniLavoro::elenco(['aree' => true], [], [['id' => 9, 'titolo' => 'Aule', 'calendario' => true, 'risorse' => 4, 'prossime' => 6, 'da_approvare' => 2]]);
@@ -209,3 +209,17 @@ prova($ar3_ap[0]['novita'] === 2 && array_column($ar3_ap[0]['altri'], 0) === ['P
 $ok_ap = true;
 foreach (array_merge($ar_ap, $ar3_ap) as $v_a) foreach ($v_a['altri'] as $a_a) $ok_ap = $ok_ap && is_file(__DIR__ . '/../../../' . strtok($a_a[1], '?'));
 prova($ok_ap, "il mio lavoro: ogni pulsante delle aree porta a una pagina che esiste");
+
+// Icone di servizio in alto, righe di lavoro con i numeri sui pulsanti, «Il mio lavoro» solo a chi gestisce qualcosa
+use App\Portale\Area\CatalogoRiquadri as CatRiq;
+$icone_ap = array_keys(array_filter(CatRiq::sistema(), static fn (array $v): bool => ($v['forma'] ?? '') === CatRiq::ICONA));
+prova(!array_diff(['assistenza', 'messaggi', 'calendario', 'eventi', 'disponibilita', 'risorse_responsabile', 'profilo', 'guida', 'cerca'], $icone_ap), "area personale: assistenza, messaggi, calendario, eventi, disponibilità, risorse, profilo, guida e ricerca sono icone di servizio");
+prova(!CatRiq::eIcona('lavoro') && !CatRiq::eIcona('da_fare') && CatRiq::eIcona('messaggi'), "area personale: «Il mio lavoro» e «Da fare per te» restano tessere grandi");
+foreach (['messaggi', 'cerca'] as $k_ic) prova(is_file(__DIR__ . "/../../../inc/area/$k_ic.php"), "esiste inc/area/$k_ic.php");
+$pr_ap = array_values(array_filter(PostazioniLavoro::elenco(['didattica_tutto' => true, 'didattica' => true], ['smistare' => 3, 'smistare_giorni' => 9, 'verbali' => 2]), static fn (array $x): bool => $x['chiave'] === 'pratiche'))[0];
+$da_ass_ap = array_values(array_filter($pr_ap['altri'], static fn (array $b): bool => $b[0] === 'Da assegnare'))[0];
+prova(($da_ass_ap[4] ?? 0) === 3 && $da_ass_ap[3] === true, "il mio lavoro: il pulsante «Da assegnare» porta il numero (3) e l'evidenza");
+$se_ap = array_values(array_filter(PostazioniLavoro::elenco(['didattica' => true], ['verbali' => 2]), static fn (array $x): bool => $x['chiave'] === 'sedute'))[0];
+prova(in_array('Verbali da firmare', array_column($se_ap['altri'], 0), true), "il mio lavoro: con verbali in firma compare il pulsante «Verbali da firmare»");
+prova(PostazioniLavoro::elenco([], []) === [], "il mio lavoro: a chi non gestisce niente non esce nessuna riga");
+

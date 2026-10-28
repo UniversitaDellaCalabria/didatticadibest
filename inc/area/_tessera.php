@@ -35,3 +35,51 @@ if (!function_exists('area_tessera')) {
         echo '</div></div></div>';
     }
 }
+
+if (!function_exists('area_icona')) {
+    /**
+     * Una piccola tessera «icona» (tre per riga): il simbolo in alto, il nome sotto in piccolo e, se serve, il numero in rosso.
+     * Per i servizi che si usano spesso (assistenza, messaggi, calendario, profilo, guide…): la riga di stato sta nel suggerimento al passaggio del mouse.
+     */
+    function area_icona(string $icona, string $colore, string $titolo, string $href, int $novita = 0, string $nota = ''): void
+    {
+        $h = static fn (string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+        echo '<div class="col-4"><a href="' . $h($href) . '" class="ui-icona' . ($novita > 0 ? ' ha-novita' : '') . '" style="--tc:' . $h($colore) . ';"'
+            . ($nota !== '' ? ' title="' . $h($nota) . '"' : '') . '>';
+        echo '<span class="ui-icona-simbolo" aria-hidden="true"><i class="fa ' . $h($icona) . '"></i></span><span class="ui-icona-testo">' . $h($titolo) . '</span>';
+        if ($novita > 0) {
+            echo '<span class="ui-badge-rosso" aria-label="' . $novita . ' da vedere">' . $novita . '</span>';
+        }
+        echo '</a></div>';
+    }
+}
+
+if (!function_exists('area_riga')) {
+    /**
+     * Una riga a tutta larghezza per una postazione di lavoro: icona, titolo e stato a sinistra, i pulsanti d'azione in fila a destra, ognuno con il suo
+     * numero in rosso se c'è qualcosa da fare. Con qualcosa da fare il bordo è rosso.
+     *
+     * @param list<array{0: string, 1: string, 2?: bool, 3?: bool, 4?: int}> $azioni etichetta, indirizzo, esterno, evidenziato, numero
+     */
+    function area_riga(string $icona, string $colore, string $titolo, string $testo, string $href, int $novita = 0, array $azioni = []): void
+    {
+        $h = static fn (string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+        echo '<div class="col-12"><div class="ui-riga' . ($novita > 0 ? ' ha-novita' : '') . '" style="--tc:' . $h($colore) . ';">';
+        echo '<span class="ui-tessera-icona" aria-hidden="true"><i class="fa ' . $h($icona) . '"></i></span>';
+        echo '<div class="ui-riga-titolo">' . ($href !== '' ? '<a href="' . $h($href) . '" class="ui-tessera-titolo">' . $h($titolo) . '</a>' : '<span class="ui-tessera-titolo">' . $h($titolo) . '</span>');
+        if ($testo !== '') {
+            echo '<div class="ui-tessera-testo">' . $h($testo) . '</div>';
+        }
+        echo '</div>';
+        if ($azioni) {
+            echo '<div class="ui-riga-azioni">';
+            foreach ($azioni as $a) {
+                $n = (int) ($a[4] ?? 0);
+                echo '<a href="' . $h($a[1]) . '" class="btn btn-sm fw-bold ' . ($n > 0 || !empty($a[3]) ? 'btn-outline-danger' : 'btn-outline-secondary') . '">' . $h($a[0])
+                    . ($n > 0 ? ' <span class="ui-badge-rosso ms-1">' . $n . '</span>' : '') . '</a>';
+            }
+            echo '</div>';
+        }
+        echo '</div></div>';
+    }
+}
