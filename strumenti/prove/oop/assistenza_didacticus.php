@@ -367,6 +367,15 @@ prova($id_pg1 > 0 && $pag_rep->aggiungi('https://www.unical.it/prova-didacticus-
 prova($pag_rep->conTesto() === [] && in_array($id_pg1, $pag_rep->daAggiornare(7), true), "pagine di Ateneo: una pagina mai letta è da aggiornare e non è ancora una fonte");
 $pag_rep->salvaLettura($id_pg1, 'Prova', "Testo di prova della pagina", 'Letta: 27 caratteri', date('Y-m-d H:i:s'));
 prova(count($pag_rep->conTesto()) === 1 && !in_array($id_pg1, $pag_rep->daAggiornare(7), true), "pagine di Ateneo: dopo la lettura è una fonte e non si rilegge per una settimana");
+// Senza modello linguistico: se nessuna voce è sicura, Didacticus riporta il brano della pagina di Ateneo con il collegamento
+$pag_rep->salvaLettura($id_pg1, 'Autobus per il campus di Arcavacata', "Gli autobus per il campus di Arcavacata partono dalla stazione di Cosenza ogni mezz'ora.\nLa corsa degli autobus costa un euro con l'abbonamento.", 'Letta', date('Y-m-d H:i:s'));
+$did_pg = new ServizioDidacticus($voci_rep, $imp_rep, null, $pag_rep);
+$r_pg = $did_pg->risposta('da dove partono gli autobus per il campus di Arcavacata', null, true);
+prova($r_pg['tipo'] === 'pagina' && str_contains($r_pg['testo'], 'ogni mezz') && str_contains($r_pg['testo'], 'Testo preso dal sito') && ($r_pg['extra']['link'][0]['u'] ?? '') === 'https://www.unical.it/prova-didacticus-1' && !empty($r_pg['extra']['operatore']) && $r_pg['voce_id'] === null, "pagine di Ateneo: senza voce sicura riporta il brano della pagina con il collegamento, l'avviso e il pulsante per l'operatore", $r_pg['tipo'] . ' ' . $did_pg->titolo((int) $r_pg['voce_id']));
+$r_pg2 = $did_pg->risposta('come cucino la pasta al forno con le melanzane', null, true);
+prova($r_pg2['tipo'] === 'nessuna', "pagine di Ateneo: una domanda fuori tema non riceve nessun brano (" . $r_pg2['tipo'] . ")");
+$r_pg3 = (new ServizioDidacticus($voci_rep, $imp_rep))->risposta('da dove partono gli autobus per il campus di Arcavacata', null, true);
+prova($r_pg3['tipo'] !== 'pagina', "pagine di Ateneo: senza il collegamento alle pagine Didacticus non cambia comportamento");
 $pag_rep->attiva($id_pg1, false);
 prova($pag_rep->conTesto() === [], "pagine di Ateneo: in pausa non è più una fonte");
 $pag_rep->elimina($id_pg1);
@@ -417,6 +426,91 @@ if (!$vive) {
 }
 
 $conn->rollback(); // le prove non lasciano le voci importate nella base di prova
+
+// Lettura automatica di unical.it (crawler): indirizzi, robots.txt, collegamenti, passata su un sito finto, rilettura dei soli cambiamenti, ricerca nell'indice FULLTEXT.
+// Fuori dalla transazione di prova: l'indice FULLTEXT di InnoDB vede i dati solo dopo il commit; alla fine si svuota tutto.
+use App\Assistenza\Didacticus\CrawlerSito;
+use App\Assistenza\Didacticus\RicercaSito;
+use App\Assistenza\Didacticus\SitoRepository;
+prova(CrawlerSito::normalizza('https://WWW.unical.it/didattica/#ancora') === 'https://www.unical.it/didattica/' && CrawlerSito::normalizza('https://www.unical.it/a?x=1') === null && CrawlerSito::normalizza('https://www.unical.it/file.PDF') === null
+    && CrawlerSito::normalizza('http://www.unical.it/a') === null && CrawlerSito::normalizza('https://altro.org/a') === null && CrawlerSito::normalizza('https://www.unical.it/a//b') === null && CrawlerSito::normalizza('https://www.unical.it') === 'https://www.unical.it/', "crawler: gli indirizzi si riducono alla forma canonica e si scartano parametri, file, http e altri domini");
+prova(CrawlerSito::escluso('https://www.unical.it/Albo/x', ['/albo']) && !CrawlerSito::escluso('https://www.unical.it/didattica', ['/albo', ' ']), "crawler: le parti escluse valgono senza badare alle maiuscole");
+$reg_rb = CrawlerSito::analizzaRobots("# prova\nUser-agent: Googlebot\nDisallow: /solo-google\n\nUser-agent: *\nDisallow: /privato/\nDisallow: /*.json$\nDisallow:\nAllow: /privato/ok\n");
+prova($reg_rb === ['/privato/', '/*.json$'] && CrawlerSito::vietato('/privato/segreto', $reg_rb) && CrawlerSito::vietato('/dati/x.json', $reg_rb) && !CrawlerSito::vietato('/dati/x.json.html', $reg_rb) && !CrawlerSito::vietato('/didattica/', $reg_rb) && !CrawlerSito::vietato('/solo-google', $reg_rb), "crawler: robots.txt, i divieti per tutti i robot si riconoscono (prefissi, «*» e «\$»)");
+prova(LettorePagine::assoluto('../b/c', 'https://www.unical.it/a/x/y') === 'https://www.unical.it/a/b/c' && LettorePagine::assoluto('/z', 'https://www.unical.it/a/x') === 'https://www.unical.it/z' && LettorePagine::assoluto('//dibest.unical.it/q', 'https://www.unical.it/a') === 'https://dibest.unical.it/q'
+    && LettorePagine::assoluto('altra', 'https://www.unical.it/a/b') === 'https://www.unical.it/a/altra' && LettorePagine::assoluto('mailto:x@y.it', 'https://www.unical.it/') === null && LettorePagine::assoluto('#top', 'https://www.unical.it/') === null, "crawler: i collegamenti relativi si rendono assoluti");
+$html_col = '<html><head><base href="https://www.unical.it/didattica/"></head><body><a href="x">uno</a><a href="/y#a">due</a><a href="mailto:a@b.it">m</a><a href="javascript:void(0)">j</a><a href="#top">t</a><a href="https://dibest.unical.it/">d</a><a href="x">doppione</a></body></html>';
+prova(LettorePagine::collegamenti($html_col, 'https://www.unical.it/') === ['https://www.unical.it/didattica/x', 'https://www.unical.it/y', 'https://dibest.unical.it/'], "crawler: dal HTML si estraggono i collegamenti (base, ancore, mailto e doppioni a parte)");
+
+// Un piccolo sito finto: la rete non si usa
+$web_finto = [
+    'https://www.unical.it/robots.txt' => "User-agent: *\nDisallow: /privato/\n",
+    'https://www.unical.it/' => '<html><head><title>Università della Calabria</title></head><body><nav><a href="/didattica/">Didattica</a><a href="/privato/segreto">P</a><a href="/guida.pdf">PDF</a><a href="/albo/avviso">Albo</a><a href="https://altro.org/x">Altro</a><a href="/didattica/?pagina=2">Pagina 2</a><a href="https://dibest.unical.it/">DiBEST</a></nav><main><h1>Benvenuti</h1><p>Questo è il portale dell\'Università della Calabria, con tutte le informazioni per studenti e personale.</p></main></body></html>',
+    'https://www.unical.it/didattica/' => '<html><head><title>Borse di merito</title></head><body><main><h1>Borse di merito</h1><p>La domanda per le borse di merito si presenta entro il 30 novembre dal portale Esse3 dello studente.</p></main></body></html>',
+    'https://dibest.unical.it/' => '<html><head><title>DiBEST</title></head><body><main><h1>Erbario</h1><p>L\'erbario del Dipartimento espone le farfalle rare della Sila nella sala principale, aperta ogni primo giovedì del mese.</p></main></body></html>',
+    'https://www.unical.it/privato/segreto' => '<html><body><main><p>Pagina riservata che il crawler non deve leggere perché robots.txt la vieta, anche se è piena di testo.</p></main></body></html>',
+    'https://www.unical.it/albo/avviso' => '<html><body><main><p>Avviso dell\'albo che le impostazioni escludono, anche se contiene abbastanza testo per essere letto.</p></main></body></html>',
+];
+$lettore_finto = new class ($web_finto) extends LettorePagine {
+    public array $richieste = [];
+    public function __construct(public array $web)
+    {
+    }
+    public function scarica(string $url, bool $soloHtml = true): array
+    {
+        $this->richieste[] = $url;
+        if (!isset($this->web[$url])) {
+            throw new \RuntimeException('La pagina ha risposto 404');
+        }
+
+        return [$this->web[$url], $url];
+    }
+};
+$sito_rep = $cont_di->get(SitoRepository::class);
+$sito_rep->svuota();
+$crawler = (new CrawlerSito($sito_rep, $lettore_finto))->conPausa(static function (int $micro): void {
+});
+$r_c0 = $crawler->passata(30);
+prova($r_c0['lette'] === 0 && str_contains($r_c0['nota'], 'spenta') && $lettore_finto->richieste === [], "crawler: con la lettura spenta non fa nessuna richiesta");
+$sito_rep->salvaImpostazioni(true, "https://www.unical.it/\nhttps://dibest.unical.it/\nhttps://altro.org/", SitoRepository::ESCLUDI_PREDEFINITO, 1000, 3, 20);
+$imp_c = $sito_rep->impostazioni();
+prova($imp_c['attivo'] && $imp_c['max_pagine'] === 1000 && $imp_c['profondita'] === 3 && in_array('/albo', $imp_c['escludi'], true) && count($imp_c['partenza']) === 3, "crawler: le impostazioni si salvano e si rileggono");
+$r_c1 = $crawler->passata(30);
+$n_c1 = $sito_rep->conteggi();
+$url_lette = array_column($conn->query("SELECT url FROM didacticus_sito WHERE stato = 'letta' ORDER BY url")->fetch_all(MYSQLI_ASSOC), 'url');
+prova($r_c1['finita'] && $r_c1['lette'] === 3 && $url_lette === ['https://dibest.unical.it/', 'https://www.unical.it/', 'https://www.unical.it/didattica/'], "crawler: legge la partenza e segue i collegamenti interni", implode(', ', $url_lette));
+prova($n_c1['esclusa'] === 1 && !in_array('https://www.unical.it/albo/avviso', array_column($conn->query('SELECT url FROM didacticus_sito')->fetch_all(MYSQLI_ASSOC), 'url'), true) && $n_c1['brani'] >= 3 && !in_array('https://www.unical.it/guida.pdf', $lettore_finto->richieste, true) && !in_array('https://altro.org/x', $lettore_finto->richieste, true) && !in_array('https://www.unical.it/didattica/?pagina=2', $lettore_finto->richieste, true) && !in_array('https://www.unical.it/privato/segreto', $lettore_finto->richieste, true) && !in_array('https://www.unical.it/albo/avviso', $lettore_finto->richieste, true), "crawler: salta PDF, altri domini, indirizzi con parametri, pagine vietate da robots.txt e pagine escluse", json_encode($n_c1));
+$lettore_finto->richieste = [];
+$r_c2 = $crawler->passata(30);
+prova($r_c2['finita'] && $r_c2['lette'] === 0 && $lettore_finto->richieste === [], "crawler: una seconda passata subito dopo non rilegge nulla");
+$conn->query("UPDATE didacticus_sito SET aggiornata_il = '2020-01-01 00:00:00' WHERE stato = 'letta'");
+$lettore_finto->web['https://www.unical.it/didattica/'] = '<html><head><title>Borse di merito</title></head><body><main><h1>Borse di merito</h1><p>La domanda per le borse di merito si presenta entro il 15 dicembre dal portale Esse3 dello studente.</p></main></body></html>';
+$r_c3 = $crawler->passata(30);
+prova($r_c3['lette'] === 3 && $r_c3['cambiate'] === 1, "crawler: dopo una settimana rilegge le pagine e riconosce quella cambiata (" . $r_c3['cambiate'] . ")");
+$brani_did = array_column($conn->query("SELECT b.testo FROM didacticus_sito_brani b JOIN didacticus_sito p ON p.id = b.pagina_id WHERE p.url = 'https://www.unical.it/didattica/'")->fetch_all(MYSQLI_ASSOC), 'testo');
+prova(count($brani_did) === 1 && str_contains($brani_did[0], '15 dicembre') && !str_contains($brani_did[0], '30 novembre'), "crawler: i brani della pagina cambiata sono stati sostituiti");
+$lettore_finto->web['https://dibest.unical.it/'] = 'x';
+$conn->query("UPDATE didacticus_sito SET aggiornata_il = '2020-01-01 00:00:00' WHERE url = 'https://dibest.unical.it/'");
+$crawler->passata(30);
+$stato_db = $conn->query("SELECT stato FROM didacticus_sito WHERE url = 'https://dibest.unical.it/'")->fetch_row()[0];
+prova($stato_db === 'vuota' && (int) $conn->query("SELECT COUNT(*) FROM didacticus_sito_brani b JOIN didacticus_sito p ON p.id = b.pagina_id WHERE p.url = 'https://dibest.unical.it/'")->fetch_row()[0] === 0, "crawler: una pagina che resta senza testo utile esce dall'indice");
+$lettore_finto->web['https://dibest.unical.it/'] = $web_finto['https://dibest.unical.it/'];
+$conn->query("UPDATE didacticus_sito SET aggiornata_il = '2020-01-01 00:00:00' WHERE url = 'https://dibest.unical.it/'");
+$crawler->passata(30);
+
+$ric_sito = new RicercaSito($sito_rep);
+$t_ric = $ric_sito->cerca('entro quando si presenta la domanda per le borse di merito', 2);
+prova(count($t_ric) >= 1 && $t_ric[0]['url'] === 'https://www.unical.it/didattica/' && $t_ric[0]['punteggio'] >= 70 && str_contains($t_ric[0]['testo'], '15 dicembre'), "ricerca nell'indice: trova il brano giusto con l'indirizzo, già aggiornato", json_encode($t_ric));
+prova($ric_sito->cerca('come si cucina la pasta al forno con le melanzane', 2) === [] && $ric_sito->cerca('borse', 2) === [], "ricerca nell'indice: domanda fuori tema o con una parola sola, nessun brano");
+$did_sito = new ServizioDidacticus($voci_rep, $imp_rep, null, null, null, $ric_sito);
+$r_si = $did_sito->risposta('farfalle rare della Sila nell erbario del Dipartimento', null, true);
+prova($r_si['tipo'] === 'pagina' && str_contains($r_si['testo'], 'farfalle rare') && ($r_si['extra']['link'][0]['u'] ?? '') === 'https://dibest.unical.it/', "Didacticus: senza voce sicura risponde con il brano trovato nell'indice di unical.it e il collegamento", $r_si['tipo'] . ' ' . $r_si['testo']);
+$sito_rep->applicaEsclusioni(['/didattica']);
+prova($ric_sito->cerca('entro quando si presenta la domanda per le borse di merito', 2) === [] && $sito_rep->conteggi()['esclusa'] >= 2, "crawler: una nuova esclusione toglie subito le pagine dall'indice");
+$sito_rep->svuota();
+$conn->query("DELETE FROM didacticus_sito_impostazioni");
+prova($sito_rep->conteggi()['totale'] === 0 && $sito_rep->conteggi()['brani'] === 0 && !$sito_rep->impostazioni()['attivo'], "crawler: svuotando l'indice si riparte da zero e la lettura resta spenta di partenza");
+
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 // La chat parte da Didacticus: saluto per nome, argomento scelto nella chat, domanda sul corso di laurea e operatori di quel corso (5-bis)

@@ -136,6 +136,21 @@ final class Definizioni
         'didacticus_vettori' => "CREATE TABLE IF NOT EXISTS didacticus_vettori (
             voce_id INT NOT NULL PRIMARY KEY, impronta CHAR(32) NOT NULL, vettore MEDIUMTEXT NOT NULL, aggiornato_il DATETIME DEFAULT NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        // v102: lettura automatica di unical.it e dei suoi sottodomini (crawler notturno di Didacticus): le pagine scoperte, i loro brani con indice di ricerca e le impostazioni
+        'didacticus_sito' => "CREATE TABLE IF NOT EXISTS didacticus_sito (
+            id INT AUTO_INCREMENT PRIMARY KEY, url VARCHAR(300) NOT NULL, titolo VARCHAR(200) NOT NULL DEFAULT '', profondita TINYINT NOT NULL DEFAULT 0,
+            stato VARCHAR(10) NOT NULL DEFAULT 'coda', esito VARCHAR(200) NOT NULL DEFAULT '', impronta CHAR(32) DEFAULT NULL,
+            scoperta_il DATETIME DEFAULT NULL, aggiornata_il DATETIME DEFAULT NULL,
+            UNIQUE KEY uq_url (url), INDEX idx_stato (stato, profondita, id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        'didacticus_sito_brani' => "CREATE TABLE IF NOT EXISTS didacticus_sito_brani (
+            id INT AUTO_INCREMENT PRIMARY KEY, pagina_id INT NOT NULL, testo TEXT NOT NULL, INDEX idx_pagina (pagina_id), FULLTEXT KEY ft_testo (testo)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        'didacticus_sito_impostazioni' => "CREATE TABLE IF NOT EXISTS didacticus_sito_impostazioni (
+            id TINYINT NOT NULL PRIMARY KEY, attivo TINYINT(1) NOT NULL DEFAULT 0, partenza TEXT DEFAULT NULL, escludi TEXT DEFAULT NULL,
+            max_pagine INT NOT NULL DEFAULT 5000, profondita TINYINT NOT NULL DEFAULT 4, minuti TINYINT NOT NULL DEFAULT 20,
+            ultima_passata DATETIME DEFAULT NULL, ultimo_esito VARCHAR(250) NOT NULL DEFAULT ''
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         // v23: abilitazioni date a chi non ha ancora fatto il primo accesso: si attivano al login con quell'email
         'abilitazioni_attesa' => "CREATE TABLE IF NOT EXISTS abilitazioni_attesa (
             id INT AUTO_INCREMENT PRIMARY KEY, email VARCHAR(150) NOT NULL, persona_id VARCHAR(80) DEFAULT NULL, nominativo VARCHAR(200) DEFAULT '',

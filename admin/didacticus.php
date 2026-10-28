@@ -193,6 +193,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $redirect_d('scheda=pagine');
     }
+    if (in_array($azione, ['sito_salva', 'sito_passata', 'sito_svuota'], true)) {
+        $sito_rep = $app_d->get(\App\Assistenza\Didacticus\SitoRepository::class);
+        if ($azione === 'sito_salva') {
+            $partenza_si = implode("\n", array_filter(array_map(fn($u) => \App\Assistenza\Didacticus\CrawlerSito::normalizza($u) ?? '', preg_split('/\R+/', (string)($_POST['partenza'] ?? '')) ?: [])));
+            $escludi_si = implode("\n", array_filter(array_map('trim', preg_split('/\R+/', (string)($_POST['escludi'] ?? '')) ?: [])));
+            $sito_rep->salvaImpostazioni(!empty($_POST['attivo']), $partenza_si, $escludi_si, (int)($_POST['max_pagine'] ?? 5000), (int)($_POST['profondita'] ?? 4), (int)($_POST['minuti'] ?? 20));
+            $tolte_si = $sito_rep->applicaEsclusioni(preg_split('/\R+/', $escludi_si) ?: []);
+            registra_log_audit($conn, 'Lettura automatica di unical.it per Didacticus: impostazioni modificate', ['Attiva' => !empty($_POST['attivo']) ? 'sì' : 'no', 'Pagine al massimo' => (int)($_POST['max_pagine'] ?? 0)]);
+            flash_set('✅ Impostazioni salvate.' . ($tolte_si ? " $tolte_si pagine escluse." : '') . (!empty($_POST['attivo']) ? ' La lettura parte con il prossimo giro notturno, oppure subito con «Leggi per 30 secondi».' : ''));
+        } elseif ($azione === 'sito_passata') {
+            $r_si = $app_d->get(\App\Assistenza\Didacticus\CrawlerSito::class)->passata(30);
+            flash_set("Passata fatta: {$r_si['lette']} pagine lette ({$r_si['cambiate']} cambiate), {$r_si['scoperte']} scoperte, {$r_si['errori']} con errore. {$r_si['nota']}", $r_si['errori'] ? 'warning' : 'success');
+        } else {
+            $sito_rep->svuota();
+            registra_log_audit($conn, 'Pagine lette da unical.it per Didacticus svuotate', []);
+            flash_set('Elenco e indice delle pagine lette svuotati: alla prossima passata si riparte dalle pagine di partenza.');
+        }
+        $redirect_d('scheda=pagine');
+    }
     if ($azione === 'importa') {
         $tmp = (string)($_FILES['csv']['tmp_name'] ?? '');
         if ($tmp === '' || ($_FILES['csv']['error'] ?? 1) !== UPLOAD_ERR_OK || ($_FILES['csv']['size'] ?? 0) > 3 * 1024 * 1024) {
@@ -443,10 +462,33 @@ $schede_d = ['voci' => ['Domande e risposte', 'fa-book-open'], 'argomenti' => ['
     $pagine_d = $pag_rep->tutte(); ?>
 <div class="card border-0 shadow-sm mb-3" style="border-radius:12px;"><div class="card-body">
     <h2 class="h6 fw-bold"><i class="fa fa-globe me-1 text-primary" aria-hidden="true"></i>Pagine del sito di Ateneo e del Dipartimento come fonti</h2>
-    <p class="small text-secondary mb-2">Didacticus legge ogni settimana queste pagine (solo indirizzi <strong>https://…unical.it</strong>, pagine pubbliche, non i PDF) e le usa come fonti per scrivere la risposta quando la sua base di conoscenza non basta; la risposta cita la pagina con un collegamento. Servono solo se è collegato un modello linguistico.</p>
+    <p class="small text-secondary mb-2">Didacticus legge ogni settimana queste pagine (solo indirizzi <strong>https://…unical.it</strong>, pagine pubbliche, non i PDF) e le usa quando la sua base di conoscenza non basta: riporta il brano più pertinente con il collegamento alla pagina e, se è collegato un modello linguistico, lo usa come fonte per scrivere la risposta. Qui sotto le pagine scelte a mano (al massimo 60, le più importanti: tasse, sedute di laurea, calendari); sopra la lettura automatica di tutto il sito.</p>
     <p class="small mb-0"><strong>Modello linguistico:</strong>
         <?php if ($modello_ml->attivo()): ?><span class="badge bg-success">collegato</span> <?php echo $h($modello_ml->nome()); ?>, modalità «<?php echo $h($modello_ml->modalita()); ?>»
         <?php else: ?><span class="badge bg-secondary">non collegato</span> <span class="text-secondary">(si collega con LLM_URL nel file .env del server)</span><?php endif; ?></p>
+</div></div>
+<?php $sito_rep = $app_d->get(\App\Assistenza\Didacticus\SitoRepository::class); $sito_imp = $sito_rep->impostazioni(); $sito_n = $sito_rep->conteggi(); ?>
+<div class="card border-0 shadow-sm mb-3" style="border-radius:12px;"><div class="card-body">
+    <h2 class="h6 fw-bold"><i class="fa fa-spider me-1 text-primary" aria-hidden="true"></i>Lettura automatica di unical.it e dibest.unical.it</h2>
+    <p class="small text-secondary">Di notte Didacticus parte dalle pagine indicate qui sotto, segue i collegamenti interni al sito di Ateneo (rispettando <code>robots.txt</code>, una pagina al secondo, niente PDF né indirizzi con parametri) e ne conserva il testo in un indice di ricerca. Rilegge solo le pagine cambiate, una volta a settimana. Quando nessuna delle sue voci è sicura, riporta il brano più pertinente con il collegamento alla pagina.</p>
+    <p class="small mb-2"><strong><?php echo (int)$sito_n['letta']; ?></strong> pagine lette · <strong><?php echo (int)$sito_n['brani']; ?></strong> brani nell'indice · <?php echo (int)$sito_n['coda']; ?> in coda · <?php echo (int)$sito_n['errore']; ?> con errore · <?php echo (int)$sito_n['vuota']; ?> senza testo · <?php echo (int)$sito_n['esclusa']; ?> escluse<br>
+        <span class="text-secondary">Ultima passata: <?php echo $sito_imp['ultima_passata'] ? $h(date('d/m/Y H:i', strtotime((string)$sito_imp['ultima_passata']))) . ' — ' . $h($sito_imp['ultimo_esito']) : 'mai'; ?></span></p>
+    <form method="POST" class="row g-2"><?php csrf_field(); ?><input type="hidden" name="azione" value="sito_salva">
+        <div class="col-12"><div class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" name="attivo" value="1" id="si-attivo" <?php echo $sito_imp['attivo'] ? 'checked' : ''; ?>><label class="form-check-label fw-bold small" for="si-attivo">Lettura automatica accesa</label></div></div>
+        <div class="col-md-6"><label class="form-label small fw-bold" for="si-partenza">Pagine di partenza (una per riga)</label>
+            <textarea id="si-partenza" name="partenza" rows="3" class="form-control form-control-sm" placeholder="https://www.unical.it/"><?php echo $h(implode("\n", $sito_imp['partenza'])); ?></textarea></div>
+        <div class="col-md-6"><label class="form-label small fw-bold" for="si-escludi">Escludi gli indirizzi che contengono (uno per riga)</label>
+            <textarea id="si-escludi" name="escludi" rows="3" class="form-control form-control-sm" placeholder="/albo"><?php echo $h(implode("\n", $sito_imp['escludi'])); ?></textarea></div>
+        <div class="col-6 col-md-3"><label class="form-label small fw-bold" for="si-max">Pagine al massimo</label><input id="si-max" type="number" name="max_pagine" min="100" max="<?php echo \App\Assistenza\Didacticus\SitoRepository::MAX_PAGINE_LIMITE; ?>" value="<?php echo (int)$sito_imp['max_pagine']; ?>" class="form-control form-control-sm"></div>
+        <div class="col-6 col-md-3"><label class="form-label small fw-bold" for="si-prof">Profondità dei collegamenti</label><input id="si-prof" type="number" name="profondita" min="1" max="8" value="<?php echo (int)$sito_imp['profondita']; ?>" class="form-control form-control-sm"></div>
+        <div class="col-6 col-md-3"><label class="form-label small fw-bold" for="si-min">Minuti per notte</label><input id="si-min" type="number" name="minuti" min="1" max="60" value="<?php echo (int)$sito_imp['minuti']; ?>" class="form-control form-control-sm"></div>
+        <div class="col-12 d-flex flex-wrap gap-2"><button class="btn btn-sm btn-primary fw-bold"><i class="fa fa-floppy-disk me-1" aria-hidden="true"></i>Salva</button></div>
+    </form>
+    <div class="d-flex flex-wrap gap-2 mt-2">
+        <form method="POST"><?php csrf_field(); ?><input type="hidden" name="azione" value="sito_passata"><button class="btn btn-sm btn-outline-secondary fw-bold" <?php echo $sito_imp['attivo'] ? '' : 'disabled title="Accendi prima la lettura automatica"'; ?>><i class="fa fa-play me-1" aria-hidden="true"></i>Leggi per 30 secondi</button></form>
+        <form method="POST" onsubmit="return confirm('Svuotare l\'elenco e l\'indice delle pagine lette? Si riparte dalle pagine di partenza.');"><?php csrf_field(); ?><input type="hidden" name="azione" value="sito_svuota"><button class="btn btn-sm btn-outline-danger fw-bold"><i class="fa fa-trash me-1" aria-hidden="true"></i>Svuota l'indice</button></form>
+    </div>
+    <?php $sito_err = $sito_rep->ultimiErrori(5); if ($sito_err): ?><p class="small fw-bold mt-3 mb-1">Ultimi errori</p><ul class="small text-secondary mb-0"><?php foreach ($sito_err as $e_si): ?><li class="text-break"><?php echo $h($e_si['url']); ?> — <?php echo $h($e_si['esito']); ?></li><?php endforeach; ?></ul><?php endif; ?>
 </div></div>
 <div class="card border-0 shadow-sm mb-3" style="border-radius:12px;"><div class="card-body">
     <form method="POST" class="row g-2"><?php csrf_field(); ?><input type="hidden" name="azione" value="pagine_aggiungi">

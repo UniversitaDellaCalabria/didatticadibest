@@ -11,7 +11,7 @@ use App\Assistenza\Costanti;
  * scritta dal pannello. Non scrive nulla nella chat e non avvisa nessuno: lo fa ServizioAssistenza, che decide anche quando passare la parola a un operatore.
  *
  * Tipi di risposta: «risposta» (ha trovato la voce giusta), «suggerimenti» (non è sicuro: propone voci vicine), «nessuna» (non sa), «riservata» (la voce c'è ma
- * serve il login), «generata» (risposta scritta dal modello linguistico, se collegato, solo con le voci trovate), «saluto», «grazie», «operatore» (la persona ha chiesto una persona vera), «argomento» (elenco delle voci di un argomento).
+ * serve il login), «pagina» (nessuna voce sicura: riporta il brano più pertinente delle pagine di Ateneo con il link, senza modello), «generata» (risposta scritta dal modello linguistico, se collegato, solo con le voci trovate), «saluto», «grazie», «operatore» (la persona ha chiesto una persona vera), «argomento» (elenco delle voci di un argomento).
  */
 final class ServizioDidacticus
 {
@@ -29,9 +29,16 @@ final class ServizioDidacticus
     /** Quanto testo si dà in tutto al modello linguistico come fonti (più testo = risposta più lenta). */
     private const CARATTERI_FONTI = 3600;
     /** In fondo alle risposte scritte dal modello linguistico: dice che sono automatiche e vanno controllate. */
-    public const AVVISO_GENERATA = "\n\n**Risposta preparata automaticamente.** Controlla i dati sulle pagine indicate oppure parla con un operatore.";
+    /** Punteggio minimo (0-100) del brano di una pagina di Ateneo per rispondere con quello, e da quando prevale sulle voci vicine proposte come «forse intendevi…». */
+    private const PUNTEGGIO_PAGINA = 70;
+    private const PUNTEGGIO_PAGINA_FORTE = 85;
+    /** Lunghezza massima del brano riportato nella chat. */
+    private const CARATTERI_BRANO = 600;
+    /** In fondo alle risposte con un brano di pagina: non è una voce scritta dal Dipartimento, va controllato sulla pagina. */
+    public const AVVISO_PAGINA = "\n\n**Testo preso dal sito.** Controlla i dati sulla pagina indicata oppure parla con un operatore.";
+    public const AVVISO_GENERATA ="\n\n**Risposta preparata automaticamente.** Controlla i dati sulle pagine indicate oppure parla con un operatore.";
 
-    public function __construct(private VociRepository $voci, private ImpostazioniDidacticus $impostazioni, private ?ModelloLinguistico $modello = null, private ?PagineRepository $pagine = null, private ?ServizioSignificato $significato = null)
+    public function __construct(private VociRepository $voci, private ImpostazioniDidacticus $impostazioni, private ?ModelloLinguistico $modello = null, private ?PagineRepository $pagine = null, private ?ServizioSignificato $significato = null, private ?RicercaSito $sito = null)
     {
     }
 
@@ -127,11 +134,75 @@ final class ServizioDidacticus
                 $vicine[] = ['t' => (string) $c['voce']['titolo'], 'v' => (int) $c['voce']['id']];
             }
         }
+        // Nessuna voce sicura: il brano più pertinente delle pagine di Ateneo, con il collegamento (senza modello linguistico). Se ci sono voci vicine da proporre
+        // ha la precedenza solo un brano molto pertinente.
+        $dallaPagina = $this->dallaPagina($domanda);
+        if ($dallaPagina !== null && (!$vicine || $dallaPagina['punteggio'] >= self::PUNTEGGIO_PAGINA_FORTE)) {
+            return $dallaPagina['esito'];
+        }
         if ($vicine) {
             return self::esito('suggerimenti', 'Non sono sicuro di aver capito. Intendevi una di queste?', ['suggerimenti' => $vicine]);
         }
 
         return self::esito('nessuna', 'Non ho trovato una risposta a questa domanda. Prova a scriverla in modo diverso, scegli un argomento qui sotto oppure parla con un operatore.', ['argomenti' => true, 'operatore' => true], null, true);
+    }
+
+    /**
+     * I brani più pertinenti delle pagine di Ateneo: quelle scelte a mano dal pannello e quelle lette dal crawler (a parità di punteggio vincono le prime).
+     *
+     * @return list<array{titolo: string, url: string, testo: string, punteggio: int}>
+     */
+    private function braniDiAteneo(string $domanda, int $quanti): array
+    {
+        $out = [];
+        foreach ([fn (): array => $this->pagine !== null ? RicercaPagine::cerca($domanda, $this->pagine->conTesto(), $quanti) : [], fn (): array => $this->sito?->cerca($domanda, $quanti) ?? []] as $cerca) {
+            try {
+                $out = array_merge($out, $cerca());
+            } catch (\Throwable $e) {
+                error_log('[Didacticus] pagine di Ateneo non disponibili: ' . $e->getMessage());
+            }
+        }
+        usort($out, static fn (array $a, array $b): int => $b['punteggio'] <=> $a['punteggio']);
+        $viste = [];
+        $unici = [];
+        foreach ($out as $b) {
+            $chiave = md5($b['testo']);
+            if (!isset($viste[$chiave])) {
+                $viste[$chiave] = true;
+                $unici[] = $b;
+            }
+        }
+
+        return array_slice($unici, 0, $quanti);
+    }
+
+    /**
+     * Il brano più pertinente delle pagine di Ateneo e del Dipartimento, riportato com'è con il collegamento alla pagina; null se non c'è un brano abbastanza pertinente
+     * o le pagine non sono disponibili.
+     *
+     * @return array{punteggio: int, esito: array{tipo: string, testo: string, extra: array<string, mixed>, voce_id: ?int, nessuna: bool, passa: bool}}|null
+     */
+    private function dallaPagina(string $domanda): ?array
+    {
+        $brani = $this->braniDiAteneo($domanda, 3);
+        if (!$brani || $brani[0]['punteggio'] < self::PUNTEGGIO_PAGINA) {
+            return null;
+        }
+        $primo = $brani[0];
+        $brano = trim($primo['testo']);
+        if (mb_strlen($brano) > self::CARATTERI_BRANO) {
+            $brano = rtrim((string) preg_replace('/\s+\S*$/u', '', mb_substr($brano, 0, self::CARATTERI_BRANO)), " ,;:.") . '…';
+        }
+        $nome = static fn (array $b): string => $b['titolo'] !== '' ? $b['titolo'] : $b['url'];
+        $link = [];
+        foreach ($brani as $b) {
+            if ($b['punteggio'] >= self::PUNTEGGIO_PAGINA && count($link) < 2) {
+                $link[$b['url']] = ['e' => 'Pagina di Ateneo: ' . mb_strimwidth($nome($b), 0, 70, '…'), 'u' => $b['url']];
+            }
+        }
+        $testo = 'Ho cercato nelle pagine del sito di Ateneo e ho trovato questo nella pagina «' . $nome($primo) . "»:\n\n" . $brano . self::AVVISO_PAGINA;
+
+        return ['punteggio' => $primo['punteggio'], 'esito' => self::esito('pagina', $testo, ['feedback' => true, 'operatore' => true, 'link' => array_values($link)])];
     }
 
     /**
@@ -160,20 +231,14 @@ final class ServizioDidacticus
         }
         // I brani delle pagine di Ateneo e del Dipartimento scelte dal pannello, con il collegamento alla pagina
         $pagine = [];
-        if ($this->pagine !== null) {
-            try {
-                foreach (RicercaPagine::cerca($domanda, $this->pagine->conTesto(), 2) as $br) {
-                    if ($budget < 200) {
-                        break;
-                    }
-                    $testo = mb_substr($br['testo'], 0, min($budget, 800));
-                    $fonti[] = ['titolo' => 'Pagina «' . ($br['titolo'] !== '' ? $br['titolo'] : $br['url']) . '»', 'testo' => $testo];
-                    $pagine[$br['url']] = $br['titolo'] !== '' ? $br['titolo'] : $br['url'];
-                    $budget -= mb_strlen($testo);
-                }
-            } catch (\Throwable $e) {
-                error_log('[Didacticus] pagine di Ateneo non disponibili: ' . $e->getMessage());
+        foreach ($this->braniDiAteneo($domanda, 2) as $br) {
+            if ($budget < 200) {
+                break;
             }
+            $testo = mb_substr($br['testo'], 0, min($budget, 800));
+            $fonti[] = ['titolo' => 'Pagina «' . ($br['titolo'] !== '' ? $br['titolo'] : $br['url']) . '»', 'testo' => $testo];
+            $pagine[$br['url']] = $br['titolo'] !== '' ? $br['titolo'] : $br['url'];
+            $budget -= mb_strlen($testo);
         }
         $testo = $fonti ? $this->modello->rispondi($domanda, $fonti) : null;
         if ($testo === null) {

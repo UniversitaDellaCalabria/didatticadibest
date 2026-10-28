@@ -131,6 +131,14 @@ if ($mesi_as > 0) {
     // Pagine di Ateneo che Didacticus legge come fonti: si rileggono quelle ferme da più di una settimana (di solito poche per volta)
     try { [$pg_ok, $pg_ko] = \App\Core\App::per($conn)->get(\App\Assistenza\Didacticus\ServizioPagine::class)->aggiornaScadute(); if ($pg_ok + $pg_ko > 0) echo "- Pagine di Ateneo per Didacticus: $pg_ok lette, $pg_ko con errore.\n"; }
     catch (\Throwable $e_pg) { echo '- Pagine di Ateneo per Didacticus: errore (' . $e_pg->getMessage() . ")\n"; }
+    // Lettura automatica di unical.it e dei suoi sottodomini (se accesa dal pannello): una passata di al massimo «minuti» minuti, che riprende dove era arrivata
+    try {
+        $sito_srv = \App\Core\App::per($conn);
+        $sito_imp = $sito_srv->get(\App\Assistenza\Didacticus\SitoRepository::class)->impostazioni();
+        if ($sito_imp['attivo']) { $sito_r = $sito_srv->get(\App\Assistenza\Didacticus\CrawlerSito::class)->passata($sito_imp['minuti'] * 60); echo "- Lettura di unical.it per Didacticus: {$sito_r['lette']} pagine lette ({$sito_r['cambiate']} cambiate), {$sito_r['scoperte']} scoperte, {$sito_r['errori']} con errore. {$sito_r['nota']}
+"; }
+    } catch (\Throwable $e_si) { echo '- Lettura di unical.it per Didacticus: errore (' . $e_si->getMessage() . ")
+"; }
     // Significato delle voci di Didacticus (embedding): si ricalcolano solo le voci nuove o cambiate; senza EMB_URL non fa nulla
     try { [$sg_ok, $sg_ko] = \App\Core\App::per($conn)->get(\App\Assistenza\Didacticus\ServizioSignificato::class)->aggiorna(); if ($sg_ok + $sg_ko > 0) echo "- Significato delle voci di Didacticus: $sg_ok calcolate, $sg_ko non calcolate.
 "; }
