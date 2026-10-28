@@ -266,9 +266,10 @@ def costruisci():
             'Sotto ogni risposta: <b>«Sì, grazie»</b> chiude la chat; <b>«Non mi basta»</b> o <b>«Parla con un operatore»</b> (o la parola «operatore» scritta in chat) passano la parola a una persona.',
             'La chat passa agli operatori, che ricevono email e finestrella con la domanda e vedono già quello che Didacticus ha risposto. Chi ha chiesto aiuto continua a scrivere nella stessa chat e, se chiude la pagina, riceve la risposta per email.',
             'A fine conversazione si può dire se l\'assistenza è stata utile.')
-        + fig('map_pub_didacticus_widget', '<b>Il pulsante di Didacticus</b> in basso a destra su ogni pagina, con la nuvoletta «Chiedi a Didacticus» che compare un istante, sparisce da sola e non torna nella stessa visita.')
-        + gal(fig('map_pub_assistenza_form', '<b>Nuova richiesta.</b> Argomento, domanda e, per gli esterni, nome ed email. Chi preferisce può scrivere subito a un operatore.'),
-              fig('map_pub_assistenza_didacticus', '<b>La chat con Didacticus:</b> risposta, link, «Ti è stato utile?» e «Parla con un operatore».'),
+        + '<p>La chat si apre con <b>«Ciao <i>Nome</i>! Dimmi cosa ti serve»</b> (chi non ha l\'accesso indica prima nome ed email) e gli argomenti da scegliere nella finestra. Se Didacticus non sa rispondere («Mi dispiace, ti passo un operatore») o si chiede un operatore, Didacticus domanda <b>a quale corso di laurea si è iscritti</b> e avvisa solo le persone dell\'ufficio che seguono quel corso; se nessuno lo segue, avvisa tutti.</p>'
+        + fig('map_pub_didacticus_widget', '<b>Il pulsante di Didacticus</b> in basso a destra su ogni pagina: la riga «Ti serve aiuto?» compare un istante e si riapre ogni volta che si passa con il mouse sul gufo.')
+        + gal(fig('map_pub_assistenza_form', '<b>Il modulo classico</b> (con «Preferisco il modulo»): argomento, domanda e, per gli esterni, nome ed email.'),
+              fig('map_pub_assistenza_didacticus', '<b>La chat parte da Didacticus:</b> saluta per nome, fa scegliere l\'argomento e poi risponde con link e «Ti è stato utile?».'),
               fig('map_pub_assistenza_esterno', '<b>La chat di un utente esterno</b>, ripresa dal suo link personale.'))
         + '<h3>Per chi risponde</h3><p>Le persone dell\'ufficio <b>Assistenza</b> (scelte da Gestione del portale → Uffici) trovano la voce <b>Assistenza</b> nel menu di Didattica e le chat anche nella casella <b>Messaggi</b>. La chat si aggiorna da sola; il pulsante «Prendo io» assegna la chat, «Passa a…» la gira a un collega, le <b>note interne</b> non le vede chi ha chiesto aiuto.</p>'
         + gal(fig('map_adm_assistenza_coda', '<b>Una chat da prendere</b>, con le schede Da prendere · Mie · Tutte · Con Didacticus · Chiuse.'),

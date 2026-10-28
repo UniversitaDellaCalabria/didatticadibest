@@ -6,7 +6,7 @@ import html, os
 RADICE = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 USCITA = os.path.join(RADICE, 'documentazione', 'mappa')
 IMG = os.path.join(USCITA, 'img')
-DATA = '22 ottobre 2026'
+DATA = '28 ottobre 2026'
 
 CSS = """
 :root{--c1:#8e0f1f;--c2:#b30000;--ink:#1e293b;--muted:#64748b;--line:#e2e8f0;--bg:#f8fafc;--card:#fff;--ok:#15803d;--blu:#0b5cad;--code:#0f172a}
