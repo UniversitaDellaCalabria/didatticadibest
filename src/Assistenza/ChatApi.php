@@ -171,6 +171,7 @@ final class ChatApi
             'bot_utile' => $this->servizio->azioneBot($conv, 'utile'),
             'bot_non_utile' => $this->servizio->azioneBot($conv, 'non_utile'),
             'operatore' => $this->servizio->azioneBot($conv, 'operatore'),
+            'bot_corso' => $this->servizio->azioneBot($conv, 'corso', (string) ($dati['valore'] ?? '')),
             'bot_voce' => $this->servizio->azioneBot($conv, 'voce', (string) ($dati['valore'] ?? '')),
             'bot_argomento' => $this->servizio->azioneBot($conv, 'argomento', (string) ($dati['valore'] ?? '')),
             default => 'Azione non valida.',

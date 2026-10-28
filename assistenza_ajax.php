@@ -66,6 +66,22 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 if (!(new \App\Auth\Csrf(new \App\Auth\SessioneNativa()))->valido($_POST['csrf_token'] ?? '')) $rispondi(['ok' => false, 'errore' => 'Sessione scaduta: ricarica la pagina.'], 403);
 session_write_close();
+// La chat parte da Didacticus: la conversazione nasce solo quando la persona sceglie un argomento o scrive (chi non ha l'accesso ha già indicato nome ed email in assistenza.php)
+if ($azione === 'avvia') {
+    if (!check_rate_limit($conn, 'assistenza_nuova', 12, 600)) $rispondi(['ok' => false, 'errore' => 'Troppi tentativi: riprova tra qualche minuto.'], 429);
+    $avvio = ($_POST['scelta'] ?? '') === 'argomento' ? 'argomento' : 'testo';
+    $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+    if (!empty($_SESSION['utente_id'])) {
+        $u = $app->get(\App\Auth\UtenteRepository::class)->perId((int)$_SESSION['utente_id']);
+        [$nuova, $err] = $u ? $srv->apriDaUtente($u, (string)($_POST['argomento'] ?? ''), (string)($_POST['testo'] ?? ''), null, $ip, false, $avvio) : [null, 'Accedi di nuovo.'];
+    } else {
+        $o = $_SESSION['assistenza_ospite'] ?? null;
+        [$nuova, $err] = is_array($o) ? $srv->apriDaEsterno((string)$o['nome'], (string)$o['email'], (string)($_POST['argomento'] ?? ''), (string)($_POST['testo'] ?? ''), $ip, null, false, $avvio) : [null, 'Indica prima nome ed email: ricarica la pagina.'];
+    }
+    if (!$nuova) $rispondi(['ok' => false, 'errore' => $err ?: 'Non sono riuscito ad aprire la chat.']);
+    $esterno = $nuova['canale'] === \App\Assistenza\Costanti::CANALE_ESTERNO;
+    $rispondi(['ok' => true, 'c' => $esterno ? '' : (int)$nuova['id'], 't' => $esterno ? (string)$nuova['token'] : ''] + $api->chatUtente($nuova, 0));
+}
 if (!$conv) $rispondi(['ok' => false, 'errore' => 'Non hai conversazioni aperte.'], 404);
 // Notifiche a finestrella di chi ha chiesto aiuto: iscrizione e rinuncia di questo browser (legate alla sua conversazione)
 if ($azione === 'push_iscrivi' || $azione === 'push_disiscrivi') {

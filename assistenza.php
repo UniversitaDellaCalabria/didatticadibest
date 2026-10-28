@@ -63,12 +63,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['azione'] ?? '') === 'nuova
     }
 }
 
-$mostra_modulo = !$conv || isset($_GET['nuova']) || $errore !== null;
-$chiusa = $conv && $conv['stato'] === $Cost::STATO_CHIUSA;
+// Chi non ha l'accesso dice prima come si chiama (nome, email, controllo anti-robot): Didacticus lo saluta per nome e la chat parte da lì
+$errore_ospite = null;
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['azione'] ?? '') === 'ospite' && !$utente) {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    $o_nome = trim((string)preg_replace('/\s+/u', ' ', (string)($_POST['nome'] ?? '')));
+    $o_email = strtolower(trim((string)($_POST['email'] ?? '')));
+    if (!empty($_POST['sito_web'])) {
+        $errore_ospite = 'Richiesta non valida.';
+    } elseif (!check_rate_limit($conn, 'assistenza_nuova', 12, 600)) {
+        $errore_ospite = 'Troppi tentativi: riprova tra qualche minuto.';
+    } elseif (mb_strlen($o_nome) < 2 || mb_strlen($o_nome) > $Cost::MAX_NOME) {
+        $errore_ospite = 'Scrivi il tuo nome e cognome.';
+    } elseif (!filter_var($o_email, FILTER_VALIDATE_EMAIL) || mb_strlen($o_email) > 190) {
+        $errore_ospite = 'Scrivi un indirizzo email valido: le risposte arrivano lì.';
+    } else {
+        $errore_ospite = captcha_verifica((string)($_POST['captcha_id'] ?? ''), (string)($_POST['captcha_risposta'] ?? ''));
+        if ($errore_ospite === null) {
+            $_SESSION['assistenza_ospite'] = ['nome' => $o_nome, 'email' => $o_email];
+            header('Location: ' . $url_pagina(['nuova' => 1]));
+            exit;
+        }
+    }
+}
+$ospite = !$utente && is_array($_SESSION['assistenza_ospite'] ?? null) ? $_SESSION['assistenza_ospite'] : null;
+$svc_attivo = $app->get(\App\Assistenza\OrariAssistenza::class)->attiva();
+// Con Didacticus acceso la chat parte da lui («Dimmi cosa ti serve»); il modulo classico resta con ?modulo=1 e quando Didacticus è spento
+$avvio = $did_attivo && $svc_attivo && !isset($_GET['modulo']) && $errore === null && (!$conv || isset($_GET['nuova']));
+$serve_ospite = $avvio && !$utente && !$ospite;
+$nome_chat = $utente ? trim((string)$utente['nome'] . ' ' . (string)$utente['cognome']) : (string)($ospite['nome'] ?? '');
+$mostra_modulo = !$avvio && (!$conv || isset($_GET['nuova']) || $errore !== null);
+$chiusa = !$avvio && $conv && $conv['stato'] === $Cost::STATO_CHIUSA;
 $argomento_sel = $Cost::argomentoValido((string)($_POST['argomento'] ?? $_GET['argomento'] ?? ''));
 $pratica_ctx = $utente ? $app->get(\App\Assistenza\Contesti::class)->pratica((int)($_GET['pratica'] ?? $_POST['pratica'] ?? 0), (int)$utente['id']) : null;
 $pren_ctx = $utente && !$pratica_ctx ? $app->get(\App\Assistenza\Contesti::class)->prenotazione((int)($_GET['prenotazione'] ?? $_POST['prenotazione'] ?? 0), (int)$utente['id']) : null;
-$cap = !$utente && $mostra_modulo ? captcha_prenotazione() : null;
+$cap = !$utente && ($mostra_modulo || $serve_ospite) ? captcha_prenotazione() : null;
 
 $page_cfg['titolo'] = 'Assistenza';
 if ($pannello) {
@@ -120,23 +149,52 @@ if (!$servizio_attivo): ?>
 <?php elseif ($descr_orari !== '' && !$pannello): ?>
     <p class="small text-secondary mb-2"><i class="fa fa-clock me-1" aria-hidden="true"></i>Orari dell'assistenza: <?php echo $h($descr_orari); ?>.</p>
 <?php endif; ?>
-<?php if ($errore): ?><div class="alert alert-danger py-2" role="alert"><i class="fa fa-circle-xmark me-1" aria-hidden="true"></i><?php echo $h($errore); ?></div><?php endif; ?>
+<?php if ($errore || $errore_ospite): ?><div class="alert alert-danger py-2" role="alert"><i class="fa fa-circle-xmark me-1" aria-hidden="true"></i><?php echo $h($errore ?: $errore_ospite); ?></div><?php endif; ?>
 <?php if (!empty($_GET['nuova_ok']) && $conv): ?>
     <div class="alert alert-success py-2" role="status"><i class="fa fa-circle-check me-1" aria-hidden="true"></i>Richiesta inviata. Ti abbiamo scritto un'email con il <strong>link personale</strong> per riprendere questa chat in qualsiasi momento: non condividerlo.</div>
 <?php endif; ?>
 
-<?php if ($conv && !$mostra_modulo): ?>
+<?php if ($serve_ospite): ?>
+    <!-- CHI NON HA L'ACCESSO: come ti chiami? -->
+    <form method="POST" action="<?php echo $h($url_pagina()); ?>" class="card border-0 shadow-sm"><div class="card-body">
+        <?php csrf_field(); ?>
+        <input type="hidden" name="azione" value="ospite">
+        <?php if ($pannello): ?><input type="hidden" name="pannello" value="1"><?php endif; ?>
+        <div class="d-flex align-items-center gap-2 mb-3"><img src="didacticus_file.php?avatar=1" alt="" width="48" height="48" class="rounded-circle" style="object-fit:cover;"><div><strong>Ciao, sono Didacticus!</strong><div class="small text-secondary">Prima di iniziare dimmi chi sei: così posso salutarti e, se serve una persona dell'ufficio, sa come risponderti.</div></div></div>
+        <div class="row g-2 mb-3">
+            <div class="col-12"><label class="form-label fw-bold small" for="as-nome">Nome e cognome</label><input class="form-control" id="as-nome" name="nome" maxlength="150" autocomplete="name" required value="<?php echo $h($_POST['nome'] ?? ''); ?>"></div>
+            <div class="col-12"><label class="form-label fw-bold small" for="as-email">Email (ti rispondiamo qui)</label><input class="form-control" type="email" id="as-email" name="email" maxlength="190" autocomplete="email" required value="<?php echo $h($_POST['email'] ?? ''); ?>"></div>
+        </div>
+        <?php if ($cap): ?>
+            <div class="p-3 rounded border bg-light mb-3">
+                <label for="as-captcha" class="form-label small fw-bold mb-1"><i class="fa fa-shield-halved me-1" aria-hidden="true"></i>Controllo anti-robot: <?php echo $h($cap['domanda']); ?></label>
+                <input type="text" name="captcha_risposta" id="as-captcha" class="form-control form-control-sm" style="max-width:140px;" inputmode="numeric" pattern="[0-9]*" maxlength="3" autocomplete="off" required>
+                <input type="hidden" name="captcha_id" value="<?php echo $h($cap['id']); ?>">
+            </div>
+            <div style="position:absolute; left:-10000px; width:1px; height:1px; overflow:hidden;" aria-hidden="true"><label>Sito web <input type="text" name="sito_web" tabindex="-1" autocomplete="off"></label></div>
+        <?php endif; ?>
+        <div class="form-text mb-3">Non scrivere password, codice fiscale o dati bancari. La conversazione si conserva per 12 mesi: <a href="privacy.php" target="_top">informativa privacy</a>.</div>
+        <button class="btn btn-danger fw-bold" type="submit" style="background-color:#B80000;border:none;"><i class="fa fa-comments me-1" aria-hidden="true"></i>Inizia la chat</button>
+        <a class="btn btn-link" href="<?php echo $h($url_pagina(['modulo' => 1])); ?>">Preferisco il modulo</a>
+    </div></form>
+<?php elseif ($avvio || ($conv && !$mostra_modulo)): ?>
     <!-- CHAT -->
-    <div class="card border-0 shadow-sm" id="ac-app" data-url="assistenza_ajax.php" data-csrf="<?php echo $h(csrf_token()); ?>" data-t="<?php echo $conv['canale'] === $Cost::CANALE_ESTERNO ? $h($token) : ''; ?>" data-c="<?php echo $c_url; ?>" data-chiusa="<?php echo $chiusa ? 1 : 0; ?>" data-chiave="<?php echo $h($push_pub->chiavePubblica()); ?>" data-avatar="didacticus_file.php?avatar=1" data-argomenti="<?php echo $h(json_encode(array_map(fn($k, $a) => ['k' => $k, 'n' => $a['nome'], 'i' => $a['icona']], array_keys($Cost::argomenti()), $Cost::argomenti()), JSON_UNESCAPED_UNICODE)); ?>">
+    <?php if ($avvio && $in_corso): ?>
+        <div class="alert alert-warning py-2 d-flex flex-wrap align-items-center gap-2" role="status">
+            <span><i class="fa fa-comments me-1" aria-hidden="true"></i>Hai già una richiesta in corso con l'ufficio («<?php echo $h($Cost::nomeArgomento((string)$in_corso['argomento'])); ?>»): se scrivi qui, il messaggio va in quella conversazione.</span>
+            <a class="btn btn-sm btn-outline-dark fw-bold ms-md-auto" href="<?php echo $h($url_pagina(['c' => (int)$in_corso['id']])); ?>">Riprendila</a>
+        </div>
+    <?php endif; ?>
+    <div class="card border-0 shadow-sm" id="ac-app" data-url="assistenza_ajax.php" data-csrf="<?php echo $h(csrf_token()); ?>" data-t="<?php echo !$avvio && $conv['canale'] === $Cost::CANALE_ESTERNO ? $h($token) : ''; ?>" data-c="<?php echo $avvio ? '' : $c_url; ?>" data-chiusa="<?php echo $chiusa ? 1 : 0; ?>" data-avvio="<?php echo $avvio ? 1 : 0; ?>" data-saluto="<?php echo $h(\App\Assistenza\ServizioAssistenza::salutoAvvio($nome_chat)); ?>" data-chiave="<?php echo $h($push_pub->chiavePubblica()); ?>" data-avatar="didacticus_file.php?avatar=1" data-argomenti="<?php echo $h(json_encode(array_map(fn($k, $a) => ['k' => $k, 'n' => $a['nome'], 'i' => $a['icona']], array_keys($Cost::argomenti()), $Cost::argomenti()), JSON_UNESCAPED_UNICODE)); ?>">
         <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2 py-2">
             <div>
                 <div id="ac-intestazione" class="d-none"><span class="d-flex align-items-center gap-2 mb-1"><img src="didacticus_file.php?avatar=1" alt="" width="34" height="34" class="rounded-circle" style="object-fit:cover;"><strong>Didacticus</strong><span class="badge bg-light text-dark border">assistente virtuale</span></span></div>
-                <div class="fw-bold"><?php echo $h($Cost::nomeArgomento((string)$conv['argomento'])); ?></div>
+                <div class="fw-bold"><?php echo $avvio ? 'Chiedi a Didacticus' : $h($Cost::nomeArgomento((string)$conv['argomento'])); ?></div>
                 <div class="small text-secondary" id="ac-stato" role="status"></div>
             </div>
             <div class="d-flex gap-1">
-                <a class="btn btn-outline-secondary btn-sm" href="<?php echo $h($url_pagina(['t' => $token, 'nuova' => 1, 'c' => $c_url])); ?>" title="Inizia una nuova richiesta su un altro argomento"><i class="fa fa-plus <?php echo $pannello ? '' : 'me-1'; ?>" aria-hidden="true"></i><span class="<?php echo $pannello ? 'visually-hidden' : ''; ?>">Nuova richiesta</span></a>
-                <button type="button" class="btn btn-outline-secondary btn-sm" id="ac-chiudi" title="Chiudi la conversazione"><i class="fa fa-check <?php echo $pannello ? '' : 'me-1'; ?>" aria-hidden="true"></i><span class="<?php echo $pannello ? 'visually-hidden' : ''; ?>">Ho risolto</span></button>
+                <?php if (!$avvio): ?><a class="btn btn-outline-secondary btn-sm" href="<?php echo $h($url_pagina(['t' => $token, 'nuova' => 1, 'c' => $c_url])); ?>" title="Inizia una nuova richiesta su un altro argomento"><i class="fa fa-plus <?php echo $pannello ? '' : 'me-1'; ?>" aria-hidden="true"></i><span class="<?php echo $pannello ? 'visually-hidden' : ''; ?>">Nuova richiesta</span></a><?php endif; ?>
+                <button type="button" class="btn btn-outline-secondary btn-sm<?php echo $avvio ? ' d-none' : ''; ?>" id="ac-chiudi" title="Chiudi la conversazione"><i class="fa fa-check <?php echo $pannello ? '' : 'me-1'; ?>" aria-hidden="true"></i><span class="<?php echo $pannello ? 'visually-hidden' : ''; ?>">Ho risolto</span></button>
             </div>
         </div>
         <div class="card-body" id="ac-log" role="log" aria-live="polite" aria-label="Messaggi della conversazione" style="height: <?php echo $pannello ? '48vh' : '50vh'; ?>; min-height: 260px; overflow-y: auto; background: #f8fafc;"></div>
@@ -164,11 +222,12 @@ if (!$servizio_attivo): ?>
         <noscript><div class="alert alert-warning m-2">Per la chat serve JavaScript. Puoi comunque aspettare la risposta: ti arriva per email.</div></noscript>
     </div>
     <?php if ($chiusa && !$pannello): ?><p class="small text-secondary mt-2">La conversazione è chiusa: se scrivi di nuovo si riapre, oppure inizia una <a href="<?php echo $h($url_pagina(['t' => $token, 'nuova' => 1, 'c' => $c_url])); ?>">nuova richiesta</a>.</p><?php endif; ?>
+    <?php if ($avvio && !$pannello): ?><p class="small text-secondary mt-2 mb-1">Preferisci scrivere un messaggio all'ufficio? <a href="<?php echo $h($url_pagina(['modulo' => 1])); ?>">Usa il modulo</a>.</p><?php endif; ?>
     <?php if ($utente && !$pannello): ?><p class="small mt-2"><a href="assistenza_storico.php"><i class="fa fa-clock-rotate-left me-1" aria-hidden="true"></i>Le mie conversazioni</a></p><?php endif; ?>
-    <?php if ($c_url !== ''): ?><script>try { sessionStorage.setItem('assistenza_c', '<?php echo $c_url; ?>'); } catch (e) {}</script><?php endif; ?>
+    <?php if ($c_url !== '' && !$avvio): ?><script>try { sessionStorage.setItem('assistenza_c', '<?php echo $c_url; ?>'); } catch (e) {}</script><?php endif; ?>
     <?php if ($push_pub->attivo()): ?><script src="assets/js/assistenza-push.js?v=1"></script><?php endif; ?>
-    <script src="assets/js/assistenza-chat.js?v=5"></script>
-    <?php if ($conv['canale'] === $Cost::CANALE_ESTERNO): ?>
+    <script src="assets/js/assistenza-chat.js?v=6"></script>
+    <?php if (!$avvio && $conv['canale'] === $Cost::CANALE_ESTERNO): ?>
         <script>try { localStorage.setItem('assistenza_t', <?php echo json_encode($token, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>); } catch (e) {}</script>
     <?php endif; ?>
 

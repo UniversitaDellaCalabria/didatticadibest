@@ -7,8 +7,9 @@
     if (!app) return;
 
     var URL = app.dataset.url, CSRF = app.dataset.csrf, TOKEN = app.dataset.t || '', CHAT = app.dataset.c || '';
+    var AVVIO = app.dataset.avvio === '1'; // la chat parte da Didacticus: la conversazione nasce solo alla prima scelta o al primo messaggio
     var el = function (id) { return document.getElementById(id); };
-    var stato = { ultimoId: 0, chiusa: app.dataset.chiusa === '1', valutata: false, bot: false, titolo: document.title, nuovi: 0, ultimoBot: null };
+    var stato = { ultimoId: AVVIO ? -1 : 0, chiusa: app.dataset.chiusa === '1', valutata: false, bot: false, titolo: document.title, nuovi: 0, ultimoBot: null };
     var AVATAR = app.dataset.avatar || '', ARGOMENTI = [];
     try { ARGOMENTI = JSON.parse(app.dataset.argomenti || '[]'); } catch (e) { ARGOMENTI = []; }
 
@@ -107,8 +108,16 @@
             });
         }
         if (extra.argomenti) {
-            box.appendChild(crea('div', 'small fw-bold text-secondary mt-1 mb-1', 'Oppure scegli un argomento:'));
+            box.appendChild(crea('div', 'small fw-bold text-secondary mt-1 mb-1', extra.argomenti_titolo || 'Oppure scegli un argomento:'));
             ARGOMENTI.forEach(function (a) { box.appendChild(pulsante(a.n, a.i, 'btn-outline-secondary', function () { agisci('bot_argomento', { valore: a.k }); })); });
+        }
+        if (extra.corsi) {
+            box.appendChild(crea('div', 'small fw-bold text-secondary mt-1 mb-1', 'Il tuo corso di laurea:'));
+            extra.corsi.forEach(function (c) {
+                box.appendChild(pulsante(c, 'fa-graduation-cap', 'btn-outline-secondary text-start', function () { agisci('bot_corso', { valore: c }); }));
+            });
+            box.appendChild(pulsante('Un altro / non lo so', '', 'btn-outline-secondary', function () { agisci('bot_corso', { valore: '' }); }));
+            return box;
         }
         if (extra.feedback) {
             box.appendChild(crea('div', 'small fw-bold text-secondary mt-2 mb-1', 'Ti è stato utile?'));
@@ -182,7 +191,45 @@
         if (primaVolta) el('ac-log').scrollTop = el('ac-log').scrollHeight;
     }
 
+    function oraLocale() {
+        var d = new Date();
+        return d.getFullYear() + '-' + due(d.getMonth() + 1) + '-' + due(d.getDate()) + ' ' + due(d.getHours()) + ':' + due(d.getMinutes()) + ':' + due(d.getSeconds());
+    }
+    // Il saluto di Didacticus mentre la chat non esiste ancora: lo stesso testo viene poi salvato dal server come primo messaggio
+    function saluta() {
+        stato.bot = true;
+        el('ac-intestazione').classList.remove('d-none');
+        el('ac-stato').textContent = 'Ti risponde Didacticus · puoi chiedere un operatore';
+        aggiungi([{ id: 0, da: 'bot', tipo: 'messaggio', testo: app.dataset.saluto || 'Ciao! Dimmi cosa ti serve.', autore: 'Didacticus', quando: oraLocale(),
+            extra: { argomenti: true, argomenti_titolo: 'Scegli un argomento:' } }]);
+    }
+    // Primo contatto: crea la conversazione (con il saluto salvato) e da lì la chat è quella di sempre
+    function avvia(parametri) {
+        return chiama(Object.assign({ azione: 'avvia' }, parametri), true).then(function (r) {
+            if (!r.ok) {
+                errore(r.errore);
+                document.querySelectorAll('#ac-log .ac-azioni button').forEach(function (x) { x.disabled = false; });
+                return r;
+            }
+            AVVIO = false;
+            if (r.c) { CHAT = String(r.c); try { sessionStorage.setItem('assistenza_c', CHAT); } catch (e) {} }
+            if (r.t) { TOKEN = r.t; try { localStorage.setItem('assistenza_t', TOKEN); } catch (e) {} }
+            el('ac-log').textContent = '';
+            stato.ultimoId = 0; stato.ultimoBot = null;
+            el('ac-chiudi').classList.remove('d-none');
+            applica(r, true);
+            avviaPolling();
+            return r;
+        });
+    }
+
     function agisci(azione, extra) {
+        if (AVVIO) {
+            if (azione === 'bot_argomento') return avvia({ argomento: extra.valore, scelta: 'argomento' });
+            if (azione === 'operatore') return avvia({ testo: 'Voglio parlare con un operatore' });
+            if (azione === 'invia') return avvia({ testo: extra.testo });
+            return Promise.resolve({ ok: false });
+        }
         var dati = Object.assign({ azione: azione, dopo: stato.ultimoId }, extra || {});
         return chiama(dati, true).then(function (r) { applica(r, false); var l = el('ac-log'); l.scrollTop = l.scrollHeight; return r; });
     }
@@ -233,12 +280,21 @@
         });
     }
 
-    var giro = 0;
-    setInterval(function () {
-        giro++;
-        if (document.hidden && giro % 5 !== 0) return;
-        chiama({ azione: 'chat', dopo: stato.ultimoId }).then(function (r) { applica(r, false); });
-    }, 4000);
+    var giro = 0, polling = false;
+    function avviaPolling() {
+        if (polling) return;
+        polling = true;
+        setInterval(function () {
+            giro++;
+            if (document.hidden && giro % 5 !== 0) return;
+            chiama({ azione: 'chat', dopo: stato.ultimoId }).then(function (r) { applica(r, false); });
+        }, 4000);
+    }
 
-    chiama({ azione: 'chat', dopo: 0 }).then(function (r) { applica(r, true); });
+    if (AVVIO) {
+        saluta();
+    } else {
+        avviaPolling();
+        chiama({ azione: 'chat', dopo: 0 }).then(function (r) { applica(r, true); });
+    }
 })();

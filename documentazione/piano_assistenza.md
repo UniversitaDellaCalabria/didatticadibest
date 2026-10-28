@@ -1,4 +1,10 @@
-# Piano — Assistenza, notifiche e Didacticus
+#### H6 — La chat parte da Didacticus: saluto, argomenti nella chat, corso di laurea e operatori *(28/10/2026, nessuna modifica allo schema)*
+
+* Con Didacticus acceso `assistenza.php` (e la finestrella) si apre già come chat: «Ciao *Nome*! Sono Didacticus… Dimmi cosa ti serve» con i pulsanti degli argomenti; chi non ha l'accesso indica prima nome, email e controllo anti-robot. La conversazione nasce solo alla prima scelta o al primo messaggio (azione `avvia` di `assistenza_ajax.php`, parametro `avvio` di `apriDaUtente`/`apriDaEsterno`), con il saluto salvato come primo messaggio. Il modulo classico resta con `?modulo=1` e a Didacticus spento.
+* Se Didacticus non sa rispondere («Mi dispiace… ti passo un operatore») o la persona chiede un operatore, chiede **a quale corso di laurea è iscritta** (pulsanti, o il nome scritto a mano) e avvisa via email solo le persone dell'ufficio Assistenza che seguono quel corso (`uffici_persone.corsi`, `OperatoriAssistenza::emailPerCorso`); se nessuno lo segue, tutti. La nota interna riporta il corso dichiarato.
+* **Da fare in Gestione → Uffici → Assistenza**: indicare i «corsi seguiti» di ogni persona. Finché nessuno li ha indicati la domanda sul corso non viene fatta e la chat passa subito.
+
+ Piano — Assistenza, notifiche e Didacticus
 
 > Nato il 22/10/2026 dalla richiesta: un servizio di assistenza per studenti e utenti esterni (non solo sulle pratiche), con chat, notifiche a finestrella su Windows per gli operatori e un bot, **Didacticus**, che risponde alle prime domande e poi passa la parola all'operatore.
 > Stesso metodo del `piano_nuove_feature.md`: **uno step alla volta**; prima di ogni step si elencano i materiali che servono; a fine step si aggiorna il Registro (§5) e `mappa_file_da_caricare.html`.

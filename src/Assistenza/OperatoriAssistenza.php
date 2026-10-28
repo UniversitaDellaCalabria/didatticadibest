@@ -53,6 +53,57 @@ final class OperatoriAssistenza
         return array_values($out);
     }
 
+    /**
+     * I corsi di laurea seguiti dalle persone dell'ufficio Assistenza (come sono scritti nell'anagrafe degli uffici): servono a chiedere «a quale corso sei iscritto?».
+     * Vuoto se nessuno ha indicato i corsi: in quel caso Didacticus non fa la domanda e avvisa tutti.
+     *
+     * @return list<string>
+     */
+    public function corsiSeguiti(): array
+    {
+        $out = [];
+        foreach ($this->personeUfficio() as $p) {
+            foreach ((array) json_decode((string) ($p['corsi'] ?? ''), true) as $c) {
+                if (is_string($c) && trim($c) !== '') {
+                    $out[trim($c)] = true;
+                }
+            }
+        }
+        $corsi = array_keys($out);
+        sort($corsi, SORT_NATURAL | SORT_FLAG_CASE);
+
+        return $corsi;
+    }
+
+    /**
+     * Gli indirizzi degli operatori che seguono un corso di laurea; se nessuno lo segue (o il corso non è indicato) quelli di tutti gli operatori.
+     *
+     * @return list<string>
+     */
+    public function emailPerCorso(string $corso): array
+    {
+        $corso = trim($corso);
+        $out = [];
+        if ($corso !== '') {
+            foreach ($this->personeUfficio() as $p) {
+                $seguiti = array_map('trim', array_filter((array) json_decode((string) ($p['corsi'] ?? ''), true), 'is_string'));
+                if (in_array($corso, $seguiti, true) && filter_var((string) $p['email'], FILTER_VALIDATE_EMAIL)) {
+                    $out[strtolower((string) $p['email'])] = (string) $p['email'];
+                }
+            }
+        }
+
+        return $out ? array_values($out) : $this->emailAvvisi();
+    }
+
+    /** @return list<array<string, string|null>> */
+    private function personeUfficio(): array
+    {
+        $u = $this->uffici->perChiave(Costanti::UFFICIO);
+
+        return $u !== null && (int) $u['attivo'] === 1 ? $this->uffici->persone((int) $u['id']) : [];
+    }
+
     /** L'email di un operatore (per avvisarlo di un messaggio nella sua chat), '' se non c'è. */
     public function emailDi(int $utenteId): string
     {

@@ -418,4 +418,58 @@ if (!$vive) {
 
 $conn->rollback(); // le prove non lasciano le voci importate nella base di prova
 
-foreach (["DELETE FROM didacticus_mancate", "DELETE FROM assistenza_messaggi", "DELETE FROM assistenza_conversazioni", "DELETE FROM uffici_persone WHERE email = 'op-d989@example.org'", "DELETE FROM utenti WHERE id BETWEEN 98931 AND 98949", "UPDATE impostazioni_sistema SET didacticus_attivo = 0 WHERE id = 1"] as $sql) $q($sql);
+// ---------------------------------------------------------------------------------------------------------------------------------------------------
+// La chat parte da Didacticus: saluto per nome, argomento scelto nella chat, domanda sul corso di laurea e operatori di quel corso (5-bis)
+// ---------------------------------------------------------------------------------------------------------------------------------------------------
+$q("UPDATE impostazioni_sistema SET didacticus_attivo = 1, didacticus_soglia = 60 WHERE id = 1");
+$q("INSERT INTO utenti (id, nome, cognome, email, ruolo_id, ruoli_secondari) VALUES (98943, 'Marta', 'Rossi', 'marta-d989@example.org', 3, ''), (98948, 'Luca', 'Bianchi', 'luca-d989@example.org', 3, '')");
+$q("UPDATE uffici_persone SET corsi = '[\"Informatica\",\"Matematica\"]' WHERE email = 'op-d989@example.org'");
+$q("INSERT INTO uffici_persone (ufficio_id, email, nominativo, ruolo, compiti, corsi) VALUES ($ass_id, 'op2-d989@example.org', 'Biagio Biologo', '', '', '[\"Biologia\"]')");
+$op_ass = $cont_di->get(\App\Assistenza\OperatoriAssistenza::class);
+prova($op_ass->corsiSeguiti() === ['Biologia', 'Informatica', 'Matematica'], "operatori: i corsi seguiti dall'ufficio sono l'unione di quelli delle sue persone", json_encode($op_ass->corsiSeguiti()));
+prova($op_ass->emailPerCorso('Biologia') === ['op2-d989@example.org'] && $op_ass->emailPerCorso('Informatica') === ['op-d989@example.org'], "operatori: per ogni corso gli indirizzi sono solo di chi lo segue");
+prova(count($op_ass->emailPerCorso('Fisica')) >= 2 && count($op_ass->emailPerCorso('')) >= 2, "operatori: un corso che nessuno segue (o non indicato) avvisa tutti");
+
+$ora_di->t = $ora_di->t->modify('+1 hour');
+$marta = ['id' => 98943, 'nome' => 'Marta', 'cognome' => 'Rossi', 'email' => 'marta-d989@example.org'];
+[$a1, $ea1] = $srv_d->apriDaUtente($marta, 'tesi', '', null, '10.9.89.121', false, 'argomento');
+$m_a1 = $srv_d->messaggi($ricarica($a1));
+prova($ea1 === null && $a1['stato'] === 'bot' && count($m_a1) === 3 && $m_a1[0]['da'] === 'bot' && str_starts_with($m_a1[0]['testo'], 'Ciao Marta!') && $m_a1[1]['da'] === 'utente' && $m_a1[2]['da'] === 'bot' && str_contains($m_a1[2]['testo'], 'Ecco cosa so su'),
+    "avvio: saluto con il nome, argomento scelto come messaggio e Didacticus elenca le sue voci", json_encode(array_column($m_a1, 'testo')));
+[$a2] = $srv_d->apriDaUtente($marta, 'altro', 'Come richiedo il certificato di iscrizione?', null, '10.9.89.122', false, 'testo');
+prova(str_starts_with($srv_d->messaggi($ricarica($a2))[0]['testo'], 'Ciao Marta!') && count($bot_msgs($a2)) === 2, "avvio: scrivendo subito la domanda Didacticus saluta e poi risponde");
+
+$mail_a = $conta_mail('Nuova richiesta di assistenza');
+$srv_d->azioneBot($ricarica($a2), 'operatore');
+$ex_a = json_decode((string) end($bot_msgs($a2))['extra'], true);
+prova($ricarica($a2)['stato'] === 'bot' && ($ex_a['corsi'] ?? []) === ['Biologia', 'Informatica', 'Matematica'] && $conta_mail('Nuova richiesta di assistenza') === $mail_a, "operatore: prima chiede il corso di laurea (con i pulsanti) e non avvisa nessuno");
+prova($srv_d->azioneBot($ricarica($a2), 'corso', 'Chimica') === 'Corso non valido.', "operatore: un corso inventato non vale");
+$ora_di->t = $ora_di->t->modify('+1 minute');
+prova($srv_d->azioneBot($ricarica($a2), 'corso', 'Biologia') === null, "operatore: il corso scelto con il pulsante passa la chat");
+$a2r = $ricarica($a2);
+$mail_bio = array_values(array_filter($EMAIL, fn($e) => str_contains($e['oggetto'], 'Nuova richiesta di assistenza') && $e['a'] === 'op2-d989@example.org'));
+$mail_inf = array_values(array_filter($EMAIL, fn($e) => str_contains($e['oggetto'], 'Nuova richiesta di assistenza') && $e['a'] === 'op-d989@example.org' && str_contains($e['corpo'], 'Biologia')));
+prova($a2r['stato'] === 'nuova' && $a2r['passata_il'] !== null && $conta_mail('Nuova richiesta di assistenza') === $mail_a + 1 && count($mail_bio) === 1 && $mail_inf === [], "operatore: l'avviso va solo a chi segue Biologia");
+$note_a = implode('|', array_column(array_filter($srv_d->messaggi($a2r, 0, true), fn($m) => $m['tipo'] === 'nota'), 'testo'));
+prova(str_contains($note_a, 'Corso di laurea dichiarato: Biologia'), "operatore: la nota per chi riceve dice il corso dichiarato");
+prova($srv_d->azioneBot($a2r, 'corso', 'Biologia') !== null, "operatore: la domanda sul corso vale solo finché la chat è con Didacticus");
+
+// il corso scritto a mano invece di cliccare
+[$a3] = $srv_d->apriDaUtente(['id' => 98948, 'nome' => 'Luca', 'cognome' => 'Bianchi', 'email' => 'luca-d989@example.org'], 'altro', 'Voglio parlare con un operatore', null, '10.9.89.123', false, 'testo');
+$a3 = $ricarica($a3);
+$ex_a3 = json_decode((string) end($bot_msgs($a3))['extra'], true);
+prova($a3['stato'] === 'bot' && !empty($ex_a3['corsi']), "operatore: «voglio parlare con un operatore» all'inizio chiede subito il corso");
+$ora_di->t = $ora_di->t->modify('+1 minute');
+$srv_d->scriviComeUtente($ricarica($a3), 'boh');
+prova($ricarica($a3)['stato'] === 'bot' && str_contains(end($bot_msgs($a3))['testo'], 'Non ho riconosciuto il corso'), "operatore: un corso non riconosciuto fa richiedere la scelta");
+$ora_di->t = $ora_di->t->modify('+1 minute');
+$srv_d->scriviComeUtente($ricarica($a3), 'informatica');
+$a3r = $ricarica($a3);
+prova($a3r['stato'] === 'nuova' && str_contains(implode('|', array_column($srv_d->messaggi($a3r, 0, true), 'testo')), 'Corso di laurea dichiarato: Informatica'), "operatore: il corso scritto a mano (anche in minuscolo) passa la chat");
+
+// senza corsi indicati la domanda non si fa
+$q("UPDATE uffici_persone SET corsi = NULL WHERE email IN ('op-d989@example.org', 'op2-d989@example.org')");
+[$a4] = $srv_d->apriDaEsterno('Esterna Prova', 'esterna-d989@example.org', 'altro', 'Voglio parlare con un operatore', '10.9.89.124', null, false, 'testo');
+prova($ricarica($a4)['stato'] === 'nuova' && str_starts_with($srv_d->messaggi($ricarica($a4))[0]['testo'], 'Ciao Esterna!'), "operatore: se nessuno ha indicato i corsi la chat passa subito (e il saluto usa il nome scritto)");
+
+foreach (["DELETE FROM didacticus_mancate", "DELETE FROM assistenza_messaggi", "DELETE FROM assistenza_conversazioni", "DELETE FROM uffici_persone WHERE email LIKE 'op%-d989@example.org'", "DELETE FROM utenti WHERE id BETWEEN 98931 AND 98949", "UPDATE impostazioni_sistema SET didacticus_attivo = 0 WHERE id = 1"] as $sql) $q($sql);

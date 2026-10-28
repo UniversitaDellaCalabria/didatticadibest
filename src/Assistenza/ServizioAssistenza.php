@@ -76,11 +76,12 @@ final class ServizioAssistenza
      * @param bool $conOperatore true = salta Didacticus e scrive subito a un operatore
      * @return array{0: array<string, string|null>|null, 1: string|null} conversazione ed errore
      */
-    public function apriDaUtente(array $utente, string $argomento, string $testo, ?array $contesto = null, string $ip = '', bool $conOperatore = false): array
+    public function apriDaUtente(array $utente, string $argomento, string $testo, ?array $contesto = null, string $ip = '', bool $conOperatore = false, ?string $avvio = null): array
     {
         if (!$this->orari->attiva()) {
             return [null, self::SOSPESO];
         }
+        $testo = $this->testoAvvio($testo, $argomento, $avvio);
         if (($err = $this->controllaTesto($testo)) !== null) {
             return [null, $err];
         }
@@ -100,7 +101,7 @@ final class ServizioAssistenza
         $nome = trim(trim((string) ($utente['nome'] ?? '')) . ' ' . trim((string) ($utente['cognome'] ?? ''))) ?: (string) ($utente['email'] ?? 'Utente');
         $this->chiudiRimasteConBot($uid); // la nuova richiesta parte da zero: le chat lasciate con Didacticus restano nello storico, chiuse
 
-        return [$this->nuova(Costanti::CANALE_UTENTE, $uid, $nome, (string) ($utente['email'] ?? ''), $argomento, $testo, $contesto, $ip, $conOperatore), null];
+        return [$this->nuova(Costanti::CANALE_UTENTE, $uid, $nome, (string) ($utente['email'] ?? ''), $argomento, $testo, $contesto, $ip, $conOperatore, $avvio), null];
     }
 
     /** Chiude da sistema le chat di una persona che sono ancora con Didacticus (nessun operatore le ha viste): restano leggibili nello storico. */
@@ -121,11 +122,12 @@ final class ServizioAssistenza
      * @param array{tipo: string, id: int, testo: string}|null $contesto
      * @return array{0: array<string, string|null>|null, 1: string|null}
      */
-    public function apriDaEsterno(string $nome, string $email, string $argomento, string $testo, string $ip, ?array $contesto = null, bool $conOperatore = false): array
+    public function apriDaEsterno(string $nome, string $email, string $argomento, string $testo, string $ip, ?array $contesto = null, bool $conOperatore = false, ?string $avvio = null): array
     {
         if (!$this->orari->attiva()) {
             return [null, self::SOSPESO];
         }
+        $testo = $this->testoAvvio($testo, $argomento, $avvio);
         $nome = trim((string) preg_replace('/\s+/u', ' ', $nome));
         $email = strtolower(trim($email));
         if (mb_strlen($nome) < 2 || mb_strlen($nome) > Costanti::MAX_NOME) {
@@ -141,7 +143,7 @@ final class ServizioAssistenza
         if (($ip !== '' && $this->conversazioni->nuoveDaIp($ip, $dal) >= Costanti::MAX_NUOVE_PER_IP_ORA) || $this->conversazioni->nuoveDaEmail($email, $dal) >= Costanti::MAX_NUOVE_PER_EMAIL_ORA) {
             return [null, 'Hai mandato molte richieste nell\'ultima ora: riprova più tardi.'];
         }
-        $c = $this->nuova(Costanti::CANALE_ESTERNO, null, $nome, $email, $argomento, $testo, $contesto, $ip, $conOperatore);
+        $c = $this->nuova(Costanti::CANALE_ESTERNO, null, $nome, $email, $argomento, $testo, $contesto, $ip, $conOperatore, $avvio);
         $this->notifiche->ricevuta($c);
 
         return [$c, null];
@@ -151,7 +153,7 @@ final class ServizioAssistenza
      * @param array{tipo: string, id: int, testo: string}|null $contesto
      * @return array<string, string|null>
      */
-    private function nuova(string $canale, ?int $utenteId, string $nome, string $email, string $argomento, string $testo, ?array $contesto, string $ip, bool $conOperatore = false): array
+    private function nuova(string $canale, ?int $utenteId, string $nome, string $email, string $argomento, string $testo, ?array $contesto, string $ip, bool $conOperatore = false, ?string $avvio = null): array
     {
         $quando = $this->adesso();
         $conBot = !$conOperatore && $this->didacticus->attivo();
@@ -161,9 +163,18 @@ final class ServizioAssistenza
             'contesto_tipo' => $ct ? $contesto['tipo'] : '', 'contesto_id' => $ct ? (int) $contesto['id'] : null, 'contesto_testo' => $ct ? (string) $contesto['testo'] : '',
             'stato' => $conBot ? Costanti::STATO_BOT : Costanti::STATO_NUOVA, 'ip' => $ip,
         ], $quando);
+        if ($conBot && $avvio !== null) { // la chat parte da Didacticus: prima il saluto con il nome, poi quello che la persona ha scelto o scritto
+            $this->messaggi->aggiungi($id, Costanti::DA_BOT, Costanti::TIPO_MESSAGGIO, self::salutoAvvio($nome), 'Didacticus', $quando);
+        }
         $this->messaggi->aggiungi($id, Costanti::DA_UTENTE, Costanti::TIPO_MESSAGGIO, $testo, $nome, $quando);
         $this->conversazioni->visto($id, Costanti::DA_UTENTE, $quando);
         $c = $this->conversazioni->perId($id) ?? [];
+        if ($conBot && $avvio === 'argomento') {
+            $r = $this->didacticus->rispostaArgomento(Costanti::argomentoValido($argomento), $canale === Costanti::CANALE_UTENTE);
+            $this->scriviBot($c, $r['testo'], $r['extra']);
+
+            return $this->conversazioni->perId($id) ?? $c;
+        }
         if ($conBot) {
             // Didacticus risponde subito; gli operatori non vengono disturbati finché la persona non ha bisogno di loro
             $this->rispondiBot($c, $testo, true);
@@ -176,6 +187,21 @@ final class ServizioAssistenza
         $this->conversazioni->avvisato($id, Costanti::DA_OPERATORE, $quando);
 
         return $this->conversazioni->perId($id) ?? $c;
+    }
+
+    /** Chi sceglie un argomento nella chat non scrive niente: il suo «messaggio» è il nome dell'argomento. */
+    private function testoAvvio(string $testo, string $argomento, ?string $avvio): string
+    {
+        return $avvio === 'argomento' && trim($testo) === '' ? Costanti::nomeArgomento(Costanti::argomentoValido($argomento)) : $testo;
+    }
+
+    /** Il primo messaggio di Didacticus quando la chat parte da lui: saluta per nome (quello del login o quello scritto da chi non ha l'accesso). */
+    public static function salutoAvvio(string $nome): string
+    {
+        $primo = trim(explode(' ', trim($nome))[0] ?? '');
+        $primo = str_contains($primo, '@') ? '' : $primo;
+
+        return 'Ciao' . ($primo !== '' ? ' ' . $primo : '') . '! Sono Didacticus, l\'assistente virtuale del Dipartimento. Dimmi cosa ti serve: scegli un argomento qui sotto oppure scrivimi la tua domanda.';
     }
 
     /**
@@ -239,6 +265,17 @@ final class ServizioAssistenza
     private function rispondiBot(array $conv, string $testo, bool $primo = false): void
     {
         $id = (int) $conv['id'];
+        if ($this->inAttesaCorso($id)) { // Didacticus ha chiesto il corso di laurea: quello che la persona scrive è la risposta
+            $corso = $this->corsoDaTesto($testo);
+            if ($corso === null) {
+                $this->scriviBot($conv, 'Non ho riconosciuto il corso: scegli dai pulsanti qui sotto oppure scrivimi il nome del corso di laurea.', $this->extraCorsi());
+
+                return;
+            }
+            $this->passaConCorso($conv, $corso, $this->ultimaDomandaVera($id));
+
+            return;
+        }
         $r = $this->didacticus->risposta($testo, (string) $conv['argomento'], $conv['canale'] === Costanti::CANALE_UTENTE, $primo);
         $this->scriviBot($conv, $r['testo'], $r['extra'] + ($r['voce_id'] !== null ? ['voce' => $r['voce_id']] : []));
         if ($r['tipo'] === 'nessuna' || $r['tipo'] === 'suggerimenti') {
@@ -249,11 +286,86 @@ final class ServizioAssistenza
             $this->conversazioni->botMancate($id, $mancate);
         }
         if ($r['passa']) {
-            $this->passaAOperatore($this->conversazioni->perId($id) ?? $conv, 'su richiesta della persona', $testo);
+            $this->chiediCorso($this->conversazioni->perId($id) ?? $conv, 'su richiesta della persona', $this->ultimaDomandaVera($id));
         } elseif ($mancate >= 2) {
-            $this->scriviBot($conv, 'Non riesco ad aiutarti con le risposte che ho: ti metto in contatto con una persona dell\'ufficio.');
-            $this->passaAOperatore($this->conversazioni->perId($id) ?? $conv, 'Didacticus non ha trovato risposte per due volte di fila');
+            $this->scriviBot($conv, 'Mi dispiace, non riesco ad aiutarti con le risposte che ho: ti passo un operatore.');
+            $this->chiediCorso($this->conversazioni->perId($id) ?? $conv, 'Didacticus non ha trovato risposte per due volte di fila');
         }
+    }
+
+    /** I pulsanti della domanda «a quale corso sei iscritto?». @return array<string, mixed> */
+    private function extraCorsi(): array
+    {
+        return ['corsi' => $this->operatori->corsiSeguiti()];
+    }
+
+    /** L'ultimo messaggio di Didacticus è la domanda sul corso di laurea (ha i pulsanti dei corsi): la prossima cosa scritta è la risposta. */
+    private function inAttesaCorso(int $id): bool
+    {
+        $extra = null;
+        foreach ($this->messaggi->della($id) as $m) {
+            if ($m['da'] === Costanti::DA_BOT) {
+                $extra = (array) json_decode((string) $m['extra'], true);
+            }
+        }
+
+        return $extra !== null && !empty($extra['corsi']);
+    }
+
+    /** Il corso scritto dalla persona: il nome di uno dei corsi seguiti dagli operatori, '' se dice che non sa o non è iscritta, null se non lo riconosco. */
+    private function corsoDaTesto(string $testo): ?string
+    {
+        $t = mb_strtolower(trim($testo));
+        if ($t === '' || preg_match('/\b(altro|non so|nessun[oa]?|non sono iscritt[oa]|qualsiasi|indifferente)\b/u', $t)) {
+            return '';
+        }
+        foreach ($this->operatori->corsiSeguiti() as $c) {
+            $n = mb_strtolower($c);
+            if (str_contains($n, $t) || (mb_strlen($n) >= 6 && str_contains($t, $n))) {
+                return $c;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * La persona vuole un operatore (o Didacticus non sa risponderle): se gli operatori hanno indicato i corsi che seguono, Didacticus chiede a quale corso di laurea
+     * è iscritta, così la chat arriva a chi segue quel corso; altrimenti la passa subito.
+     *
+     * @param array<string, string|null> $conv
+     */
+    private function chiediCorso(array $conv, string $motivo, string $domanda = ''): void
+    {
+        if (!$this->operatori->corsiSeguiti()) {
+            $this->scriviBot($conv, 'Certo, ti metto in contatto con una persona dell\'ufficio.');
+            $this->passaAOperatore($conv, $motivo, $domanda);
+
+            return;
+        }
+        $this->scriviBot($conv, 'Certo! Per mandarti alla persona giusta, a quale corso di laurea sei iscritto/a?', $this->extraCorsi());
+    }
+
+    /** @param array<string, string|null> $conv */
+    private function passaConCorso(array $conv, string $corso, string $domanda): void
+    {
+        $id = (int) $conv['id'];
+        $this->scriviBot($conv, $corso !== '' ? 'Grazie! Ti passo a un operatore che segue ' . $corso . ': ti risponde qui appena è disponibile.' : 'Va bene, ti passo a un operatore dell\'ufficio.');
+        $this->passaAOperatore($this->conversazioni->perId($id) ?? $conv, 'su richiesta della persona', $domanda, $corso);
+    }
+
+    /** La domanda vera della persona, cioè l'ultima che non è un corso di laurea o una richiesta di operatore. */
+    private function ultimaDomandaVera(int $id): string
+    {
+        $corsi = $this->operatori->corsiSeguiti();
+        $d = '';
+        foreach ($this->messaggi->della($id) as $m) {
+            if ($m['da'] === Costanti::DA_UTENTE && !in_array((string) $m['testo'], $corsi, true) && !\App\Assistenza\Didacticus\Motore::chiedeOperatore((string) $m['testo'])) {
+                $d = (string) $m['testo'];
+            }
+        }
+
+        return $d !== '' ? $d : $this->ultimaDomanda($id);
     }
 
     /**
@@ -261,7 +373,7 @@ final class ServizioAssistenza
      *
      * @param array<string, string|null> $conv
      */
-    private function passaAOperatore(array $conv, string $motivo, string $domanda = ''): void
+    private function passaAOperatore(array $conv, string $motivo, string $domanda = '', string $corso = ''): void
     {
         if ($conv['stato'] !== Costanti::STATO_BOT) {
             return;
@@ -272,10 +384,10 @@ final class ServizioAssistenza
         $this->conversazioni->impostaStato($id, Costanti::STATO_NUOVA);
         $this->messaggi->aggiungi($id, Costanti::DA_SISTEMA, Costanti::TIPO_MESSAGGIO, 'Ti ho messo in contatto con un operatore: ti risponde qui appena è disponibile.', '', $quando);
         $this->avvisoFuoriOrario($id, $quando);
-        $this->messaggi->aggiungi($id, Costanti::DA_SISTEMA, Costanti::TIPO_NOTA, 'Chat passata da Didacticus (' . $motivo . '). Rileggi le risposte che ha già dato qui sopra.', '', $quando);
+        $this->messaggi->aggiungi($id, Costanti::DA_SISTEMA, Costanti::TIPO_NOTA, 'Chat passata da Didacticus (' . $motivo . ').' . ($corso !== '' ? ' Corso di laurea dichiarato: ' . $corso . '.' : '') . ' Rileggi le risposte che ha già dato qui sopra.', '', $quando);
         $c = $this->conversazioni->perId($id) ?? $conv;
         $prima = $domanda !== '' ? $domanda : $this->ultimeDomande($id);
-        $this->notifiche->nuovaRichiesta($c, $prima, $this->operatori->emailAvvisi());
+        $this->notifiche->nuovaRichiesta($c, ($corso !== '' ? '[' . $corso . '] ' : '') . $prima, $corso !== '' ? $this->operatori->emailPerCorso($corso) : $this->operatori->emailAvvisi());
         $this->notifiche->pushNuovaRichiesta($c, $prima);
         $this->conversazioni->avvisato($id, Costanti::DA_OPERATORE, $quando);
     }
@@ -309,13 +421,25 @@ final class ServizioAssistenza
                     $this->didacticus->registraEsito($ultimaVoce, false);
                 }
                 $this->mancate->registra($id, $this->ultimaDomanda($id), (string) $conv['argomento'], MancateRepository::NON_UTILE, $ultimaVoce ?: null, $quando);
-                $this->scriviBot($conv, 'Mi dispiace che non sia bastato: ti metto in contatto con una persona dell\'ufficio.');
-                $this->passaAOperatore($this->conversazioni->perId($id) ?? $conv, 'la risposta di Didacticus non è bastata', $this->ultimaDomanda($id));
+                $this->scriviBot($conv, 'Mi dispiace che non sia bastato: ti passo un operatore.');
+                $this->chiediCorso($this->conversazioni->perId($id) ?? $conv, 'la risposta di Didacticus non è bastata', $this->ultimaDomanda($id));
 
                 return null;
             case 'operatore':
-                $this->scriviBot($conv, 'Certo, ti metto in contatto con una persona dell\'ufficio.');
-                $this->passaAOperatore($this->conversazioni->perId($id) ?? $conv, 'su richiesta della persona', $this->ultimaDomanda($id));
+                $this->chiediCorso($this->conversazioni->perId($id) ?? $conv, 'su richiesta della persona', $this->ultimaDomandaVera($id));
+
+                return null;
+            case 'corso':
+                if (!$this->inAttesaCorso($id)) {
+                    return 'Questa scelta non è più disponibile.';
+                }
+                $corso = trim($valore);
+                if ($corso !== '' && !in_array($corso, $this->operatori->corsiSeguiti(), true)) {
+                    return 'Corso non valido.';
+                }
+                $this->messaggi->aggiungi($id, Costanti::DA_UTENTE, Costanti::TIPO_MESSAGGIO, $corso !== '' ? $corso : 'Un altro corso / non lo so', (string) $conv['nome'], $quando);
+                $this->conversazioni->visto($id, Costanti::DA_UTENTE, $quando);
+                $this->passaConCorso($conv, $corso, $this->ultimaDomandaVera($id));
 
                 return null;
             case 'voce':
