@@ -11,7 +11,7 @@ use App\Assistenza\Costanti;
  * scritta dal pannello. Non scrive nulla nella chat e non avvisa nessuno: lo fa ServizioAssistenza, che decide anche quando passare la parola a un operatore.
  *
  * Tipi di risposta: «risposta» (ha trovato la voce giusta), «suggerimenti» (non è sicuro: propone voci vicine), «nessuna» (non sa), «riservata» (la voce c'è ma
- * serve il login), «saluto», «grazie», «operatore» (la persona ha chiesto una persona vera), «argomento» (elenco delle voci di un argomento).
+ * serve il login), «generata» (risposta scritta dal modello linguistico, se collegato, solo con le voci trovate), «saluto», «grazie», «operatore» (la persona ha chiesto una persona vera), «argomento» (elenco delle voci di un argomento).
  */
 final class ServizioDidacticus
 {
@@ -20,7 +20,10 @@ final class ServizioDidacticus
     /** Una seconda voce si affianca alla prima («vedi anche») se ha almeno questo punteggio. */
     private const MARGINE_ALTRE = 8;
 
-    public function __construct(private VociRepository $voci, private ImpostazioniDidacticus $impostazioni)
+    /** Punteggio minimo perché una voce vicina sia data come fonte al modello linguistico (se c'è). */
+    private const PUNTEGGIO_FONTE = 15;
+
+    public function __construct(private VociRepository $voci, private ImpostazioniDidacticus $impostazioni, private ?ModelloLinguistico $modello = null)
     {
     }
 
@@ -61,6 +64,13 @@ final class ServizioDidacticus
         $classifica = (new Motore($voci))->classifica($domanda, $argomento);
         $migliore = $classifica[0] ?? null;
 
+        $sicura = $migliore !== null && $migliore['punteggio'] >= $soglia && ((int) $migliore['voce']['solo_login'] === 0 || $conLogin);
+        if ($this->modello !== null && $this->modello->attivo() && (!$sicura || $this->modello->modalita() === ModelloLinguistico::MODALITA_SEMPRE)) {
+            $g = $this->generata($domanda, $classifica, $conLogin);
+            if ($g !== null) {
+                return $g;
+            }
+        }
         if ($migliore !== null && $migliore['punteggio'] >= $soglia) {
             if ((int) $migliore['voce']['solo_login'] === 1 && !$conLogin) {
                 return self::esito('riservata', 'Questa informazione è riservata a chi ha effettuato l\'accesso: entra con le tue credenziali Unical e riscrivimi la domanda.', [
@@ -87,6 +97,46 @@ final class ServizioDidacticus
         }
 
         return self::esito('nessuna', 'Non ho trovato una risposta a questa domanda. Prova a scriverla in modo diverso, scegli un argomento qui sotto oppure parla con un operatore.', ['argomenti' => true, 'operatore' => true], null, true);
+    }
+
+    /**
+     * La risposta scritta dal modello linguistico con le voci più vicine come uniche fonti; null se non ci sono fonti o il modello non sa rispondere
+     * (allora si continua con il comportamento a regole).
+     *
+     * @param list<array{voce: array<string, mixed>, punteggio: int, corrispondenze: list<string>}> $classifica
+     * @return array{tipo: string, testo: string, extra: array<string, mixed>, voce_id: ?int, nessuna: bool, passa: bool}|null
+     */
+    private function generata(string $domanda, array $classifica, bool $conLogin): ?array
+    {
+        $fonti = [];
+        $voci = [];
+        foreach ($classifica as $c) {
+            if ($c['punteggio'] < self::PUNTEGGIO_FONTE || count($fonti) >= 3) {
+                break;
+            }
+            if ((int) $c['voce']['solo_login'] === 1 && !$conLogin) {
+                continue;
+            }
+            $fonti[] = ['titolo' => (string) $c['voce']['titolo'], 'testo' => (string) $c['voce']['risposta']];
+            $voci[] = $c['voce'];
+        }
+        $testo = $fonti ? $this->modello->rispondi($domanda, $fonti) : null;
+        if ($testo === null) {
+            return null;
+        }
+        $this->voci->registraUso((int) $voci[0]['id']);
+        $link = [];
+        foreach ($voci as $v) {
+            foreach (VociRepository::link($v) as $l) {
+                $link[$l['u'] ?? $l['e']] = $l;
+            }
+        }
+        $extra = ['feedback' => true, 'operatore' => true];
+        if ($link) {
+            $extra['link'] = array_slice(array_values($link), 0, 4);
+        }
+
+        return self::esito('generata', $testo, $extra, (int) $voci[0]['id']);
     }
 
     /**

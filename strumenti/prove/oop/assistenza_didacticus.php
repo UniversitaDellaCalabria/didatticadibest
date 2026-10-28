@@ -331,6 +331,17 @@ foreach ($casi_did as $domanda => $atteso) {
     $t = $top_did($domanda);
     prova($t['punteggio'] >= 60 && str_starts_with($t['voce']['titolo'], $atteso), "voci sulla didattica: «" . $domanda . "» → " . $atteso, $t['punteggio'] . ' ' . $t['voce']['titolo']);
 }
+// Modello linguistico aperto (facoltativo): spento di partenza; risponde solo con le voci; se non risponde si torna alle regole
+use App\Assistenza\Didacticus\ModelloLinguistico;
+prova(!(new ModelloLinguistico('', null, null, null))->attivo() && (new ModelloLinguistico('', null, null, null))->rispondi('ciao', [['titolo' => 'x', 'testo' => 'y']]) === null, "modello linguistico: spento senza LLM_URL, non chiama nessun servizio");
+prova((new ModelloLinguistico('http://127.0.0.1:1/v1', 'm', 5, 'sempre'))->attivo() && (new ModelloLinguistico('http://127.0.0.1:1/v1', 'm', 5, 'sempre'))->modalita() === 'sempre' && (new ModelloLinguistico('http://x', null, null, 'boh'))->modalita() === 'incerto', "modello linguistico: acceso con LLM_URL, modalità «sempre» o «incerto» (di partenza)");
+prova(ModelloLinguistico::pulisci('NON_SO') === null && ModelloLinguistico::pulisci('  ') === null && ModelloLinguistico::pulisci("Non lo so: NON_SO") === null && ModelloLinguistico::pulisci('Vai sul portale [1] e invia il modulo [2].') === 'Vai sul portale e invia il modulo.', "modello linguistico: «NON_SO» e risposte vuote scartate, rimandi alle fonti tolti");
+$msg_ml = ModelloLinguistico::messaggio('Come mi iscrivo?', [['titolo' => 'Iscrizione', 'testo' => '<b>Vai</b> su Esse3'], ['titolo' => 'Altro', 'testo' => 'Testo']]);
+prova(str_contains($msg_ml, "[1] Iscrizione: Vai su Esse3") && str_contains($msg_ml, '[2] Altro: Testo') && str_contains($msg_ml, 'DOMANDA: Come mi iscrivo?'), "modello linguistico: il messaggio contiene le fonti numerate (senza HTML) e la domanda");
+$did_ml = new ServizioDidacticus($voci_rep, $imp_rep, new ModelloLinguistico('http://127.0.0.1:1/v1', 'm', 5, 'sempre'));
+$r_ml = $did_ml->risposta('Come faccio a fare il tirocinio?', null, true);
+prova($r_ml['tipo'] !== 'generata' && $r_ml['tipo'] !== '' && $r_ml['testo'] !== '', "modello linguistico: se il servizio non risponde Didacticus risponde a regole come prima");
+
 $conn->rollback(); // le prove non lasciano le voci importate nella base di prova
 
 foreach (["DELETE FROM didacticus_mancate", "DELETE FROM assistenza_messaggi", "DELETE FROM assistenza_conversazioni", "DELETE FROM uffici_persone WHERE email = 'op-d989@example.org'", "DELETE FROM utenti WHERE id BETWEEN 98931 AND 98949", "UPDATE impostazioni_sistema SET didacticus_attivo = 0 WHERE id = 1"] as $sql) $q($sql);
