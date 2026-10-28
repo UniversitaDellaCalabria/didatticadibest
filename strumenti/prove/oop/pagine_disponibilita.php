@@ -14,3 +14,8 @@ $r = $http('/eventi/admin/menu.php', null, $jar);
 prova($r['codice'] === 200 && str_contains($r['corpo'], 'data-nota="') && str_contains($r['corpo'], 'value="disponibilita_tesi.php"') && str_contains($r['corpo'], 'value="ricerca.php"') && !str_contains($r['corpo'], 'Fatal error'), "admin/menu.php: il menu a tendina elenca tutte le pagine del sito, con le note");
 $r = $http('/eventi/area_personale.php', null, $jar);
 prova($r['codice'] === 200 && str_contains($r['corpo'], 'class="ui-icona') && str_contains($r['corpo'], 'class="ui-riga') && !str_contains($r['corpo'], 'Fatal error'), "area_personale.php: icone di servizio in alto e righe di lavoro per chi gestisce");
+$r = $http('/eventi/admin/didacticus.php?scheda=pagine', null, $jar);
+prova($r['codice'] === 200 && str_contains($r['corpo'], 'Pagine del sito di Ateneo') && str_contains($r['corpo'], 'pagine_aggiungi') && !str_contains($r['corpo'], 'Fatal error'), "admin/didacticus.php: la scheda «Pagine di Ateneo» c'è");
+$r = $http('/eventi/admin/didacticus.php?scheda=pagine', ['azione' => 'pagine_aggiungi', 'indirizzi' => "https://sito-non-ammesso.example.org/x", 'csrf_token' => 'sbagliato'], $jar);
+prova($r['codice'] === 403, "admin/didacticus.php: aggiungere pagine con token CSRF sbagliato è respinto");
+

@@ -10,7 +10,7 @@
 
 | # | Decisione | Perché |
 |---|---|---|
-| H-1 | Si fanno **chat, notifiche push e Didacticus a regole** (nessun servizio esterno, nessun modello linguistico). | Scelta dell'utente: niente costi, niente dati verso terzi, niente parere privacy da attendere. |
+| H-1 | Si fanno **chat, notifiche push e Didacticus a regole** (nessun servizio esterno). Dal 28/10/2026 si aggiunge, **facoltativo e spento di partenza**, un modello linguistico aperto che gira sul server dell'Ateneo (H4). | Scelta dell'utente: niente costi, niente dati verso terzi, niente parere privacy da attendere. |
 | H-2 | La chat **non usa WebSocket** (il server è Apache/PHP): la pagina chiede i messaggi nuovi ogni 4 secondi (ogni 20 se la scheda è nascosta, si ferma se la conversazione è chiusa). | Per qualche decina di persone contemporanee basta ed è affidabile. |
 | H-3 | **Operatori** = persone dell'ufficio fisso **«Assistenza»** (si scelgono da Gestione del portale → Uffici, come per l'ufficio convenzioni FSL) + gli amministratori. | Riusa l'anagrafe degli uffici (F8): niente nuovo elenco di persone. |
 | H-4 | **Studenti e personale** entrano col loro accesso (SSO) e la conversazione è collegata al loro utente. Gli **esterni** scrivono nome ed email, risolvono il CAPTCHA interno (già presente) e ricevono per email un **link personale** (token) per riprendere la conversazione. | Come già per scuole (convenzione) e aziende (tesi). |
@@ -55,6 +55,15 @@
 * **H3c — Nella chat.** Didacticus apre ogni conversazione (saluto + pulsanti per argomento), risponde, chiede «Ti è stato utile?», e **passa all'operatore** se: l'utente lo chiede («voglio parlare con una persona»), non capisce due volte di seguito, o la risposta non è stata utile. Il passaggio manda la notifica all'operatore e gli mostra il riepilogo di cosa è già stato detto. Fuori orario lo dice e raccoglie la richiesta.
 * **H3d — Impara dall'uso.** Cruscotto «Domande senza risposta» (quelle finite all'operatore) con il pulsante **«Crea una voce»** partendo dalla risposta data dall'operatore; voci più usate e meno utili da rivedere.
 
+### H4 — Modello linguistico aperto e pagine di Ateneo come fonti *(28/10/2026, schema v100)*
+
+Provati in locale Qwen 2.5 3B, **Llama 3.2 3B** e Phi-4-mini sulle stesse 12 domande: tutti e tre sbagliano su casi ambigui (es. «tirocinio all'estero»), Llama è il più preciso e naturale in italiano. Quindi: **solo in modalità «incerto»** (quando nessuna voce è abbastanza sicura), con risposte segnalate come «preparate automaticamente».
+
+* `ModelloLinguistico`: servizio con interfaccia OpenAI (Ollama), spento senza `LLM_URL` nel `.env`; un solo calcolo alla volta (blocco su file), timeout 45 s, se non risponde si torna alle regole. Risponde solo con le fonti, altrimenti `NON_SO`.
+* Fonti: le voci più vicine e i **brani delle pagine di Ateneo** scelte dal pannello (`admin/didacticus.php`, scheda «Pagine di Ateneo»): solo https unical.it, rilette ogni settimana dal cron (`ServizioPagine`, `LettorePagine`, `RicercaPagine`, tabella `didacticus_pagine`). La risposta cita la pagina con il collegamento.
+* Informativa privacy: il testo cambia da solo se `LLM_URL` è impostato. Guida per il server: `documentazione/guida_modello_server.md`.
+* Prova a confronto in locale: `php strumenti/locale/prova_didacticus_modello.php --modello=llama3.2:3b`.
+
 ---
 
 ## 3. Ordine
@@ -85,5 +94,7 @@ Gli step sono indipendenti: dopo ognuno il portale funziona. H3 richiede H1; H2b
 | H3d | Impara dall'uso | **fatto in locale (da caricare)** | 22/10/2026 | «Domande senza risposta» (nessuna risposta o «non mi basta») con «Crea una voce» (bozza dalla risposta dell'operatore), prova, contatori usi/utile/non utile per voce, conservazione |
 | H3e | Istruzione sui temi della didattica | **fatto in locale (da caricare)** | 23/10/2026 | 48 voci scritte da uniTicket (modulistica), dalle risposte dell'ufficio sui tirocini, dalle guide TSP 2.0 e dalle pagine di dibest.unical.it/unical.it: tirocini (iter, convenzioni, fine tirocinio, crediti), tesi e laurea, esami e piano di studi, certificati, iscrizione, tasse, OFA, trasferimenti, tutorato, mobilità. File `strumenti/didacticus/voci_didattica.txt` → `genera_csv.php` → `documentazione/didacticus_voci_didattica.csv` da importare dal pannello. Codice: `VociRepository::importaCsv()`, colonne «Propone operatore»/«Solo con accesso», argomenti `iscrizione` ed `esami`. La modulistica non è ancora nel portale: le voci rimandano a uniTicket. Da rivedere ogni anno: importi, finestre, scadenze. |
 | H3f | Chat nuova a ogni apertura e storico | **fatto in locale (da caricare)** | 27/10/2026 | Chi ha il login parte sempre da una richiesta nuova (non più dall'ultima chat); le chat rimaste solo con Didacticus si chiudono da sole alla richiesta successiva; una richiesta già in mano all'ufficio continua lì, con avviso e «Riprendila». Storico in `assistenza_storico.php` (+ ultime 3 nell'area personale); la chat aperta si indica con `?c=` (solo le proprie). La finestrella riprende la chat solo nella stessa visita (sessionStorage). |
+
+| H4 | Modello linguistico aperto e pagine di Ateneo | **fatto in locale (da caricare)** | 28/10/2026 | Schema v100; spento di partenza, si accende con `LLM_URL`; guida in `guida_modello_server.md`. |
 
 **Stati**: `da fare` · `in corso` · `fatto in locale (da caricare)` · `in produzione`.

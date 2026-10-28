@@ -16,6 +16,9 @@ use App\Assistenza\Didacticus\MancateRepository;
 use App\Assistenza\Didacticus\Motore;
 use App\Assistenza\Didacticus\ServizioDidacticus;
 use App\Assistenza\Didacticus\VociRepository;
+use App\Assistenza\Didacticus\PagineRepository;
+use App\Assistenza\Didacticus\ModelloLinguistico;
+use App\Assistenza\Didacticus\ServizioPagine;
 
 $app_d = \App\Core\App::per($conn);
 $voci_rep = $app_d->get(VociRepository::class);
@@ -34,7 +37,7 @@ const MIME_ALLEGATI = ['application/pdf', 'image/png', 'image/jpeg', 'applicatio
     'text/plain', 'application/zip', 'application/octet-stream'];
 const MAX_BYTE_ALLEGATO = 10 * 1024 * 1024;
 
-$scheda = in_array($_GET['scheda'] ?? '', ['voci', 'argomenti', 'mancate', 'prova', 'impostazioni'], true) ? $_GET['scheda'] : 'voci';
+$scheda = in_array($_GET['scheda'] ?? '', ['voci', 'argomenti', 'mancate', 'prova', 'pagine', 'impostazioni'], true) ? $_GET['scheda'] : 'voci';
 
 // ----- Esportazione dell'elenco delle voci (Excel, PDF, CSV)
 if (isset($_GET['scarica'])) {
@@ -152,6 +155,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         flash_set('✅ Impostazioni salvate.' . $msg_av, $msg_av ? 'warning' : 'success');
         $redirect_d('scheda=impostazioni');
     }
+    if (in_array($azione, ['pagine_aggiungi', 'pagina_aggiorna', 'pagine_aggiorna_tutte', 'pagina_attiva', 'pagina_elimina'], true)) {
+        $pag_rep = $app_d->get(PagineRepository::class);
+        $pag_srv = $app_d->get(ServizioPagine::class);
+        $id_pg = (int)($_POST['id'] ?? 0);
+        if ($azione === 'pagine_aggiungi') {
+            $nuove_pg = 0; $scartate_pg = [];
+            foreach (preg_split('/\R+/', (string)($_POST['indirizzi'] ?? '')) as $u_pg) {
+                $u_pg = trim($u_pg);
+                if ($u_pg === '') continue;
+                $nuovo_id = $pag_rep->aggiungi($u_pg, $adesso_d);
+                if ($nuovo_id > 0) { $nuove_pg++; $pag_srv->aggiorna($nuovo_id); } else { $scartate_pg[] = $u_pg; }
+            }
+            registra_log_audit($conn, 'Pagine di Ateneo per Didacticus aggiunte', ['Aggiunte' => $nuove_pg, 'Scartate' => count($scartate_pg)]);
+            flash_set($nuove_pg . ' pagine aggiunte e lette.' . ($scartate_pg ? ' Non aggiunte (indirizzo non https di unical.it, già presente o elenco pieno): ' . implode(', ', array_map(fn($x) => mb_strimwidth($x, 0, 60, '…'), array_slice($scartate_pg, 0, 5))) . '.' : ''), $scartate_pg ? 'warning' : 'success');
+        } elseif ($azione === 'pagina_aggiorna') {
+            $err_pg = $pag_srv->aggiorna($id_pg);
+            flash_set($err_pg === null ? '✅ Pagina riletta.' : 'La pagina non si è potuta leggere: ' . $err_pg, $err_pg === null ? 'success' : 'warning');
+        } elseif ($azione === 'pagine_aggiorna_tutte') {
+            $ok_pg = $ko_pg = 0;
+            foreach ($pag_rep->tutte() as $r_pg) { if ((int)$r_pg['attiva'] === 1) { $pag_srv->aggiorna((int)$r_pg['id']) === null ? $ok_pg++ : $ko_pg++; } }
+            flash_set("Pagine rilette: $ok_pg bene" . ($ko_pg ? ", $ko_pg con errore (vedi la colonna «Ultima lettura»)" : '') . '.', $ko_pg ? 'warning' : 'success');
+        } elseif ($azione === 'pagina_attiva') {
+            $pag_rep->attiva($id_pg, !empty($_POST['attiva']));
+            flash_set('Pagina ' . (!empty($_POST['attiva']) ? 'attivata' : 'disattivata') . '.');
+        } else {
+            $pag_rep->elimina($id_pg);
+            registra_log_audit($conn, 'Pagina di Ateneo tolta da Didacticus', ['Pagina' => $id_pg]);
+            flash_set("Pagina tolta dall'elenco.");
+        }
+        $redirect_d('scheda=pagine');
+    }
     if ($azione === 'importa') {
         $tmp = (string)($_FILES['csv']['tmp_name'] ?? '');
         if ($tmp === '' || ($_FILES['csv']['error'] ?? 1) !== UPLOAD_ERR_OK || ($_FILES['csv']['size'] ?? 0) > 3 * 1024 * 1024) {
@@ -170,7 +204,7 @@ $conteggio_mancate = $manc_rep->contaDaVedere();
 $imp = $imp_rep->leggi();
 $n_attive = $voci_rep->contaAttive();
 $url_scheda = fn(string $s, string $extra = '') => 'didacticus.php?p_id=' . (int)$filtro_p . '&scheda=' . $s . $extra;
-$schede_d = ['voci' => ['Domande e risposte', 'fa-book-open'], 'argomenti' => ['Argomenti', 'fa-folder-tree'], 'mancate' => ['Domande senza risposta', 'fa-circle-question'], 'prova' => ['Prova', 'fa-flask'], 'impostazioni' => ['Impostazioni', 'fa-sliders']];
+$schede_d = ['voci' => ['Domande e risposte', 'fa-book-open'], 'argomenti' => ['Argomenti', 'fa-folder-tree'], 'mancate' => ['Domande senza risposta', 'fa-circle-question'], 'prova' => ['Prova', 'fa-flask'], 'pagine' => ['Pagine di Ateneo', 'fa-globe'], 'impostazioni' => ['Impostazioni', 'fa-sliders']];
 ?>
 <style>.did-testo{white-space:pre-wrap;overflow-wrap:anywhere}</style>
 <div class="d-flex flex-wrap align-items-center gap-3 mb-2">
@@ -379,5 +413,40 @@ $schede_d = ['voci' => ['Domande e risposte', 'fa-book-open'], 'argomenti' => ['
                 <?php if ($imp['avatar'] !== ''): ?><div class="form-check mt-1"><input class="form-check-input" type="checkbox" name="avatar_ripristina" value="1" id="i-avr"><label class="form-check-label small" for="i-avr">Torna al gufo di serie</label></div><?php endif; ?></div></div></div>
     <button class="btn btn-danger fw-bold px-4" type="submit" style="background-color:#B80000;border:none;"><i class="fa fa-floppy-disk me-1" aria-hidden="true"></i>Salva</button>
 </div></form>
+<?php endif; ?>
+<?php if ($scheda === 'pagine'):
+    $pag_rep = $app_d->get(PagineRepository::class);
+    $modello_ml = $app_d->get(ModelloLinguistico::class);
+    $pagine_d = $pag_rep->tutte(); ?>
+<div class="card border-0 shadow-sm mb-3" style="border-radius:12px;"><div class="card-body">
+    <h2 class="h6 fw-bold"><i class="fa fa-globe me-1 text-primary" aria-hidden="true"></i>Pagine del sito di Ateneo e del Dipartimento come fonti</h2>
+    <p class="small text-secondary mb-2">Didacticus legge ogni settimana queste pagine (solo indirizzi <strong>https://…unical.it</strong>, pagine pubbliche, non i PDF) e le usa come fonti per scrivere la risposta quando la sua base di conoscenza non basta; la risposta cita la pagina con un collegamento. Servono solo se è collegato un modello linguistico.</p>
+    <p class="small mb-0"><strong>Modello linguistico:</strong>
+        <?php if ($modello_ml->attivo()): ?><span class="badge bg-success">collegato</span> <?php echo $h($modello_ml->nome()); ?>, modalità «<?php echo $h($modello_ml->modalita()); ?>»
+        <?php else: ?><span class="badge bg-secondary">non collegato</span> <span class="text-secondary">(si collega con LLM_URL nel file .env del server)</span><?php endif; ?></p>
+</div></div>
+<div class="card border-0 shadow-sm mb-3" style="border-radius:12px;"><div class="card-body">
+    <form method="POST" class="row g-2"><?php csrf_field(); ?><input type="hidden" name="azione" value="pagine_aggiungi">
+        <div class="col-12"><label class="form-label small fw-bold" for="indirizzi_pg">Aggiungi pagine (un indirizzo per riga)</label>
+            <textarea id="indirizzi_pg" name="indirizzi" rows="3" class="form-control" placeholder="https://www.unical.it/…"></textarea></div>
+        <div class="col-12"><button class="btn btn-sm btn-primary fw-bold"><i class="fa fa-plus me-1" aria-hidden="true"></i>Aggiungi e leggi</button></div>
+    </form>
+</div></div>
+<div class="card border-0 shadow-sm" style="border-radius:12px;"><div class="card-body">
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-2"><h2 class="h6 fw-bold mb-0"><?php echo count($pagine_d); ?> pagine (al massimo <?php echo PagineRepository::MAX_PAGINE; ?>)</h2>
+        <?php if ($pagine_d): ?><form method="POST" class="ms-auto"><?php csrf_field(); ?><input type="hidden" name="azione" value="pagine_aggiorna_tutte"><button class="btn btn-sm btn-outline-secondary fw-bold"><i class="fa fa-rotate me-1" aria-hidden="true"></i>Rileggi tutte ora</button></form><?php endif; ?></div>
+    <?php if (!$pagine_d): ?><p class="text-secondary small mb-0">Nessuna pagina: aggiungi qui sopra gli indirizzi (per esempio la pagina delle sedute di laurea, delle tasse, dei calendari).</p><?php else: ?>
+    <div class="table-responsive"><table class="table table-sm align-middle mb-0"><thead><tr><th>Pagina</th><th>Ultima lettura</th><th class="text-end">Azioni</th></tr></thead><tbody>
+    <?php foreach ($pagine_d as $pg): ?>
+        <tr class="<?php echo (int)$pg['attiva'] ? '' : 'text-muted'; ?>">
+            <td><div class="fw-bold"><?php echo $h($pg['titolo'] !== '' ? $pg['titolo'] : '(titolo non ancora letto)'); ?></div><a class="small text-break" href="<?php echo $h($pg['url']); ?>" target="_blank" rel="noopener"><?php echo $h($pg['url']); ?></a></td>
+            <td class="small"><?php echo $pg['aggiornata_il'] ? $h(date('d/m/Y H:i', strtotime((string)$pg['aggiornata_il']))) : 'mai'; ?><br><span class="<?php echo str_starts_with((string)$pg['esito'], 'Letta') ? 'text-success' : 'text-danger'; ?>"><?php echo $h($pg['esito']); ?></span></td>
+            <td class="text-end text-nowrap">
+                <form method="POST" class="d-inline"><?php csrf_field(); ?><input type="hidden" name="azione" value="pagina_aggiorna"><input type="hidden" name="id" value="<?php echo (int)$pg['id']; ?>"><button class="btn btn-sm btn-outline-secondary" title="Rileggi ora"><i class="fa fa-rotate" aria-hidden="true"></i><span class="visually-hidden">Rileggi</span></button></form>
+                <form method="POST" class="d-inline"><?php csrf_field(); ?><input type="hidden" name="azione" value="pagina_attiva"><input type="hidden" name="id" value="<?php echo (int)$pg['id']; ?>"><input type="hidden" name="attiva" value="<?php echo (int)$pg['attiva'] ? 0 : 1; ?>"><button class="btn btn-sm btn-outline-secondary" title="<?php echo (int)$pg['attiva'] ? 'Metti in pausa' : 'Riattiva'; ?>"><i class="fa <?php echo (int)$pg['attiva'] ? 'fa-pause' : 'fa-play'; ?>" aria-hidden="true"></i><span class="visually-hidden"><?php echo (int)$pg['attiva'] ? 'Metti in pausa' : 'Riattiva'; ?></span></button></form>
+                <form method="POST" class="d-inline" onsubmit="return confirm('Togliere questa pagina dall\'elenco?');"><?php csrf_field(); ?><input type="hidden" name="azione" value="pagina_elimina"><input type="hidden" name="id" value="<?php echo (int)$pg['id']; ?>"><button class="btn btn-sm btn-outline-danger" title="Togli"><i class="fa fa-trash" aria-hidden="true"></i><span class="visually-hidden">Togli</span></button></form>
+            </td></tr>
+    <?php endforeach; ?></tbody></table></div><?php endif; ?>
+</div></div>
 <?php endif; ?>
 <?php require_once 'admin_footer.php'; ?>

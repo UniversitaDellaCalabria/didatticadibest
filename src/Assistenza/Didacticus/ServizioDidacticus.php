@@ -22,8 +22,12 @@ final class ServizioDidacticus
 
     /** Punteggio minimo perché una voce vicina sia data come fonte al modello linguistico (se c'è). */
     private const PUNTEGGIO_FONTE = 15;
+    /** Quanto testo si dà in tutto al modello linguistico come fonti (più testo = risposta più lenta). */
+    private const CARATTERI_FONTI = 3600;
+    /** In fondo alle risposte scritte dal modello linguistico: dice che sono automatiche e vanno controllate. */
+    public const AVVISO_GENERATA = "\n\n**Risposta preparata automaticamente.** Controlla i dati sulle pagine indicate oppure parla con un operatore.";
 
-    public function __construct(private VociRepository $voci, private ImpostazioniDidacticus $impostazioni, private ?ModelloLinguistico $modello = null)
+    public function __construct(private VociRepository $voci, private ImpostazioniDidacticus $impostazioni, private ?ModelloLinguistico $modello = null, private ?PagineRepository $pagine = null)
     {
     }
 
@@ -110,33 +114,58 @@ final class ServizioDidacticus
     {
         $fonti = [];
         $voci = [];
+        $budget = self::CARATTERI_FONTI;
         foreach ($classifica as $c) {
-            if ($c['punteggio'] < self::PUNTEGGIO_FONTE || count($fonti) >= 3) {
+            if ($c['punteggio'] < self::PUNTEGGIO_FONTE || count($voci) >= 3 || $budget < 300) {
                 break;
             }
             if ((int) $c['voce']['solo_login'] === 1 && !$conLogin) {
                 continue;
             }
-            $fonti[] = ['titolo' => (string) $c['voce']['titolo'], 'testo' => (string) $c['voce']['risposta']];
+            $testo = mb_substr((string) $c['voce']['risposta'], 0, min($budget, 1100));
+            $fonti[] = ['titolo' => (string) $c['voce']['titolo'], 'testo' => $testo];
             $voci[] = $c['voce'];
+            $budget -= mb_strlen($testo);
+        }
+        // I brani delle pagine di Ateneo e del Dipartimento scelte dal pannello, con il collegamento alla pagina
+        $pagine = [];
+        if ($this->pagine !== null) {
+            try {
+                foreach (RicercaPagine::cerca($domanda, $this->pagine->conTesto(), 2) as $br) {
+                    if ($budget < 200) {
+                        break;
+                    }
+                    $testo = mb_substr($br['testo'], 0, min($budget, 800));
+                    $fonti[] = ['titolo' => 'Pagina «' . ($br['titolo'] !== '' ? $br['titolo'] : $br['url']) . '»', 'testo' => $testo];
+                    $pagine[$br['url']] = $br['titolo'] !== '' ? $br['titolo'] : $br['url'];
+                    $budget -= mb_strlen($testo);
+                }
+            } catch (\Throwable $e) {
+                error_log('[Didacticus] pagine di Ateneo non disponibili: ' . $e->getMessage());
+            }
         }
         $testo = $fonti ? $this->modello->rispondi($domanda, $fonti) : null;
         if ($testo === null) {
             return null;
         }
-        $this->voci->registraUso((int) $voci[0]['id']);
+        if ($voci) {
+            $this->voci->registraUso((int) $voci[0]['id']);
+        }
         $link = [];
         foreach ($voci as $v) {
             foreach (VociRepository::link($v) as $l) {
-                $link[$l['u'] ?? $l['e']] = $l;
+                $link[$l['u']] = $l;
             }
         }
-        $extra = ['feedback' => true, 'operatore' => true];
+        foreach ($pagine as $url => $titolo) {
+            $link[$url] = ['e' => 'Pagina di Ateneo: ' . mb_strimwidth($titolo, 0, 70, '…'), 'u' => $url];
+        }
+        $extra = ['feedback' => true, 'operatore' => true, 'generata' => true];
         if ($link) {
             $extra['link'] = array_slice(array_values($link), 0, 4);
         }
 
-        return self::esito('generata', $testo, $extra, (int) $voci[0]['id']);
+        return self::esito('generata', $testo . self::AVVISO_GENERATA, $extra, $voci ? (int) $voci[0]['id'] : null);
     }
 
     /**

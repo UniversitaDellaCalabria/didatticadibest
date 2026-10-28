@@ -1852,6 +1852,42 @@ var PACCHETTI = [
     ],
     nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
     commit: "Area personale: icone di servizio a tre per riga (assistenza, messaggi, calendario, profilo, ricerca…), «Il mio lavoro» solo per chi gestisce con righe e pulsanti col numero in rosso, «Da fare per te» con i pulsanti dei gruppi (schema v99)"
+  },
+  {
+    id: "didacticus-modello",
+    titolo: "Pacchetto 41 · Didacticus con un modello linguistico aperto e le pagine di Ateneo",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare (il modello è facoltativo)",
+    schema: "v100 (una tabella nuova, didacticus_pagine: si crea da sola alla prima pagina)",
+    riassunto: "<strong>Didacticus</strong> può usare un <strong>modello linguistico aperto</strong> (Llama 3.2 3B con Ollama) che gira sul server dell'Ateneo: nessun dato esce. È <strong>spento di partenza</strong> e si accende con <code>LLM_URL</code> nel file <code>.env</code>. Interviene solo quando Didacticus non trova una voce sicura, risponde <strong>solo</strong> con le voci della base di conoscenza e con i brani delle <strong>pagine di Ateneo</strong> scelte dal pannello (solo https unical.it, rilette ogni settimana), cita la pagina con un collegamento e segnala la risposta come «preparata automaticamente». Un solo calcolo alla volta, 45 secondi al massimo, poi si torna alle regole. L'informativa privacy cambia da sola quando il modello è collegato.",
+    passi: [["H4a", "Collegamento al modello, un calcolo alla volta"], ["H4b", "Pagine di Ateneo: tabella, lettura, ricerca"], ["H4c", "Scheda «Pagine di Ateneo» nel pannello e lettura settimanale"], ["H4d", "Prove, informativa, guida per il server"]],
+    cartelle: [
+      { cartella: "src/Assistenza/Didacticus/", file: [
+        ["ModelloLinguistico.php", "nuovo", "H4a", "il collegamento al modello (Ollama), spento senza LLM_URL"],
+        ["PagineRepository.php", "nuovo", "H4b", "archivio delle pagine, solo https unical.it"],
+        ["LettorePagine.php", "nuovo", "H4b", "legge titolo e testo di una pagina pubblica"],
+        ["ServizioPagine.php", "nuovo", "H4c", "rilettura di una pagina o di tutte quelle ferme da una settimana"],
+        ["RicercaPagine.php", "nuovo", "H4b", "i brani delle pagine più vicini alla domanda"],
+        ["ServizioDidacticus.php", "mod", "H4a", "usa il modello quando non c'è una voce sicura, con le fonti"]
+      ]},
+      { cartella: "src/Core/Schema/", file: [
+        ["Definizioni.php", "mod", "H4b", "tabella didacticus_pagine"],
+        ["Migrazioni.php", "mod", "H4b", "versione 100"]
+      ]},
+      { cartella: "admin/ e radice", file: [
+        ["admin/didacticus.php", "mod", "H4c", "scheda «Pagine di Ateneo»"],
+        ["cron_background.php", "mod", "H4c", "rilegge le pagine una volta alla settimana"],
+        ["privacy.php", "mod", "H4d", "il testo cambia se il modello è collegato"]
+      ]}
+    ],
+    dopo: [
+      "Apri una pagina del sito: lo schema v100 crea la tabella. <strong>Il modello non è ancora attivo</strong>: Didacticus risponde a regole come prima.",
+      "Per attivarlo segui <code>documentazione/guida_modello_server.md</code>: installare Ollama sul server, scaricare <code>llama3.2:3b</code>, aggiungere <code>LLM_URL</code> al <code>.env</code>. Il server ha 4 core e nessuna GPU: ogni risposta del modello richiede 20-40 secondi, per questo interviene solo nei casi incerti.",
+      "Da <strong>Gestione → Didacticus → Pagine di Ateneo</strong> aggiungi gli indirizzi delle pagine di Ateneo e del Dipartimento da usare come fonti.",
+      "Per spegnerlo: togli <code>LLM_URL</code> dal <code>.env</code>."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Didacticus: modello linguistico aperto facoltativo con un calcolo alla volta, pagine di Ateneo come fonti (lettura settimanale, ricerca dei brani, scheda nel pannello), risposte segnalate come automatiche, informativa e guida per il server (schema v100)"
   }
 ];
 

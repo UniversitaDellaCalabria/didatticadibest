@@ -342,6 +342,36 @@ $did_ml = new ServizioDidacticus($voci_rep, $imp_rep, new ModelloLinguistico('ht
 $r_ml = $did_ml->risposta('Come faccio a fare il tirocinio?', null, true);
 prova($r_ml['tipo'] !== 'generata' && $r_ml['tipo'] !== '' && $r_ml['testo'] !== '', "modello linguistico: se il servizio non risponde Didacticus risponde a regole come prima");
 
+// Pagine di Ateneo come fonti: indirizzi ammessi, lettura del testo, brani e ricerca
+use App\Assistenza\Didacticus\LettorePagine;
+use App\Assistenza\Didacticus\PagineRepository;
+use App\Assistenza\Didacticus\RicercaPagine;
+prova(PagineRepository::urlAmmesso('https://www.unical.it/didattica/tasse') && PagineRepository::urlAmmesso('https://dibest.unical.it/') && PagineRepository::urlAmmesso('https://unical.it/x'), "pagine di Ateneo: ammessi gli indirizzi https di unical.it e dei suoi sottodomini");
+prova(!PagineRepository::urlAmmesso('http://www.unical.it/x') && !PagineRepository::urlAmmesso('https://unical.it.evil.com/x') && !PagineRepository::urlAmmesso('https://evilunical.it/x') && !PagineRepository::urlAmmesso('https://www.unical.it:8443/x') && !PagineRepository::urlAmmesso('https://utente@www.unical.it/x') && !PagineRepository::urlAmmesso('ftp://unical.it/x') && !PagineRepository::urlAmmesso(''), "pagine di Ateneo: respinti http, altri domini, finti sottodomini, porte e credenziali");
+$html_pg = '<html><head><title>Sedute di laurea</title><script>var x=1</script></head><body><nav>Menu del sito</nav><main><h1>Sedute di laurea</h1><p>La domanda di conseguimento titolo si presenta entro il 15 del mese.</p><p>La domanda di conseguimento titolo si presenta entro il 15 del mese.</p><ul><li>Tassa di laurea da pagare con PagoPA</li></ul><form>Cerca</form></main><footer>Piè di pagina</footer></body></html>';
+$est_pg = LettorePagine::estrai($html_pg);
+prova($est_pg['titolo'] === 'Sedute di laurea' && str_contains($est_pg['testo'], 'conseguimento titolo') && str_contains($est_pg['testo'], 'PagoPA') && !str_contains($est_pg['testo'], 'Menu del sito') && !str_contains($est_pg['testo'], 'Piè di pagina') && !str_contains($est_pg['testo'], 'var x') && substr_count($est_pg['testo'], 'conseguimento titolo') === 1, "pagine di Ateneo: dal HTML restano titolo e testo, senza menu, piè di pagina, script e righe ripetute");
+$testo_pg = implode("\n", array_map(fn($i) => "Riga numero $i con un po' di testo per riempire il brano senza dire niente di particolare.", range(1, 30)));
+$brani_pg = RicercaPagine::brani($testo_pg);
+prova(count($brani_pg) > 3 && max(array_map('mb_strlen', $brani_pg)) <= RicercaPagine::BRANO + 120, "pagine di Ateneo: il testo si divide in brani di circa " . RicercaPagine::BRANO . " caratteri");
+$pag_ric = [
+    ['id' => 1, 'url' => 'https://www.unical.it/tasse', 'titolo' => 'Tasse e contributi', 'testo' => "Le rate delle tasse universitarie scadono a novembre, febbraio e maggio.\nIl pagamento si fa con PagoPA dalla propria area Esse3."],
+    ['id' => 2, 'url' => 'https://www.unical.it/lauree', 'titolo' => 'Sedute di laurea', 'testo' => "La domanda di conseguimento titolo si presenta entro la data della seduta.\nIl calendario delle sedute di laurea è pubblicato ogni anno."],
+];
+$ris_pg = RicercaPagine::cerca('quando scadono le rate delle tasse universitarie', $pag_ric);
+prova(count($ris_pg) >= 1 && $ris_pg[0]['url'] === 'https://www.unical.it/tasse', "pagine di Ateneo: la ricerca trova il brano giusto con l'indirizzo della pagina");
+prova(RicercaPagine::cerca('tasse', $pag_ric) === [] && RicercaPagine::cerca('come si cucina la pasta al forno', $pag_ric) === [], "pagine di Ateneo: una parola sola o una domanda fuori tema non danno fonti");
+$pag_rep = $cont_di->get(PagineRepository::class);
+$id_pg1 = $pag_rep->aggiungi('https://www.unical.it/prova-didacticus-1', '2026-10-28 10:00:00');
+prova($id_pg1 > 0 && $pag_rep->aggiungi('https://www.unical.it/prova-didacticus-1', '2026-10-28 10:00:00') === 0 && $pag_rep->aggiungi('https://altro.example.org/x', '2026-10-28 10:00:00') === 0, "pagine di Ateneo: si aggiunge una volta sola e solo se l'indirizzo è ammesso");
+prova($pag_rep->conTesto() === [] && in_array($id_pg1, $pag_rep->daAggiornare(7), true), "pagine di Ateneo: una pagina mai letta è da aggiornare e non è ancora una fonte");
+$pag_rep->salvaLettura($id_pg1, 'Prova', "Testo di prova della pagina", 'Letta: 27 caratteri', date('Y-m-d H:i:s'));
+prova(count($pag_rep->conTesto()) === 1 && !in_array($id_pg1, $pag_rep->daAggiornare(7), true), "pagine di Ateneo: dopo la lettura è una fonte e non si rilegge per una settimana");
+$pag_rep->attiva($id_pg1, false);
+prova($pag_rep->conTesto() === [], "pagine di Ateneo: in pausa non è più una fonte");
+$pag_rep->elimina($id_pg1);
+$conn->query("DELETE FROM didacticus_pagine");
+
 $conn->rollback(); // le prove non lasciano le voci importate nella base di prova
 
 foreach (["DELETE FROM didacticus_mancate", "DELETE FROM assistenza_messaggi", "DELETE FROM assistenza_conversazioni", "DELETE FROM uffici_persone WHERE email = 'op-d989@example.org'", "DELETE FROM utenti WHERE id BETWEEN 98931 AND 98949", "UPDATE impostazioni_sistema SET didacticus_attivo = 0 WHERE id = 1"] as $sql) $q($sql);

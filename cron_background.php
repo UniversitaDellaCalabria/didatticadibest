@@ -128,6 +128,9 @@ if ($mesi_ut > 0) echo $cron->conservazioneAccount($mesi_ut);
 // - Chat di assistenza ferme da CONSERVAZIONE_ASSISTENZA_MESI (predefinito 12, 0 = mai): messaggi cancellati e conversazione senza dati personali
 $mesi_as = max(0, (int)(env_valore('CONSERVAZIONE_ASSISTENZA_MESI') ?? 12));
 if ($mesi_as > 0) {
+    // Pagine di Ateneo che Didacticus legge come fonti: si rileggono quelle ferme da più di una settimana (di solito poche per volta)
+    try { [$pg_ok, $pg_ko] = \App\Core\App::per($conn)->get(\App\Assistenza\Didacticus\ServizioPagine::class)->aggiornaScadute(); if ($pg_ok + $pg_ko > 0) echo "- Pagine di Ateneo per Didacticus: $pg_ok lette, $pg_ko con errore.\n"; }
+    catch (\Throwable $e_pg) { echo '- Pagine di Ateneo per Didacticus: errore (' . $e_pg->getMessage() . ")\n"; }
     try { echo '- Conservazione assistenza: ' . \App\Core\App::per($conn)->get(\App\Assistenza\ConservazioneAssistenza::class)->applica($mesi_as) . " chat ripulite (ferme da più di $mesi_as mesi).\n"; }
     catch (\Throwable $e) { error_log('Cron, conservazione assistenza: ' . $e->getMessage()); }
 }

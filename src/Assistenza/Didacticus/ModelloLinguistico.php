@@ -10,8 +10,10 @@ namespace App\Assistenza\Didacticus;
  *
  * Il modello NON risponde dalla sua conoscenza: riceve la domanda e le voci della base di conoscenza più vicine, e deve rispondere solo con quelle; se non bastano
  * risponde NON_SO e Didacticus torna al suo comportamento a regole. Se il servizio non risponde in tempo o dà errore, lo stesso: nessuna chat si rompe.
+ * Un solo calcolo alla volta (blocco su un file): se il modello è già occupato per un'altra chat, Didacticus risponde subito a regole invece di mettersi in coda e
+ * lasciare il server a lavorare più del dovuto.
  *
- * Variabili del file .env: LLM_URL (es. http://127.0.0.1:11434/v1), LLM_MODELLO (es. qwen2.5:3b), LLM_TIMEOUT (secondi, 60),
+ * Variabili del file .env: LLM_URL (es. http://127.0.0.1:11434/v1), LLM_MODELLO (es. qwen2.5:3b), LLM_TIMEOUT (secondi, 45),
  * LLM_MODALITA («incerto» = solo quando nessuna voce è abbastanza sicura, «sempre» = anche per riformulare le voci trovate).
  */
 final class ModelloLinguistico
@@ -38,7 +40,7 @@ final class ModelloLinguistico
         $env = static fn (string $k): string => function_exists('env_valore') ? trim((string) env_valore($k)) : '';
         $this->url = rtrim($url ?? $env('LLM_URL'), '/');
         $this->modello = ($modello ?? $env('LLM_MODELLO')) ?: 'qwen2.5:3b';
-        $this->timeout = max(5, min(180, $timeout ?? (((int) $env('LLM_TIMEOUT')) ?: 60)));
+        $this->timeout = max(5, min(180, $timeout ?? (((int) $env('LLM_TIMEOUT')) ?: 45)));
         $m = strtolower($modalita ?? $env('LLM_MODALITA'));
         $this->modalita = $m === self::MODALITA_SEMPRE ? self::MODALITA_SEMPRE : self::MODALITA_INCERTO;
     }
@@ -90,6 +92,25 @@ final class ModelloLinguistico
             'max_tokens' => 300,
             'stream' => false,
         ], JSON_UNESCAPED_UNICODE);
+        $blocco = @fopen(sys_get_temp_dir() . '/didacticus_modello.lock', 'c');
+        if ($blocco === false || !flock($blocco, LOCK_EX | LOCK_NB)) {
+            if ($blocco !== false) {
+                fclose($blocco);
+            }
+            error_log('[Didacticus] modello occupato: risposta a regole');
+
+            return null;
+        }
+        try {
+            return $this->chiama((string) $corpo);
+        } finally {
+            flock($blocco, LOCK_UN);
+            fclose($blocco);
+        }
+    }
+
+    private function chiama(string $corpo): ?string
+    {
         $ch = curl_init($this->url . '/chat/completions');
         curl_setopt_array($ch, [
             CURLOPT_POST => true, CURLOPT_POSTFIELDS => $corpo, CURLOPT_RETURNTRANSFER => true,

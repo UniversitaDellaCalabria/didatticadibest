@@ -126,6 +126,12 @@ final class Definizioni
             attivita TEXT DEFAULT NULL, obiettivi TEXT DEFAULT NULL, sede VARCHAR(200) NOT NULL DEFAULT '', note VARCHAR(500) NOT NULL DEFAULT '',
             aggiornato_il DATETIME DEFAULT NULL, UNIQUE KEY uq_utente_tipo (utente_id, tipo), INDEX idx_tipo (tipo)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        // v100: pagine del sito di Ateneo e del Dipartimento (solo indirizzi unical.it) che Didacticus legge ogni settimana: il testo serve da fonte al modello linguistico
+        'didacticus_pagine' => "CREATE TABLE IF NOT EXISTS didacticus_pagine (
+            id INT AUTO_INCREMENT PRIMARY KEY, url VARCHAR(300) NOT NULL, titolo VARCHAR(200) NOT NULL DEFAULT '', testo MEDIUMTEXT DEFAULT NULL,
+            attiva TINYINT(1) NOT NULL DEFAULT 1, esito VARCHAR(200) NOT NULL DEFAULT '', aggiornata_il DATETIME DEFAULT NULL, creata_il DATETIME DEFAULT NULL,
+            UNIQUE KEY uq_url (url)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         // v23: abilitazioni date a chi non ha ancora fatto il primo accesso: si attivano al login con quell'email
         'abilitazioni_attesa' => "CREATE TABLE IF NOT EXISTS abilitazioni_attesa (
             id INT AUTO_INCREMENT PRIMARY KEY, email VARCHAR(150) NOT NULL, persona_id VARCHAR(80) DEFAULT NULL, nominativo VARCHAR(200) DEFAULT '',
