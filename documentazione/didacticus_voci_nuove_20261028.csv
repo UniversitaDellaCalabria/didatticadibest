@@ -1,0 +1,133 @@
+﻿Argomento;Titolo;Domande;Parole chiave;Risposta;Link (etichetta|indirizzo);Attiva;Usi;Utile;Non utile;Propone operatore;Solo con accesso
+tesi;Come trovo un relatore: i docenti che accettano tesisti;"Come trovo un relatore
+Quali docenti accettano tesisti
+Docenti disponibili per la tesi
+Chi può farmi da relatore
+Dove vedo i posti per la tesi";relatore, tesista, tesisti, disponibilità tesi, posti tesi, semaforo, docente per la tesi;"Nella pagina **Disponibilità per la tesi** trovi i docenti che hanno indicato di accettare nuovi tesisti, con un **semaforo**: verde se hanno posti, arancione se ne resta uno solo, rosso se sono al completo. Per ognuno vedi temi, attività previste, obiettivi formativi e i corsi di laurea a cui si rivolge.
+
+Puoi filtrare per docente, tema o corso di laurea, e con «Scrivi al docente» gli mandi una email per proporti. Compaiono solo i docenti che hanno inserito la propria disponibilità: se non trovi chi cerchi, scrivigli direttamente.";"Disponibilità dei docenti per la tesi|disponibilita_tesi.php
+Tesi e laurea: i passi|percorso_tesi.php";sì;0;0;0;no;no
+tirocini;Quali docenti accettano tirocinanti: disponibilità per i tirocini;"Quali docenti accettano tirocinanti
+Dove vedo i docenti disponibili per il tirocinio
+Come trovo un tutor accademico per il tirocinio
+Posti per il tirocinio nei laboratori dei docenti";disponibilità tirocini, docenti tirocinanti, tutor accademico, laboratorio docente, posti tirocinio, semaforo;"Nella pagina **Disponibilità per i tirocini** trovi i docenti che accettano tirocinanti, con la barra dei posti liberi, le attività previste, gli obiettivi formativi e i corsi di laurea a cui si rivolgono. Il colore del semaforo dice se ci sono posti: verde, arancione (l'ultimo posto), rosso (completo).
+
+Qui scegli con chi vuoi lavorare e gli scrivi con «Scrivi al docente»; il tirocinio vero e proprio, però, si avvia sempre sulla piattaforma TSP 2.0 con la proposta di stage.";"Disponibilità dei docenti per i tirocini|disponibilita_tirocini.php
+Tirocinio: i passi|percorso_tirocini.php";sì;0;0;0;sì;no
+tesi;Cosa significa il semaforo della disponibilità dei docenti;"Cosa significa il semaforo verde arancione rosso
+Perché un docente è grigio
+Cosa vuol dire da riconfermare
+Il docente ha ancora posti per la tesi";semaforo, colori, verde, arancione, rosso, grigio, da riconfermare, posti liberi;"Il colore si calcola da solo, dai posti liberi che il docente ha indicato:
+
+- **verde**: ci sono almeno due posti liberi;
+- **arancione**: resta un solo posto;
+- **rosso**: il docente è al completo;
+- **grigio**: il docente non accetta nuovi studenti, oppure non ha aggiornato la sua disponibilità da più di 90 giorni («da riconfermare»): in quel caso conviene scrivergli per chiedere se ci sono posti.";"Disponibilità per la tesi|disponibilita_tesi.php
+Disponibilità per i tirocini|disponibilita_tirocini.php";sì;0;0;0;no;no
+altro;Docenti: come indico la mia disponibilità per tesi e tirocini;"Come inserisco la mia disponibilità per tesi e tirocini
+Sono un docente e voglio comparire nella pagina delle disponibilità
+Come aggiorno i posti per i tesisti
+Come tolgo la mia disponibilità";docente disponibilità, indicare posti, aggiornare posti, tesisti docente, togliere disponibilità, area personale docente;"Dalla tua **Area personale**, nella tessera «La mia disponibilità», apri la pagina e, per la tesi e per il tirocinio, indichi se accetti nuovi studenti, i posti totali e quelli già occupati, i corsi di laurea (scelti dall'anagrafe di Ateneo), i temi, le attività e gli obiettivi formativi.
+
+Quando uno studente si laurea o finisce il tirocinio aggiorna i posti occupati: il semaforo della pagina pubblica cambia da solo. Se non aggiorni per 90 giorni il semaforo diventa grigio («da riconfermare»). Per toglierti dalla pagina pubblica usa «Togli dalla pagina pubblica».";La mia disponibilità|la_mia_disponibilita.php;sì;0;0;0;no;sì
+altro;Il mio calendario: eventi, aule, ricevimenti e scadenze in un posto solo;"Dove vedo il mio calendario
+Come aggiungo gli eventi al calendario del telefono
+Come scarico il file ics
+Calendario personale del portale
+Come sincronizzo il calendario";calendario, ics, calendario telefono, abbonarsi calendario, agenda personale, sincronizzare calendario;"Dopo l'accesso, dall'**Area personale** apri «Il mio calendario»: raccoglie in un posto solo gli eventi a cui sei prenotato, le aule e i laboratori prenotati, il ricevimento e le scadenze.
+
+Puoi scaricare il file **.ics** (si apre con Outlook, Google Calendar, Apple Calendario) oppure **abbonare il calendario del telefono** con il link segreto che trovi nella pagina: da quel momento si aggiorna da solo. Se pensi che il link sia finito in mani sbagliate, dalla stessa pagina lo rigeneri.";Il mio calendario|calendario.php;sì;0;0;0;no;sì
+altro;Area personale: cos'è e cosa ci trovo;"Cos'è l'area personale
+Dove trovo le mie cose nel portale
+Cosa vedo nella mia area personale
+Dove sono le mie prenotazioni, pratiche e attestati
+Come uso l'area personale";area personale, cruscotto, tessere, da fare per te, scrivania, le mie cose;"L'**Area personale** è la tua pagina di partenza dopo l'accesso. In alto trovi le scorciatoie (assistenza, calendario, profilo, guide, ricerca), poi **«Da fare per te»** con le cose che aspettano te (firme, conferme, registri, pratiche da lavorare) e le tessere per i tuoi eventi, le pratiche, il tutorato, la disponibilità e le altre cose che ti riguardano.
+
+Chi gestisce qualcosa (pratiche, protocollo, consigli, aree) trova anche **«Il mio lavoro»**, con le sue postazioni e i numeri. Cosa vedi dipende dal tuo profilo (studente, docente, personale…).";"La mia Area personale|area_personale.php
+Come si fa: le guide|guida.php";sì;0;0;0;no;sì
+altro;Installare il portale come app sul telefono o sul computer;"Posso installare il portale come app
+Come metto il portale sul telefono
+Come installo l'app di Didattica DiBEST
+Icona del portale sulla schermata home";app, installare, telefono, schermata home, pwa, icona, installa l'app;"Il portale si può installare come app, senza passare dagli store. Dopo l'accesso apri l'**Area personale**: se il tuo browser lo permette, in alto compare il pulsante **«Installa l'app»**. Su iPhone si fa dal menu «Condividi» del browser Safari, scegliendo «Aggiungi alla schermata Home».
+
+Con l'app installata si aprono più in fretta le tue cose e, se le attivi, arrivano le notifiche.";La mia Area personale|area_personale.php;sì;0;0;0;no;sì
+eventi;Registrare la presenza a un evento con il codice QR;"Come registro la mia presenza a un evento
+Come si usa il QR code dell'evento
+Scanner QR per la presenza
+Come faccio il check-in a un seminario
+Ho il QR dell'evento, cosa ne faccio";presenza, qr, qr code, check-in, scanner, registrare presenza, firma presenza;"Per registrare la presenza a un evento prenotato apri **«Registra presenza (QR)»** dal portale (dopo l'accesso) e inquadra con la fotocamera il codice QR dell'evento. La presenza viene registrata e, se l'evento prevede un attestato, ti arriverà dopo la conclusione.
+
+Se il lettore non parte, controlla di aver dato al browser il permesso di usare la fotocamera. Non riesci? Chiedilo a chi organizza l'evento: può registrarti a mano.";"Registra presenza (QR)|scanner_studente.php
+Eventi, attestati e sondaggi|miei_eventi.php";sì;0;0;0;sì;sì
+eventi;Lista d'attesa e posto liberato a un evento;"Il turno è pieno cosa posso fare
+Come funziona la lista d'attesa
+Mi è arrivata una email: posto liberato
+Come confermo il posto che si è liberato
+Come mi metto in lista d'attesa";lista d'attesa, posto liberato, turno pieno, confermare posto, posto disponibile, sold out;"Se un turno è pieno puoi metterti in **lista d'attesa** al momento della prenotazione. Se si libera un posto ricevi un avviso e, nella tua **Area personale**, la tessera «Eventi e attestati» segnala **«posto liberato da confermare»**: entra e confermalo in tempo, altrimenti il posto passa a chi segue.
+
+Tutte le tue prenotazioni, anche quelle in attesa, le trovi nella pagina «Eventi, attestati e sondaggi».";Eventi, attestati e sondaggi|miei_eventi.php;sì;0;0;0;no;sì
+eventi;Sondaggi di gradimento degli eventi;"Dove trovo il sondaggio dell'evento
+Come compilo il questionario di gradimento
+Mi è arrivato un sondaggio su un evento";sondaggio, questionario, gradimento, valutare evento, feedback evento;I sondaggi di un evento ti arrivano per email e li ritrovi nella pagina **«Eventi, attestati e sondaggi»** della tua Area personale, vicino all'evento a cui hai partecipato. Bastano pochi minuti: servono al Dipartimento per migliorare le attività.;Eventi, attestati e sondaggi|miei_eventi.php;sì;0;0;0;no;sì
+eventi;Ricevere un avviso per email quando c'è un nuovo evento;"Come ricevo gli avvisi dei nuovi eventi
+Posso iscrivermi agli avvisi per email
+Come mi avvisano dei seminari
+Come smetto di ricevere gli avvisi
+Newsletter degli eventi";avvisi, newsletter, nuovi eventi, notifica evento, iscrizione avvisi, disiscrizione;"Dalla pagina **Avvisi** scegli gli argomenti che ti interessano (gli ambiti degli eventi e le attività per le scuole) e inserisci la tua email: ricevi un messaggio di conferma e da quel momento un avviso quando nasce un evento che ti riguarda.
+
+In fondo a ogni email c'è il link per cambiare gli argomenti o cancellarti quando vuoi.";"Avvisi per email dei nuovi eventi|avvisi.php
+Agenda degli eventi|agenda.php";sì;0;0;0;no;no
+altro;Dove trovo le notizie e le comunicazioni del Dipartimento;"Dove trovo le comunicazioni del Dipartimento
+Notizie per gli studenti
+Avvisi del dipartimento
+Come seguo le notizie con un lettore RSS";notizie, comunicazioni, avvisi dipartimento, news, rss, feed;"Le notizie e le comunicazioni del Dipartimento sono nella pagina **Notizie e comunicazioni**: puoi filtrarle per pubblico (studenti, scuole, aziende, docenti) e cercare per parola. Chi usa un lettore di feed può seguirle anche in **RSS**.
+
+Le date da ricordare (iscrizioni, termini, scadenze) le trovi riunite anche nella pagina «Scadenze e date utili».";"Notizie e comunicazioni|comunicazioni.php
+Scadenze e date utili|scadenze.php";sì;0;0;0;no;no
+altro;Scadenze e date utili;"Dove trovo le scadenze
+Date da ricordare
+Quali sono le scadenze di questo periodo
+Termini per le domande e i moduli";scadenze, date utili, termini, date da ricordare, calendario scadenze;La pagina **Scadenze e date utili** riunisce le date da ricordare pubblicate nelle comunicazioni del Dipartimento e le scadenze dei moduli online della didattica. Se sei registrato, le scadenze che ti riguardano compaiono anche nel tuo calendario personale.;"Scadenze e date utili|scadenze.php
+Il mio calendario|calendario.php";sì;0;0;0;no;no
+iscrizione;Corsi di studio e insegnamenti del Dipartimento;"Dove trovo i corsi di studio del dipartimento
+Come cerco un insegnamento
+Quali insegnamenti ci sono quest'anno
+Chi è il docente di un insegnamento
+Come cerco un corso per docente";corsi di studio, insegnamenti, offerta formativa, cercare insegnamento, docente insegnamento, anno accademico;La pagina **Corsi di studio e insegnamenti** elenca i corsi del Dipartimento e, per ognuno, gli insegnamenti dell'anno accademico in corso, con i dati che arrivano dal portale dell'Ateneo. Puoi cercare per nome dell'insegnamento o per docente.;Corsi di studio e insegnamenti|corsi.php;sì;0;0;0;no;no
+altro;Contatti: chi contattare per cosa;"Chi devo contattare
+Dove trovo i recapiti degli uffici
+Contatti del dipartimento
+A chi scrivo per un problema
+Numero di telefono dell'ufficio";contatti, recapiti, telefono, email ufficio, chi contattare, a chi scrivere;La pagina **Contatti** elenca chi contattare per ogni esigenza, con i recapiti istituzionali. Se non sai a chi rivolgerti, scrivi qui in chat e ti indirizziamo: puoi anche chiedere di parlare con una persona dell'ufficio.;Chi contattare per cosa|contatti.php;sì;0;0;0;sì;no
+altro;Cercare nel sito: eventi, notizie, guide, docenti e risposte;"Come cerco qualcosa nel sito
+C'è una ricerca nel portale
+Cerco un docente o una guida
+Come trovo una pagina";ricerca, cercare, cerca nel sito, trovare pagina, motore di ricerca;Usa **Cerca nel sito** (in alto, o dalla tua Area personale): con una sola ricerca trovi eventi e progetti, notizie e pagine, le guide «Come si fa», i docenti e le risposte di Didacticus, raggruppati per tipo.;"Cerca nel sito|ricerca.php
+Come si fa: le guide|guida.php";sì;0;0;0;no;no
+altro;Come cambio i miei dati o le impostazioni del profilo;"Come modifico il mio profilo
+Come cambio la mia email nel portale
+Dove cambio i miei dati personali
+Come attivo le notifiche
+Come cambio tema chiaro o scuro";profilo, modificare dati, email profilo, notifiche, tema scuro, impostazioni, dati personali;"Dal **Profilo** della tua Area personale puoi modificare i dati personali e l'email e vedere la scheda di Ateneo. Nella stessa pagina e nell'Area personale trovi anche il pulsante per il **tema chiaro o scuro**.
+
+Se un dato non si lascia modificare, viene dall'anagrafe di Ateneo: va cambiato lì.";Il mio profilo|profilo.php;sì;0;0;0;no;sì
+tesi;Aziende convenzionate per la tesi;"Con quali aziende posso fare la tesi
+Elenco delle aziende convenzionate per la tesi
+L'azienda dove voglio fare la tesi è convenzionata
+Come faccio la tesi in un'azienda";aziende convenzionate, tesi in azienda, enti convenzionati tesi, convenzione tesi elenco;Nella pagina **Aziende convenzionate per la tesi** trovi gli enti e le aziende che hanno già la convenzione con il Dipartimento. Se quella che ti interessa non c'è, l'ente o l'azienda può richiederla online dalla pagina «Convenzione di tesi per enti e aziende».;"Aziende convenzionate per la tesi|aziende_convenzionate_tesi.php
+Convenzione di tesi per enti e aziende|richiedi_convenzione_tesi.php";sì;0;0;0;sì;no
+tirocini;Tirocinio all'estero;"Posso fare il tirocinio all'estero
+Come faccio un tirocinio in un altro paese
+Erasmus traineeship
+Stage all'estero
+Tirocinio all'estero con i bandi di mobilità";tirocinio estero, stage estero, erasmus tirocinio, traineeship, mobilità tirocinio, all'estero;"Un'esperienza di tirocinio all'estero **non si avvia come il tirocinio curriculare** con la proposta di stage su TSP 2.0: passa dai **bandi di mobilità internazionale** dell'Ateneo (per esempio Erasmus+), che escono una volta all'anno con i loro requisiti e le loro scadenze.
+
+Prima di partire parla con l'ufficio e con il tuo tutor accademico per capire se e come l'esperienza è riconosciuta tra i crediti del tuo corso.";Pratiche: mobilità internazionale|pratiche.php;sì;0;0;0;sì;no
+altro;Prenotare un'aula, un laboratorio o il ricevimento di un docente;"Come prenoto un'aula
+Dove prenoto il laboratorio
+Come prenoto il ricevimento di un docente
+Prenotare uno sportello
+Come annullo la prenotazione di un'aula";prenotare aula, laboratorio, ricevimento, sportello, risorsa, prenotazione aula;"Le aule, i laboratori e gli sportelli si prenotano dalle pagine delle aree «Calendari e risorse»: scegli la risorsa, poi uno o più slot liberi nella settimana. Per il ricevimento dei docenti usa la pagina **Docenti**: cerchi il docente e prenoti uno degli orari disponibili.
+
+Le prenotazioni compaiono nel tuo calendario e nella tua Area personale, dove puoi anche annullarle.";"Docenti e ricevimento|docenti.php
+Il mio calendario|calendario.php";sì;0;0;0;no;no
