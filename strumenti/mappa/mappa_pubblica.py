@@ -41,12 +41,17 @@ def costruisci():
             card('Link personale', '<p>Scuole, aziende e docenti che devono solo confermare o firmare ricevono per email un link personale: non serve creare un account.</p>'),
             card('Password dedicata', '<p>I rappresentanti esterni leggono i verbali dei consigli con una password data dall\'Ufficio didattico, valida per un periodo.</p>'),
         )
-        + gal(fig('map_area_studente', '<b>Area personale dello studente.</b> Prenotazioni, pratiche, attestati e le cose da fare.'),
-              fig('map_area_docente', '<b>Area personale del docente.</b> In più le conferme da dare, le risorse di cui si occupa e il «Da fare per te».'))
+        + gal(fig('map_area_studente', '<b>Area personale dello studente.</b> In alto le icone di servizio (assistenza, messaggi, calendario, profilo, ricerca, guide) con il numero in rosso, poi «Da fare per te» e le tessere.'),
+              fig('map_area_docente', '<b>Area personale del docente.</b> In più le conferme da dare, le firme dei verbali e delle lettere, la disponibilità per tesi e tirocini.'),
+              fig('map_area_gestore', '<b>«Il mio lavoro»</b>, solo per chi gestisce qualcosa o fa parte di un ufficio: una riga per ogni postazione, con i pulsanti e il numero in rosso di quello che aspetta.'))
         + gal(fig('map_area_studente_scuro', '<b>Tema scuro.</b> Con un pulsante l\'area personale cambia colori; il portale ricorda la scelta.'),
               fig('map_miei_eventi', '<b>Eventi, attestati e sondaggi.</b> Prenotazioni, storico, attestati e scanner QR in una pagina.'))
         + fig('map_profilo', '<b>Il profilo.</b> I dati arrivano dal login di Ateneo; si può aggiungere un\'email personale.')
         + fig('map_calendario', '<b>Il mio calendario.</b> Eventi, aule, ricevimenti e scadenze in un posto solo, con il file .ics e il link per abbonare il telefono.')
+        + '<h3>Disponibilità dei docenti per tesi e tirocini</h3><p>Ogni docente indica dalla sua Area personale se accetta nuovi tesisti e tirocinanti, quanti posti ha e quanti sono occupati, i corsi di laurea (dall\'anagrafe di Ateneo), i temi, le attività e gli obiettivi formativi. Le due pagine pubbliche mostrano un <b>semaforo</b> che si calcola da solo: <b>verde</b> con almeno due posti liberi, <b>arancione</b> con l\'ultimo posto, <b>rosso</b> al completo, <b>grigio</b> se non accetta o se non ha aggiornato da più di 90 giorni («da riconfermare»). Gli studenti filtrano per tema o corso di laurea e scrivono al docente con un clic.</p>'
+        + gal(fig('map_pub_disponibilita_tesi', '<b>Disponibilità per la tesi.</b> I docenti con il semaforo, i posti liberi e il corso di laurea.'),
+              fig('map_pub_disponibilita_tirocini', '<b>Disponibilità per i tirocini</b>, con gli stessi colori.'),
+              fig('map_doc_disponibilita', '<b>La pagina del docente.</b> Posti, corsi, temi, attività e obiettivi; «Togli dalla pagina pubblica» quando non serve più.'))
     )))
 
     # 4 ----------------------------------------------------------------------------------------------
@@ -245,7 +250,7 @@ def costruisci():
     # 13 ---------------------------------------------------------------------------------------------
     # 14 ---------------------------------------------------------------------------------------------
     S.append(('assistenza', 'Assistenza e Didacticus', sezione('assistenza', '14', 'Assistenza e Didacticus, l\'assistente virtuale',
-        'Per qualsiasi dubbio (tirocini, certificati, pratiche, tutorato, tesi, eventi, accesso) studenti, personale e utenti esterni scrivono dal pulsante <b>«Serve aiuto?»</b>, in basso a destra su ogni pagina. Risponde prima <b>Didacticus</b>, l\'assistente virtuale; se non basta, passa la parola a una persona dell\'ufficio, che riceve un avviso e continua la stessa chat.',
+        'Per qualsiasi dubbio (tirocini, certificati, pratiche, tutorato, tesi, eventi, accesso) studenti, personale e utenti esterni scrivono dal pulsante con il <b>gufo di Didacticus</b> («Chiedi a Didacticus»), in basso a destra su ogni pagina. Risponde prima <b>Didacticus</b>, l\'assistente virtuale; se non basta, passa la parola a una persona dell\'ufficio, che riceve un avviso e continua la stessa chat.',
         griglia(
             card('Per tutti', '<p>Chi ha il login ritrova la sua chat e le sue pratiche; gli esterni scrivono nome ed email e ricevono un <b>link personale</b> per riprendere la conversazione, senza registrarsi.</p>', '💬'),
             card('Didacticus', '<p>Risponde subito alle domande più comuni con le risposte scritte dal Dipartimento, con <b>pulsanti, link e allegati</b>. Se non sa, lo dice: non inventa. Se la risposta non basta, un clic e arriva una persona.</p>', '🦉'),
@@ -256,11 +261,12 @@ def costruisci():
         )
         + '<h3>Come funziona, per chi chiede aiuto</h3>'
         + passi(
-            'Dal pulsante <b>«Serve aiuto?»</b> (o dalla pagina Assistenza, o dal pulsante «Chiedi aiuto su questa pratica») si sceglie l\'argomento e si scrive la domanda. Gli esterni indicano nome ed email.',
+            'Dal pulsante con il gufo (o dalla pagina Assistenza, o dal pulsante «Chiedi aiuto su questa pratica») si sceglie l\'argomento e si scrive la domanda. Gli esterni indicano nome ed email.',
             '<b>Didacticus risponde subito</b>, con il testo, i pulsanti dei link e gli eventuali allegati. Se non è sicuro propone delle voci vicine («intendevi…?»).',
             'Sotto ogni risposta: <b>«Sì, grazie»</b> chiude la chat; <b>«Non mi basta»</b> o <b>«Parla con un operatore»</b> (o la parola «operatore» scritta in chat) passano la parola a una persona.',
             'La chat passa agli operatori, che ricevono email e finestrella con la domanda e vedono già quello che Didacticus ha risposto. Chi ha chiesto aiuto continua a scrivere nella stessa chat e, se chiude la pagina, riceve la risposta per email.',
             'A fine conversazione si può dire se l\'assistenza è stata utile.')
+        + fig('map_pub_didacticus_widget', '<b>Il pulsante di Didacticus</b> in basso a destra su ogni pagina, con la nuvoletta «Chiedi a Didacticus» che compare un istante, sparisce da sola e non torna nella stessa visita.')
         + gal(fig('map_pub_assistenza_form', '<b>Nuova richiesta.</b> Argomento, domanda e, per gli esterni, nome ed email. Chi preferisce può scrivere subito a un operatore.'),
               fig('map_pub_assistenza_didacticus', '<b>La chat con Didacticus:</b> risposta, link, «Ti è stato utile?» e «Parla con un operatore».'),
               fig('map_pub_assistenza_esterno', '<b>La chat di un utente esterno</b>, ripresa dal suo link personale.'))
@@ -273,12 +279,15 @@ def costruisci():
             '<b>Voci</b>: l\'elenco con quante volte ogni risposta è stata usata e quanti l\'hanno trovata utile.',
             '<b>Prova</b>: si scrive una domanda come la scriverebbe uno studente e si vede cosa risponderebbe Didacticus, con il punteggio di ogni voce.',
             '<b>Domande senza risposta</b>: quelle che Didacticus non ha saputo gestire; «Crea una voce» le trasforma in risposte.',
-            '<b>Impostazioni</b>: acceso o spento, saluto, soglia di sicurezza e immagine di profilo.')
+            '<b>Pagine di Ateneo</b>: gli indirizzi delle pagine pubbliche di unical.it che Didacticus legge ogni settimana come fonti (servono solo se è collegato un modello linguistico).',
+            '<b>Impostazioni</b>: acceso o spento, saluto, soglia di sicurezza, immagine di profilo e lo stato del «significato delle domande».')
+        + '<h3>Capire il significato delle domande</h3><p>Un piccolo modello che gira sul server dell\'Ateneo (<b>bge-m3</b>) confronta il <b>significato</b> della domanda con quello delle voci: «stage fuori dall\'Italia» trova «Tirocinio all\'estero» anche senza parole in comune. <b>Non scrive risposte</b>: mostra sempre il testo delle voci, quindi non può inventare. Interviene solo quando le regole non sono sicure (o lo sono poco); se non risponde, Didacticus torna alle regole. È spento di partenza e si accende dal file di configurazione del server; i vettori delle voci si aggiornano ogni notte e con «Aggiorna ora». Nella <b>Prova</b> si vedono le due classifiche, per parole e per significato. Un modello che scrive le risposte (Llama) è stato provato ma resta spento: sul server senza scheda grafica è troppo lento e a volte inventa.</p>'
         + gal(fig('map_adm_didacticus_voci', '<b>La base di conoscenza:</b> voci, usi, utilità, stato e azioni.'),
               fig('map_adm_didacticus_voce', '<b>Una voce:</b> domande, parole chiave, risposta, link e allegati.'),
-              fig('map_adm_didacticus_prova', '<b>La prova:</b> cosa risponderebbe e le voci più vicine con il punteggio.'),
+              fig('map_adm_didacticus_prova', '<b>La prova:</b> cosa risponderebbe, le voci più vicine per parole (punteggio) e per significato (somiglianza).'),
+              fig('map_adm_didacticus_pagine', '<b>Pagine di Ateneo:</b> gli indirizzi letti ogni settimana, con l\'esito dell\'ultima lettura.'),
               fig('map_adm_didacticus_mancate', '<b>Domande senza risposta</b> da trasformare in voci.'),
-              fig('map_adm_didacticus_impostazioni', '<b>Impostazioni:</b> acceso/spento, saluto, soglia e immagine del gufo.'))
+              fig('map_adm_didacticus_impostazioni', '<b>Impostazioni:</b> lo stato del significato delle domande, acceso/spento, saluto, soglia e immagine del gufo.'))
     )))
 
     S.append(('direttore', 'Il Direttore', sezione('direttore', '15', 'Il Direttore: un cruscotto e le firme',

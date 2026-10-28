@@ -1895,8 +1895,8 @@ var PACCHETTI = [
     stato: "pronto",
     statoTesto: "Pronto da caricare (si accende con EMB_URL)",
     schema: "v101 (una tabella nuova, didacticus_vettori: si crea da sola alla prima pagina)",
-    riassunto: "<strong>Didacticus</strong> confronta il <strong>significato</strong> della domanda con quello delle voci (embedding con un piccolo modello, bge-m3, che gira sul server dell'Ateneo): «stage fuori dall'Italia» trova «Tirocinio all'estero» anche senza parole in comune. <strong>Non scrive risposte</strong>: mostra sempre il testo delle voci, quindi non può inventare. Interviene quando le regole non sono sicure o lo sono poco, e un'altra voce è molto più vicina; la voce delle regole resta tra i «vedi anche». <strong>Spento di partenza</strong>: si accende con <code>EMB_URL</code> nel <code>.env</code>. Nella prova su 20 domande parafrasate trova la voce giusta in 15 casi contro 7 delle sole regole.",
-    passi: [["H5a", "Collegamento al modello di significato e archivio dei vettori"], ["H5b", "Scelta della voce: significato e regole insieme"], ["H5c", "Pannello: stato, «Aggiorna ora» e confronto nella Prova"], ["H5d", "Aggiornamento notturno dal cron, prove"]],
+    riassunto: "<strong>Didacticus</strong> confronta il <strong>significato</strong> della domanda con quello delle voci (embedding con un piccolo modello, bge-m3, che gira sul server dell'Ateneo): «stage fuori dall'Italia» trova «Tirocinio all'estero» anche senza parole in comune. <strong>Non scrive risposte</strong>: mostra sempre il testo delle voci, quindi non può inventare. Interviene quando le regole non sono sicure o lo sono poco, e un'altra voce è molto più vicina; la voce delle regole resta tra i «vedi anche». <strong>Spento di partenza</strong>: si accende con <code>EMB_URL</code> nel <code>.env</code>. Nella prova su 20 domande parafrasate trova la voce giusta in 15 casi contro 7 delle sole regole. In più il pulsante «Serve aiuto?» in basso a destra diventa il <strong>gufo di Didacticus</strong> con una nuvoletta «Chiedi a Didacticus» (compare un istante, sparisce da sola e non torna nella stessa visita).",
+    passi: [["H5a", "Collegamento al modello di significato e archivio dei vettori"], ["H5b", "Scelta della voce: significato e regole insieme"], ["H5c", "Pannello: stato, «Aggiorna ora» e confronto nella Prova"], ["H5d", "Aggiornamento notturno dal cron, prove"], ["H5e", "Il pulsante «Serve aiuto?» diventa il gufo con la nuvoletta «Chiedi a Didacticus»"]],
     cartelle: [
       { cartella: "src/Assistenza/Didacticus/", file: [
         ["Significato.php", "nuovo", "H5a", "il collegamento al modello (Ollama), spento senza EMB_URL"],
@@ -1910,7 +1910,11 @@ var PACCHETTI = [
       ]},
       { cartella: "admin/ e radice", file: [
         ["admin/didacticus.php", "mod", "H5c", "stato nelle Impostazioni, «Aggiorna ora», confronto nella Prova"],
-        ["cron_background.php", "mod", "H5d", "calcola ogni notte i vettori delle voci nuove o cambiate"]
+        ["cron_background.php", "mod", "H5d", "calcola ogni notte i vettori delle voci nuove o cambiate"],
+        ["footer.php", "mod", "H5e", "versione del pulsante di Didacticus (?v=7)"]
+      ]},
+      { cartella: "assets/js/", file: [
+        ["assistenza-widget.js", "mod", "H5e", "il pulsante diventa il gufo di Didacticus con la nuvoletta «Chiedi a Didacticus»"]
       ]}
     ],
     dopo: [

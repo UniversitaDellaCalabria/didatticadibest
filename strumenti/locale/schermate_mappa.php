@@ -3,6 +3,7 @@
 // Schermate per la «Mappa del portale» (documentazione/mappa_portale.html): documentazione/schermate/map_*.png.
 //   Prima: bash strumenti/locale/avvia.sh --nuovo, php strumenti/locale/scenario_demo.php e il menu del sito (Organizzazione proposta).
 //   Poi:   php -d extension=gd strumenti/locale/schermate_mappa.php [prefisso]     (con un prefisso, per esempio «map_adm_», rifà solo quelle)
+// Scrive i PNG in documentazione/schermate/ e i JPEG in documentazione/mappa/img/.
 // Usa Chrome in modalità headless (una schermata per volta: l'accesso di prova è dentro lo stesso indirizzo) e GD per ritagliare.
 // =========================================================================
 $radice = realpath(__DIR__ . '/../..');
@@ -38,6 +39,10 @@ $elenco = [
     $pub('map_calendario.png', 6, 'calendario.php', 1000),
     $pub('map_area_studente_scuro.png', 6, 'area_personale.php', 900), // tema scuro: Chrome dichiara la preferenza del sistema (vedi sotto)
     $pub('map_pub_ricerca_gruppi.png', 6, 'ricerca.php?q=tesi', 1000),
+    $pub('map_pub_disponibilita_tesi.png', 5, 'disponibilita_tesi.php', 900),
+    $pub('map_pub_disponibilita_tirocini.png', 5, 'disponibilita_tirocini.php', 900),
+    $pub('map_doc_disponibilita.png', 3, 'la_mia_disponibilita.php', 1000),
+    $pub('map_area_gestore.png', 1, 'area_personale.php', 1400),
     $pan('map_adm_inizio.png', 1, 'admin/inizio.php'),
     $pan('map_adm_aree.png', 1, 'admin/aree.php'),
     $pan('map_adm_dashboard.png', 1, 'admin/dashboard.php?p_id=1', 900),
@@ -119,5 +124,6 @@ foreach ($elenco as $v) {
     $w = imagesx($im); $hh = imagesy($im);
     $out = imagecrop($im, ['x' => 0, 'y' => min($v['y'], $hh - 1), 'width' => $w, 'height' => max(1, min($v['alt'], $hh - $v['y']))]);
     imagepng($out, "$USCITA/{$v['n']}");
+    imagejpeg($out, "$radice/documentazione/mappa/img/" . substr($v['n'], 0, -4) . '.jpg', 84);
     echo "ok {$v['n']}\n";
 }

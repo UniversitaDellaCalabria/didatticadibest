@@ -409,6 +409,8 @@ consumaToken($t, $sedutaId)    // vale una sola volta, per quel verbale''')
             ['<code>push_sottoscrizioni</code>', 'i recapiti dei browser (endpoint unico per impronta SHA-256, chiavi, ruolo, preferenze: silenzia, solo le mie chat)'],
             ['<code>didacticus_voci</code>', 'la base di conoscenza: argomento, titolo, domande, parole chiave, risposta, link e allegati (JSON), solo_login, proponi_operatore, attiva, contatori usi/utile/non_utile'],
             ['<code>didacticus_mancate</code>', 'domande senza risposta o la cui risposta non è bastata (da trasformare in voci)'],
+            ['<code>didacticus_pagine</code>', 'v100: pagine pubbliche di unical.it (solo https) lette ogni settimana, con titolo, testo, esito e data dell\'ultima lettura: fonti del modello linguistico'],
+            ['<code>didacticus_vettori</code>', 'v101: un vettore di significato per voce (numeri a 32 bit in base64) con l\'impronta del testo da cui è stato calcolato; si ricalcola solo se la voce cambia'],
             ['<code>impostazioni_sistema</code>', 'colonne <code>assistenza_attiva</code>, <code>assistenza_orari</code> (JSON giorno → fasce) e <code>didacticus_*</code> (acceso, saluto, soglia, avatar, seminato)'],
         ])
         + '<h3>Classi</h3>'
@@ -420,6 +422,9 @@ consumaToken($t, $sedutaId)    // vale una sola volta, per quel verbale''')
             ['<code>ChatApi</code>', 'le risposte JSON delle pagine (casella, chat dell\'operatore, chat di chi chiede aiuto): permessi controllati dall\'endpoint, dati qui'],
             ['<code>OrariAssistenza</code>', 'servizio acceso/spento e fasce orarie («09:00-13:00, 14:00-16:00»), avviso fuori orario'],
             ['<code>ConservazioneAssistenza</code>', 'dopo 12 mesi (<code>CONSERVAZIONE_ASSISTENZA_MESI</code>) cancella messaggi, recapiti push e domande senza risposta; nome alle iniziali, email e IP svuotati, link personale invalidato'],
+            ['<code>Significato</code>, <code>VettoriRepository</code>, <code>ServizioSignificato</code>', 'embedding (Ollama <code>/api/embed</code>, modello <code>bge-m3</code>) per trovare le voci per significato; spento senza <code>EMB_URL</code>; vettori calcolati dal pannello («Aggiorna ora») e dal cron, mai durante una chat; coseno tra domanda e voci'],
+            ['<code>ModelloLinguistico</code>', 'facoltativo e spento di partenza (<code>LLM_URL</code>): modello che scrive la risposta con le sole fonti (voci e brani di pagine di Ateneo), un calcolo alla volta (blocco su file), timeout 45 s, <code>NON_SO</code> e fallback a regole; risposta segnalata come «preparata automaticamente»'],
+            ['<code>PagineRepository</code>, <code>LettorePagine</code>, <code>ServizioPagine</code>, <code>RicercaPagine</code>', 'pagine di Ateneo come fonti: solo https del dominio unical.it (niente porte né credenziali), testo estratto senza menu e script, brani di circa 600 caratteri scelti per vicinanza alla domanda; rilettura settimanale dal cron'],
             ['<code>StatisticheAssistenza</code>, <code>Contesti</code>', 'numeri per periodo (argomento, operatore, tempi, utilità, risolte da Didacticus); pratica o prenotazione collegata, solo se della persona'],
         ])
         + '<h3>Notifiche push (Web Push)</h3>'
@@ -430,15 +435,37 @@ consumaToken($t, $sedutaId)    // vale una sola volta, per quel verbale''')
    |-- «Sì, grazie» ................................. chiusa, risolta_da_bot = 1
    |-- «Non mi basta» / «operatore» / 2 volte «non so» -> stato «nuova», passata_il, nota interna, email + finestrella agli operatori
    '-- un operatore risponde o «Prendo io» ............ stato «assegnata» (passata_il se veniva da Didacticus)""")
+        + '<h3>Significato e modello linguistico (facoltativi)</h3>'
+        + '<p>Dopo il <code>Motore</code>, se le regole non sono sicure (punteggio sotto la soglia) o lo sono poco (sotto 75), <code>ServizioSignificato</code> confronta la domanda con i vettori delle voci: con somiglianza da 0,62 sceglie la voce (da 0,55 se deve correggere una scelta debole delle regole, che resta tra i «vedi anche»), da 0,50 propone «forse intendevi…». Le soglie si regolano con <code>EMB_SOGLIA</code> e <code>EMB_SOGLIA_SUGGERISCI</code>. Il testo mostrato è sempre quello della voce. Su 20 domande parafrasate trova la voce giusta in 15 casi contro 7 delle sole regole. Se resta incerto e <code>LLM_URL</code> è impostato, <code>ModelloLinguistico</code> può scrivere una risposta con le sole fonti; in prova (Llama 3.2 3B e 1B, Qwen, Phi-4-mini) sul server a 4 core senza GPU è troppo lento e a volte inventa, quindi resta spento.</p>'
+        + cod("""domanda --> Motore (regole, punteggio 0-100)
+   |-- sicura (>= soglia e >= 75) ......................... risposta della voce
+   |-- incerta o debole --> ServizioSignificato::cerca() --> voce per somiglianza (0,62 / 0,55) o suggerimenti (0,50)
+   |-- ancora incerta e LLM_URL impostato ................. ModelloLinguistico con le sole fonti (spento di partenza)
+   '-- niente di tutto questo ............................. suggerimenti a regole o «non so» (domanda senza risposta)""")
         + '<h3>Pagine e file</h3>'
         + tab(['File', 'Ruolo'], [
             ['<code>assistenza.php</code>, <code>assistenza_ajax.php</code>', 'pagina pubblica (anche come finestrella <code>?pannello=1</code>) e risposte JSON; chat di chi ha il login o, per gli esterni, del link <code>?t=</code>'],
             ['<code>admin/assistenza.php</code>, <code>admin/assistenza_ajax.php</code>, <code>admin/push_ajax.php</code>', 'casella e chat degli operatori, statistiche, orari; notifiche del browser'],
-            ['<code>admin/didacticus.php</code>', 'voci (con link e allegati), domande senza risposta, prova, impostazioni; esportazione Excel/PDF/CSV e importazione CSV'],
+            ['<code>admin/didacticus.php</code>', 'voci (con link e allegati), domande senza risposta, prova (con la classifica per significato), pagine di Ateneo, impostazioni (stato del significato, «Aggiorna ora»); esportazione Excel/PDF/CSV e importazione CSV'],
             ['<code>didacticus_file.php</code>', 'immagine di profilo e allegati (cartella <code>uploads/didacticus/</code> chiusa al web, scaricabili solo da qui e solo per le voci attive)'],
+            ['<code>assets/js/assistenza-widget.js</code>', 'il pulsante di Didacticus (il gufo, immagine da <code>didacticus_file.php?avatar=1</code>) con la nuvoletta «Chiedi a Didacticus»: compare dopo 1,8 s, sparisce dopo 12 s e non torna nella stessa visita (<code>sessionStorage</code>); la finestrella è la pagina <code>assistenza.php?pannello=1</code> in un iframe'],
             ['<code>assets/js/assistenza-*.js</code>', 'chat, casella degli operatori, finestrella, iscrizione push (testo sempre via <code>textContent</code>, mai HTML; il Service Worker mette i JS in cache: si cambia <code>?v=</code> a ogni modifica)'],
         ])
         + '<h3>Prove</h3><p><code>strumenti/prove/oop/assistenza.php</code> (chat, operatori, limiti, orari, conservazione), <code>assistenza_push.php</code> e <code>assistenza_push_db.php</code> (cifratura contro la RFC, firma, invio, iscrizioni, preferenze, integrazione con la chat), <code>assistenza_didacticus.php</code> (motore su domande vere, risposte, passaggi all\'operatore, domande senza risposta, statistiche). Scenario di dimostrazione e schermate: <code>strumenti/locale/scenario_assistenza.php</code>, <code>schermate_assistenza.php</code>.</p>'
+    )))
+
+    # 13a ----------------------------------------------------------------------------------------------
+    S.append(('disponibilita', 'Disponibilità dei docenti', sezione('disponibilita', '13a', 'Disponibilità dei docenti per tesi e tirocini',
+        'I docenti indicano dalla loro Area personale se accettano nuovi tesisti e tirocinanti; due pagine pubbliche mostrano i posti con un semaforo che si calcola da solo (<code>src/Disponibilita/</code>).',
+        tab(['Elemento', 'Compito'], [
+            ['<code>disponibilita_docenti</code>', 'una riga per docente e per tipo (<code>tesi</code>, <code>tirocinio</code>): accetta, posti, occupati, corsi (codici dall\'anagrafe di Ateneo), temi, attività, obiettivi, sede, note, <code>aggiornato_il</code> (v98)'],
+            ['<code>DisponibilitaRepository</code>', 'lettura e salvataggio per utente e tipo, elenco pubblico dei docenti che accettano; valida posti e corsi'],
+            ['<code>Semaforo::di()</code>', 'verde con almeno due posti liberi, arancione con uno, rosso a zero, grigio se non accetta o se l\'ultimo aggiornamento ha più di 90 giorni («da riconfermare»); funzione pura, provata con l\'orologio iniettato'],
+            ['<code>la_mia_disponibilita.php</code>', 'la pagina del docente: tesi e tirocinio, «Togli dalla pagina pubblica»; tessera «La mia disponibilità» nell\'Area personale'],
+            ['<code>disponibilita_tesi.php</code>, <code>disponibilita_tirocini.php</code>', 'pagine pubbliche con filtri per ricerca, corso di laurea e «solo con posti», e «Scrivi al docente»'],
+        ])
+        + gal(fig('map_pub_disponibilita_tesi', '<b>Disponibilità per la tesi</b> · <code>disponibilita_tesi.php</code>.'),
+              fig('map_doc_disponibilita', '<b>La pagina del docente</b> · <code>la_mia_disponibilita.php</code>.'))
     )))
 
     # 13b ----------------------------------------------------------------------------------------------
