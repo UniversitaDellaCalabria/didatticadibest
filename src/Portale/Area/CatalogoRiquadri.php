@@ -49,6 +49,8 @@ final class CatalogoRiquadri
                 'profili' => [Profili::STUDENTE, Profili::DOCENTE, Profili::AMMINISTRATORE], 'ordine' => 72],
             'tutorato_pagamenti' => ['tipo' => self::SPECIALE, 'titolo' => 'Ufficio pagamenti del tutorato', 'descrizione' => 'Per le persone dell\'ufficio pagamenti: spento finché i pagamenti non passano dal portale', 'icona' => 'fa-euro-sign', 'colore' => '#15803d',
                 'profili' => [Profili::PERSONALE, Profili::AMMINISTRATORE], 'ordine' => 74, 'attivo' => 0],
+            'disponibilita' => ['tipo' => self::SPECIALE, 'titolo' => 'La mia disponibilità per tesi e tirocini', 'descrizione' => 'Per i docenti: posti per tesisti e tirocinanti, corsi di laurea, attività e obiettivi; compaiono sulle pagine pubbliche con un semaforo', 'icona' => 'fa-traffic-light', 'colore' => '#0e7490',
+                'profili' => [Profili::DOCENTE, Profili::AMMINISTRATORE], 'ordine' => 82],
             'ricevimento' => ['tipo' => self::SPECIALE, 'titolo' => 'Il mio ricevimento', 'descrizione' => 'Giorni, orari, assenze e appuntamenti in programma', 'icona' => 'fa-user-clock', 'colore' => '#7c3aed',
                 'profili' => [Profili::DOCENTE, Profili::PERSONALE, Profili::AMMINISTRATORE], 'ordine' => 80],
             'risorse_responsabile' => ['tipo' => self::SPECIALE, 'titolo' => 'Le mie risorse', 'descrizione' => 'Per i responsabili di aule e laboratori: richieste da approvare e prenotazioni in arrivo', 'icona' => 'fa-user-shield', 'colore' => '#0f766e',

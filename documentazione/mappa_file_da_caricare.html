@@ -1752,6 +1752,46 @@ var PACCHETTI = [
     ],
     nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
     commit: "Il mio lavoro: nell'area personale una tessera per ogni postazione di chi gestisce (pratiche, protocollo, sedute, convenzioni, tutorato, assistenza, aree) con i numeri; pulsante «Area personale» nel pannello (schema v97)"
+  },
+  {
+    id: "disponibilita-docenti",
+    titolo: "Pacchetto 38 · Disponibilità dei docenti per tesi e tirocini (semafori)",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare",
+    schema: "v98 (una tabella nuova, disponibilita_docenti: si crea da sola alla prima pagina)",
+    riassunto: "I <strong>docenti</strong> indicano dalla propria area personale, per tesi e per tirocinio, se accettano nuovi studenti, i posti totali e occupati, i <strong>corsi di laurea dall'anagrafe di Ateneo</strong>, i temi, le attività e gli obiettivi formativi. Due <strong>pagine pubbliche separate</strong>, <code>disponibilita_tesi.php</code> (elenco) e <code>disponibilita_tirocini.php</code> (carte), mostrano chi ha messo la disponibilità con un <strong>semaforo</strong> calcolato dai posti liberi: verde, arancione (ultimo posto), rosso (completo), grigio (non accetta o non aggiornata da 90 giorni). Filtri per docente, tema, corso di laurea e «solo con posti»; pulsante «Scrivi al docente».",
+    passi: [["D1", "Tabella e regole del semaforo"], ["D2", "Pagina del docente e tessera nell'area personale"], ["D3", "Pagine pubbliche tesi e tirocini"], ["D4", "Prove, mappe e guida"]],
+    cartelle: [
+      { cartella: "/ (radice del portale)", file: [
+        ["disponibilita_tesi.php", "nuovo", "D3", "pagina pubblica delle tesi: elenco con semafori"],
+        ["disponibilita_tirocini.php", "nuovo", "D3", "pagina pubblica dei tirocini: carte con barra dei posti"],
+        ["la_mia_disponibilita.php", "nuovo", "D2", "la pagina del docente: posti, corsi, temi, attività, obiettivi"]
+      ]},
+      { cartella: "inc/", file: [
+        ["inc/disponibilita_vista.php", "nuovo", "D2 D3", "il semaforo e lo stile comuni"],
+        ["inc/disponibilita_pubblica.php", "nuovo", "D3", "il disegno delle due pagine pubbliche"],
+        ["inc/area/disponibilita.php", "nuovo", "D2", "la tessera «La mia disponibilità» del docente"]
+      ]},
+      { cartella: "src/Disponibilita/ (cartella nuova)", file: [
+        ["src/Disponibilita/Semaforo.php", "nuovo", "D1", "le regole del colore"],
+        ["src/Disponibilita/DisponibilitaRepository.php", "nuovo", "D1", "archivio, corsi validati sull'anagrafe, elenco pubblico"]
+      ]},
+      { cartella: "src/ (modificati)", file: [
+        ["src/Core/Schema/Definizioni.php", "mod", "D1", "tabella disponibilita_docenti"],
+        ["src/Core/Schema/Migrazioni.php", "mod", "D1", "versione 98"],
+        ["src/Portale/Area/CatalogoRiquadri.php", "mod", "D2", "riquadro «disponibilita» per docenti e amministratore"],
+        ["src/Portale/CatalogoPagineMenu.php", "mod", "D3", "le due pagine nel catalogo del menu"],
+        ["src/Portale/GuidePerRuolo.php", "mod", "D4", "guida del docente: disponibilità per tesi e tirocini"]
+      ]}
+    ],
+    dopo: [
+      "Apri una pagina del sito: lo schema v98 crea la tabella. Le due pagine pubbliche sono <strong>vuote</strong> finché i docenti non inseriscono la disponibilità.",
+      "Da <strong>Gestione del portale → Menu</strong> puoi mostrare le due pagine nel menu del sito (sono nel gruppo «Tesi e tirocini: disponibilità dei docenti» delle pagine proposte).",
+      "Avvisa i docenti: dalla loro area personale c'è la tessera <strong>«La mia disponibilità per tesi e tirocini»</strong>. Serve che l'elenco dei corsi di Ateneo sia caricato (Gestione → Anagrafi).",
+      "Il semaforo diventa grigio «da riconfermare» dopo 90 giorni senza aggiornamenti: se vuoi un promemoria automatico ai docenti, dimmelo."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Disponibilità dei docenti per tesi e tirocini: pagina del docente e tessera nell'area personale, due pagine pubbliche con semafori, corsi di laurea dall'anagrafe di Ateneo, temi, attività e obiettivi (schema v98)"
   }
 ];
 

@@ -118,6 +118,14 @@ final class Definizioni
             dipartimento_cod VARCHAR(20) DEFAULT '', visibile TINYINT(1) NOT NULL DEFAULT 1, presente TINYINT(1) NOT NULL DEFAULT 1, aggiornato_il DATETIME DEFAULT NULL,
             INDEX idx_dip (dipartimento_cod)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        // v98: disponibilità dei docenti per tesi e tirocini (una riga per docente e per tipo): posti, corsi di laurea dall'anagrafe di Ateneo, temi, attività
+        // e obiettivi formativi. Il semaforo della pagina pubblica si calcola da posti e aggiornamento (App\Disponibilita\Semaforo).
+        'disponibilita_docenti' => "CREATE TABLE IF NOT EXISTS disponibilita_docenti (
+            id INT AUTO_INCREMENT PRIMARY KEY, utente_id INT NOT NULL, tipo VARCHAR(10) NOT NULL DEFAULT 'tesi', accetta TINYINT(1) NOT NULL DEFAULT 1,
+            posti INT NOT NULL DEFAULT 0, occupati INT NOT NULL DEFAULT 0, corsi VARCHAR(600) NOT NULL DEFAULT '', temi VARCHAR(300) NOT NULL DEFAULT '',
+            attivita TEXT DEFAULT NULL, obiettivi TEXT DEFAULT NULL, sede VARCHAR(200) NOT NULL DEFAULT '', note VARCHAR(500) NOT NULL DEFAULT '',
+            aggiornato_il DATETIME DEFAULT NULL, UNIQUE KEY uq_utente_tipo (utente_id, tipo), INDEX idx_tipo (tipo)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         // v23: abilitazioni date a chi non ha ancora fatto il primo accesso: si attivano al login con quell'email
         'abilitazioni_attesa' => "CREATE TABLE IF NOT EXISTS abilitazioni_attesa (
             id INT AUTO_INCREMENT PRIMARY KEY, email VARCHAR(150) NOT NULL, persona_id VARCHAR(80) DEFAULT NULL, nominativo VARCHAR(200) DEFAULT '',
