@@ -20,6 +20,9 @@
 = pratica, richiesta, modulo, moduli, modulistica, segreteria didattica, presentare, uniticket, ticket, credenziali esse3, spid
 @ Modulistica per gli studenti | https://dibest.unical.it/didattica/iscriversi-studiare-laurearsi/modulistica-studenti/
 @ uniTicket | https://ticket.unical.it
+@ Tutti i moduli online del DiBEST (uniTicket) | https://ticket.unical.it/tickets/new/dibest/
+@ Come usare e inviare i moduli (vademecum) | http://www2.unical.it/portale/strutture/dipartimenti_240/dibest/studenti/modulistica/vademecum.htm
+@ Videoguida: come inoltrare le istanze su uniTicket | http://www.youtube.com/watch?v=93ESf3QUSr0
 ---
 Le richieste agli uffici (certificati, convalide, piano di studi, tesi, esoneri, trasferimenti…) si presentano con i **moduli online di uniTicket**. L'elenco completo, con il link di ogni modulo, è nella pagina «Modulistica per gli studenti» del Dipartimento.
 
@@ -79,9 +82,11 @@ Ricorda che con le credenziali Unical (senza SPID) non arrivano email: controlla
 ? Autocertificazione di iscrizione
 ? Certificato per uso estero
 = certificato, certificati, iscrizione, laurea, diploma supplement, autocertificazione, bollo, estero, anis, questura, permesso di soggiorno
-@ Certificato di iscrizione | https://ticket.unical.it/tickets/new/13/116/
-@ Certificato di laurea | https://ticket.unical.it/tickets/new/13/117/
-@ Diploma Supplement | https://ticket.unical.it/tickets/new/13/118/
+@ Richiedi il certificato di iscrizione (modulo uniTicket) | https://ticket.unical.it/tickets/new/13/116/
+@ Richiedi il certificato di laurea (modulo uniTicket) | https://ticket.unical.it/tickets/new/13/117/
+@ Richiedi il Diploma Supplement (modulo uniTicket) | https://ticket.unical.it/tickets/new/13/118/
+@ Richiesta generica di attestato (modulo uniTicket) | https://ticket.unical.it/tickets/new/13/229/
+@ Autocertificazione del titolo di studio (PDF) | http://www2.unical.it/portale/strutture/dipartimenti_240/dibest/studenti/modulistica/autodichiara_titolo_di_studio_dip.pdf
 @ Certificati e pergamene | https://dibest.unical.it/didattica/iscriversi-studiare-laurearsi/certificati-pergamene/
 ---
 **Uso nazionale:** i certificati di iscrizione e di laurea si chiedono con i moduli di uniTicket (accesso con credenziali Esse3 anche a carriera chiusa, o con SPID). Servono **due marche da bollo da 16 €**, che si caricano su Esse3 prima del rilascio; il certificato lo ritiri su uniTicket.
@@ -168,6 +173,7 @@ Si chiedono con i moduli di uniTicket (credenziali Esse3, SPID o CIE). Leggi con
 @ Esse3 | https://unical.esse3.cineca.it/Home.do
 @ Guida alla compilazione del piano di studi | https://www.unical.it/media/publications_attachments/3132/Guida_compilazione_piani_di_studio_dibest.pdf
 @ Videoguida | https://www.youtube.com/watch?v=e4rhzGqIS5w
+@ Richiesta modifica piano di studi (modulo uniTicket) | https://ticket.unical.it/tickets/new/13/123/
 @ Modifica curriculum o classe | https://ticket.unical.it/tickets/new/13/122/
 @ Esami fuori piano | https://ticket.unical.it/tickets/new/13/139/
 ---
@@ -232,6 +238,8 @@ Accedi a Esse3 con le tue credenziali, vai in **Esami → Appelli**, trova l'ins
 @ Convalida esami | https://ticket.unical.it/tickets/new/13/115/
 @ Convalida inglese | https://ticket.unical.it/tickets/new/13/125/
 @ Esonero dall'inglese | https://ticket.unical.it/tickets/new/13/566/
+@ Riconoscimento del titolo di studio conseguito all'estero | https://ticket.unical.it/tickets/new/13/607/
+@ Esonero dalla frequenza delle lezioni | https://ticket.unical.it/tickets/new/13/364/
 ---
 La convalida si chiede con il modulo di uniTicket «Richiesta convalida/riconoscimento esami» (per l'inglese ci sono i moduli dedicati di convalida e di esonero). Di norma si presentano **nella stessa finestra del piano di studi** (settembre): non perdere la scadenza, perché poi i moduli si chiudono. Decide il Consiglio di Corso di Studio.
 
@@ -247,6 +255,8 @@ Se hai sostenuto esami come corsi singoli e hai perso i tempi, scrivi all'uffici
 = fuori piano, attività aggiuntive, esami in più, part-time, tempo parziale, competenze extrauniversitarie, sovrannumero
 @ Modifica tempo pieno / part-time | https://ticket.unical.it/tickets/new/13/266/
 @ Esami fuori piano | https://ticket.unical.it/tickets/new/13/139/
+@ Anticipo insegnamenti | https://ticket.unical.it/tickets/new/13/225/
+@ Semestre aggiuntivo | https://ticket.unical.it/tickets/new/13/212/
 ---
 - **Attività formative aggiuntive:** al massimo due per anno accademico, scelte nell'offerta dell'Ateneo, con autorizzazione del Consiglio di Corso e domanda su Esse3. Non contano per i CFU del titolo né per la media.
 - **Part-time:** di norma 30 CFU all'anno e 60 per biennio, con contribuzione ridotta. Si chiede all'immatricolazione su Esse3 o dopo con il modulo di uniTicket; è riservato agli studenti in corso.
@@ -323,6 +333,7 @@ Qualsiasi cambiamento dopo la richiesta (titolo, relatore, **aggiunta del correl
 = laurea, domanda di laurea, conseguimento titolo, seduta, sedute di laurea, scadenze, almalaurea, pdf/a, tassa fine corso, carichi pendenti
 @ Sedute di laurea | https://dibest.unical.it/didattica/iscriversi-studiare-laurearsi/sedute-laurea/
 @ Esse3 | https://unical.esse3.cineca.it/Home.do
+@ Autocertificazione carichi pendenti (Centro Residenziale) | https://www.unical.it/uuid-media/bfb1600e-ea71-49a2-9b4b-1eb5ee3fa2a4/
 ---
 La **domanda di conseguimento titolo** si presenta su Esse3 (Laurea → conseguimento titolo) entro i termini pubblicati nella pagina «Sedute di laurea», una per ogni seduta a cui vuoi partecipare. Devi essere in regola con le tasse.
 
@@ -664,6 +675,7 @@ Importi e date possono cambiare: la pagina «Trasferimenti e passaggi» è sempr
 @ Lasciare e riprendere gli studi | https://dibest.unical.it/didattica/iscriversi-studiare-laurearsi/lasciare-e-riprendere-studi/
 @ Sospensione temporanea | https://ticket.unical.it/tickets/new/servizi-didattici/sospensione-temporanea-degli-studi/
 @ Ricongiunzione | https://ticket.unical.it/tickets/new/servizi-didattici/modulo-di-richiesta-ricongiunzione/
+@ Iscrizione per rinuncia o decadenza | https://ticket.unical.it/tickets/new/13/113/
 ---
 - **Rinuncia:** si può fare in qualsiasi momento, fa perdere lo stato di studente ma non impedisce di reiscriversi a qualsiasi corso.
 - **Sospensione:** obbligatoria (percorsi incompatibili, come le scuole di specializzazione) o facoltativa (nascita o adozione di un figlio, grave infermità, visto non ottenuto…). Si chiede su uniTicket con un bollo da 16 €.
