@@ -10,3 +10,5 @@ prova($r['codice'] === 200 && !str_contains($r['corpo'], 'Fatal error'), "dispon
 prova($http('/eventi/la_mia_disponibilita.php')['codice'] === 302, "la_mia_disponibilita.php senza accesso: rimando al login");
 $r = $http('/eventi/la_mia_disponibilita.php', null, $jar);
 prova($r['codice'] === 200 && str_contains($r['corpo'], 'La mia disponibilità') && str_contains($r['corpo'], 'name="posti"') && str_contains($r['corpo'], 'name="corsi[]"') && !str_contains($r['corpo'], 'Fatal error'), "la_mia_disponibilita.php: il form per tesi e tirocinio (amministratore)");
+$r = $http('/eventi/admin/menu.php', null, $jar);
+prova($r['codice'] === 200 && str_contains($r['corpo'], 'data-nota="') && str_contains($r['corpo'], 'value="disponibilita_tesi.php"') && str_contains($r['corpo'], 'value="ricerca.php"') && !str_contains($r['corpo'], 'Fatal error'), "admin/menu.php: il menu a tendina elenca tutte le pagine del sito, con le note");

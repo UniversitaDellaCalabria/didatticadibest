@@ -47,6 +47,12 @@ prova($cat_dp && $cat_dp['profili'] === [Profili::DOCENTE, Profili::AMMINISTRATO
 foreach (['disponibilita_tesi.php', 'disponibilita_tirocini.php', 'la_mia_disponibilita.php'] as $f_dp) prova(is_file(__DIR__ . '/../../../' . $f_dp), "esiste la pagina $f_dp");
 $menu_dp = array_merge(...array_values(\App\Core\App::per($conn)->get(\App\Portale\CatalogoPagineMenu::class)->catalogo()));
 prova(in_array(['Disponibilità dei docenti per la tesi', 'disponibilita_tesi.php'], $menu_dp, true) && in_array(['Disponibilità dei docenti per i tirocini', 'disponibilita_tirocini.php'], $menu_dp, true), "menu: le due pagine sono nel catalogo delle pagine del sito");
+$note_dp = \App\Core\App::per($conn)->get(\App\Portale\CatalogoPagineMenu::class)->conNote();
+$senza_nota_dp = [];
+foreach ($note_dp as $voci_dp) foreach ($voci_dp as [$e_dp, $u_dp, $n_dp]) if ($n_dp === '') $senza_nota_dp[] = $u_dp;
+prova($senza_nota_dp === [], "menu: ogni pagina del catalogo ha la sua nota" . ($senza_nota_dp ? ' (mancano: ' . implode(', ', $senza_nota_dp) . ')' : ''));
+$url_dp = array_column(array_merge(...array_values($note_dp)), 1);
+foreach (['ricerca.php', 'calendario.php', 'miei_eventi.php', 'assistenza.php', 'il_mio_tutorato.php', 'disponibilita_tesi.php', 'disponibilita_tirocini.php'] as $f_dp) prova(in_array($f_dp, $url_dp, true), "menu: $f_dp è selezionabile");
 $q("DELETE FROM disponibilita_docenti WHERE utente_id BETWEEN 99701 AND 99709");
 $q("DELETE FROM utenti WHERE id BETWEEN 99701 AND 99709");
 $q("DELETE FROM corsi_studio WHERE codice IN ('ZZ99701', 'ZZ99702')");

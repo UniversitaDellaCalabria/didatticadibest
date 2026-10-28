@@ -1792,6 +1792,29 @@ var PACCHETTI = [
     ],
     nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
     commit: "Disponibilità dei docenti per tesi e tirocini: pagina del docente e tessera nell'area personale, due pagine pubbliche con semafori, corsi di laurea dall'anagrafe di Ateneo, temi, attività e obiettivi (schema v98)"
+  },
+  {
+    id: "menu-tutte-le-pagine",
+    titolo: "Pacchetto 39 · Menu: tutte le pagine del sito da scegliere, con una nota",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare",
+    schema: "nessuna modifica allo schema (resta v98)",
+    riassunto: "In <strong>Gestione → Menu</strong>, quando crei o modifichi una voce, il menu a tendina «Scegli una pagina del sito» elenca <strong>tutte le pagine linkabili del portale</strong>, per argomento (eventi, aree e archivi, aule, studenti, tesi e tirocini con le due nuove <code>disponibilita_tesi.php</code> e <code>disponibilita_tirocini.php</code>, area riservata, informazioni). Sotto il campo compare una <strong>nota</strong> che spiega a cosa serve la pagina scelta; l'indirizzo si compila da solo. Aggiunte al catalogo anche ricerca, assistenza, notizie RSS, il mio calendario, i miei eventi, il mio tutorato, le mie conversazioni e l'ufficio pagamenti del tutorato.",
+    passi: [["M1", "Note su ogni pagina del catalogo"], ["M2", "Menu a tendina completo nel form di creazione e di modifica"], ["M3", "Prove e mappe"]],
+    cartelle: [
+      { cartella: "admin/", file: [
+        ["admin/menu.php", "mod", "M2", "il menu a tendina con tutte le pagine e la nota, in creazione e in modifica"]
+      ]},
+      { cartella: "src/Portale/", file: [
+        ["src/Portale/CatalogoPagineMenu.php", "mod", "M1", "note per pagina (conNote) e nuove pagine nel catalogo"]
+      ]}
+    ],
+    dopo: [
+      "Apri <strong>Gestione → Menu</strong>: nel form «Aggiungi Nuova Voce» scegli una pagina dal terzo menu a tendina e leggi la nota sotto.",
+      "Il pulsante «Aggiungi le pagine nascoste» aggiunge al menu anche le pagine nuove del catalogo (restano nascoste finché non le mostri)."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Menu: tutte le pagine del sito selezionabili con una nota su cosa sono, anche le due nuove della disponibilità dei docenti; nel catalogo ricerca, assistenza, calendario, miei eventi, tutorato"
   }
 ];
 

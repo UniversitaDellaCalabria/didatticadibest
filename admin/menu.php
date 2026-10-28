@@ -128,8 +128,23 @@ function getGenitoriOptions($conn, $selected_id = 0, $exclude_id = 0) {
     return $html;
 }
 
+/** Le <optgroup> con tutte le pagine linkabili del portale, per argomento; ogni voce porta la sua nota (data-nota). */
+$pagine_con_note = \App\Core\App::per($conn)->get(\App\Portale\CatalogoPagineMenu::class)->conNote();
+function opzioniPagineMenu(array $pagine_con_note): string
+{
+    $h = '';
+    foreach ($pagine_con_note as $argomento => $voci) {
+        $h .= '<optgroup label="' . htmlspecialchars((string)$argomento) . '">';
+        foreach ($voci as [$etichetta, $url, $nota]) {
+            $h .= '<option value="' . htmlspecialchars($url) . '" data-nota="' . htmlspecialchars($nota) . '">' . htmlspecialchars($etichetta) . ' · ' . htmlspecialchars($url) . '</option>';
+        }
+        $h .= '</optgroup>';
+    }
+    return $h;
+}
+
 $tutti_i_menu = [];
-$tutti_i_menu = \App\Core\App::get(\App\Portale\MenuRepository::class)->righe();
+$tutti_i_menu =\App\Core\App::get(\App\Portale\MenuRepository::class)->righe();
 ?>
 
 <style>
@@ -175,16 +190,12 @@ $tutti_i_menu = \App\Core\App::get(\App\Portale\MenuRepository::class)->righe();
                 <input type="text" name="etichetta" class="form-control" required placeholder="Es. Offerta Formativa">
             </div>
             <div class="col-md-4">
-                <label class="form-label small fw-bold text-secondary">3. Collega Area Esistente (opzionale)</label>
-                <select class="form-select border-success text-success fw-bold" onchange="document.getElementById('urlNuovo').value = this.value;">
+                <label class="form-label small fw-bold text-secondary" for="paginaNuova">3. Scegli una pagina del sito (opzionale)</label>
+                <select id="paginaNuova" class="form-select border-success text-success fw-bold" onchange="document.getElementById('urlNuovo').value = this.value; document.getElementById('notaNuova').textContent = this.selectedOptions[0] ? (this.selectedOptions[0].dataset.nota || '') : '';">
                     <option value="">-- Scrivi URL manualmente --</option>
-                    <optgroup label="🔗 Aree Correnti">
-                        <?php foreach ($aree_lavoro as $al): ?><option value="<?= htmlspecialchars($al['slug']) ?>.php">Area: <?= htmlspecialchars($al['titolo']) ?></option><?php endforeach; ?>
-                    </optgroup>
-                    <optgroup label="🗄️ Archivi Storici">
-                        <?php foreach ($aree_lavoro as $al): ?><option value="<?= htmlspecialchars($al['slug']) ?>_archivio.php">Archivio: <?= htmlspecialchars($al['titolo']) ?></option><?php endforeach; ?>
-                    </optgroup>
+                    <?= opzioniPagineMenu($pagine_con_note) ?>
                 </select>
+                <div id="notaNuova" class="form-text text-success" aria-live="polite"></div>
             </div>
             <div class="col-md-5">
                 <label class="form-label small fw-bold text-secondary">URL di Destinazione</label>
@@ -372,16 +383,12 @@ $tutti_i_menu = \App\Core\App::get(\App\Portale\MenuRepository::class)->righe();
                             <input type="text" name="etichetta" class="form-control" value="<?= htmlspecialchars($em['etichetta']) ?>" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold text-success">Aggiorna da Area (opzionale)</label>
-                            <select class="form-select border-success text-success" onchange="document.getElementById('editUrl<?= $em['id'] ?>').value = this.value;">
+                            <label class="form-label small fw-bold text-success">Cambia pagina (opzionale)</label>
+                            <select class="form-select border-success text-success" onchange="if (this.value) { document.getElementById('editUrl<?= $em['id'] ?>').value = this.value; } document.getElementById('editNota<?= $em['id'] ?>').textContent = this.selectedOptions[0] ? (this.selectedOptions[0].dataset.nota || '') : '';">
                                 <option value="">-- Mantieni URL corrente --</option>
-                                <optgroup label="Aree Correnti">
-                                    <?php foreach ($aree_lavoro as $al): ?><option value="<?= htmlspecialchars($al['slug']) ?>.php">Area: <?= htmlspecialchars($al['titolo']) ?></option><?php endforeach; ?>
-                                </optgroup>
-                                <optgroup label="Archivi Storici">
-                                    <?php foreach ($aree_lavoro as $al): ?><option value="<?= htmlspecialchars($al['slug']) ?>_archivio.php">Archivio: <?= htmlspecialchars($al['titolo']) ?></option><?php endforeach; ?>
-                                </optgroup>
+                                <?= opzioniPagineMenu($pagine_con_note) ?>
                             </select>
+                            <div id="editNota<?= $em['id'] ?>" class="form-text text-success" aria-live="polite"></div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label small fw-bold">URL di Destinazione</label>
