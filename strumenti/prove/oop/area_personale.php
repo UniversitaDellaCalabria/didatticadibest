@@ -171,3 +171,26 @@ $tutte_ap = array_keys(array_filter(CatalogoRiquadri::sistema(), fn($v) => ($v['
 prova(array_diff($tutte_ap, $amm_ap) === [], "l'amministratore vede tutti i riquadri accesi", implode(', ', array_diff($tutte_ap, $amm_ap)));
 $tir_pag_ap = (string) file_get_contents(__DIR__ . '/../../../percorso_tirocini.php');
 prova(substr_count($tir_pag_ap, 'unical.tsp.esse3.cineca.it') >= 2, "la guida dei tirocini rimanda alla piattaforma TSP 2.0");
+
+// ---------------------------------------------------------------------------------------------------------------------------------------------------
+// «Il mio lavoro»: le postazioni di chi gestisce qualcosa (regole senza database)
+// ---------------------------------------------------------------------------------------------------------------------------------------------------
+use App\Portale\Area\PostazioniLavoro;
+
+prova(PostazioniLavoro::elenco([], []) === [], "il mio lavoro: senza permessi non c'è nessuna postazione (il riquadro non compare)");
+$lav_op = PostazioniLavoro::elenco(['didattica_tutto' => true, 'didattica' => true, 'conv_tesi' => true], ['smistare' => 3, 'smistare_giorni' => 9, 'protocollare' => 2, 'verbali' => 1, 'conv_tesi' => 4]);
+prova(array_column($lav_op, 'chiave') === ['pratiche', 'protocollo', 'sedute', 'convenzioni_tesi'], "il mio lavoro: l'operatore dell'ufficio didattico vede pratiche, protocollo, sedute e convenzioni di tesi, nell'ordine", implode(',', array_column($lav_op, 'chiave')));
+prova($lav_op[0]['novita'] === 3 && $lav_op[0]['altri'][0][3] === true && $lav_op[1]['novita'] === 2 && $lav_op[2]['novita'] === 1 && $lav_op[3]['novita'] === 4, "il mio lavoro: i numeri arrivano sulle tessere e la pratica ferma da 9 giorni è in evidenza");
+$lav_ref = PostazioniLavoro::elenco(['didattica' => true], ['verbali' => 2]);
+prova(count($lav_ref) === 1 && $lav_ref[0]['chiave'] === 'sedute' && $lav_ref[0]['titolo'] === 'Le sedute dei miei consigli', "il mio lavoro: il referente di un consiglio vede solo le sue sedute");
+$lav_fermo = PostazioniLavoro::elenco(['didattica_tutto' => true], ['smistare' => 1, 'smistare_giorni' => 2]);
+prova(count($lav_fermo) === 1 && $lav_fermo[0]['altri'][0][3] === false, "il mio lavoro: niente protocollo se non c'è nulla da protocollare e nessun avviso per una pratica arrivata da poco");
+$lav_adm = PostazioniLavoro::elenco(array_fill_keys(PostazioniLavoro::PERMESSI, true), ['protocollare' => 1]);
+prova(count($lav_adm) === 8 && end($lav_adm)['titolo'] === 'Gestione del portale' && count(array_unique(array_column($lav_adm, 'chiave'))) === count($lav_adm), "il mio lavoro: l'amministratore ha tutte le postazioni, una volta sola");
+$lav_ok = true;
+foreach ($lav_adm as $v_l) $lav_ok = $lav_ok && is_file(__DIR__ . '/../../../' . strtok($v_l['href'], '?')) && RiquadriRepository::iconaValida($v_l['icona']) && RiquadriRepository::coloreValido($v_l['colore'])
+    && array_reduce($v_l['altri'], fn($c, $a) => $c && is_file(__DIR__ . '/../../../' . strtok($a[1], '?')), true);
+prova($lav_ok, "il mio lavoro: ogni tessera e ogni pulsante portano a una pagina che esiste");
+prova(in_array('lavoro', array_keys(CatalogoRiquadri::sistema()), true) && !in_array(Profili::STUDENTE, CatalogoRiquadri::sistema()['lavoro']['profili'], true), "il mio lavoro: è un riquadro di sistema e non lo vedono gli studenti");
+$dopo_lav = (string) file_get_contents(__DIR__ . '/../../../admin/admin_header.php');
+prova(str_contains($dopo_lav, '../area_personale.php'), "il pannello ha il pulsante per tornare all'area personale");

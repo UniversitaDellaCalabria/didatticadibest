@@ -553,6 +553,8 @@ $colore_lato = $modulo_corrente === 'portale' ? '#64748b' : $colore_modulo; // l
                 <a href="cerca.php?p_id=<?php echo (int)$filtro_p; ?>" class="btn btn-outline-secondary btn-sm d-md-none" title="Cerca ovunque"><i class="fa fa-magnifying-glass" aria-hidden="true"></i></a>
                 <span class="text-muted small d-none d-md-inline-block"><i class="fa fa-user-shield text-danger me-1"></i> <strong><?php echo htmlspecialchars($utente_admin['nome'] ?? ''); ?></strong></span>
                 
+                <a href="../area_personale.php" class="btn btn-outline-primary btn-sm fw-bold" title="Torna alla tua area personale: da lì trovi tutto quello che ti aspetta"><i class="fa fa-table-cells-large" aria-hidden="true"></i> <span class="d-none d-sm-inline">Area personale</span></a>
+
                 <a href="messaggi.php?p_id=<?php echo $filtro_p; ?>" class="btn btn-outline-dark btn-sm fw-bold me-2 shadow-sm" style="background-color: #ffffff;">
                     <i class="fa fa-envelope me-1"></i> Messaggi
                     <span id="badgeUnreadWrap" <?php echo (isset($unread_count) && $unread_count > 0) ? '' : 'style="display:none;"'; ?>>

@@ -57,3 +57,7 @@ Su approvazione dell'utente (la testata del sito non si tocca):
 - **Ricerca unica** (`ricerca.php`): eventi, notizie e pagine, guide, docenti, risposte di Didacticus, raggruppati.
 - **App installabile**: la PWA c'era già; ora ha le scorciatoie (area personale, calendario, eventi, cerca), le icone «maskable» e il pulsante «Installa l'app» nell'area personale (su iPhone/iPad spiega come fare).
 - Prove: `strumenti/prove/oop/calendario.php` e `pagine_calendario.php`. Sistemate anche le 18 prove che fallivano da prima (erano prove vecchie, nessun errore nel portale).
+
+## Il mio lavoro (28/10/2026, schema v97)
+
+Piano completo in `piano_lavoro_area_personale.md`. Nuovo riquadro di sistema «Il mio lavoro» (`inc/area/lavoro.php`, regole in `src/Portale/Area/PostazioniLavoro.php`): una tessera per ogni postazione che la persona gestisce (pratiche, protocollo, sedute, convenzioni di tesi, tutorato, convenzioni FSL, assistenza, aree), con i numeri di `CoseDaFare` e i pulsanti sulla vista giusta. Le azioni restano nelle pagine del pannello (stessi permessi e registro); nel pannello c'è il pulsante «Area personale».

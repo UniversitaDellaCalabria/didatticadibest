@@ -1720,10 +1720,42 @@ var PACCHETTI = [
     ],
     nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
     commit: "Assistenza e Didacticus: chat per studenti ed esterni con operatori, notifiche a finestrella (Web Push), assistente virtuale Didacticus istruibile dal pannello, statistiche, orari e conservazione; guide e mappe aggiornate"
+  },
+  {
+    id: "il-mio-lavoro",
+    titolo: "Pacchetto 37 · Il mio lavoro: le postazioni di chi gestisce, nell'area personale (L1–L5)",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare",
+    schema: "v97 (solo il riquadro di sistema «Il mio lavoro»: si crea da solo alla prima pagina, nessuna tabella nuova)",
+    riassunto: "Chi gestisce qualcosa (ufficio didattico, protocollo, referenti dei consigli, convenzioni di tesi, tutorato, convenzioni FSL, assistenza, gestori) trova nella <strong>propria area personale</strong> una tessera per ogni postazione, con il <strong>numero delle cose che aspettano</strong> e i pulsanti sulla vista giusta («Da assegnare», «Assegnate a me», «Da prendere»…). Le azioni si fanno nelle stesse pagine di prima (stessi permessi, stesso registro operazioni); nel pannello c'è ora il pulsante <strong>«Area personale»</strong> per tornare. La tessera compare solo a chi ha almeno una postazione; l'amministratore la accende, sposta o spegne da Gestione del portale → Area personale.",
+    passi: [["L1", "Censimento di azioni, permessi e numeri"], ["L2", "Regole delle postazioni (senza database) e prove"], ["L3", "Riquadro «Il mio lavoro»"], ["L4", "Pulsante «Area personale» nel pannello, pratiche da protocollare"], ["L5", "Prove, mappe e guida"]],
+    cartelle: [
+      { cartella: "inc/area/", file: [
+        ["inc/area/lavoro.php", "nuovo", "L3", "il riquadro: permessi, numeri e una tessera per postazione"]
+      ]},
+      { cartella: "src/Portale/", file: [
+        ["src/Portale/Area/PostazioniLavoro.php", "nuovo", "L2", "le regole: chi vede quale postazione, con numeri e pulsanti"],
+        ["src/Portale/Area/CatalogoRiquadri.php", "mod", "L3", "riquadro di sistema «lavoro» (profili docente, Direttore, personale, gestore, amministratore)"],
+        ["src/Portale/CoseDaFare.php", "mod", "L4", "pratiche da protocollare"],
+        ["src/Portale/GuidePerRuolo.php", "mod", "L5", "la guida per ruolo accenna a «Il mio lavoro»"]
+      ]},
+      { cartella: "src/Core/Schema/ e admin/", file: [
+        ["src/Core/Schema/Migrazioni.php", "mod", "L3", "versione 97: semina del nuovo riquadro"],
+        ["admin/admin_header.php", "mod", "L4", "pulsante «Area personale» nella barra in alto"]
+      ]}
+    ],
+    dopo: [
+      "Apri una pagina del sito: lo schema v97 aggiunge da solo il riquadro «Il mio lavoro» (i riquadri che hai già spento o cambiato non si toccano).",
+      "Entra come una persona dell'ufficio (o usa «Vedi come» da amministratore): nel cruscotto compaiono le tessere con i numeri. Da <strong>Gestione del portale → Area personale</strong> puoi spostare, spegnere o limitare a un profilo il riquadro.",
+      "Se vuoi, dimmi quali tre azioni i colleghi fanno più spesso: le portiamo dentro la tessera (Fase 2: «Prendi in carico», «Approva» senza aprire la pagina)."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
+    commit: "Il mio lavoro: nell'area personale una tessera per ogni postazione di chi gestisce (pratiche, protocollo, sedute, convenzioni, tutorato, assistenza, aree) con i numeri; pulsante «Area personale» nel pannello (schema v97)"
   }
 ];
 
 var PROSSIMI = [
+  ["L6 · Il mio lavoro: azioni brevi dalla tessera (Prendi in carico, Approva)", "da decidere dopo l'uso: servono le tre azioni più frequenti dei colleghi"],
   ["H2 · Notifiche push a finestrella su Windows (operatori, poi studenti ed esterni)", "fatto in locale: vedi Pacchetto 35 (da provare sul PC con il pulsante «Prova»)"],
   ["H3 · Didacticus, il bot a regole (base di conoscenza gestita dal pannello, passaggio all'operatore)", "fatto in locale: vedi Pacchetto 36. Da fare tu: rileggere le 23 voci di partenza e aggiungere le tue (orari, contatti, moduli come allegato)"],
     ["F11 · Verbali pubblici: sola visualizzazione e download con le credenziali di Ateneo", "fatto in locale (schema v80): vedi il piano (F11). File: verbali.php, admin/didattica_accessi.php, admin/didattica_sedute.php, src/Didattica/ServizioVerbaliPubblici.php, src/Didattica/AccessoVerbaliRepository.php, src/Uffici/*, src/Core/Schema/*, assets/vendor/cdnjs/ajax/libs/pdf.js/ (nuova cartella: 2 file)"],

@@ -30,6 +30,13 @@ final class CoseDaFare
         return ['n' => (int) ($r['n'] ?? 0), 'giorni' => max(0, (int) ($r['giorni'] ?? 0))];
     }
 
+    /** Pratiche aperte che si trovano in un ufficio di tipo «protocollo» (da registrare). */
+    public function praticheDaProtocollare(): int
+    {
+        return (int) $this->db->valore("SELECT COUNT(*) FROM pratiche p JOIN uffici u ON u.id = p.ufficio_id
+            WHERE u.tipo = 'protocollo' AND p.stato NOT IN ('bozza', 'integrazione', 'accolta', 'respinta', 'chiusa')");
+    }
+
     /**
      * Verbali inviati alla firma e non ancora firmati da tutti.
      *
