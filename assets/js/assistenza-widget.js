@@ -1,4 +1,4 @@
-/* assistenza-widget.js - Il pulsante «Serve aiuto?» in basso a destra su tutte le pagine pubbliche: apre la chat di assistenza in una finestrella
+/* assistenza-widget.js - Il pulsante di Didacticus (il gufo, con la nuvoletta «Chiedi a Didacticus») in basso a destra su tutte le pagine pubbliche: apre la chat di assistenza in una finestrella
    (la pagina assistenza.php?pannello=1 dentro un iframe della stessa origine). Se c'è una risposta da leggere compare un pallino rosso.
    Gli esterni ritrovano la loro chat grazie al link personale ricordato dal browser (localStorage, facoltativo). */
 (function () {
@@ -18,10 +18,19 @@
     var stile = document.createElement('style');
     stile.textContent =
         '#assistenza-widget{position:fixed;right:16px;bottom:16px;z-index:2000;font-family:inherit}' +
-        '#assistenza-widget .aw-btn{display:flex;align-items:center;gap:8px;border:0;border-radius:28px;background:#B30000;color:#fff;font-weight:700;padding:12px 18px;box-shadow:0 4px 14px rgba(0,0,0,.3);cursor:pointer;font-size:1rem}' +
-        '#assistenza-widget .aw-btn:hover,#assistenza-widget .aw-btn:focus{background:#8a0000;outline:3px solid #ffbf47;outline-offset:2px}' +
+        '#assistenza-widget .aw-btn{position:relative;display:block;width:64px;height:64px;padding:0;border:3px solid #fff;border-radius:50%;background:#B30000;box-shadow:0 4px 14px rgba(0,0,0,.35);cursor:pointer;overflow:visible}' +
+        '#assistenza-widget .aw-btn img{display:block;width:100%;height:100%;border-radius:50%;object-fit:cover}' +
+        '#assistenza-widget .aw-btn i.aw-ripiego{color:#fff;font-size:1.6rem;line-height:58px}' +
+        '#assistenza-widget .aw-btn:hover,#assistenza-widget .aw-btn:focus{outline:3px solid #ffbf47;outline-offset:2px}' +
+        '#assistenza-widget .aw-nuvola{position:absolute;right:78px;bottom:10px;display:none;align-items:center;gap:6px;width:max-content;max-width:230px;background:#fff;color:#1f2937;border:1px solid #cbd5e1;border-radius:14px;padding:9px 8px 9px 14px;box-shadow:0 4px 14px rgba(0,0,0,.25);font-size:.95rem;line-height:1.25}' +
+        '#assistenza-widget .aw-nuvola.visibile{display:flex}' +
+        '#assistenza-widget .aw-nuvola:after{content:"";position:absolute;right:-8px;bottom:16px;width:14px;height:14px;background:#fff;border-right:1px solid #cbd5e1;border-top:1px solid #cbd5e1;transform:rotate(45deg)}' +
+        '#assistenza-widget .aw-nuvola-testo{background:none;border:0;padding:0;text-align:left;color:inherit;font:inherit;cursor:pointer}' +
+        '#assistenza-widget .aw-nuvola-testo b{display:block;color:#B30000}' +
+        '#assistenza-widget .aw-nuvola-x{background:none;border:0;color:#64748b;font-size:1.1rem;line-height:1;cursor:pointer;padding:2px 6px;border-radius:6px;align-self:flex-start}' +
+        '#assistenza-widget .aw-nuvola-x:hover,#assistenza-widget .aw-nuvola-x:focus{background:#e2e8f0;outline:2px solid #ffbf47}' +
         '#assistenza-widget .aw-pallino{position:absolute;top:-4px;right:-2px;min-width:20px;height:20px;border-radius:10px;background:#ffbf47;color:#000;border:2px solid #fff;font-size:.7rem;line-height:16px;text-align:center;font-weight:700;padding:0 4px}' +
-        '#assistenza-widget .aw-pannello{position:absolute;right:0;bottom:64px;width:400px;max-width:calc(100vw - 32px);height:640px;max-height:calc(100vh - 160px);background:#fff;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.35);overflow:hidden;display:none;flex-direction:column;border:1px solid #cbd5e1}' +
+        '#assistenza-widget .aw-pannello{position:absolute;right:0;bottom:78px;width:400px;max-width:calc(100vw - 32px);height:640px;max-height:calc(100vh - 160px);background:#fff;border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.35);overflow:hidden;display:none;flex-direction:column;border:1px solid #cbd5e1}' +
         '#assistenza-widget.aperto .aw-pannello{display:flex}' +
         '#assistenza-widget.grande .aw-pannello{width:760px;max-width:calc(100vw - 32px);height:calc(100vh - 160px);max-height:none}' +
         '#assistenza-widget .aw-azioni{display:flex;align-items:center;gap:2px}' +
@@ -29,8 +38,8 @@
         '#assistenza-widget .aw-chiudi,#assistenza-widget .aw-icona{background:transparent;border:0;color:#fff;font-size:1.3rem;line-height:1;cursor:pointer;padding:4px 7px;border-radius:6px}' +
         '#assistenza-widget .aw-icona{font-size:1rem}#assistenza-widget .aw-chiudi:hover,#assistenza-widget .aw-icona:hover,#assistenza-widget .aw-chiudi:focus,#assistenza-widget .aw-icona:focus{background:rgba(255,255,255,.2);outline:2px solid #ffbf47}' +
         '#assistenza-widget iframe{border:0;width:100%;flex:1}' +
-        '@media (max-width:575px){#assistenza-widget .aw-pannello{position:fixed;right:8px;left:8px;bottom:76px;width:auto;max-width:none;height:calc(100vh - 160px)}#assistenza-widget .aw-btn span.aw-testo{display:none}#assistenza-widget .aw-btn{padding:14px}}' +
-        '@media (prefers-reduced-motion:no-preference){#assistenza-widget .aw-pannello{animation:aw-su .15s ease-out}@keyframes aw-su{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}}';
+        '@media (max-width:575px){#assistenza-widget .aw-pannello{position:fixed;right:8px;left:8px;bottom:90px;width:auto;max-width:none;height:calc(100vh - 170px)}#assistenza-widget .aw-nuvola{max-width:170px;font-size:.9rem}}' +
+        '@media (prefers-reduced-motion:no-preference){#assistenza-widget .aw-pannello{animation:aw-su .15s ease-out}@keyframes aw-su{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}#assistenza-widget .aw-nuvola.visibile{animation:aw-su .25s ease-out}}';
     document.head.appendChild(stile);
 
     var w = document.createElement('div');
@@ -40,12 +49,27 @@
         '<span class="aw-azioni"><button type="button" class="aw-icona aw-grande" aria-label="Ingrandisci la finestra" title="Ingrandisci"><i class="fa fa-expand" aria-hidden="true"></i></button>' +
         '<button type="button" class="aw-icona aw-popup" aria-label="Apri la chat in una finestra separata" title="Apri in una finestra"><i class="fa fa-up-right-from-square" aria-hidden="true"></i></button>' +
         '<button type="button" class="aw-chiudi" aria-label="Chiudi la finestra dell\'assistenza">&times;</button></span></div></div>' +
-        '<button type="button" class="aw-btn" aria-expanded="false" aria-controls="aw-pannello"><i class="fa fa-headset" aria-hidden="true"></i><span class="aw-testa-testo aw-testo">Serve aiuto?</span><span class="aw-pallino" hidden></span></button>';
+        '<div class="aw-nuvola" id="aw-nuvola"><button type="button" class="aw-nuvola-testo"><b>Chiedi a Didacticus</b>Ti rispondo subito</button><button type="button" class="aw-nuvola-x" aria-label="Nascondi il suggerimento">&times;</button></div>' +
+        '<button type="button" class="aw-btn" aria-expanded="false" aria-controls="aw-pannello" aria-label="Chiedi a Didacticus: apri la chat di assistenza" title="Chiedi a Didacticus"><img src="' + BASE + 'didacticus_file.php?avatar=1" alt="" width="58" height="58"><span class="aw-pallino" hidden></span></button>';
     document.body.appendChild(w);
 
-    var btn = w.querySelector('.aw-btn'), pannello = w.querySelector('.aw-pannello'), pallino = w.querySelector('.aw-pallino'), iframe = null;
+    var nuvola = w.querySelector('.aw-nuvola'), btn = w.querySelector('.aw-btn'), pannello = w.querySelector('.aw-pannello'), pallino = w.querySelector('.aw-pallino'), iframe = null;
+
+    // Se l'immagine di Didacticus non si carica resta l'icona delle cuffie
+    var img = btn.querySelector('img');
+    img.addEventListener('error', function () { var i = document.createElement('i'); i.className = 'fa fa-headset aw-ripiego'; i.setAttribute('aria-hidden', 'true'); btn.replaceChild(i, img); });
+
+    // La nuvoletta «Chiedi a Didacticus»: compare dopo un istante, sparisce da sola dopo 12 secondi e non torna nella stessa visita se la chiudi o apri la chat
+    function nuvolaVista() { try { return sessionStorage.getItem('assistenza_nuvola') === '1'; } catch (e) { return false; } }
+    function nuvolaSpegni() { nuvola.classList.remove('visibile'); try { sessionStorage.setItem('assistenza_nuvola', '1'); } catch (e) {} }
+    if (!nuvolaVista()) {
+        setTimeout(function () { if (!w.classList.contains('aperto') && !nuvolaVista()) { nuvola.classList.add('visibile'); setTimeout(nuvolaSpegni, 12000); } }, 1800);
+    }
+    nuvola.querySelector('.aw-nuvola-x').addEventListener('click', nuvolaSpegni);
+    nuvola.querySelector('.aw-nuvola-testo').addEventListener('click', function () { nuvolaSpegni(); apri(true); });
 
     function apri(on) {
+        if (on) nuvolaSpegni();
         w.classList.toggle('aperto', on);
         btn.setAttribute('aria-expanded', on ? 'true' : 'false');
         if (on) {
