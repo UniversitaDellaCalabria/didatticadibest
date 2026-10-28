@@ -80,6 +80,23 @@ final class CoseDaFare
     }
 
     /**
+     * Iscrizioni agli eventi che aspettano l'approvazione, per area.
+     *
+     * @param list<int> $areeIds
+     * @return array<int, int>
+     */
+    public function iscrizioniDaApprovare(array $areeIds): array
+    {
+        if (!$areeIds) {
+            return [];
+        }
+        $righe = $this->db->righe("SELECT e.pagina_id AS area, COUNT(*) AS n FROM prenotazioni p JOIN turni t ON p.turno_id = t.id JOIN eventi e ON t.evento_id = e.id
+            WHERE e.archiviato = 0 AND p.stato = 'da_approvare' AND e.pagina_id IN (" . implode(',', array_map('intval', $areeIds)) . ') GROUP BY e.pagina_id');
+
+        return $this->perArea($righe);
+    }
+
+    /**
      * Prenotazioni di aule e laboratori da approvare (ancora non finite), per area.
      *
      * @param list<int> $areeIds

@@ -39,6 +39,27 @@ if ($lav_perm['assistenza']) $lav_conta('assistenza', function () use (&$lav_num
     $c = $lav_app->get(\App\Assistenza\ServizioAssistenza::class)->contatori($lav_uid);
     $lav_num['assistenza_prendere'] = (int)$c['da_prendere']; $lav_num['assistenza_mie'] = (int)$c['mie'];
 });
-foreach (\App\Portale\Area\PostazioniLavoro::elenco($lav_perm, $lav_num) as $lav_p) {
+// Le aree (eventi, progetti, aule) che la persona gestisce, con i numeri: iscrizioni da approvare, messaggi da leggere, prenotazioni da approvare.
+// L'amministratore ha tutte le aree: gli si mostrano solo quelle con qualcosa da guardare (il resto sta in «Gestione del portale»).
+$lav_aree = [];
+if ($lav_perm['aree']) $lav_conta('aree', function () use (&$lav_aree, $lav_app, $lav_cose, $lav_uid, $lav_admin, $conn) {
+    $rows = $lav_app->get(\App\Portale\Area\AreeGestite::class)->perUtente($lav_uid, $lav_admin, $lav_admin ? [] : aree_da_ambiti($conn, $lav_uid));
+    $cal = array_map(fn($a) => (int)$a['id'], array_filter($rows, fn($a) => tipo_area($a) === 'calendario'));
+    $ev = array_values(array_diff(array_map(fn($a) => (int)$a['id'], $rows), $cal));
+    $mess = $lav_cose->messaggiNonLetti($ev); $appr = $lav_cose->iscrizioniDaApprovare($ev); $app_r = $lav_cose->prenotazioniRisorseDaApprovare($cal);
+    $repo = $lav_app->get(\App\Portale\AreeRepository::class);
+    foreach ($rows as $a) {
+        $id = (int)$a['id']; $calendario = in_array($id, $cal, true);
+        $intera = $lav_admin || in_array($lav_uid, ids_gestori_da_campi($a['gestore_utente_id'], $a['gestori_utenti_ids'], $a['permessi_gestori_json']), true) || area_nel_modulo_utente($conn, $lav_uid, $a);
+        $x = $repo->numeriArea($id, $calendario) ?: [];
+        $voce = ['id' => $id, 'titolo' => (string)$a['titolo'], 'colore' => colore_valido($a['colore_primario'] ?? '', '#0056B3'), 'calendario' => $calendario, 'intera' => $intera,
+            'crea_eventi' => $intera || ha_ambito($conn, $lav_uid, 'eventi', $id), 'crea_progetti' => $intera || ha_ambito($conn, $lav_uid, 'progetti', $id),
+            'eventi' => (int)($x['eventi'] ?? 0), 'progetti' => (int)($x['progetti'] ?? 0), 'iscritti' => (int)($x['iscritti'] ?? 0), 'risorse' => (int)($x['risorse'] ?? 0), 'prossime' => (int)($x['prossime'] ?? 0),
+            'messaggi' => $calendario ? 0 : (int)($mess[$id] ?? 0), 'da_approvare' => $calendario ? (int)($app_r[$id] ?? 0) : ($intera ? (int)($appr[$id] ?? 0) : 0)];
+        if ($lav_admin && $voce['messaggi'] + $voce['da_approvare'] === 0) continue;
+        $lav_aree[] = $voce;
+    }
+});
+foreach (\App\Portale\Area\PostazioniLavoro::elenco($lav_perm, $lav_num, $lav_aree) as $lav_p) {
     area_tessera($lav_p['icona'], $lav_p['colore'], $lav_p['titolo'], $lav_p['testo'], $lav_p['href'], $lav_p['novita'], $lav_p['novita_et'], $lav_p['altri']);
 }

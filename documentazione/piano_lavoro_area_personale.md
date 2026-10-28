@@ -29,8 +29,16 @@ Fase 2 (da decidere dopo l'uso): azioni brevi direttamente dalla tessera («Pren
 | L3 | Riquadro «Il mio lavoro» nell'area personale (schema v97) | **fatto** | 28/10/2026 |
 | L4 | Pulsante «Area personale» nel pannello, numero «Pratiche da protocollare» | **fatto** | 28/10/2026 |
 | L5 | Prove, mappe, guida, pacchetto per il server | **fatto** | 28/10/2026 |
-| L6 | Azioni brevi dalla tessera (fase 2) | da decidere | |
+| L6 | Tutte le azioni sulle tessere (pratiche, sedute, tutorato, FSL, convenzioni) | **fatto** | 28/10/2026 |
+| L7 | Tessere delle aree per i gestori: iscritti, presenze, messaggi, sondaggi, statistiche, «Nuovo evento» e «Nuovo progetto» come scorciatoie | **fatto** | 28/10/2026 |
+| L8 | Azioni brevi senza aprire la pagina (Prendi in carico, Approva) | da decidere | |
 
 ## Materiali che servono
 
 Nessuno per le fasi fatte. Per la fase 2: quali azioni i colleghi fanno più spesso (le tre da portare in tessera per prime).
+
+## Decisioni del 28/10/2026 (seconda parte)
+
+- **Ogni tessera elenca tutte le azioni** che la persona può fare (non solo la coda): ogni pulsante apre la pagina del pannello già sulla vista o sul modulo giusto.
+- **Eventi e progetti:** la creazione resta nel pannello (modulo lungo con turni, campi, attestati) ma si raggiunge con «Nuovo evento» e «Nuovo progetto» dalla tessera dell'area, solo a chi può crearli. Le cose che si fanno ogni giorno (iscritti, presenze, scanner, messaggi, sondaggi, statistiche) sono tutte sulla tessera.
+- **Una regola sola per le aree:** `AreeGestite` decide quali aree gestisce una persona e lo usano sia il menu del pannello sia l'area personale. L'amministratore vede una tessera solo per le aree con qualcosa da guardare.

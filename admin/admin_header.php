@@ -101,24 +101,9 @@ if (isset($_POST['del_pagina_completa']) && $is_full_admin) {
 // che la riguarda (tutti i progetti / tutti gli eventi dell'area, attività di Formazione Scuola Lavoro).
 // ==============================================================================
 $aree_ambito = $is_full_admin ? [] : aree_da_ambiti($conn, (int)$u_id_curr);
-$pagine_disponibili = [];
 $abil_repo_h = \App\Core\App::get(\App\Auth\Abilitazioni\AbilitazioniRepository::class);
-
-foreach (\App\Core\App::get(\App\Portale\AreeRepository::class)->tutte() as $p_row) {
-    if ($is_full_admin) {
-        $pagine_disponibili[] = $p_row;
-        continue;
-    }
-    $p_id = (int)$p_row['id'];
-    $has_access = in_array((int)$u_id_curr, ids_gestori_da_campi($p_row['gestore_utente_id'], $p_row['gestori_utenti_ids'], $p_row['permessi_gestori_json']), true)
-               || in_array($p_id, $aree_ambito, true);
-    if (!$has_access) {
-        foreach ($abil_repo_h->gestoriAttivitaArea($p_id) as $e_row) {
-            if (in_array((int)$u_id_curr, ids_gestori_da_campi(0, $e_row['gestori_utenti_ids'], $e_row['permessi_gestori_json']), true)) { $has_access = true; break; }
-        }
-    }
-    if ($has_access) $pagine_disponibili[] = $p_row;
-}
+// Le aree che la persona gestisce: stessa regola dell'area personale («Il mio lavoro»)
+$pagine_disponibili = \App\Core\App::get(\App\Portale\Area\AreeGestite::class)->perUtente((int)$u_id_curr, (bool)$is_full_admin, array_map('intval', $aree_ambito));
 
 $ids_aree_consentite = array_map('intval', array_column($pagine_disponibili, 'id'));
 $filtro_p = isset($_GET['p_id']) ? (int)$_GET['p_id'] : 0;

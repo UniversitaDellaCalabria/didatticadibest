@@ -194,3 +194,18 @@ prova($lav_ok, "il mio lavoro: ogni tessera e ogni pulsante portano a una pagina
 prova(in_array('lavoro', array_keys(CatalogoRiquadri::sistema()), true) && !in_array(Profili::STUDENTE, CatalogoRiquadri::sistema()['lavoro']['profili'], true), "il mio lavoro: è un riquadro di sistema e non lo vedono gli studenti");
 $dopo_lav = (string) file_get_contents(__DIR__ . '/../../../admin/admin_header.php');
 prova(str_contains($dopo_lav, '../area_personale.php'), "il pannello ha il pulsante per tornare all'area personale");
+
+// Tutte le azioni sulle tessere e le tessere delle aree (eventi, iscritti, presenze)
+$az_ap = array_column($lav_adm[0]['altri'], 0);
+prova(in_array('Seguite da me', $az_ap, true) && in_array('Moduli e documenti', $az_ap, true) && in_array('Ricevimento', $az_ap, true) && in_array('Statistiche', $az_ap, true), "il mio lavoro: la tessera delle pratiche ha tutte le azioni (assegnate, seguite, moduli, ricevimento, statistiche)");
+$ar_ap = PostazioniLavoro::elenco(['aree' => true], [], [['id' => 7, 'titolo' => 'OpenLab', 'colore' => '#0056B3', 'calendario' => false, 'intera' => true, 'crea_eventi' => true, 'crea_progetti' => true, 'eventi' => 3, 'progetti' => 1, 'iscritti' => 40, 'messaggi' => 2, 'da_approvare' => 5]]);
+$et_ap = array_column($ar_ap[0]['altri'] ?? [], 0);
+prova(count($ar_ap) === 1 && $ar_ap[0]['chiave'] === 'area_7' && $ar_ap[0]['novita'] === 7 && $ar_ap[0]['testo'] === '3 eventi · 1 progetti · 40 iscritti', "il mio lavoro: il gestore vede una tessera per area con eventi, iscritti e le cose da guardare (2 messaggi + 5 iscrizioni)");
+prova(in_array('Iscritti e presenze', $et_ap, true) && in_array('Scanner presenze', $et_ap, true) && in_array('Messaggi (2)', $et_ap, true) && in_array('Nuovo evento', $et_ap, true) && in_array('Nuovo progetto', $et_ap, true), "il mio lavoro: la tessera dell'area ha iscritti, presenze, messaggi e la scorciatoia per creare eventi e progetti");
+$ar2_ap = PostazioniLavoro::elenco(['aree' => true], [], [['id' => 8, 'titolo' => 'Solo un evento', 'intera' => false, 'eventi' => 1]]);
+prova(!in_array('Nuovo evento', array_column($ar2_ap[0]['altri'], 0), true) && !in_array('Nuovo progetto', array_column($ar2_ap[0]['altri'], 0), true), "il mio lavoro: chi gestisce solo alcune attività non vede «Nuovo evento» né «Nuovo progetto»");
+$ar3_ap = PostazioniLavoro::elenco(['aree' => true], [], [['id' => 9, 'titolo' => 'Aule', 'calendario' => true, 'risorse' => 4, 'prossime' => 6, 'da_approvare' => 2]]);
+prova($ar3_ap[0]['novita'] === 2 && array_column($ar3_ap[0]['altri'], 0) === ['Prenotazioni', 'Risorse e orari'], "il mio lavoro: un'area di aule e laboratori ha prenotazioni da approvare e risorse");
+$ok_ap = true;
+foreach (array_merge($ar_ap, $ar3_ap) as $v_a) foreach ($v_a['altri'] as $a_a) $ok_ap = $ok_ap && is_file(__DIR__ . '/../../../' . strtok($a_a[1], '?'));
+prova($ok_ap, "il mio lavoro: ogni pulsante delle aree porta a una pagina che esiste");
