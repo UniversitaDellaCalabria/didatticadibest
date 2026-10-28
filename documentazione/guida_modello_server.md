@@ -72,3 +72,70 @@ Cancella (o lascia vuoto) `LLM_URL` nel `.env`: Didacticus torna subito a regole
 - Il sito non rallenta (`top` mostra `ollama` sotto il 200%).
 - Le risposte «preparate automaticamente» in **Chat di assistenza → Con Didacticus**: le sbagliate diventano nuove voci in **Didacticus → Domande e risposte**.
 - Se il modello non risponde in 45 secondi o è occupato, la chat riceve la risposta a regole: nel registro degli errori di PHP compaiono righe `[Didacticus] modello …`.
+
+---
+
+# Capire il significato delle domande (embedding) — consigliato
+
+Un piccolo modello (**bge-m3**, circa 1,2 GB) confronta il significato della domanda con quello delle voci. **Non scrive risposte**: mostra sempre il testo delle voci, quindi non può inventare. Nella prova su 20 domande parafrasate trova la voce giusta in 15 casi contro 7 delle sole regole. Funziona anche senza GPU: sul PC di prova ogni domanda richiede qualche decimo di secondo.
+
+## 1. Scaricare il modello
+
+Con Ollama già installato (vedi sopra):
+
+```bash
+ollama pull bge-m3
+```
+
+Prova di velocità sul server (la prima chiamata carica il modello in memoria):
+
+```bash
+time curl -s http://127.0.0.1:11434/api/embed -d '{"model":"bge-m3","input":["posso fare lo stage fuori dall Italia"]}' | head -c 100
+time curl -s http://127.0.0.1:11434/api/embed -d '{"model":"bge-m3","input":["posso fare lo stage fuori dall Italia"]}' | head -c 100
+```
+
+La seconda deve richiedere meno di un secondo. Se anche la seconda è lenta, il server non regge: lascia spento.
+
+## 2. Tenerlo in memoria
+
+Senza istruzioni Ollama scarica il modello dopo 5 minuti di inattività e la prima domanda dopo una pausa deve ricaricarlo (qualche secondo: in quel caso Didacticus risponde a regole). Per tenerlo caricato (circa 1,2 GB di memoria):
+
+```bash
+sudo systemctl edit ollama
+```
+
+e nell'editor:
+
+```ini
+[Service]
+Environment="OLLAMA_KEEP_ALIVE=24h"
+Environment="OLLAMA_MAX_LOADED_MODELS=1"
+```
+
+```bash
+sudo systemctl restart ollama
+```
+
+Se avevi scaricato anche un modello linguistico (llama3.2) puoi toglierlo per liberare spazio: `ollama rm llama3.2:3b`.
+
+## 3. Collegare il portale
+
+Nel `.env` del portale:
+
+```ini
+EMB_URL=http://127.0.0.1:11434
+EMB_MODELLO=bge-m3
+```
+
+Poi **Gestione → Didacticus → Impostazioni → Aggiorna ora** calcola i vettori delle voci (circa 13 secondi per 80 voci sul PC di prova). Da lì in poi si aggiornano da soli ogni notte (cron) solo per le voci nuove o cambiate.
+
+## 4. Controllare
+
+- In **Didacticus → Prova** scrivi una domanda con parole diverse da quelle delle voci: sotto compare la tabella «Le voci più vicine per significato».
+- Soglie (facoltative, nel `.env`): `EMB_SOGLIA=0.62` (da qui risponde direttamente) e `EMB_SOGLIA_SUGGERISCI=0.50` (da qui propone «forse intendevi…»). Se sbaglia troppo alza la prima; se non propone mai niente abbassa la seconda.
+- Se il servizio non risponde, Didacticus torna alle regole senza errori per chi scrive.
+
+## 5. Come spegnere
+
+Cancella `EMB_URL` dal `.env`.
+

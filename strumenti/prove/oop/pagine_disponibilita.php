@@ -19,3 +19,7 @@ prova($r['codice'] === 200 && str_contains($r['corpo'], 'Pagine del sito di Aten
 $r = $http('/eventi/admin/didacticus.php?scheda=pagine', ['azione' => 'pagine_aggiungi', 'indirizzi' => "https://sito-non-ammesso.example.org/x", 'csrf_token' => 'sbagliato'], $jar);
 prova($r['codice'] === 403, "admin/didacticus.php: aggiungere pagine con token CSRF sbagliato è respinto");
 
+$r = $http('/eventi/admin/didacticus.php?scheda=impostazioni', null, $jar);
+prova($r['codice'] === 200 && str_contains($r['corpo'], 'Capire il significato delle domande') && !str_contains($r['corpo'], 'Fatal error'), "admin/didacticus.php: la scheda delle impostazioni mostra il significato delle domande");
+$r = $http('/eventi/admin/didacticus.php?scheda=impostazioni', ['azione' => 'significato_aggiorna', 'csrf_token' => 'sbagliato'], $jar);
+prova($r['codice'] === 403, "admin/didacticus.php: aggiornare il significato con token CSRF sbagliato è respinto");

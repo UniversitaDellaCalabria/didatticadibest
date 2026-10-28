@@ -131,6 +131,11 @@ if ($mesi_as > 0) {
     // Pagine di Ateneo che Didacticus legge come fonti: si rileggono quelle ferme da più di una settimana (di solito poche per volta)
     try { [$pg_ok, $pg_ko] = \App\Core\App::per($conn)->get(\App\Assistenza\Didacticus\ServizioPagine::class)->aggiornaScadute(); if ($pg_ok + $pg_ko > 0) echo "- Pagine di Ateneo per Didacticus: $pg_ok lette, $pg_ko con errore.\n"; }
     catch (\Throwable $e_pg) { echo '- Pagine di Ateneo per Didacticus: errore (' . $e_pg->getMessage() . ")\n"; }
+    // Significato delle voci di Didacticus (embedding): si ricalcolano solo le voci nuove o cambiate; senza EMB_URL non fa nulla
+    try { [$sg_ok, $sg_ko] = \App\Core\App::per($conn)->get(\App\Assistenza\Didacticus\ServizioSignificato::class)->aggiorna(); if ($sg_ok + $sg_ko > 0) echo "- Significato delle voci di Didacticus: $sg_ok calcolate, $sg_ko non calcolate.
+"; }
+    catch (\Throwable $e_sg) { echo '- Significato delle voci di Didacticus: errore (' . $e_sg->getMessage() . ")
+"; }
     try { echo '- Conservazione assistenza: ' . \App\Core\App::per($conn)->get(\App\Assistenza\ConservazioneAssistenza::class)->applica($mesi_as) . " chat ripulite (ferme da più di $mesi_as mesi).\n"; }
     catch (\Throwable $e) { error_log('Cron, conservazione assistenza: ' . $e->getMessage()); }
 }

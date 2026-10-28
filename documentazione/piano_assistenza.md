@@ -64,6 +64,15 @@ Provati in locale Qwen 2.5 3B, **Llama 3.2 3B** e Phi-4-mini sulle stesse 12 dom
 * Informativa privacy: il testo cambia da solo se `LLM_URL` è impostato. Guida per il server: `documentazione/guida_modello_server.md`.
 * Prova a confronto in locale: `php strumenti/locale/prova_didacticus_modello.php --modello=llama3.2:3b`.
 
+### H5 — Didacticus capisce il significato delle domande *(28/10/2026, schema v101)*
+
+Provato in locale con **bge-m3** (embedding, Ollama) su 20 domande scritte con parole diverse da quelle delle voci: 15 voci giuste contro 7 delle sole regole. Il modello non scrive nulla: confronta il significato della domanda con quello di titolo e domande d'esempio di ogni voce; la risposta mostrata è sempre il testo del Dipartimento.
+
+* `Significato` (collegamento a Ollama, spento senza `EMB_URL`), `VettoriRepository` (tabella `didacticus_vettori`), `ServizioSignificato` (calcolo dei vettori per le voci nuove o cambiate, ricerca).
+* In `ServizioDidacticus`: se le regole non sono sicure, la voce più vicina per significato risponde da somiglianza 0,62 (propone «forse intendevi…» da 0,50); se le regole sono sicure ma sotto 75 punti, il significato le corregge da 0,55 e la voce delle regole resta tra i «vedi anche».
+* Pannello: stato e «Aggiorna ora» in Impostazioni, confronto per significato nella Prova. Cron: ricalcolo notturno.
+* Guida: `guida_modello_server.md` (seconda parte).
+
 ---
 
 ## 3. Ordine
@@ -96,5 +105,7 @@ Gli step sono indipendenti: dopo ognuno il portale funziona. H3 richiede H1; H2b
 | H3f | Chat nuova a ogni apertura e storico | **fatto in locale (da caricare)** | 27/10/2026 | Chi ha il login parte sempre da una richiesta nuova (non più dall'ultima chat); le chat rimaste solo con Didacticus si chiudono da sole alla richiesta successiva; una richiesta già in mano all'ufficio continua lì, con avviso e «Riprendila». Storico in `assistenza_storico.php` (+ ultime 3 nell'area personale); la chat aperta si indica con `?c=` (solo le proprie). La finestrella riprende la chat solo nella stessa visita (sessionStorage). |
 
 | H4 | Modello linguistico aperto e pagine di Ateneo | **fatto in locale (da caricare)** | 28/10/2026 | Schema v100; spento di partenza, si accende con `LLM_URL`; guida in `guida_modello_server.md`. |
+
+| H5 | Capire il significato delle domande (embedding) | **fatto in locale (da caricare)** | 28/10/2026 | Schema v101; spento di partenza, si accende con `EMB_URL`; vedi `guida_modello_server.md`. |
 
 **Stati**: `da fare` · `in corso` · `fatto in locale (da caricare)` · `in produzione`.

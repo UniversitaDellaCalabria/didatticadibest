@@ -132,6 +132,10 @@ final class Definizioni
             attiva TINYINT(1) NOT NULL DEFAULT 1, esito VARCHAR(200) NOT NULL DEFAULT '', aggiornata_il DATETIME DEFAULT NULL, creata_il DATETIME DEFAULT NULL,
             UNIQUE KEY uq_url (url)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        // v101: vettori di significato delle voci di Didacticus (embedding), uno per voce, con l'impronta del testo da cui sono stati calcolati
+        'didacticus_vettori' => "CREATE TABLE IF NOT EXISTS didacticus_vettori (
+            voce_id INT NOT NULL PRIMARY KEY, impronta CHAR(32) NOT NULL, vettore MEDIUMTEXT NOT NULL, aggiornato_il DATETIME DEFAULT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         // v23: abilitazioni date a chi non ha ancora fatto il primo accesso: si attivano al login con quell'email
         'abilitazioni_attesa' => "CREATE TABLE IF NOT EXISTS abilitazioni_attesa (
             id INT AUTO_INCREMENT PRIMARY KEY, email VARCHAR(150) NOT NULL, persona_id VARCHAR(80) DEFAULT NULL, nominativo VARCHAR(200) DEFAULT '',

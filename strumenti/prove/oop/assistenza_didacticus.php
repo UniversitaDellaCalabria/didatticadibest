@@ -372,6 +372,50 @@ prova($pag_rep->conTesto() === [], "pagine di Ateneo: in pausa non è più una f
 $pag_rep->elimina($id_pg1);
 $conn->query("DELETE FROM didacticus_pagine");
 
+// Significato delle domande (embedding): spento senza EMB_URL, vettori compressi, somiglianza; con il servizio vero (se risponde) trova le voci per significato
+use App\Assistenza\Didacticus\Significato;
+use App\Assistenza\Didacticus\ServizioSignificato;
+use App\Assistenza\Didacticus\VettoriRepository;
+$sig_spento = new Significato('', null, null);
+prova(!$sig_spento->attivo() && $sig_spento->incorpora(['ciao']) === null && (new Significato('http://127.0.0.1:1', 'm', 2))->attivo(), "significato: spento senza EMB_URL, non chiama nessun servizio");
+prova((new Significato('http://x', null, null))->nome() === 'bge-m3' && (new Significato('http://x', null, null))->sogliaSuggerimento() < (new Significato('http://x', null, null))->sogliaRisposta(), "significato: modello e soglie di partenza, la soglia dei suggerimenti sta sotto quella delle risposte");
+$vet_p = [0.5, -0.25, 1.0, 0.0];
+$ripreso = Significato::espandi(Significato::comprimi($vet_p));
+prova(count($ripreso) === 4 && abs($ripreso[0] - 0.5) < 1e-6 && abs($ripreso[1] + 0.25) < 1e-6 && Significato::espandi('non base64 !!') === [] && Significato::espandi('') === [], "significato: il vettore si conserva come testo e si rilegge uguale");
+prova(abs(Significato::coseno([1, 0], [1, 0]) - 1.0) < 1e-9 && abs(Significato::coseno([1, 0], [0, 1])) < 1e-9 && Significato::coseno([0, 0], [1, 1]) === 0.0, "significato: la somiglianza vale 1 per frasi uguali, 0 per frasi senza nulla in comune");
+$voce_a = ['titolo' => 'Prova', 'domande' => 'una domanda'];
+prova($sig_spento->impronta($voce_a) === $sig_spento->impronta($voce_a) && $sig_spento->impronta($voce_a) !== $sig_spento->impronta(array_merge($voce_a, ['titolo' => 'Altra'])) && $sig_spento->impronta($voce_a) !== (new Significato('', 'altro-modello', null))->impronta($voce_a), "significato: l'impronta cambia se cambiano il testo della voce o il modello");
+$srv_sig_spento = new ServizioSignificato($sig_spento, $voci_rep, $cont_di->get(VettoriRepository::class));
+prova($srv_sig_spento->aggiorna() === [0, 0] && $srv_sig_spento->cerca('tirocinio', []) === null, "significato: senza servizio non calcola nulla e non propone voci");
+$url_emb = 'http://127.0.0.1:11434';
+$sig_vero = new Significato($url_emb, 'bge-m3', 20);
+$vive = ($sig_vero->incorpora(['prova']) ?? null) !== null;
+if (!$vive) {
+    echo "  (saltate le prove con il servizio di significato: Ollama con bge-m3 non risponde su $url_emb)\n";
+} else {
+    $csv_sg = "Argomento;Titolo;Domande;Parole chiave;Risposta;Link\r\ntirocini;PROVA SIGNIFICATO tirocinio all'estero;\"Posso fare il tirocinio all'estero\nStage in un altro paese\";;Si passa dai bandi di mobilità.;\r\ncertificati;PROVA SIGNIFICATO certificato;Come richiedo un certificato di iscrizione;;Si chiede con uniTicket.;\r\n";
+    $voci_rep->importaCsv($csv_sg, date('Y-m-d H:i:s'));
+    $vettori_rep = $cont_di->get(VettoriRepository::class);
+    $conn->query("DELETE FROM didacticus_vettori");
+    $srv_sig = new ServizioSignificato($sig_vero, $voci_rep, $vettori_rep);
+    $st0 = $srv_sig->stato();
+    [$ok_s, $ko_s] = $srv_sig->aggiorna();
+    $st1 = $srv_sig->stato();
+    prova($ok_s >= 2 && $ko_s === 0 && $st0['pronte'] === 0 && $st1['pronte'] === $st1['voci'], "significato: il calcolo dei vettori copre tutte le voci attive (" . $st1['pronte'] . " su " . $st1['voci'] . ")");
+    prova($srv_sig->aggiorna() === [0, 0], "significato: un secondo calcolo non rifà le voci già pronte");
+    $voci_att = $voci_rep->attive();
+    $trov = $srv_sig->cerca("voglio andare a fare uno stage fuori dall'Italia", $voci_att);
+    prova(is_array($trov) && stripos((string) $trov[0]['voce']['titolo'], 'estero') !== false && $trov[0]['somiglianza'] >= $trov[1]['somiglianza'], "significato: «stage fuori dall'Italia» trova la voce sul tirocinio all'estero senza parole in comune");
+    $did_sg = new ServizioDidacticus($voci_rep, $cont_di->get(ImpostazioniDidacticus::class), null, null, $srv_sig);
+    $r_sg = $did_sg->risposta("posso andare a fare lo stage in un altro paese?", null, true);
+    prova(in_array($r_sg['tipo'], ['risposta', 'suggerimenti'], true) && $r_sg['tipo'] !== 'nessuna', "significato: Didacticus non resta senza risposta su una domanda parafrasata (" . $r_sg['tipo'] . ")");
+    $r_sg2 = $did_sg->risposta("come cucino la pasta al forno con le melanzane", null, true);
+    prova($r_sg2['tipo'] === 'nessuna', "significato: una domanda fuori tema non trova nessuna voce (" . $r_sg2['tipo'] . ")");
+    $p_sg = $did_sg->prova("stage in un altro paese", null);
+    prova(!empty($p_sg['significato']) && count($p_sg['significato']) <= 5, "significato: la prova del pannello mostra le voci più vicine per significato");
+    $conn->query("DELETE FROM didacticus_vettori");
+}
+
 $conn->rollback(); // le prove non lasciano le voci importate nella base di prova
 
 foreach (["DELETE FROM didacticus_mancate", "DELETE FROM assistenza_messaggi", "DELETE FROM assistenza_conversazioni", "DELETE FROM uffici_persone WHERE email = 'op-d989@example.org'", "DELETE FROM utenti WHERE id BETWEEN 98931 AND 98949", "UPDATE impostazioni_sistema SET didacticus_attivo = 0 WHERE id = 1"] as $sql) $q($sql);

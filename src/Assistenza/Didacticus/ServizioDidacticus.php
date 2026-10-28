@@ -19,6 +19,10 @@ final class ServizioDidacticus
     private const MARGINE_SUGGERIMENTI = 12;
     /** Una seconda voce si affianca alla prima («vedi anche») se ha almeno questo punteggio. */
     private const MARGINE_ALTRE = 8;
+    /** Da questo punteggio le regole si fidano di sé: sotto, il significato della domanda può indicare un'altra voce. */
+    private const PUNTEGGIO_SICURO = 75;
+    /** Quanto sotto la soglia di risposta può stare la somiglianza per correggere una scelta incerta delle regole. */
+    private const MARGINE_SOSTITUZIONE = 0.07;
 
     /** Punteggio minimo perché una voce vicina sia data come fonte al modello linguistico (se c'è). */
     private const PUNTEGGIO_FONTE = 15;
@@ -27,7 +31,7 @@ final class ServizioDidacticus
     /** In fondo alle risposte scritte dal modello linguistico: dice che sono automatiche e vanno controllate. */
     public const AVVISO_GENERATA = "\n\n**Risposta preparata automaticamente.** Controlla i dati sulle pagine indicate oppure parla con un operatore.";
 
-    public function __construct(private VociRepository $voci, private ImpostazioniDidacticus $impostazioni, private ?ModelloLinguistico $modello = null, private ?PagineRepository $pagine = null)
+    public function __construct(private VociRepository $voci, private ImpostazioniDidacticus $impostazioni, private ?ModelloLinguistico $modello = null, private ?PagineRepository $pagine = null, private ?ServizioSignificato $significato = null)
     {
     }
 
@@ -69,6 +73,33 @@ final class ServizioDidacticus
         $migliore = $classifica[0] ?? null;
 
         $sicura = $migliore !== null && $migliore['punteggio'] >= $soglia && ((int) $migliore['voce']['solo_login'] === 0 || $conLogin);
+        // Il significato della domanda (embedding): se le regole non sono sicure, cerca la voce per somiglianza di significato; se è molto simile la sceglie,
+        // se lo è abbastanza la propone come «forse intendevi…». Mostra sempre il testo scritto dal Dipartimento.
+        // Se le regole sono sicure ma non troppo (punteggio sotto PUNTEGGIO_SICURO) e il significato indica un'altra voce, vince il significato e la voce delle regole
+        // resta tra i «vedi anche».
+        $vicineSignificato = [];
+        $dubbia = $sicura && $migliore['punteggio'] < self::PUNTEGGIO_SICURO;
+        if ((!$sicura || $dubbia) && $this->significato !== null && $this->significato->attivo()) {
+            $trovate = $this->significato->cerca($domanda, $voci, $argomento);
+            if ($trovate) {
+                $sig = $this->significato->significato();
+                $minimo = $dubbia ? $sig->sogliaRisposta() - self::MARGINE_SOSTITUZIONE : $sig->sogliaRisposta();
+                if ($dubbia && (int) $trovate[0]['voce']['id'] === (int) $migliore['voce']['id']) {
+                    // le due strade sono d'accordo: nessun cambiamento
+                } elseif ($trovate[0]['somiglianza'] >= $minimo) {
+                    $scelta = ['voce' => $trovate[0]['voce'], 'punteggio' => max($soglia, (int) ($migliore['punteggio'] ?? 0)), 'corrispondenze' => ['significato']];
+                    $classifica = array_merge([$scelta], array_values(array_filter($classifica, static fn (array $c): bool => (int) $c['voce']['id'] !== (int) $scelta['voce']['id'])));
+                    $migliore = $classifica[0];
+                    $sicura = (int) $migliore['voce']['solo_login'] === 0 || $conLogin;
+                } elseif (!$dubbia) {
+                    foreach (array_slice($trovate, 0, 3) as $t) {
+                        if ($t['somiglianza'] >= $sig->sogliaSuggerimento() && ((int) $t['voce']['solo_login'] === 0 || $conLogin)) {
+                            $vicineSignificato[] = ['t' => (string) $t['voce']['titolo'], 'v' => (int) $t['voce']['id']];
+                        }
+                    }
+                }
+            }
+        }
         if ($this->modello !== null && $this->modello->attivo() && (!$sicura || $this->modello->modalita() === ModelloLinguistico::MODALITA_SEMPRE)) {
             $g = $this->generata($domanda, $classifica, $conLogin);
             if ($g !== null) {
@@ -90,9 +121,9 @@ final class ServizioDidacticus
 
             return $this->daVoce($migliore['voce'], $altre);
         }
-        $vicine = [];
+        $vicine = $vicineSignificato;
         foreach (array_slice($classifica, 0, 3) as $c) {
-            if ($c['punteggio'] >= $soglia - self::MARGINE_SUGGERIMENTI && ((int) $c['voce']['solo_login'] === 0 || $conLogin)) {
+            if (count($vicine) < 3 && $c['punteggio'] >= $soglia - self::MARGINE_SUGGERIMENTI && ((int) $c['voce']['solo_login'] === 0 || $conLogin) && !in_array((int) $c['voce']['id'], array_column($vicine, 'v'), true)) {
                 $vicine[] = ['t' => (string) $c['voce']['titolo'], 'v' => (int) $c['voce']['id']];
             }
         }
@@ -263,8 +294,30 @@ final class ServizioDidacticus
                 : ($cl && $cl[0]['punteggio'] >= $imp['soglia'] - self::MARGINE_SUGGERIMENTI ? self::esito('suggerimenti', 'Proporrebbe queste voci come «forse intendevi…».') : self::esito('nessuna', 'Non saprebbe rispondere (la domanda finirebbe tra quelle senza risposta).'));
         }
 
+        // Il significato (embedding): stesse regole di risposta(), per mostrarlo nella prova del pannello
+        $sign = [];
+        if ($this->significato !== null && $this->significato->attivo()) {
+            $attive = array_values(array_filter($voci, static fn (array $v): bool => (int) $v['attiva'] === 1));
+            $trovate = $this->significato->cerca($domanda, $attive, $argomento);
+            if ($trovate) {
+                $sg = $this->significato->significato();
+                foreach (array_slice($trovate, 0, 5) as $t) {
+                    $sign[] = ['id' => (int) $t['voce']['id'], 'titolo' => (string) $t['voce']['titolo'], 'somiglianza' => round($t['somiglianza'], 3)];
+                }
+                $regoleSicure = $cl && $cl[0]['punteggio'] >= $imp['soglia'];
+                $dubbia = $regoleSicure && $cl[0]['punteggio'] < self::PUNTEGGIO_SICURO && (int) $cl[0]['voce']['id'] !== (int) $trovate[0]['voce']['id'];
+                if (!in_array($r['tipo'], ['operatore', 'saluto'], true) && (!$regoleSicure || $dubbia)) {
+                    if ($trovate[0]['somiglianza'] >= $sg->sogliaRisposta() - ($dubbia ? self::MARGINE_SOSTITUZIONE : 0.0)) {
+                        $r = self::esito('risposta', (string) $trovate[0]['voce']['risposta']);
+                    } elseif (!$dubbia && $trovate[0]['somiglianza'] >= $sg->sogliaSuggerimento()) {
+                        $r = self::esito('suggerimenti', 'Proporrebbe queste voci come «forse intendevi…».');
+                    }
+                }
+            }
+        }
+
         return [
-            'tipo' => $r['tipo'], 'testo' => $r['testo'], 'soglia' => $imp['soglia'],
+            'tipo' => $r['tipo'], 'testo' => $r['testo'], 'soglia' => $imp['soglia'], 'significato' => $sign,
             'classifica' => array_map(static fn (array $c): array => ['id' => (int) $c['voce']['id'], 'titolo' => (string) $c['voce']['titolo'], 'punteggio' => $c['punteggio'], 'corrispondenze' => $c['corrispondenze'], 'attiva' => true], array_slice($cl, 0, 5)),
         ];
     }

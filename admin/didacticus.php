@@ -19,9 +19,11 @@ use App\Assistenza\Didacticus\VociRepository;
 use App\Assistenza\Didacticus\PagineRepository;
 use App\Assistenza\Didacticus\ModelloLinguistico;
 use App\Assistenza\Didacticus\ServizioPagine;
+use App\Assistenza\Didacticus\ServizioSignificato;
 
 $app_d = \App\Core\App::per($conn);
 $voci_rep = $app_d->get(VociRepository::class);
+$sig_srv = $app_d->get(ServizioSignificato::class);
 $manc_rep = $app_d->get(MancateRepository::class);
 $arg_rep = $app_d->get(\App\Assistenza\Didacticus\ArgomentiRepository::class);
 $imp_rep = $app_d->get(ImpostazioniDidacticus::class);
@@ -153,6 +155,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         registra_log_audit($conn, 'Impostazioni di Didacticus modificate', ['Attivo' => !empty($_POST['attivo']) ? 'sì' : 'no', 'Soglia' => (int)($_POST['soglia'] ?? 0)]);
         flash_set('✅ Impostazioni salvate.' . $msg_av, $msg_av ? 'warning' : 'success');
+        $redirect_d('scheda=impostazioni');
+    }
+    if ($azione === 'significato_aggiorna') {
+        [$ok_sg, $ko_sg] = $app_d->get(ServizioSignificato::class)->aggiorna();
+        flash_set($ko_sg ? "Significato: $ok_sg voci calcolate, $ko_sg non calcolate (il servizio non ha risposto: controlla EMB_URL e che il modello sia scaricato)." : ($ok_sg ? "✅ Significato calcolato per $ok_sg voci." : 'Tutte le voci erano già aggiornate.'), $ko_sg ? 'warning' : 'success');
         $redirect_d('scheda=impostazioni');
     }
     if (in_array($azione, ['pagine_aggiungi', 'pagina_aggiorna', 'pagine_aggiorna_tutte', 'pagina_attiva', 'pagina_elimina'], true)) {
@@ -395,9 +402,25 @@ $schede_d = ['voci' => ['Domande e risposte', 'fa-book-open'], 'argomenti' => ['
                 <td><div class="progress" role="progressbar" aria-valuenow="<?php echo $c_p['punteggio']; ?>" aria-valuemin="0" aria-valuemax="100" style="height:18px;"><div class="progress-bar <?php echo $c_p['punteggio'] >= $esito_prova['soglia'] ? 'bg-success' : 'bg-secondary'; ?>" style="width:<?php echo (int)$c_p['punteggio']; ?>%"><?php echo (int)$c_p['punteggio']; ?></div></div></td>
                 <td class="small text-secondary"><?php echo $h(implode(', ', $c_p['corrispondenze'])); ?></td></tr>
         <?php endforeach; ?></tbody></table></div>
+    <?php if (!empty($esito_prova['significato'])): ?>
+    <div class="card border-0 shadow-sm mt-3"><div class="card-header fw-bold bg-white">Le voci più vicine per significato <span class="small text-secondary fw-normal">(risponde da <?php echo $h(number_format($sig_srv->significato()->sogliaRisposta(), 2, ',', '')); ?>, propone da <?php echo $h(number_format($sig_srv->significato()->sogliaSuggerimento(), 2, ',', '')); ?>)</span></div><table class="table mb-0 align-middle"><tbody>
+        <?php foreach ($esito_prova['significato'] as $s_p): ?>
+            <tr><td class="ps-3"><a href="<?php echo $h($url_scheda('voci', '&voce=' . $s_p['id'])); ?>"><?php echo $h($s_p['titolo']); ?></a></td><td class="text-end pe-3"><?php echo $h(number_format($s_p['somiglianza'], 2, ',', '')); ?></td></tr>
+        <?php endforeach; ?></tbody></table></div>
+    <?php endif; ?>
 <?php endif; ?>
 
 <?php else: // impostazioni ?>
+<?php $st_sg = $sig_srv->stato(); ?>
+<div class="card border-0 shadow-sm mb-3" style="max-width:820px;"><div class="card-body">
+    <h2 class="h6 fw-bold"><i class="fa fa-brain me-1 text-primary" aria-hidden="true"></i>Capire il significato delle domande</h2>
+    <p class="small text-secondary mb-2">Un piccolo modello che gira sul server dell'Ateneo confronta il significato della domanda con quello delle voci, così «stage fuori dall'Italia» trova «Tirocinio all'estero» anche senza parole in comune. Non scrive risposte: mostra sempre il testo delle voci. Interviene solo quando le regole non sono sicure.</p>
+    <p class="small mb-2"><strong>Servizio:</strong>
+        <?php if ($sig_srv->attivo()): ?><span class="badge bg-success">collegato</span> <?php echo $h($sig_srv->significato()->nome()); ?> · voci pronte: <strong><?php echo $st_sg['pronte']; ?></strong> su <?php echo $st_sg['voci']; ?>
+        <?php else: ?><span class="badge bg-secondary">non collegato</span> <span class="text-secondary">(si collega con EMB_URL nel file .env del server)</span><?php endif; ?></p>
+    <?php if ($sig_srv->attivo()): ?><form method="POST" action="<?php echo $h($url_scheda('impostazioni')); ?>" class="d-inline"><?php csrf_field(); ?><input type="hidden" name="azione" value="significato_aggiorna"><button class="btn btn-sm btn-outline-secondary fw-bold"><i class="fa fa-rotate me-1" aria-hidden="true"></i>Aggiorna ora</button></form>
+    <span class="small text-secondary ms-2">Si aggiorna da solo ogni notte; serve dopo aver cambiato molte voci.</span><?php endif; ?>
+</div></div>
 <form method="POST" enctype="multipart/form-data" action="<?php echo $h($url_scheda('impostazioni')); ?>" class="card border-0 shadow-sm" style="max-width:820px;"><div class="card-body">
     <?php csrf_field(); ?><input type="hidden" name="azione" value="salva_impostazioni">
     <div class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" role="switch" id="i-att" name="attivo" value="1" <?php echo $imp['attivo'] ? 'checked' : ''; ?>><label class="form-check-label fw-bold" for="i-att">Didacticus acceso</label>
