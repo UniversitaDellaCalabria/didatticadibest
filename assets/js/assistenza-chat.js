@@ -111,6 +111,14 @@
             box.appendChild(crea('div', 'small fw-bold text-secondary mt-1 mb-1', extra.argomenti_titolo || 'Oppure scegli un argomento:'));
             ARGOMENTI.forEach(function (a) { box.appendChild(pulsante(a.n, a.i, 'btn-outline-secondary', function () { agisci('bot_argomento', { valore: a.k }); })); });
         }
+        if (extra.corsi_cdl) {
+            box.appendChild(crea('div', 'small fw-bold text-secondary mt-1 mb-1', 'Il tuo corso di laurea:'));
+            extra.corsi_cdl.forEach(function (c) {
+                box.appendChild(pulsante(c, 'fa-graduation-cap', 'btn-outline-secondary text-start', function () { agisci('bot_corso_cdl', { valore: c }); }));
+            });
+            box.appendChild(pulsante('Un altro / non lo so', '', 'btn-outline-secondary', function () { agisci('bot_corso_cdl', { valore: '' }); }));
+            return box;
+        }
         if (extra.uffici) {
             box.appendChild(crea('div', 'small fw-bold text-secondary mt-1 mb-1', 'Scegli l\'ufficio:'));
             extra.uffici.forEach(function (u) {

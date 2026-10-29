@@ -619,8 +619,41 @@ prova($b2r['stato'] === 'nuova' && (int) $b2r['ufficio_id'] === $u_tes, "uffici:
 $srv_d->azioneBot($ricarica($b3), 'ufficio', '0');
 prova($ricarica($b3)['stato'] === 'nuova' && (int) $ricarica($b3)['ufficio_id'] === 0, "uffici: «Assistenza generale» lascia la chat all'Assistenza");
 
+// il corso di laurea sceglie l'ufficio del corso di studio (se nessun ufficio per argomento dichiara l'argomento)
+$q("INSERT INTO didattica_consigli (nome, corsi, attivo, ordine) VALUES ('Consiglio prova d989 Biologia', '[\"Biologia prova d989\",\"Biotecnologie prova d989\"]', 1, 990)");
+$cons_p = (int) $db_di->valore("SELECT id FROM didattica_consigli WHERE nome = 'Consiglio prova d989 Biologia'");
+$q("INSERT INTO uffici (nome, descrizione, ambito, attivo, tipo, consiglio_id, segue_corsi, didacticus, didacticus_argomenti) VALUES ('Ufficio prova CdS d989', '', 'dipartimento', 1, 'cdl', $cons_p, 1, 1, '')");
+$u_cds = (int) $db_di->valore("SELECT id FROM uffici WHERE nome = 'Ufficio prova CdS d989'");
+$q("INSERT INTO uffici_persone (ufficio_id, email, nominativo, ruolo, compiti) VALUES ($u_cds, 'op5-d989@example.org', 'Carla Cds', '', '')");
+$q("INSERT INTO utenti (id, nome, cognome, email, ruolo_id, ruoli_secondari) VALUES (98937, 'Quattro', 'Prova', 'u4-d989@example.org', 3, ''), (98940, 'Sette', 'Prova', 'u7-d989@example.org', 3, '')");
+prova($op_ass->corsiDegliUffici() === ['Biologia prova d989', 'Biotecnologie prova d989'] && $op_ass->ufficioPerCorso('biologia PROVA d989') === $u_cds && $op_ass->ufficioPerCorso('Fisica') === null, "corso: i corsi e l'ufficio del corso di studio vengono dal consiglio a cui è legato");
+$ora_di->t = $ora_di->t->modify('+1 hour');
+[$k1] = $srv_d->apriDaUtente($sx(4), 'altro', 'Voglio parlare con un operatore', null, '10.9.89.141', false, 'testo');
+$km = $bot_msgs($k1);
+$ex_k1 = json_decode((string) end($km)['extra'], true);
+prova($ricarica($k1)['stato'] === 'bot' && ($ex_k1['corsi_cdl'] ?? []) === ['Biologia prova d989', 'Biotecnologie prova d989'], "corso: su un argomento generico Didacticus chiede il corso di laurea");
+$mail_k = $conta_mail('Nuova richiesta di assistenza');
+prova($srv_d->azioneBot($ricarica($k1), 'corso_cdl', 'Fisica') === 'Corso non valido.', "corso: un corso non coperto dai pulsanti non vale");
+$ora_di->t = $ora_di->t->modify('+1 minute');
+prova($srv_d->azioneBot($ricarica($k1), 'corso_cdl', 'Biologia prova d989') === null, "corso: il corso scelto passa la chat");
+$k1r = $ricarica($k1);
+$mail_cds = array_values(array_filter($EMAIL, fn($e) => str_contains($e['oggetto'], 'Nuova richiesta di assistenza') && $e['a'] === 'op5-d989@example.org'));
+$mail_altri = array_values(array_filter($EMAIL, fn($e) => str_contains($e['oggetto'], 'Nuova richiesta di assistenza') && in_array($e['a'], ['op-d989@example.org', 'op2-d989@example.org', 'op3-d989@example.org', 'op4-d989@example.org'], true) && str_contains($e['corpo'], 'Biologia prova d989')));
+prova($k1r['stato'] === 'nuova' && (int) $k1r['ufficio_id'] === $u_cds && count($mail_cds) === 1 && $mail_altri === [] && $conta_mail('Nuova richiesta di assistenza') === $mail_k + 1, "corso: la chat va all'ufficio del corso di studio e avvisa solo le sue persone");
+prova(in_array($k1['id'], $vis([$u_cds])) && !in_array($k1['id'], $vis([0])) && !in_array($k1['id'], $vis([$u_tir])), "corso: la chat la vedono solo le persone dell'ufficio del corso (e gli amministratori)");
+// il corso scritto a mano
+[$k2] = $srv_d->apriDaUtente($sx(7), 'altro', 'Voglio parlare con un operatore', null, '10.9.89.142', false, 'testo');
+$ora_di->t = $ora_di->t->modify('+1 minute');
+$srv_d->scriviComeUtente($ricarica($k2), 'biotecnologie');
+prova((int) $ricarica($k2)['ufficio_id'] === $u_cds && $ricarica($k2)['stato'] === 'nuova', "corso: il nome del corso scritto a mano (anche in parte) basta");
+// l'argomento dichiarato da un ufficio batte il corso
+$q("UPDATE uffici SET didacticus = 1 WHERE id = $u_tir");
+[$k3] = $srv_d->apriDaUtente($stu[1], 'tirocini', '', null, '10.9.89.143', false, 'argomento');
+$srv_d->azioneBot($ricarica($k3), 'operatore');
+prova((int) $ricarica($k3)['ufficio_id'] === $u_tir && $ricarica($k3)['stato'] === 'nuova', "corso: se un ufficio dichiara l'argomento (tirocini) vince l'argomento sul corso");
+
 // senza uffici collegati si torna al comportamento di prima
-$q("UPDATE uffici SET didacticus = 0 WHERE id IN ($u_tir, $u_tes)");
+$q("UPDATE uffici SET didacticus = 0 WHERE id IN ($u_tir, $u_tes, $u_cds)");
 prova($op_ass->ufficiCollegati() === [] && $op_ass->ufficiVisibili($tina) === [], "uffici: scollegati, le loro persone non vedono più le chat");
 
-foreach (["DELETE FROM didacticus_mancate", "DELETE FROM assistenza_messaggi", "DELETE FROM assistenza_conversazioni", "DELETE FROM uffici_persone WHERE email LIKE 'op%-d989@example.org'", "DELETE FROM uffici WHERE nome LIKE 'Ufficio prova % d989'", "DELETE FROM utenti WHERE id BETWEEN 98931 AND 98949", "UPDATE impostazioni_sistema SET didacticus_attivo = 0 WHERE id = 1"] as $sql) $q($sql);
+foreach (["DELETE FROM didacticus_mancate", "DELETE FROM assistenza_messaggi", "DELETE FROM assistenza_conversazioni", "DELETE FROM uffici_persone WHERE email LIKE 'op%-d989@example.org'", "DELETE FROM uffici WHERE nome LIKE 'Ufficio prova % d989'", "DELETE FROM didattica_consigli WHERE nome LIKE 'Consiglio prova d989%'", "DELETE FROM utenti WHERE id BETWEEN 98931 AND 98949", "UPDATE impostazioni_sistema SET didacticus_attivo = 0 WHERE id = 1"] as $sql) $q($sql);

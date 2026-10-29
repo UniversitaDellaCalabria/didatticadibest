@@ -276,6 +276,17 @@ final class ServizioAssistenza
 
             return;
         }
+        if ($this->inAttesaCorsoCdl($id)) { // Didacticus ha chiesto il corso di laurea per scegliere l'ufficio del corso di studio
+            $corso = $this->corsoDaTesto($testo, null, $this->operatori->corsiDegliUffici());
+            if ($corso === null) {
+                $this->scriviBot($conv, 'Non ho riconosciuto il corso: scegli dai pulsanti qui sotto oppure scrivimi il nome del corso di laurea.', $this->extraCorsiCdl());
+
+                return;
+            }
+            $this->passaPerCorsoCdl($conv, $corso);
+
+            return;
+        }
         if ($this->inAttesaCorso($id)) { // Didacticus ha chiesto il corso di laurea: quello che la persona scrive è la risposta
             $uff = $this->ufficioDi($conv);
             $corso = $this->corsoDaTesto($testo, $uff);
@@ -317,10 +328,47 @@ final class ServizioAssistenza
         return (int) ($conv['ufficio_id'] ?? 0) ?: null;
     }
 
-    /** I pulsanti della domanda «con quale ufficio vuoi parlare?». @return array<string, mixed> */
-    private function extraUffici(): array
+    /** I pulsanti della domanda «con quale ufficio vuoi parlare?» (solo gli uffici per argomento, senza quelli dei corsi di studio, se $senzaCdl). @return array<string, mixed> */
+    private function extraUffici(bool $senzaCdl = false): array
     {
-        return ['uffici' => array_map(fn(array $u) => ['id' => $u['id'], 'n' => $u['nome']], $this->operatori->ufficiCollegati())];
+        $uffici = array_filter($this->operatori->ufficiCollegati(), fn(array $u) => !$senzaCdl || !$u['cdl']);
+
+        return ['uffici' => array_values(array_map(fn(array $u) => ['id' => $u['id'], 'n' => $u['nome']], $uffici))];
+    }
+
+    /** I pulsanti della domanda «a quale corso di laurea sei iscritto?» per scegliere l'ufficio del corso di studio. @return array<string, mixed> */
+    private function extraCorsiCdl(): array
+    {
+        return ['corsi_cdl' => $this->operatori->corsiDegliUffici()];
+    }
+
+    private function inAttesaCorsoCdl(int $id): bool
+    {
+        return !empty(($this->ultimoExtraBot($id) ?? [])['corsi_cdl']);
+    }
+
+    /**
+     * La persona ha detto il corso di laurea: la chat va all'ufficio del corso di studio (se è collegato a Didacticus); chi non sa o non è coperto resta all'Assistenza
+     * o sceglie tra gli uffici per argomento.
+     *
+     * @param array<string, string|null> $conv
+     */
+    private function passaPerCorsoCdl(array $conv, string $corso): void
+    {
+        $id = (int) $conv['id'];
+        if ($corso === '') {
+            if (array_filter($this->operatori->ufficiCollegati(), fn(array $u) => !$u['cdl'])) {
+                $this->scriviBot($conv, 'Va bene! Con quale ufficio vuoi parlare?', $this->extraUffici(true));
+
+                return;
+            }
+            $this->passaConCorso($conv, '', $this->ultimaDomandaVera($id));
+
+            return;
+        }
+        $uff = $this->operatori->ufficioPerCorso($corso);
+        $this->conversazioni->impostaUfficio($id, $uff);
+        $this->passaConCorso($this->conversazioni->perId($id) ?? $conv, $corso, $this->ultimaDomandaVera($id, $uff));
     }
 
     /** I dati extra dell'ultimo messaggio di Didacticus (i pulsanti che ha proposto), null se non ne ha scritti. @return array<string, mixed>|null */
@@ -392,9 +440,21 @@ final class ServizioAssistenza
             return;
         }
         $arg = $this->argomentoEffettivo($conv);
-        $trovati = $arg === 'altro' ? [] : array_values(array_filter($uffici, fn(array $u) => in_array($arg, $u['argomenti'], true)));
+        // 1. un ufficio per argomento (tirocini, tesi…) che dichiara quell'argomento: vince l'argomento
+        $trovati = $arg === 'altro' ? [] : array_values(array_filter($uffici, fn(array $u) => !$u['cdl'] && in_array($arg, $u['argomenti'], true)));
         if (count($trovati) === 1) {
             $this->scegliUfficio($conv, $trovati[0]['id'], $motivo);
+
+            return;
+        }
+        if (count($trovati) > 1) {
+            $this->scriviBot($conv, 'Certo! Con quale ufficio vuoi parlare?', ['uffici' => array_map(fn(array $u) => ['id' => $u['id'], 'n' => $u['nome']], $trovati)]);
+
+            return;
+        }
+        // 2. altrimenti vince il corso di laurea: si chiede a quale corso è iscritta la persona
+        if ($this->operatori->corsiDegliUffici()) {
+            $this->scriviBot($conv, 'Certo! Per mandarti alla persona giusta, a quale corso di laurea sei iscritto/a?', $this->extraCorsiCdl());
 
             return;
         }
@@ -417,13 +477,13 @@ final class ServizioAssistenza
     }
 
     /** Il corso scritto dalla persona: il nome di uno dei corsi seguiti dagli operatori, '' se dice che non sa o non è iscritta, null se non lo riconosco. */
-    private function corsoDaTesto(string $testo, ?int $ufficioId = null): ?string
+    private function corsoDaTesto(string $testo, ?int $ufficioId = null, ?array $lista = null): ?string
     {
         $t = mb_strtolower(trim($testo));
         if ($t === '' || preg_match('/\b(altro|non so|nessun[oa]?|non sono iscritt[oa]|qualsiasi|indifferente)\b/u', $t)) {
             return '';
         }
-        foreach ($this->operatori->corsiSeguiti($ufficioId) as $c) {
+        foreach ($lista ?? $this->operatori->corsiSeguiti($ufficioId) as $c) {
             $n = mb_strtolower($c);
             if (str_contains($n, $t) || (mb_strlen($n) >= 6 && str_contains($t, $n))) {
                 return $c;
@@ -463,7 +523,7 @@ final class ServizioAssistenza
     /** La domanda vera della persona, cioè l'ultima che non è un corso di laurea o una richiesta di operatore. */
     private function ultimaDomandaVera(int $id, ?int $ufficioId = null): string
     {
-        $corsi = array_merge($this->operatori->corsiSeguiti($ufficioId), array_column($this->operatori->ufficiCollegati(), 'nome'));
+        $corsi = array_merge($this->operatori->corsiSeguiti($ufficioId), $this->operatori->corsiDegliUffici(), array_column($this->operatori->ufficiCollegati(), 'nome'));
         $d = '';
         foreach ($this->messaggi->della($id) as $m) {
             if ($m['da'] === Costanti::DA_UTENTE && !in_array((string) $m['testo'], $corsi, true) && !\App\Assistenza\Didacticus\Motore::chiedeOperatore((string) $m['testo'])) {
@@ -549,6 +609,19 @@ final class ServizioAssistenza
                 $this->messaggi->aggiungi($id, Costanti::DA_UTENTE, Costanti::TIPO_MESSAGGIO, $nomeScelto !== '' ? $nomeScelto : 'Assistenza generale', (string) $conv['nome'], $quando);
                 $this->conversazioni->visto($id, Costanti::DA_UTENTE, $quando);
                 $this->scegliUfficio($conv, $scelto);
+
+                return null;
+            case 'corso_cdl':
+                if (!$this->inAttesaCorsoCdl($id)) {
+                    return 'Questa scelta non è più disponibile.';
+                }
+                $scelto_c = trim($valore);
+                if ($scelto_c !== '' && !in_array($scelto_c, $this->operatori->corsiDegliUffici(), true)) {
+                    return 'Corso non valido.';
+                }
+                $this->messaggi->aggiungi($id, Costanti::DA_UTENTE, Costanti::TIPO_MESSAGGIO, $scelto_c !== '' ? $scelto_c : 'Un altro corso / non lo so', (string) $conv['nome'], $quando);
+                $this->conversazioni->visto($id, Costanti::DA_UTENTE, $quando);
+                $this->passaPerCorsoCdl($conv, $scelto_c);
 
                 return null;
             case 'corso':

@@ -78,13 +78,66 @@ final class OperatoriAssistenza
     /**
      * Gli uffici collegati a Didacticus (spuntati in Gestione → Uffici), con gli argomenti di cui si occupano.
      *
-     * @return list<array{id: int, nome: string, argomenti: list<string>}>
+     * @return list<array{id: int, nome: string, argomenti: list<string>, cdl: bool}> cdl = ufficio di un corso di studio (legato a un consiglio)
      */
     public function ufficiCollegati(): array
     {
         $out = [];
-        foreach ($this->db->righe("SELECT id, nome, didacticus_argomenti FROM uffici WHERE didacticus = 1 AND attivo = 1 AND ambito = 'dipartimento' ORDER BY ordine, nome") as $r) {
-            $out[] = ['id' => (int) $r['id'], 'nome' => (string) $r['nome'], 'argomenti' => array_values(array_filter(explode(',', (string) $r['didacticus_argomenti'])))];
+        foreach ($this->db->righe("SELECT id, nome, tipo, didacticus_argomenti FROM uffici WHERE didacticus = 1 AND attivo = 1 AND ambito = 'dipartimento' ORDER BY ordine, nome") as $r) {
+            $out[] = ['id' => (int) $r['id'], 'nome' => (string) $r['nome'], 'argomenti' => array_values(array_filter(explode(',', (string) $r['didacticus_argomenti']))), 'cdl' => (string) $r['tipo'] === 'cdl'];
+        }
+
+        return $out;
+    }
+
+    /**
+     * I corsi di laurea coperti dagli uffici di corso di studio collegati a Didacticus (i corsi del consiglio a cui ogni ufficio è legato).
+     *
+     * @return list<string>
+     */
+    public function corsiDegliUffici(): array
+    {
+        $out = [];
+        foreach ($this->consigliDegliUffici() as $c) {
+            foreach ($c['corsi'] as $nome) {
+                $out[$nome] = true;
+            }
+        }
+        $corsi = array_keys($out);
+        sort($corsi, SORT_NATURAL | SORT_FLAG_CASE);
+
+        return $corsi;
+    }
+
+    /** L'ufficio di corso di studio collegato a Didacticus che segue quel corso di laurea (stessa regola delle pratiche), null se non c'è. */
+    public function ufficioPerCorso(string $corso): ?int
+    {
+        $corso = mb_strtolower(trim($corso));
+        if ($corso === '') {
+            return null;
+        }
+        $uffici = $this->consigliDegliUffici();
+        foreach ($uffici as $c) {
+            if (in_array($corso, array_map('mb_strtolower', $c['corsi']), true)) {
+                return $c['ufficio'];
+            }
+        }
+        foreach ($uffici as $c) { // consigli senza i corsi indicati: il corso citato nel nome del consiglio
+            if (!$c['corsi'] && preg_match('/' . preg_quote($corso, '/') . '(?![\p{L}])/u', mb_strtolower($c['nome']))) {
+                return $c['ufficio'];
+            }
+        }
+
+        return null;
+    }
+
+    /** @return list<array{ufficio: int, nome: string, corsi: list<string>}> */
+    private function consigliDegliUffici(): array
+    {
+        $out = [];
+        foreach ($this->db->righe("SELECT u.id, c.nome, c.corsi FROM uffici u JOIN didattica_consigli c ON c.id = u.consiglio_id WHERE u.didacticus = 1 AND u.attivo = 1 AND u.tipo = 'cdl' AND u.ambito = 'dipartimento' ORDER BY u.ordine, u.nome") as $r) {
+            $corsi = array_values(array_filter(array_map(fn($x) => is_string($x) ? trim($x) : '', (array) json_decode((string) $r['corsi'], true))));
+            $out[] = ['ufficio' => (int) $r['id'], 'nome' => (string) $r['nome'], 'corsi' => $corsi];
         }
 
         return $out;

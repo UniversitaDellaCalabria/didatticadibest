@@ -226,7 +226,7 @@ if (!$servizio_attivo): ?>
     <?php if ($utente && !$pannello): ?><p class="small mt-2"><a href="assistenza_storico.php"><i class="fa fa-clock-rotate-left me-1" aria-hidden="true"></i>Le mie conversazioni</a></p><?php endif; ?>
     <?php if ($c_url !== '' && !$avvio): ?><script>try { sessionStorage.setItem('assistenza_c', '<?php echo $c_url; ?>'); } catch (e) {}</script><?php endif; ?>
     <?php if ($push_pub->attivo()): ?><script src="assets/js/assistenza-push.js?v=1"></script><?php endif; ?>
-    <script src="assets/js/assistenza-chat.js?v=7"></script>
+    <script src="assets/js/assistenza-chat.js?v=8"></script>
     <?php if (!$avvio && $conv['canale'] === $Cost::CANALE_ESTERNO): ?>
         <script>try { localStorage.setItem('assistenza_t', <?php echo json_encode($token, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>); } catch (e) {}</script>
     <?php endif; ?>
