@@ -188,13 +188,13 @@ final class ServizioPush
 
     /**
      * Una chat nuova da prendere, o un messaggio in una chat che nessuno ha ancora preso: lo sentono tutti gli operatori che non hanno silenziato
-     * e che non hanno scelto «solo le mie chat».
+     * e che non hanno scelto «solo le mie chat». Se è indicato $ammesso (id utente → vero/falso) li sente solo chi può vedere quella chat.
      *
      * @param array<string, string|null> $conv
      */
-    public function avvisaOperatori(array $conv, string $testo, string $link, bool $nuova): int
+    public function avvisaOperatori(array $conv, string $testo, string $link, bool $nuova, ?callable $ammesso = null): int
     {
-        $recapiti = array_filter($this->repo->operatori(), fn(array $r) => !$this->silenziato($r) && (int) $r['solo_mie'] === 0);
+        $recapiti = array_filter($this->repo->operatori(), fn(array $r) => !$this->silenziato($r) && (int) $r['solo_mie'] === 0 && ($ammesso === null || $ammesso((int) $r['utente_id'])));
 
         return $this->manda(array_values($recapiti), [
             'titolo' => $nuova ? 'Nuova richiesta di assistenza' : 'Nuovo messaggio da prendere', 'corpo' => $conv['nome'] . ' · ' . Costanti::nomeArgomento((string) $conv['argomento']) . ': ' . self::anteprima($testo),

@@ -56,7 +56,7 @@ final class ChatApi
     /**
      * La casella di un operatore: le conversazioni della scheda scelta e i numeri di tutte le schede.
      *
-     * @param array{id: int, nome: string} $operatore
+     * @param array{id: int, nome: string, uffici?: list<int>|null} $operatore gli uffici dicono quali chat può vedere (assente o null = tutte)
      * @return array<string, mixed>
      */
     public function elenco(array $operatore, string $vista): array
@@ -65,8 +65,8 @@ final class ChatApi
             ? $vista : ConversazioniRepository::VISTA_DA_PRENDERE;
 
         return [
-            'ok' => true, 'vista' => $vista, 'contatori' => $this->servizio->contatori($operatore['id']),
-            'elenco' => array_map(self::convPerOperatore(...), $this->servizio->elenco($vista, $operatore['id'])),
+            'ok' => true, 'vista' => $vista, 'contatori' => $this->servizio->contatori($operatore['id'], $operatore['uffici'] ?? null),
+            'elenco' => array_map(self::convPerOperatore(...), $this->servizio->elenco($vista, $operatore['id'], $operatore['uffici'] ?? null)),
         ];
     }
 
@@ -75,23 +75,23 @@ final class ChatApi
      *
      * @return array<string, mixed>
      */
-    public function chatOperatore(int $id, int $dopoId): array
+    public function chatOperatore(int $id, int $dopoId, ?array $uffici = null): array
     {
         $c = $this->servizio->perId($id);
-        if ($c === null) {
+        if ($c === null || !$this->servizio->visibileA($c, $uffici)) {
             return self::errore('Conversazione non trovata.');
         }
         $this->servizio->apertaDa($c, Costanti::DA_OPERATORE);
         $m = self::messaggi($this->servizio->messaggi($c, $dopoId, true));
 
-        return ['ok' => true, 'conv' => self::convPerOperatore($this->servizio->perId($id) ?? $c), 'messaggi' => $m, 'colleghi' => $this->colleghi()];
+        return ['ok' => true, 'conv' => self::convPerOperatore($this->servizio->perId($id) ?? $c), 'messaggi' => $m, 'colleghi' => $this->colleghi((int) $c['ufficio_id'] ?: null)];
     }
 
     /** @return list<array{id: int, nome: string}> */
-    private function colleghi(): array
+    private function colleghi(?int $ufficioId = null): array
     {
         $out = [];
-        foreach ($this->operatori->colleghi() as $id => $nome) {
+        foreach ($this->operatori->colleghi($ufficioId) as $id => $nome) {
             $out[] = ['id' => $id, 'nome' => $nome];
         }
 
@@ -108,7 +108,7 @@ final class ChatApi
     public function azioneOperatore(string $azione, int $id, array $operatore, array $dati): array
     {
         $c = $this->servizio->perId($id);
-        if ($c === null) {
+        if ($c === null || !$this->servizio->visibileA($c, $operatore['uffici'] ?? null)) {
             return self::errore('Conversazione non trovata.');
         }
         $err = match ($azione) {
@@ -126,9 +126,9 @@ final class ChatApi
     /** @param array<string, string|null> $c @param array{id: int, nome: string} $da */
     private function passa(array $c, array $da, int $a): ?string
     {
-        $colleghi = $this->operatori->colleghi();
+        $colleghi = $this->operatori->colleghi((int) ($c['ufficio_id'] ?? 0) ?: null);
         if (!isset($colleghi[$a])) {
-            return 'Scegli un collega dell\'ufficio Assistenza.';
+            return 'Scegli un collega dell\'ufficio.';
         }
 
         return $this->servizio->passaA($c, $da, ['id' => $a, 'nome' => $colleghi[$a]]);
@@ -171,6 +171,7 @@ final class ChatApi
             'bot_utile' => $this->servizio->azioneBot($conv, 'utile'),
             'bot_non_utile' => $this->servizio->azioneBot($conv, 'non_utile'),
             'operatore' => $this->servizio->azioneBot($conv, 'operatore'),
+            'bot_ufficio' => $this->servizio->azioneBot($conv, 'ufficio', (string) ($dati['valore'] ?? '')),
             'bot_corso' => $this->servizio->azioneBot($conv, 'corso', (string) ($dati['valore'] ?? '')),
             'bot_voce' => $this->servizio->azioneBot($conv, 'voce', (string) ($dati['valore'] ?? '')),
             'bot_argomento' => $this->servizio->azioneBot($conv, 'argomento', (string) ($dati['valore'] ?? '')),

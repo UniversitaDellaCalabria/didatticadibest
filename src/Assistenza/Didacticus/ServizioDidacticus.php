@@ -333,6 +333,12 @@ final class ServizioDidacticus
         return self::esito('risposta', (string) $voce['risposta'], $extra, (int) $voce['id']);
     }
 
+    /** L'argomento di una voce (serve a capire a quale ufficio passare una chat). */
+    public function argomentoDiVoce(int $voceId): string
+    {
+        return (string) ($this->voci->perId($voceId)['argomento'] ?? '');
+    }
+
     public function titolo(int $voceId): string
     {
         return (string) ($this->voci->perId($voceId)['titolo'] ?? '');

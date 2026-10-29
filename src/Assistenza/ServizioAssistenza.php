@@ -265,14 +265,26 @@ final class ServizioAssistenza
     private function rispondiBot(array $conv, string $testo, bool $primo = false): void
     {
         $id = (int) $conv['id'];
-        if ($this->inAttesaCorso($id)) { // Didacticus ha chiesto il corso di laurea: quello che la persona scrive è la risposta
-            $corso = $this->corsoDaTesto($testo);
-            if ($corso === null) {
-                $this->scriviBot($conv, 'Non ho riconosciuto il corso: scegli dai pulsanti qui sotto oppure scrivimi il nome del corso di laurea.', $this->extraCorsi());
+        if ($this->inAttesaUfficio($id)) { // Didacticus ha chiesto con quale ufficio parlare: quello che la persona scrive è la risposta
+            $uff = $this->ufficioDaTesto($testo);
+            if ($uff === null) {
+                $this->scriviBot($conv, 'Non ho capito con quale ufficio: scegli dai pulsanti qui sotto.', $this->extraUffici());
 
                 return;
             }
-            $this->passaConCorso($conv, $corso, $this->ultimaDomandaVera($id));
+            $this->scegliUfficio($conv, $uff);
+
+            return;
+        }
+        if ($this->inAttesaCorso($id)) { // Didacticus ha chiesto il corso di laurea: quello che la persona scrive è la risposta
+            $uff = $this->ufficioDi($conv);
+            $corso = $this->corsoDaTesto($testo, $uff);
+            if ($corso === null) {
+                $this->scriviBot($conv, 'Non ho riconosciuto il corso: scegli dai pulsanti qui sotto oppure scrivimi il nome del corso di laurea.', $this->extraCorsi($uff));
+
+                return;
+            }
+            $this->passaConCorso($conv, $corso, $this->ultimaDomandaVera($id, $uff));
 
             return;
         }
@@ -286,21 +298,33 @@ final class ServizioAssistenza
             $this->conversazioni->botMancate($id, $mancate);
         }
         if ($r['passa']) {
-            $this->chiediCorso($this->conversazioni->perId($id) ?? $conv, 'su richiesta della persona', $this->ultimaDomandaVera($id));
+            $this->instrada($this->conversazioni->perId($id) ?? $conv, 'su richiesta della persona', $this->ultimaDomandaVera($id));
         } elseif ($mancate >= 2) {
             $this->scriviBot($conv, 'Mi dispiace, non riesco ad aiutarti con le risposte che ho: ti passo un operatore.');
-            $this->chiediCorso($this->conversazioni->perId($id) ?? $conv, 'Didacticus non ha trovato risposte per due volte di fila');
+            $this->instrada($this->conversazioni->perId($id) ?? $conv, 'Didacticus non ha trovato risposte per due volte di fila');
         }
     }
 
     /** I pulsanti della domanda «a quale corso sei iscritto?». @return array<string, mixed> */
-    private function extraCorsi(): array
+    private function extraCorsi(?int $ufficioId = null): array
     {
-        return ['corsi' => $this->operatori->corsiSeguiti()];
+        return ['corsi' => $this->operatori->corsiSeguiti($ufficioId)];
     }
 
-    /** L'ultimo messaggio di Didacticus è la domanda sul corso di laurea (ha i pulsanti dei corsi): la prossima cosa scritta è la risposta. */
-    private function inAttesaCorso(int $id): bool
+    /** @param array<string, string|null> $conv */
+    private function ufficioDi(array $conv): ?int
+    {
+        return (int) ($conv['ufficio_id'] ?? 0) ?: null;
+    }
+
+    /** I pulsanti della domanda «con quale ufficio vuoi parlare?». @return array<string, mixed> */
+    private function extraUffici(): array
+    {
+        return ['uffici' => array_map(fn(array $u) => ['id' => $u['id'], 'n' => $u['nome']], $this->operatori->ufficiCollegati())];
+    }
+
+    /** I dati extra dell'ultimo messaggio di Didacticus (i pulsanti che ha proposto), null se non ne ha scritti. @return array<string, mixed>|null */
+    private function ultimoExtraBot(int $id): ?array
     {
         $extra = null;
         foreach ($this->messaggi->della($id) as $m) {
@@ -309,17 +333,97 @@ final class ServizioAssistenza
             }
         }
 
-        return $extra !== null && !empty($extra['corsi']);
+        return $extra;
+    }
+
+    private function inAttesaUfficio(int $id): bool
+    {
+        return !empty(($this->ultimoExtraBot($id) ?? [])['uffici']);
+    }
+
+    /** L'ufficio scritto dalla persona: l'id di un ufficio collegato, 0 per «assistenza generale», null se non lo riconosco. */
+    private function ufficioDaTesto(string $testo): ?int
+    {
+        $t = mb_strtolower(trim($testo));
+        if ($t === '' || preg_match('/\b(general[ei]|assistenza|altro|non so|nessuno|qualsiasi)\b/u', $t)) {
+            return 0;
+        }
+        $parole = array_filter(preg_split('/[^\p{L}\p{N}]+/u', $t) ?: [], fn(string $w) => mb_strlen($w) >= 4 && $w !== 'ufficio');
+        $trovati = [];
+        foreach ($this->operatori->ufficiCollegati() as $u) {
+            $n = mb_strtolower($u['nome']);
+            if (str_contains($n, $t) || (mb_strlen($n) >= 4 && str_contains($t, $n))) {
+                return $u['id'];
+            }
+            foreach ($parole as $w) {
+                if (str_contains($n, $w)) {
+                    $trovati[$u['id']] = true;
+                }
+            }
+        }
+
+        return count($trovati) === 1 ? (int) array_key_first($trovati) : null; // una parola che c'è nel nome di un solo ufficio basta («la tesi»)
+    }
+
+    /** L'argomento della chat: quello scelto, o (se è «altro») quello dell'ultima voce che Didacticus ha mostrato. @param array<string, string|null> $conv */
+    private function argomentoEffettivo(array $conv): string
+    {
+        $a = (string) $conv['argomento'];
+        if ($a !== '' && $a !== 'altro') {
+            return $a;
+        }
+        $voce = $this->ultimaVoceBot((int) $conv['id']);
+
+        return $voce > 0 && ($x = $this->didacticus->argomentoDiVoce($voce)) !== '' ? $x : 'altro';
+    }
+
+    /**
+     * La persona vuole un operatore: se ci sono uffici collegati a Didacticus, la chat va a quello che si occupa dell'argomento (se è uno solo) o la persona
+     * sceglie l'ufficio dai pulsanti; poi, se l'ufficio ha indicato i corsi che segue, si chiede il corso di laurea.
+     *
+     * @param array<string, string|null> $conv
+     */
+    private function instrada(array $conv, string $motivo, string $domanda = ''): void
+    {
+        $uffici = $this->operatori->ufficiCollegati();
+        if (!$uffici) {
+            $this->chiediCorso($conv, $motivo, $domanda);
+
+            return;
+        }
+        $arg = $this->argomentoEffettivo($conv);
+        $trovati = $arg === 'altro' ? [] : array_values(array_filter($uffici, fn(array $u) => in_array($arg, $u['argomenti'], true)));
+        if (count($trovati) === 1) {
+            $this->scegliUfficio($conv, $trovati[0]['id'], $motivo);
+
+            return;
+        }
+        $this->scriviBot($conv, 'Certo! Con quale ufficio vuoi parlare?', $this->extraUffici());
+    }
+
+    /** @param array<string, string|null> $conv @param int $ufficioId 0 = Assistenza generale */
+    private function scegliUfficio(array $conv, int $ufficioId, string $motivo = 'su richiesta della persona'): void
+    {
+        $id = (int) $conv['id'];
+        $uff = $ufficioId > 0 && in_array($ufficioId, array_column($this->operatori->ufficiCollegati(), 'id'), true) ? $ufficioId : null;
+        $this->conversazioni->impostaUfficio($id, $uff);
+        $this->chiediCorso($this->conversazioni->perId($id) ?? $conv, $motivo, $this->ultimaDomandaVera($id, $uff));
+    }
+
+    /** L'ultimo messaggio di Didacticus è la domanda sul corso di laurea (ha i pulsanti dei corsi): la prossima cosa scritta è la risposta. */
+    private function inAttesaCorso(int $id): bool
+    {
+        return !empty(($this->ultimoExtraBot($id) ?? [])['corsi']);
     }
 
     /** Il corso scritto dalla persona: il nome di uno dei corsi seguiti dagli operatori, '' se dice che non sa o non è iscritta, null se non lo riconosco. */
-    private function corsoDaTesto(string $testo): ?string
+    private function corsoDaTesto(string $testo, ?int $ufficioId = null): ?string
     {
         $t = mb_strtolower(trim($testo));
         if ($t === '' || preg_match('/\b(altro|non so|nessun[oa]?|non sono iscritt[oa]|qualsiasi|indifferente)\b/u', $t)) {
             return '';
         }
-        foreach ($this->operatori->corsiSeguiti() as $c) {
+        foreach ($this->operatori->corsiSeguiti($ufficioId) as $c) {
             $n = mb_strtolower($c);
             if (str_contains($n, $t) || (mb_strlen($n) >= 6 && str_contains($t, $n))) {
                 return $c;
@@ -337,13 +441,15 @@ final class ServizioAssistenza
      */
     private function chiediCorso(array $conv, string $motivo, string $domanda = ''): void
     {
-        if (!$this->operatori->corsiSeguiti()) {
-            $this->scriviBot($conv, 'Certo, ti metto in contatto con una persona dell\'ufficio.');
+        $uff = $this->ufficioDi($conv);
+        if (!$this->operatori->corsiSeguiti($uff)) {
+            $nome = $this->operatori->nomeUfficio($uff);
+            $this->scriviBot($conv, $nome !== '' ? 'Va bene, ti passo l\'ufficio «' . $nome . '»: ti risponde qui appena è disponibile.' : 'Certo, ti metto in contatto con una persona dell\'ufficio.');
             $this->passaAOperatore($conv, $motivo, $domanda);
 
             return;
         }
-        $this->scriviBot($conv, 'Certo! Per mandarti alla persona giusta, a quale corso di laurea sei iscritto/a?', $this->extraCorsi());
+        $this->scriviBot($conv, 'Certo! Per mandarti alla persona giusta, a quale corso di laurea sei iscritto/a?', $this->extraCorsi($uff));
     }
 
     /** @param array<string, string|null> $conv */
@@ -355,9 +461,9 @@ final class ServizioAssistenza
     }
 
     /** La domanda vera della persona, cioè l'ultima che non è un corso di laurea o una richiesta di operatore. */
-    private function ultimaDomandaVera(int $id): string
+    private function ultimaDomandaVera(int $id, ?int $ufficioId = null): string
     {
-        $corsi = $this->operatori->corsiSeguiti();
+        $corsi = array_merge($this->operatori->corsiSeguiti($ufficioId), array_column($this->operatori->ufficiCollegati(), 'nome'));
         $d = '';
         foreach ($this->messaggi->della($id) as $m) {
             if ($m['da'] === Costanti::DA_UTENTE && !in_array((string) $m['testo'], $corsi, true) && !\App\Assistenza\Didacticus\Motore::chiedeOperatore((string) $m['testo'])) {
@@ -384,10 +490,12 @@ final class ServizioAssistenza
         $this->conversazioni->impostaStato($id, Costanti::STATO_NUOVA);
         $this->messaggi->aggiungi($id, Costanti::DA_SISTEMA, Costanti::TIPO_MESSAGGIO, 'Ti ho messo in contatto con un operatore: ti risponde qui appena è disponibile.', '', $quando);
         $this->avvisoFuoriOrario($id, $quando);
-        $this->messaggi->aggiungi($id, Costanti::DA_SISTEMA, Costanti::TIPO_NOTA, 'Chat passata da Didacticus (' . $motivo . ').' . ($corso !== '' ? ' Corso di laurea dichiarato: ' . $corso . '.' : '') . ' Rileggi le risposte che ha già dato qui sopra.', '', $quando);
         $c = $this->conversazioni->perId($id) ?? $conv;
+        $uff = $this->ufficioDi($c);
+        $nome_uff = $this->operatori->nomeUfficio($uff);
+        $this->messaggi->aggiungi($id, Costanti::DA_SISTEMA, Costanti::TIPO_NOTA, 'Chat passata da Didacticus (' . $motivo . ').' . ($nome_uff !== '' ? ' Ufficio scelto: ' . $nome_uff . '.' : '') . ($corso !== '' ? ' Corso di laurea dichiarato: ' . $corso . '.' : '') . ' Rileggi le risposte che ha già dato qui sopra.', '', $quando);
         $prima = $domanda !== '' ? $domanda : $this->ultimeDomande($id);
-        $this->notifiche->nuovaRichiesta($c, ($corso !== '' ? '[' . $corso . '] ' : '') . $prima, $corso !== '' ? $this->operatori->emailPerCorso($corso) : $this->operatori->emailAvvisi());
+        $this->notifiche->nuovaRichiesta($c, ($corso !== '' ? '[' . $corso . '] ' : '') . $prima, $corso !== '' ? $this->operatori->emailPerCorso($corso, $uff) : $this->operatori->emailAvvisi($uff));
         $this->notifiche->pushNuovaRichiesta($c, $prima);
         $this->conversazioni->avvisato($id, Costanti::DA_OPERATORE, $quando);
     }
@@ -422,11 +530,25 @@ final class ServizioAssistenza
                 }
                 $this->mancate->registra($id, $this->ultimaDomanda($id), (string) $conv['argomento'], MancateRepository::NON_UTILE, $ultimaVoce ?: null, $quando);
                 $this->scriviBot($conv, 'Mi dispiace che non sia bastato: ti passo un operatore.');
-                $this->chiediCorso($this->conversazioni->perId($id) ?? $conv, 'la risposta di Didacticus non è bastata', $this->ultimaDomanda($id));
+                $this->instrada($this->conversazioni->perId($id) ?? $conv, 'la risposta di Didacticus non è bastata', $this->ultimaDomanda($id));
 
                 return null;
             case 'operatore':
-                $this->chiediCorso($this->conversazioni->perId($id) ?? $conv, 'su richiesta della persona', $this->ultimaDomandaVera($id));
+                $this->instrada($this->conversazioni->perId($id) ?? $conv, 'su richiesta della persona', $this->ultimaDomandaVera($id));
+
+                return null;
+            case 'ufficio':
+                if (!$this->inAttesaUfficio($id)) {
+                    return 'Questa scelta non è più disponibile.';
+                }
+                $scelto = (int) $valore;
+                $nomeScelto = $scelto > 0 ? $this->operatori->nomeUfficio($scelto) : '';
+                if ($scelto > 0 && !in_array($scelto, array_column($this->operatori->ufficiCollegati(), 'id'), true)) {
+                    return 'Ufficio non valido.';
+                }
+                $this->messaggi->aggiungi($id, Costanti::DA_UTENTE, Costanti::TIPO_MESSAGGIO, $nomeScelto !== '' ? $nomeScelto : 'Assistenza generale', (string) $conv['nome'], $quando);
+                $this->conversazioni->visto($id, Costanti::DA_UTENTE, $quando);
+                $this->scegliUfficio($conv, $scelto);
 
                 return null;
             case 'corso':
@@ -434,12 +556,12 @@ final class ServizioAssistenza
                     return 'Questa scelta non è più disponibile.';
                 }
                 $corso = trim($valore);
-                if ($corso !== '' && !in_array($corso, $this->operatori->corsiSeguiti(), true)) {
+                if ($corso !== '' && !in_array($corso, $this->operatori->corsiSeguiti($this->ufficioDi($conv)), true)) {
                     return 'Corso non valido.';
                 }
                 $this->messaggi->aggiungi($id, Costanti::DA_UTENTE, Costanti::TIPO_MESSAGGIO, $corso !== '' ? $corso : 'Un altro corso / non lo so', (string) $conv['nome'], $quando);
                 $this->conversazioni->visto($id, Costanti::DA_UTENTE, $quando);
-                $this->passaConCorso($conv, $corso, $this->ultimaDomandaVera($id));
+                $this->passaConCorso($conv, $corso, $this->ultimaDomandaVera($id, $this->ufficioDi($conv)));
 
                 return null;
             case 'voce':
@@ -524,9 +646,9 @@ final class ServizioAssistenza
         }
         if ($assegnata) {
             $a = $this->operatori->emailDi((int) $conv['operatore_id']);
-            $partita = $a !== '' ? $this->notifiche->messaggioPerOperatore($conv, $testo, $a) : $this->notifiche->nuovaRichiesta($conv, $testo, $this->operatori->emailAvvisi()) > 0;
+            $partita = $a !== '' ? $this->notifiche->messaggioPerOperatore($conv, $testo, $a) : $this->notifiche->nuovaRichiesta($conv, $testo, $this->operatori->emailAvvisi($this->ufficioDi($conv))) > 0;
         } else {
-            $partita = $this->notifiche->nuovaRichiesta($conv, $testo, $this->operatori->emailAvvisi()) > 0;
+            $partita = $this->notifiche->nuovaRichiesta($conv, $testo, $this->operatori->emailAvvisi($this->ufficioDi($conv))) > 0;
         }
         if ($partita) {
             $this->conversazioni->avvisato((int) $conv['id'], Costanti::DA_OPERATORE, $this->adesso());
@@ -742,15 +864,26 @@ final class ServizioAssistenza
      *
      * @return list<array<string, string|null>>
      */
-    public function elenco(string $vista, int $operatoreId): array
+    public function elenco(string $vista, int $operatoreId, ?array $uffici = null): array
     {
-        return $this->conversazioni->elenco($vista, $operatoreId);
+        return $this->conversazioni->elenco($vista, $operatoreId, 200, $uffici);
+    }
+
+    /**
+     * L'operatore può vedere questa chat? $uffici è null per tutte (amministratori), altrimenti gli uffici di cui fa parte (0 = Assistenza).
+     *
+     * @param array<string, string|null> $conv
+     * @param list<int>|null $uffici
+     */
+    public function visibileA(array $conv, ?array $uffici): bool
+    {
+        return $uffici === null || in_array((int) ($conv['ufficio_id'] ?? 0), array_map('intval', $uffici), true);
     }
 
     /** @return array{da_prendere: int, mie: int, tutte: int} */
-    public function contatori(int $operatoreId): array
+    public function contatori(int $operatoreId, ?array $uffici = null): array
     {
-        return $this->conversazioni->contatori($operatoreId);
+        return $this->conversazioni->contatori($operatoreId, $uffici);
     }
 
     /** Il numero del pulsante «Messaggi»: conversazioni aperte con messaggi da leggere. */

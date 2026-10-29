@@ -164,7 +164,7 @@ prova($api->chatOperatore(99999999, 0)['ok'] === false, "ChatApi: conversazione 
 $dopo_invio = $api->chatOperatore($id1, 0)['messaggi'];
 prova($api->azioneOperatore('invia', $id1, $operatrice, ['testo' => 'Risposta dal JSON'])['ok'] === true && end($dopo_invio) !== false && in_array('Risposta dal JSON', array_column($api->chatOperatore($id1, 0)['messaggi'], 'testo'), true), "ChatApi: l'operatrice risponde");
 prova($api->azioneOperatore('invia', $id1, $operatrice, ['testo' => 'Solo per noi', 'nota' => 1])['ok'] === true && !in_array('Solo per noi', array_column($api->chatUtente($srv->perId($id1), 0)['messaggi'], 'testo'), true), "ChatApi: la nota interna non arriva a chi ha chiesto aiuto");
-prova($api->azioneOperatore('passa', $id1, $operatrice, ['a' => 98903])['errore'] === 'Scegli un collega dell\'ufficio Assistenza.', "ChatApi: si passa la chat solo a chi è nell'ufficio");
+prova($api->azioneOperatore('passa', $id1, $operatrice, ['a' => 98903])['errore'] === 'Scegli un collega dell\'ufficio.', "ChatApi: si passa la chat solo a chi è nell'ufficio");
 prova($api->azioneOperatore('boh', $id1, $operatrice, [])['ok'] === false, "ChatApi: azione sconosciuta rifiutata");
 prova($api->azioneUtente('invia', $srv->perId($id1), ['testo' => 'Grazie!'])['ok'] === true && $api->azioneUtente('valuta', $srv->perId($id1), ['utile' => 1])['ok'] === false, "ChatApi: chi ha chiesto aiuto scrive, ma non valuta una chat ancora aperta");
 $api->azioneUtente('chiudi', $srv->perId($id1), []);

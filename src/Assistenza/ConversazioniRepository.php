@@ -95,6 +95,34 @@ final class ConversazioniRepository
         $this->db->esegui('UPDATE assistenza_conversazioni SET operatore_id = ?, operatore_nome = ?, stato = ? WHERE id = ?', [$operatoreId, mb_substr($operatoreNome, 0, Costanti::MAX_NOME), $stato, $id]);
     }
 
+    /** L'ufficio collegato a Didacticus a cui la chat è passata (null = Assistenza). */
+    public function impostaUfficio(int $id, ?int $ufficioId): void
+    {
+        $this->db->esegui('UPDATE assistenza_conversazioni SET ufficio_id = ? WHERE id = ?', [$ufficioId ?: null, $id]);
+    }
+
+    /**
+     * Il filtro delle chat che un operatore può vedere: $uffici è null per tutte (amministratori), altrimenti gli id degli uffici, con 0 per quelle senza ufficio.
+     *
+     * @param list<int>|null $uffici
+     */
+    public static function filtroUffici(?array $uffici, string $colonna): string
+    {
+        if ($uffici === null) {
+            return '';
+        }
+        $id = array_values(array_filter(array_map('intval', $uffici)));
+        $parti = [];
+        if (in_array(0, array_map('intval', $uffici), true)) {
+            $parti[] = "$colonna IS NULL";
+        }
+        if ($id) {
+            $parti[] = "$colonna IN (" . implode(',', $id) . ')';
+        }
+
+        return $parti ? ' AND (' . implode(' OR ', $parti) . ')' : ' AND 1 = 0';
+    }
+
     public function impostaStato(int $id, string $stato): void
     {
         $this->db->esegui('UPDATE assistenza_conversazioni SET stato = ? WHERE id = ?', [$stato, $id]);
@@ -180,10 +208,10 @@ final class ConversazioniRepository
      *
      * @return array{da_prendere: int, mie: int, tutte: int, bot: int}
      */
-    public function contatori(int $operatoreId): array
+    public function contatori(int $operatoreId, ?array $uffici = null): array
     {
         $r = $this->db->riga(
-            "SELECT SUM(stato = 'nuova') AS da_prendere, SUM(stato = 'assegnata' AND operatore_id = ?) AS mie, SUM(stato IN ('nuova', 'assegnata')) AS tutte, SUM(stato = 'bot') AS bot FROM assistenza_conversazioni",
+            "SELECT SUM(stato = 'nuova') AS da_prendere, SUM(stato = 'assegnata' AND operatore_id = ?) AS mie, SUM(stato IN ('nuova', 'assegnata')) AS tutte, SUM(stato = 'bot') AS bot FROM assistenza_conversazioni WHERE 1 = 1" . self::filtroUffici($uffici, 'ufficio_id'),
             [$operatoreId]
         ) ?? [];
 
@@ -207,7 +235,7 @@ final class ConversazioniRepository
      *
      * @return list<array<string, string|null>>
      */
-    public function elenco(string $vista, int $operatoreId, int $limite = 200): array
+    public function elenco(string $vista, int $operatoreId, int $limite = 200, ?array $uffici = null): array
     {
         $dove = match ($vista) {
             self::VISTA_DA_PRENDERE => "c.stato = 'nuova'",
@@ -220,7 +248,7 @@ final class ConversazioniRepository
         return Righe::testo($this->db->righe(
             "SELECT x.* FROM (SELECT c.*, (SELECT COUNT(*) FROM assistenza_messaggi m WHERE m.conversazione_id = c.id AND m.da = 'utente' AND m.tipo = 'messaggio' AND m.letto_il IS NULL) AS da_leggere,
              (SELECT COUNT(*) FROM assistenza_messaggi m2 WHERE m2.conversazione_id = c.id AND m2.tipo = 'messaggio') AS totale
-             FROM assistenza_conversazioni c WHERE $dove) x ORDER BY (x.da_leggere > 0) DESC, x.ultimo_il DESC LIMIT " . max(1, $limite)
+             FROM assistenza_conversazioni c WHERE $dove" . self::filtroUffici($uffici, 'c.ufficio_id') . ") x ORDER BY (x.da_leggere > 0) DESC, x.ultimo_il DESC LIMIT " . max(1, $limite)
         ));
     }
 }

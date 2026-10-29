@@ -68,6 +68,28 @@ final class ServizioUffici
      *
      * @return array{0: int, 1: string|null}
      */
+    /**
+     * Collega l'ufficio a Didacticus: le chat che l'assistente non riesce a chiudere, sugli argomenti scelti, arrivano alle sue persone. Vale solo per gli uffici
+     * del Dipartimento che non sono fissi (l'Assistenza è già la destinazione di partenza).
+     *
+     * @param list<string> $argomenti chiavi degli argomenti dell'assistenza
+     */
+    public function collegaDidacticus(int $id, bool $collegato, array $argomenti): ?string
+    {
+        $u = $this->uffici->perId($id);
+        if (!$u) {
+            return 'Ufficio non trovato.';
+        }
+        if (self::fisso($u) || (string) $u['ambito'] !== UfficiRepository::DIPARTIMENTO) {
+            return null;
+        }
+        $validi = array_keys(\App\Assistenza\Costanti::argomenti());
+        $scelti = array_values(array_unique(array_filter($argomenti, fn($a) => is_string($a) && in_array($a, $validi, true))));
+        $this->uffici->impostaDidacticus($id, $collegato, implode(',', $scelti));
+
+        return null;
+    }
+
     public function salva(int $id, string $ambito, string $nome, string $descrizione, bool $attivo, int $ordine = 0, string $tipo = '', ?int $consiglioId = null, bool $smista = false, bool $segueCorsi = false): array
     {
         $nome = mb_substr(trim((string) preg_replace('/\s+/u', ' ', $nome)), 0, 150);

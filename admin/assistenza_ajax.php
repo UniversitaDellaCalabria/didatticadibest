@@ -20,7 +20,8 @@ $utente = !empty($_SESSION['utente_id']) ? $app->get(\App\Auth\UtenteRepository:
 if (!$utente) $rispondi(['ok' => false, 'errore' => 'Sessione scaduta: ricarica la pagina.', 'auth' => false], 401);
 if (!$app->get(\App\Assistenza\OperatoriAssistenza::class)->eOperatore($utente)) $rispondi(['ok' => false, 'errore' => 'Accesso negato.'], 403);
 
-$operatore = ['id' => (int)$utente['id'], 'nome' => trim(trim((string)$utente['nome']) . ' ' . trim((string)$utente['cognome'])) ?: (string)$utente['email']];
+$operatore = ['id' => (int)$utente['id'], 'nome' => trim(trim((string)$utente['nome']) . ' ' . trim((string)$utente['cognome'])) ?: (string)$utente['email'],
+    'uffici' => $app->get(\App\Assistenza\OperatoriAssistenza::class)->ufficiVisibili($utente)]; // le chat passate a un ufficio le vedono solo le sue persone
 $api = $app->get(\App\Assistenza\ChatApi::class);
 $azione = (string)($_REQUEST['azione'] ?? 'elenco');
 $id = (int)($_REQUEST['c'] ?? 0);
@@ -28,7 +29,7 @@ $id = (int)($_REQUEST['c'] ?? 0);
 // Le letture non modificano nulla (a parte «letto»): la sessione si libera subito per non fare aspettare le altre richieste della stessa persona
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     session_write_close();
-    if ($azione === 'chat') $rispondi($api->chatOperatore($id, (int)($_GET['dopo'] ?? 0)));
+    if ($azione === 'chat') $rispondi($api->chatOperatore($id, (int)($_GET['dopo'] ?? 0), $operatore['uffici']));
     $rispondi($api->elenco($operatore, (string)($_GET['vista'] ?? 'da_prendere')));
 }
 
@@ -37,6 +38,6 @@ session_write_close();
 $esito = $api->azioneOperatore($azione, $id, $operatore, $_POST);
 if (!empty($esito['ok']) && in_array($azione, ['invia', 'prendi', 'passa', 'chiudi', 'riapri'], true)) {
     // dopo l'azione si rimanda subito lo stato aggiornato della chat
-    $esito += $api->chatOperatore($id, (int)($_POST['dopo'] ?? 0));
+    $esito += $api->chatOperatore($id, (int)($_POST['dopo'] ?? 0), $operatore['uffici']);
 }
 $rispondi($esito);

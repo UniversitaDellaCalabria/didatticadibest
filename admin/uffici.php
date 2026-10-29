@@ -55,6 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (($id_u && !$puo_su($u_post)) || (!$id_u && !($puo_uffici_tutti || $amb_post === 'dipartimento'))) nega_accesso();
         [$nuovo_id, $err] = $sv->salva($id_u, $amb_post, (string)($_POST['nome'] ?? ''), (string)($_POST['descrizione'] ?? ''), !empty($_POST['attivo']), (int)($_POST['ordine'] ?? 0),
             (string)($_POST['tipo'] ?? ''), (int)($_POST['consiglio_id'] ?? 0) ?: null, !empty($_POST['smista']), !empty($_POST['segue_corsi']));
+        if (!$err && $amb_post === 'dipartimento') $sv->collegaDidacticus((int)$nuovo_id, !empty($_POST['didacticus']), (array)($_POST['did_argomenti'] ?? []));
         if (!$err) registra_log_audit($conn, $id_u ? "Ufficio modificato" : "Ufficio creato", ["Ufficio" => (string)($_POST['nome'] ?? ''), "Ambito" => $amb_post]);
         flash_set($err ?? ($id_u ? "Ufficio salvato." : "Ufficio creato: ora aggiungi le persone dall'anagrafe."), $err ? 'danger' : 'success');
         admin_redirect("uffici.php?u=" . (int)$nuovo_id . "&r=" . time());
@@ -99,7 +100,8 @@ $flusso = $uff && $uff['ambito'] === 'dipartimento' && !$fisso;
 $uso = $uff ? $sv->uso((int)$uff['id']) : ['moduli' => 0, 'pratiche' => 0, 'bandi' => 0, 'risorse' => 0];
 $compiti_pr = $flusso ? \App\Uffici\ServizioUffici::compitiPredefiniti($uff) : [];
 $e_assistenza = $uff && ($uff['chiave'] ?? '') === 'assistenza'; // le persone dell'Assistenza indicano i corsi che seguono: Didacticus smista le chat in base al corso di laurea
-$corsi_sc = ($flusso && (int)($uff['segue_corsi'] ?? 0)) || $e_assistenza ? scelte_anagrafe_didattica($conn, 'corso_studio') : [];
+$e_collegato = $uff && !$fisso && (int)($uff['didacticus'] ?? 0) === 1; // ufficio collegato a Didacticus: le sue persone indicano i corsi che seguono
+$corsi_sc = ($flusso && (int)($uff['segue_corsi'] ?? 0)) || $e_assistenza || $e_collegato ? scelte_anagrafe_didattica($conn, 'corso_studio') : [];
 $cons_tutti = $flusso ? consigli_didattica($conn) : [];
 $ass = $dz->assenza();
 
@@ -173,6 +175,14 @@ echo pn_testata('Uffici', 'fa-sitemap', "Gli uffici del Dipartimento e di Ateneo
                         <label class="form-check"><input class="form-check-input" type="checkbox" name="segue_corsi" value="1"<?php echo (int)($uff['segue_corsi'] ?? 0) ? ' checked' : ''; ?>> Le persone seguono corsi di studio</label></div>
                     <div class="col-md-2"><label class="form-label small fw-bold" for="ufO">Ordine</label><input type="number" class="form-control form-control-sm" id="ufO" name="ordine" value="<?php echo (int)($uff['ordine'] ?? 0); ?>"></div>
                 <?php endif; ?>
+                <?php if ($ambito === 'dipartimento' && !$fisso): $did_arg = array_filter(explode(',', (string)($uff['didacticus_argomenti'] ?? ''))); ?>
+                    <div class="col-12"><div class="border rounded p-2 bg-light">
+                        <label class="form-check fw-bold"><input class="form-check-input" type="checkbox" name="didacticus" value="1" id="ufDid"<?php echo (int)($uff['didacticus'] ?? 0) ? ' checked' : ''; ?>> <i class="fa fa-robot text-primary me-1" aria-hidden="true"></i>Collega a Didacticus</label>
+                        <div class="form-text mb-1">Quando Didacticus non sa rispondere o lo studente chiede un operatore, può passare la chat a questo ufficio. Le chat passate le vedono solo le persone dell'ufficio (e gli amministratori): le persone entrano nella casella «Assistenza» e ricevono gli avvisi.</div>
+                        <div class="small fw-bold mb-1">Argomenti di cui si occupa (Didacticus passa qui, senza chiedere, le chat su questi argomenti):</div>
+                        <div class="d-flex flex-wrap gap-3 small"><?php foreach (\App\Assistenza\Costanti::argomenti() as $k_a => $a_a): ?><label class="form-check m-0"><input class="form-check-input" type="checkbox" name="did_argomenti[]" value="<?php echo $h($k_a); ?>"<?php echo in_array($k_a, $did_arg, true) ? ' checked' : ''; ?>> <?php echo $h($a_a['nome']); ?></label><?php endforeach; ?></div>
+                    </div></div>
+                <?php endif; ?>
                 <div class="col-12"><button type="submit" name="salva_ufficio" value="1" class="btn btn-danger fw-bold"><i class="fa fa-save me-1" aria-hidden="true"></i><?php echo $uff ? 'Salva' : "Crea l'ufficio"; ?></button></div>
             </form>
         </div></div>
@@ -207,10 +217,10 @@ echo pn_testata('Uffici', 'fa-sitemap', "Gli uffici del Dipartimento e di Ateneo
                         <select class="form-select form-select-sm" name="corsi[]" multiple size="4" aria-label="Corsi di studio seguiti"><?php foreach ($corsi_sc as $g => $cc): ?><optgroup label="<?php echo $h($g); ?>"><?php foreach ($cc as $c): ?><option<?php echo in_array($c, $cs_p, true) ? ' selected' : ''; ?>><?php echo $h($c); ?></option><?php endforeach; ?></optgroup><?php endforeach; ?></select></div>
                     <?php elseif ($cs_p): ?><div class="small text-secondary mt-1"><i class="fa fa-graduation-cap me-1" aria-hidden="true"></i><?php echo $h(implode(' · ', $cs_p)); ?></div><?php endif; ?>
                     <?php elseif ($comp_p): ?><div class="small text-secondary mt-1">Compiti: <?php echo $h(implode(', ', array_map(fn($k) => \App\Didattica\Costanti::COMPITI_UFFICIO[$k] ?? $k, $comp_p))); ?></div><?php endif; ?>
-                    <?php if ($e_assistenza && $modificabile): ?>
+                    <?php if (($e_assistenza || ($e_collegato && !($flusso && (int)($uff['segue_corsi'] ?? 0)))) && $modificabile): ?>
                     <div class="mt-1"><label class="small fw-bold">Corsi di laurea seguiti <span class="fw-normal text-secondary">(Didacticus manda a questa persona le chat degli studenti di questi corsi; Ctrl+clic per sceglierne più d'uno)</span></label>
                         <select class="form-select form-select-sm" name="corsi[]" multiple size="5" aria-label="Corsi di laurea seguiti"><?php foreach ($corsi_sc as $g => $cc): ?><optgroup label="<?php echo $h($g); ?>"><?php foreach ($cc as $c): ?><option<?php echo in_array($c, $cs_p, true) ? ' selected' : ''; ?>><?php echo $h($c); ?></option><?php endforeach; ?></optgroup><?php endforeach; ?></select></div>
-                    <?php elseif ($e_assistenza && $cs_p): ?><div class="small text-secondary mt-1"><i class="fa fa-graduation-cap me-1" aria-hidden="true"></i><?php echo $h(implode(' · ', $cs_p)); ?></div><?php endif; ?>
+                    <?php elseif (($e_assistenza || $e_collegato) && $cs_p): ?><div class="small text-secondary mt-1"><i class="fa fa-graduation-cap me-1" aria-hidden="true"></i><?php echo $h(implode(' · ', $cs_p)); ?></div><?php endif; ?>
                     <?php if ($modificabile): ?><div class="mt-1 d-flex gap-1">
                         <button type="submit" name="salva_persona" value="<?php echo (int)$p['id']; ?>" class="btn btn-sm btn-outline-primary py-0">Salva</button>
                         <button type="submit" name="togli_persona" value="<?php echo (int)$p['id']; ?>" class="btn btn-sm btn-outline-danger py-0" data-confirm="Togliere <?php echo $h($p['nominativo']); ?> dall'ufficio?" aria-label="Togli"><i class="fa fa-user-minus" aria-hidden="true"></i> Togli</button></div><?php endif; ?>

@@ -78,6 +78,12 @@ final class UfficiRepository
         );
     }
 
+    /** Collega o scollega l'ufficio a Didacticus (riceve le chat passate dall'assistente) con gli argomenti di cui si occupa. */
+    public function impostaDidacticus(int $id, bool $collegato, string $argomenti): void
+    {
+        $this->db->esegui('UPDATE uffici SET didacticus = ?, didacticus_argomenti = ? WHERE id = ?', [$collegato ? 1 : 0, $argomenti, $id]);
+    }
+
     /** Elimina l'ufficio con le sue persone (i controlli su cosa lo usa sono del servizio). */
     public function elimina(int $id): void
     {

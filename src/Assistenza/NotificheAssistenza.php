@@ -14,8 +14,16 @@ final class NotificheAssistenza
     /** Quanti caratteri del messaggio si mettono nell'email. */
     private const ANTEPRIMA = 600;
 
-    public function __construct(private InvioEmail $invio, private Sito $sito, private ServizioPush $push)
+    public function __construct(private InvioEmail $invio, private Sito $sito, private ServizioPush $push, private ?OperatoriAssistenza $operatori = null)
     {
+    }
+
+    /** Chi può sentire la finestrella di una chat: le persone dell'ufficio a cui è passata (o dell'Assistenza) e gli amministratori. */
+    private function ammesso(array $conv): ?callable
+    {
+        $uff = (int) ($conv['ufficio_id'] ?? 0) ?: null;
+
+        return $this->operatori === null ? null : fn(int $utenteId): bool => $this->operatori->puoVedere($utenteId, $uff);
     }
 
     /** Il link con cui chi chiede aiuto riprende la chat: la sua pagina se ha il login, il link personale se è esterno. @param array<string, string|null> $conv */
@@ -89,7 +97,7 @@ final class NotificheAssistenza
     /** Finestrella agli operatori per una chat nuova. @param array<string, string|null> $conv */
     public function pushNuovaRichiesta(array $conv, string $testo): int
     {
-        return $this->sicuro(fn() => $this->push->avvisaOperatori($conv, $testo, $this->linkOperatore($conv), true));
+        return $this->sicuro(fn() => $this->push->avvisaOperatori($conv, $testo, $this->linkOperatore($conv), true, $this->ammesso($conv)));
     }
 
     /** Finestrella per un messaggio: all'operatore che ha la chat, o a tutti se nessuno l'ha presa. @param array<string, string|null> $conv */
@@ -97,7 +105,7 @@ final class NotificheAssistenza
     {
         return $this->sicuro(fn() => (int) $conv['operatore_id'] > 0 && $conv['stato'] === Costanti::STATO_ASSEGNATA
             ? $this->push->avvisaOperatore((int) $conv['operatore_id'], $conv, $testo, $this->linkOperatore($conv))
-            : $this->push->avvisaOperatori($conv, $testo, $this->linkOperatore($conv), false));
+            : $this->push->avvisaOperatori($conv, $testo, $this->linkOperatore($conv), false, $this->ammesso($conv)));
     }
 
     /** Finestrella a chi ha chiesto aiuto (senza il testo della risposta). @param array<string, string|null> $conv */

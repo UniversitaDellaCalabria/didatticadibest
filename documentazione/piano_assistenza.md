@@ -30,6 +30,12 @@
 
 ## 2. Gli step
 
+### H7 — Uffici collegati a Didacticus *(29/10/2026, schema v103)*
+
+* In **Gestione → Uffici**, ogni ufficio del Dipartimento (non fisso) ha la spunta **«Collega a Didacticus»** e gli **argomenti** di cui si occupa (`uffici.didacticus`, `didacticus_argomenti`). Le persone indicano i corsi di laurea che seguono (anche l'ufficio Assistenza).
+* Quando Didacticus passa la chat: se l'argomento (scelto, o quello dell'ultima voce mostrata) è gestito da **un solo** ufficio collegato, la chat va lì; altrimenti chiede «Con quale ufficio vuoi parlare?» con i pulsanti (o il nome scritto a mano; «Assistenza generale» la lascia all'Assistenza). Poi, se l'ufficio ha indicato i corsi seguiti, chiede il corso di laurea e avvisa solo chi lo segue.
+* La chat passata a un ufficio (`assistenza_conversazioni.ufficio_id`) la vedono **solo le persone di quell'ufficio e gli amministratori** (casella, apertura, azioni, contatori, finestrelle push); le persone degli uffici collegati diventano operatori di chat (`OperatoriAssistenza::ufficiVisibili`).
+
 ### H1 — Assistenza e chat *(schema v86 e successivi)*
 
 **Materiali da te (non bloccanti):** i nomi delle persone che faranno da operatori (si inseriscono dal pannello, anche dopo); gli **orari** di assistenza (es. lun–ven 9–13 e 14–16, serve per «fuori orario»); eventuali argomenti da aggiungere a quelli di partenza.

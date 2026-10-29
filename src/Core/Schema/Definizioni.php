@@ -592,6 +592,13 @@ final class Definizioni
             'passata_il'      => "ADD COLUMN passata_il DATETIME DEFAULT NULL",
             'risolta_da_bot'  => "ADD COLUMN risolta_da_bot TINYINT(1) NOT NULL DEFAULT 0",
             'bot_mancate'     => "ADD COLUMN bot_mancate SMALLINT NOT NULL DEFAULT 0",
+            // v103: l'ufficio collegato a Didacticus a cui la chat è stata passata (vuoto = Assistenza)
+            'ufficio_id'      => "ADD COLUMN ufficio_id INT DEFAULT NULL",
+        ],
+        // v103: un ufficio si collega a Didacticus (riceve le chat passate dall'assistente) e dichiara gli argomenti di cui si occupa (elenco separato da virgole)
+        'uffici' => [
+            'didacticus'           => "ADD COLUMN didacticus TINYINT(1) NOT NULL DEFAULT 0",
+            'didacticus_argomenti' => "ADD COLUMN didacticus_argomenti VARCHAR(255) NOT NULL DEFAULT ''",
         ],
         // v89: le risposte di Didacticus portano link, allegati e suggerimenti (JSON)
         'assistenza_messaggi' => [

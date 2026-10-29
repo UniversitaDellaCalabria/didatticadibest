@@ -225,7 +225,7 @@ $ex6 = json_decode((string) ($bot_msgs($c6)[0]['extra'] ?? ''), true);
 $prima_sug = $ex6['suggerimenti'][0]['v'] ?? 0;
 prova(!empty($ex6['suggerimenti']) && (int) $ricarica($c6)['bot_mancate'] === 0 && $prima_sug > 0, "chat: se non è sicuro propone delle voci e non conta come domanda a vuoto");
 prova($srv_d->azioneBot($ricarica($c6), 'voce', (string) $prima_sug) === null && count($bot_msgs($c6)) === 2 && in_array($did->titolo((int) $prima_sug), array_column($srv_d->messaggi($ricarica($c6)), 'testo'), true), "chat: scegliere un suggerimento scrive il suo titolo come domanda e Didacticus risponde");
-prova($srv_d->azioneBot($ricarica($c6), 'argomento', 'tesi') === null && count($bot_msgs($c6)) === 3 && str_contains(end($srv_d->messaggi($ricarica($c6)))['testo'], 'Ecco cosa so su'), "chat: scegliere un argomento elenca le sue voci");
+prova($srv_d->azioneBot($ricarica($c6), 'argomento', 'tesi') === null && count($bot_msgs($c6)) === 3 && str_contains((fn(array $x) => end($x))($srv_d->messaggi($ricarica($c6)))['testo'], 'Ecco cosa so su'), "chat: scegliere un argomento elenca le sue voci");
 prova($srv_d->azioneBot($ricarica($c6), 'voce', '999999') === 'Questa risposta non è più disponibile.', "chat: una voce che non c'è più non si usa");
 $mail2 = $conta_mail('Nuova richiesta di assistenza');
 [$c7] = $srv_d->apriDaUtente($stu[7], 'altro', 'Preferisco una persona', null, '10.9.89.107', true);
@@ -535,7 +535,7 @@ prova(str_starts_with($srv_d->messaggi($ricarica($a2))[0]['testo'], 'Ciao Marta!
 
 $mail_a = $conta_mail('Nuova richiesta di assistenza');
 $srv_d->azioneBot($ricarica($a2), 'operatore');
-$ex_a = json_decode((string) end($bot_msgs($a2))['extra'], true);
+$ex_a = json_decode((string) (fn(array $x) => end($x))($bot_msgs($a2))['extra'], true);
 prova($ricarica($a2)['stato'] === 'bot' && ($ex_a['corsi'] ?? []) === ['Biologia', 'Informatica', 'Matematica'] && $conta_mail('Nuova richiesta di assistenza') === $mail_a, "operatore: prima chiede il corso di laurea (con i pulsanti) e non avvisa nessuno");
 prova($srv_d->azioneBot($ricarica($a2), 'corso', 'Chimica') === 'Corso non valido.', "operatore: un corso inventato non vale");
 $ora_di->t = $ora_di->t->modify('+1 minute');
@@ -551,11 +551,11 @@ prova($srv_d->azioneBot($a2r, 'corso', 'Biologia') !== null, "operatore: la doma
 // il corso scritto a mano invece di cliccare
 [$a3] = $srv_d->apriDaUtente(['id' => 98948, 'nome' => 'Luca', 'cognome' => 'Bianchi', 'email' => 'luca-d989@example.org'], 'altro', 'Voglio parlare con un operatore', null, '10.9.89.123', false, 'testo');
 $a3 = $ricarica($a3);
-$ex_a3 = json_decode((string) end($bot_msgs($a3))['extra'], true);
+$ex_a3 = json_decode((string) (fn(array $x) => end($x))($bot_msgs($a3))['extra'], true);
 prova($a3['stato'] === 'bot' && !empty($ex_a3['corsi']), "operatore: «voglio parlare con un operatore» all'inizio chiede subito il corso");
 $ora_di->t = $ora_di->t->modify('+1 minute');
 $srv_d->scriviComeUtente($ricarica($a3), 'boh');
-prova($ricarica($a3)['stato'] === 'bot' && str_contains(end($bot_msgs($a3))['testo'], 'Non ho riconosciuto il corso'), "operatore: un corso non riconosciuto fa richiedere la scelta");
+prova($ricarica($a3)['stato'] === 'bot' && str_contains((fn(array $x) => end($x))($bot_msgs($a3))['testo'], 'Non ho riconosciuto il corso'), "operatore: un corso non riconosciuto fa richiedere la scelta");
 $ora_di->t = $ora_di->t->modify('+1 minute');
 $srv_d->scriviComeUtente($ricarica($a3), 'informatica');
 $a3r = $ricarica($a3);
@@ -566,4 +566,61 @@ $q("UPDATE uffici_persone SET corsi = NULL WHERE email IN ('op-d989@example.org'
 [$a4] = $srv_d->apriDaEsterno('Esterna Prova', 'esterna-d989@example.org', 'altro', 'Voglio parlare con un operatore', '10.9.89.124', null, false, 'testo');
 prova($ricarica($a4)['stato'] === 'nuova' && str_starts_with($srv_d->messaggi($ricarica($a4))[0]['testo'], 'Ciao Esterna!'), "operatore: se nessuno ha indicato i corsi la chat passa subito (e il saluto usa il nome scritto)");
 
-foreach (["DELETE FROM didacticus_mancate", "DELETE FROM assistenza_messaggi", "DELETE FROM assistenza_conversazioni", "DELETE FROM uffici_persone WHERE email LIKE 'op%-d989@example.org'", "DELETE FROM utenti WHERE id BETWEEN 98931 AND 98949", "UPDATE impostazioni_sistema SET didacticus_attivo = 0 WHERE id = 1"] as $sql) $q($sql);
+// ---------------------------------------------------------------------------------------------------------------------------------------------------
+// Uffici collegati a Didacticus: l'ufficio spunta «Collega a Didacticus» e dichiara gli argomenti; la chat passa lì e la vedono solo le sue persone
+// ---------------------------------------------------------------------------------------------------------------------------------------------------
+$q("INSERT INTO utenti (id, nome, cognome, email, ruolo_id, ruoli_secondari) VALUES (98938, 'Tina', 'Tirocini', 'tina-d989@example.org', 5, ''), (98939, 'Tito', 'Tesi', 'tito-d989@example.org', 5, '')");
+$q("INSERT INTO uffici (nome, descrizione, ambito, attivo, didacticus, didacticus_argomenti) VALUES ('Ufficio prova tirocini d989', '', 'dipartimento', 1, 1, 'tirocini'), ('Ufficio prova tesi d989', '', 'dipartimento', 1, 1, 'tesi,pratiche')");
+$u_tir = (int) $db_di->valore("SELECT id FROM uffici WHERE nome = 'Ufficio prova tirocini d989'");
+$u_tes = (int) $db_di->valore("SELECT id FROM uffici WHERE nome = 'Ufficio prova tesi d989'");
+$q("INSERT INTO uffici_persone (ufficio_id, email, nominativo, ruolo, compiti) VALUES ($u_tir, 'op3-d989@example.org', 'Tina Tirocini', '', ''), ($u_tes, 'op4-d989@example.org', 'Tito Tesi', '', '')");
+$q("UPDATE utenti SET email = 'op3-d989@example.org' WHERE id = 98938");
+$q("UPDATE utenti SET email = 'op4-d989@example.org' WHERE id = 98939");
+$uff_sv = $cont_di->get(\App\Uffici\ServizioUffici::class);
+prova($uff_sv->collegaDidacticus($u_tes, true, ['tesi', 'inventato', 'pratiche']) === null && $db_di->valore('SELECT didacticus_argomenti FROM uffici WHERE id = ?', [$u_tes]) === 'tesi,pratiche', "uffici: il collegamento a Didacticus tiene solo gli argomenti che esistono");
+prova($uff_sv->collegaDidacticus($ass_id, true, ['tesi']) === null && (int) $db_di->valore('SELECT didacticus FROM uffici WHERE id = ?', [$ass_id]) === 0, "uffici: l'ufficio fisso Assistenza non si collega (è già la destinazione di partenza)");
+$coll = array_column($op_ass->ufficiCollegati(), 'nome', 'id');
+prova(($coll[$u_tir] ?? '') === 'Ufficio prova tirocini d989' && isset($coll[$u_tes]), "operatori: l'elenco degli uffici collegati");
+$tina = ['id' => 98938, 'email' => 'op3-d989@example.org', 'ruolo_id' => 5, 'ruoli_secondari' => ''];
+$dora = ['id' => 98931, 'email' => 'op-d989@example.org', 'ruolo_id' => 5, 'ruoli_secondari' => ''];
+$adm = ['id' => 98933, 'email' => 'adm-d989@example.org', 'ruolo_id' => 1, 'ruoli_secondari' => ''];
+prova($op_ass->eOperatore($tina) && $op_ass->ufficiVisibili($tina) === [$u_tir] && $op_ass->ufficiVisibili($dora) === [0] && $op_ass->ufficiVisibili($adm) === null && !$op_ass->eOperatore(['id' => 98932, 'email' => 'stud-d989@example.org', 'ruolo_id' => 3, 'ruoli_secondari' => '']),
+    "operatori: chi fa parte di un ufficio collegato è operatore, ma vede solo le chat di quell'ufficio");
+
+$ora_di->t = $ora_di->t->modify('+2 hours');
+// un argomento che un solo ufficio gestisce: la chat va dritta lì
+$q("INSERT INTO utenti (id, nome, cognome, email, ruolo_id, ruoli_secondari) VALUES (98934, 'Uno', 'Prova', 'u1-d989@example.org', 3, ''), (98935, 'Due', 'Prova', 'u2-d989@example.org', 3, ''), (98936, 'Tre', 'Prova', 'u3-d989@example.org', 3, '')");
+$sx = fn(int $n) => ['id' => 98933 + $n, 'nome' => 'Studente', 'cognome' => "Prova$n", 'email' => "u$n-d989@example.org"]; // chi ha già una chat con un operatore scrive lì: una persona nuova per ogni prova
+$mail_u = $conta_mail('Nuova richiesta di assistenza');
+[$b1] = $srv_d->apriDaUtente($sx(1), 'tirocini', '', null, '10.9.89.131', false, 'argomento');
+$srv_d->azioneBot($ricarica($b1), 'operatore');
+$b1r = $ricarica($b1);
+$mail_tir = array_values(array_filter($EMAIL, fn($e) => str_contains($e['oggetto'], 'Nuova richiesta di assistenza') && $e['a'] === 'op3-d989@example.org'));
+prova($b1r['stato'] === 'nuova' && (int) $b1r['ufficio_id'] === $u_tir && count($mail_tir) >= 1 && $conta_mail('Nuova richiesta di assistenza') === $mail_u + 1, "uffici: su «Tirocini» la chat passa all'ufficio che se ne occupa e avvisa solo le sue persone");
+prova(str_contains(implode('|', array_column(array_filter($srv_d->messaggi($b1r, 0, true), fn($m) => $m['tipo'] === 'nota'), 'testo')), 'Ufficio scelto: Ufficio prova tirocini d989'), "uffici: la nota per chi riceve dice l'ufficio");
+
+// visibilità della casella
+$vis = fn(?array $uffici) => array_column($srv_d->elenco('tutte', 0, $uffici), 'id');
+prova(in_array($b1['id'], $vis(null)) && in_array($b1['id'], $vis([$u_tir])) && !in_array($b1['id'], $vis([0])) && !in_array($b1['id'], $vis([$u_tes])) && in_array($c4['id'], $vis([0])), "casella: la chat passata a un ufficio la vedono i suoi, gli amministratori e non l'Assistenza");
+prova($api_d->chatOperatore((int) $b1['id'], 0, [0])['ok'] === false && $api_d->chatOperatore((int) $b1['id'], 0, [$u_tir])['ok'] === true && $api_d->azioneOperatore('prendi', (int) $b1['id'], ['id' => 98931, 'nome' => 'Dora', 'uffici' => [0]], [])['ok'] === false, "casella: chi non è dell'ufficio non apre né prende la chat");
+prova($srv_d->contatori(98931, [0])['da_prendere'] === $srv_d->contatori(98931, [0, $u_tir])['da_prendere'] - 1, "casella: i contatori seguono la stessa visibilità");
+
+// più uffici o argomento generico: si sceglie dai pulsanti
+[$b2] = $srv_d->apriDaUtente($sx(2), 'altro', 'Voglio parlare con un operatore', null, '10.9.89.132', false, 'testo');
+$bm2 = $bot_msgs($b2);
+$ex_b2 = json_decode((string) end($bm2)['extra'], true);
+prova($ricarica($b2)['stato'] === 'bot' && count($ex_b2['uffici'] ?? []) === 2, "uffici: se non c'è un argomento chiaro Didacticus chiede con quale ufficio parlare");
+prova($srv_d->azioneBot($ricarica($b2), 'ufficio', '999999') === 'Ufficio non valido.', "uffici: un ufficio inventato non vale");
+$ora_di->t = $ora_di->t->modify('+1 minute');
+$srv_d->scriviComeUtente($ricarica($b2), 'la tesi');
+$b2r = $ricarica($b2);
+prova($b2r['stato'] === 'nuova' && (int) $b2r['ufficio_id'] === $u_tes, "uffici: il nome dell'ufficio scritto a mano basta (anche in parte)");
+[$b3] = $srv_d->apriDaUtente($sx(3), 'altro', 'Voglio parlare con un operatore', null, '10.9.89.133', false, 'testo');
+$srv_d->azioneBot($ricarica($b3), 'ufficio', '0');
+prova($ricarica($b3)['stato'] === 'nuova' && (int) $ricarica($b3)['ufficio_id'] === 0, "uffici: «Assistenza generale» lascia la chat all'Assistenza");
+
+// senza uffici collegati si torna al comportamento di prima
+$q("UPDATE uffici SET didacticus = 0 WHERE id IN ($u_tir, $u_tes)");
+prova($op_ass->ufficiCollegati() === [] && $op_ass->ufficiVisibili($tina) === [], "uffici: scollegati, le loro persone non vedono più le chat");
+
+foreach (["DELETE FROM didacticus_mancate", "DELETE FROM assistenza_messaggi", "DELETE FROM assistenza_conversazioni", "DELETE FROM uffici_persone WHERE email LIKE 'op%-d989@example.org'", "DELETE FROM uffici WHERE nome LIKE 'Ufficio prova % d989'", "DELETE FROM utenti WHERE id BETWEEN 98931 AND 98949", "UPDATE impostazioni_sistema SET didacticus_attivo = 0 WHERE id = 1"] as $sql) $q($sql);
