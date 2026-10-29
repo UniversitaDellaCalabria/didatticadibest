@@ -98,7 +98,8 @@ $modificabile = $puo_su($uff);
 $flusso = $uff && $uff['ambito'] === 'dipartimento' && !$fisso;
 $uso = $uff ? $sv->uso((int)$uff['id']) : ['moduli' => 0, 'pratiche' => 0, 'bandi' => 0, 'risorse' => 0];
 $compiti_pr = $flusso ? \App\Uffici\ServizioUffici::compitiPredefiniti($uff) : [];
-$corsi_sc = $flusso && (int)($uff['segue_corsi'] ?? 0) ? scelte_anagrafe_didattica($conn, 'corso_studio') : [];
+$e_assistenza = $uff && ($uff['chiave'] ?? '') === 'assistenza'; // le persone dell'Assistenza indicano i corsi che seguono: Didacticus smista le chat in base al corso di laurea
+$corsi_sc = ($flusso && (int)($uff['segue_corsi'] ?? 0)) || $e_assistenza ? scelte_anagrafe_didattica($conn, 'corso_studio') : [];
 $cons_tutti = $flusso ? consigli_didattica($conn) : [];
 $ass = $dz->assenza();
 
@@ -206,6 +207,10 @@ echo pn_testata('Uffici', 'fa-sitemap', "Gli uffici del Dipartimento e di Ateneo
                         <select class="form-select form-select-sm" name="corsi[]" multiple size="4" aria-label="Corsi di studio seguiti"><?php foreach ($corsi_sc as $g => $cc): ?><optgroup label="<?php echo $h($g); ?>"><?php foreach ($cc as $c): ?><option<?php echo in_array($c, $cs_p, true) ? ' selected' : ''; ?>><?php echo $h($c); ?></option><?php endforeach; ?></optgroup><?php endforeach; ?></select></div>
                     <?php elseif ($cs_p): ?><div class="small text-secondary mt-1"><i class="fa fa-graduation-cap me-1" aria-hidden="true"></i><?php echo $h(implode(' · ', $cs_p)); ?></div><?php endif; ?>
                     <?php elseif ($comp_p): ?><div class="small text-secondary mt-1">Compiti: <?php echo $h(implode(', ', array_map(fn($k) => \App\Didattica\Costanti::COMPITI_UFFICIO[$k] ?? $k, $comp_p))); ?></div><?php endif; ?>
+                    <?php if ($e_assistenza && $modificabile): ?>
+                    <div class="mt-1"><label class="small fw-bold">Corsi di laurea seguiti <span class="fw-normal text-secondary">(Didacticus manda a questa persona le chat degli studenti di questi corsi; Ctrl+clic per sceglierne più d'uno)</span></label>
+                        <select class="form-select form-select-sm" name="corsi[]" multiple size="5" aria-label="Corsi di laurea seguiti"><?php foreach ($corsi_sc as $g => $cc): ?><optgroup label="<?php echo $h($g); ?>"><?php foreach ($cc as $c): ?><option<?php echo in_array($c, $cs_p, true) ? ' selected' : ''; ?>><?php echo $h($c); ?></option><?php endforeach; ?></optgroup><?php endforeach; ?></select></div>
+                    <?php elseif ($e_assistenza && $cs_p): ?><div class="small text-secondary mt-1"><i class="fa fa-graduation-cap me-1" aria-hidden="true"></i><?php echo $h(implode(' · ', $cs_p)); ?></div><?php endif; ?>
                     <?php if ($modificabile): ?><div class="mt-1 d-flex gap-1">
                         <button type="submit" name="salva_persona" value="<?php echo (int)$p['id']; ?>" class="btn btn-sm btn-outline-primary py-0">Salva</button>
                         <button type="submit" name="togli_persona" value="<?php echo (int)$p['id']; ?>" class="btn btn-sm btn-outline-danger py-0" data-confirm="Togliere <?php echo $h($p['nominativo']); ?> dall'ufficio?" aria-label="Togli"><i class="fa fa-user-minus" aria-hidden="true"></i> Togli</button></div><?php endif; ?>
