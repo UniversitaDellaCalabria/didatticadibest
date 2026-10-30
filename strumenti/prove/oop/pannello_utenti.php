@@ -9,3 +9,11 @@ prova(!str_contains($elenco, 'salva_abilitazioni') && !str_contains($elenco, 'se
 prova(str_contains($elenco, 'data-scheda="<?php echo $uid; ?>"'), "utenti: ogni riga ha il segnaposto da riempire all'apertura");
 prova(str_contains($src, "show.bs.collapse") && str_contains($src, 'iniziaSelect2(c)') && str_contains($src, "encodeURIComponent(c.dataset.scheda)"), "utenti: il browser scarica la scheda alla prima apertura e avvia i menu a tendina");
 prova(strpos($src, "isset(\$_GET['scheda'])") > strpos($src, '$perimetri = []') && strpos($src, "isset(\$_GET['scheda'])") < strpos($src, '<style>'), "utenti: la scheda si scrive dopo aver calcolato i permessi e prima della pagina intera");
+
+// Chi non ha l'email: invito in area personale e filtro nel pannello
+$src_ap = (string) file_get_contents(__DIR__ . '/../../../area_personale.php');
+$src_pr = (string) file_get_contents(__DIR__ . '/../../../profilo.php');
+prova(str_contains($src_ap, "trim((string)(\$user_info['email'] ?? '')) === ''") && str_contains($src_ap, 'profilo.php#email') && str_contains($src_ap, 'Aggiungi la tua email'), "email mancante: l'area personale invita ad aggiungerla");
+prova(str_contains($src_ap, '$vedi_come === null && trim'), "email mancante: l'invito non compare nell'anteprima «Vedi come» dell'amministratore");
+prova(str_contains($src_pr, 'id="email"'), "email mancante: il link porta alla scheda dell'email nel profilo");
+prova(str_contains($src, 'id="soloSenzaMail"') && str_contains($src, 'data-senzamail') && str_contains($src, "card.dataset.senzamail === '1'"), "utenti: filtro «solo chi non ha l'email»");

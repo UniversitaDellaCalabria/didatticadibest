@@ -590,6 +590,11 @@ if (isset($_GET['scheda'])) {
     <input class="form-check-input" type="checkbox" id="soloAbilitati" onchange="filtraUtenti(document.getElementById('cercaUtente').value)">
     <label class="form-check-label small fw-bold" for="soloAbilitati">Mostra solo amministratori e abilitati su quest'area</label>
 </div>
+<?php $n_senza_mail = count(array_filter($utenti, fn($x) => trim((string)($x['email'] ?? '')) === '')); ?>
+<div class="form-check form-switch mb-2">
+    <input class="form-check-input" type="checkbox" id="soloSenzaMail" onchange="filtraUtenti(document.getElementById('cercaUtente').value)">
+    <label class="form-check-label small fw-bold" for="soloSenzaMail">Mostra solo chi non ha l'email (<?php echo (int)$n_senza_mail; ?>): non riceve conferme, promemoria e avvisi</label>
+</div>
 
 <!-- Lista utenti -->
 <div id="listaUtenti">
@@ -604,7 +609,7 @@ if (isset($_GET['scheda'])) {
     // Dati abilitazioni per questo utente
     $pu = $perimetri[$uid] ?? null;   // perimetro nell'area corrente e nella FSL
 ?>
-<div class="usr-card" id="card<?php echo $uid; ?>" data-gruppi=",<?php echo implode(',', $gruppi_utente($u)); ?>," data-abil="<?php echo ($pu || in_array($uid, $ids_amministratori, true)) ? '1' : '0'; ?>" data-search="<?php echo htmlspecialchars(strtolower(($u['nome']??'').' '.($u['cognome']??'').' '.($u['email']??'').' '.($u['matricola_studente']??'').' '.($u['matricola_dipendente']??''))); ?>">
+<div class="usr-card" id="card<?php echo $uid; ?>" data-gruppi=",<?php echo implode(',', $gruppi_utente($u)); ?>," data-abil="<?php echo ($pu || in_array($uid, $ids_amministratori, true)) ? '1' : '0'; ?>" data-senzamail="<?php echo trim((string)($u['email'] ?? '')) === '' ? '1' : '0'; ?>" data-search="<?php echo htmlspecialchars(strtolower(($u['nome']??'').' '.($u['cognome']??'').' '.($u['email']??'').' '.($u['matricola_studente']??'').' '.($u['matricola_dipendente']??''))); ?>">
 
     <!-- HEADER (click to expand) -->
     <div class="usr-header" data-bs-toggle="collapse" data-bs-target="#usr<?php echo $uid; ?>" aria-expanded="false">
@@ -834,12 +839,12 @@ document.addEventListener('change', function (e) {
 // Ricerca per testo, per gruppo (ruolo principale o secondario) e solo abilitati, combinabili
 function filtraUtenti(q) {
     q = q.toLowerCase().trim();
-    var solo = document.getElementById('soloAbilitati').checked;
+    var solo = document.getElementById('soloAbilitati').checked, senzaMail = document.getElementById('soloSenzaMail').checked;
     var gruppo = document.getElementById('filtroGruppo').value, n = 0, mostrati = 0;
     // Senza ricerca né filtri si vedono i primi 25: gli altri con «Mostra tutti» (con una ricerca si cerca tra tutti)
-    var filtrando = !!(q || solo || gruppo), limite = (filtrando || window.utentiTutti) ? Infinity : 25;
+    var filtrando = !!(q || solo || senzaMail || gruppo), limite = (filtrando || window.utentiTutti) ? Infinity : 25;
     document.querySelectorAll('#listaUtenti .usr-card').forEach(function(card) {
-        var ok = (!q || card.dataset.search.includes(q)) && (!solo || card.dataset.abil === '1')
+        var ok = (!q || card.dataset.search.includes(q)) && (!solo || card.dataset.abil === '1') && (!senzaMail || card.dataset.senzamail === '1')
               && (!gruppo || card.dataset.gruppi.indexOf(',' + gruppo + ',') !== -1);
         if (ok) n++;
         var vedi = ok && mostrati < limite;

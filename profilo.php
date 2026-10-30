@@ -166,7 +166,7 @@ echo ui_tema_script();
 
             <!-- Email -->
             <div class="card shadow-sm border-0 mb-4">
-                <div class="card-header fw-bold"><i class="fa fa-envelope me-2 text-secondary"></i>Indirizzo email</div>
+                <div class="card-header fw-bold" id="email"><i class="fa fa-envelope me-2 text-secondary"></i>Indirizzo email</div>
                 <div class="card-body">
                     <p class="mb-3">Email attuale:
                         <?php if (!empty($user_info['email'])): ?>

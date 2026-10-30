@@ -95,6 +95,14 @@ echo ui_tema_script();
     }
     ?>
 
+    <?php if ($vedi_come === null && trim((string)($user_info['email'] ?? '')) === ''): ?>
+        <div class="alert alert-warning d-flex flex-wrap align-items-center gap-2" role="alert">
+            <i class="fa fa-envelope" aria-hidden="true"></i>
+            <div class="flex-grow-1"><strong>Aggiungi la tua email.</strong> Il portale non ne ha una per te: senza, non ti arrivano conferme di prenotazione, promemoria, avvisi sulle pratiche e firme da fare.</div>
+            <a class="btn btn-sm btn-dark fw-bold" href="profilo.php#email">Aggiungila ora</a>
+        </div>
+    <?php endif; ?>
+
     <?php if (!$riquadri): ?>
         <div class="alert alert-light border text-secondary">Per ora non c'è niente da mostrare qui.</div>
     <?php endif; ?>
