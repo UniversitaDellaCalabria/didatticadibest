@@ -90,7 +90,7 @@ require_once 'header.php';
                 <details class="d-inline"><summary class="d-inline text-primary" style="cursor:pointer">e altri <?php echo count($doc_l) - 5; ?></summary> <?php echo $h(implode(', ', array_slice($doc_l, 5))); ?></details><?php endif; ?></div><?php endif; ?>
             <?php if ($l['descrizione'] !== ''): $breve_l = mb_strlen($l['descrizione']) > 150; ?>
             <p class="small text-secondary mt-2 mb-0"><?php echo $h($breve_l ? rtrim((string)preg_replace('/\s+\S*$/u', '', mb_substr($l['descrizione'], 0, 150)), ' ,;:.') . '…' : $l['descrizione']); ?></p>
-            <?php if ($breve_l): ?><details class="small mt-1"><summary class="text-primary" style="cursor:pointer">Leggi tutta la descrizione</summary><p class="text-secondary mt-1 mb-0"><?php echo $h($l['descrizione']); ?></p></details><?php endif; ?>
+            <?php if ($breve_l): ?><details class="mt-1"><summary class="small text-primary" style="cursor:pointer">Leggi tutta la descrizione</summary><p class="small text-secondary mt-1 mb-0"><?php echo $h($l['descrizione']); ?></p></details><?php endif; ?>
             <?php endif; ?>
         </div></div></div>
         <?php endforeach; endif; ?>
