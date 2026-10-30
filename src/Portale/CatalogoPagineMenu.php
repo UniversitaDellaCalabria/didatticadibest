@@ -54,13 +54,11 @@ final class CatalogoPagineMenu
         );
         $c['Aree (pagine degli eventi e dei progetti)'] = array_map(static fn (array $p): array => [$nome($p), $p['slug'] . '.php'], $eventi);
         $c['Archivi degli eventi'] = array_map(static fn (array $p): array => ['Archivio: ' . $nome($p), $p['slug'] . '_archivio.php'], $eventi);
-        $c['Aule, laboratori e ricevimento'] = array_merge(
-            array_map(static fn (array $p): array => [$nome($p), $p['slug'] . '.php'], $prenotazioni),
-            [['Ricevimento dei docenti', 'ricevimento.php']]
-        );
+        // Il ricevimento per gli studenti è in «Cerca un docente» (docenti.php): ricevimento.php è la pagina con cui il docente imposta i propri orari
+        $c['Aule, laboratori e ricevimento'] = array_map(static fn (array $p): array => [$nome($p), $p['slug'] . '.php'], $prenotazioni);
         $c['Formazione Scuola Lavoro'] = [['Programma FSL della scuola (attività da prenotare insieme)', 'programma_fsl.php']];
         $c['Studenti'] = [['Domande frequenti (assistenza): le risposte per argomento e pubblico', 'domande_frequenti.php'], ['Contatti: chi contattare per cosa', 'contatti.php'], ['Notizie e comunicazioni', 'comunicazioni.php'], ['Scadenze e date utili', 'scadenze.php'], ['Corsi di studio e insegnamenti', 'corsi.php'], ['Docenti e ricevimento: cerca e prenota', 'docenti.php'], ['Tesi e laurea: i passi', 'percorso_tesi.php'], ['Tirocinio: i passi', 'percorso_tirocini.php'], ['Modulistica e moduli online', 'modulistica.php'], ['Le mie pratiche', 'pratiche.php'], ['Registro delle attività di tutorato', 'registro_tutorato.php'],
-            ['Tirocini curriculari: aziende e laboratori', 'tirocini.php'], ['Registra la presenza (scanner QR)', 'scanner_studente.php'], ['Come si fa: le guide per ruolo', 'guida.php']];
+            ['Tirocini curriculari: aziende e laboratori', 'tirocini.php'], ['Tirocini di Scienze motorie: aziende e posti liberi (serve l’accesso)', 'tirocini_motorie.php'], ['Registra la presenza (scanner QR)', 'scanner_studente.php'], ['Come si fa: le guide per ruolo', 'guida.php']];
         $c['Tesi e tirocini: disponibilità dei docenti'] = [['Disponibilità dei docenti per la tesi', 'disponibilita_tesi.php'], ['Disponibilità dei docenti per i tirocini', 'disponibilita_tirocini.php']];
         $c['Tesi: enti e aziende'] = [['Aziende convenzionate per la tesi', 'aziende_convenzionate_tesi.php'], ['Convenzione di tesi per enti e aziende', 'richiedi_convenzione_tesi.php']];
         $c['Studenti'][] = ['Ricerca nel sito', 'ricerca.php'];
@@ -91,6 +89,7 @@ final class CatalogoPagineMenu
         'modulistica.php' => 'Moduli da scaricare e moduli online da compilare e inviare.',
         'pratiche.php' => 'Le pratiche dello studente: invio, stato e risposte (serve l’accesso).',
         'registro_tutorato.php' => 'Il registro delle attività dei tutor (serve l’accesso).',
+        'tirocini_motorie.php' => 'Le aziende dove fare il tirocinio di Scienze motorie, con i posti liberi e da quando (senza nomi degli studenti).',
         'tirocini.php' => 'Aziende e laboratori dove svolgere il tirocinio curriculare.',
         'scanner_studente.php' => 'Per registrare la propria presenza a un evento inquadrando il codice QR.',
         'guida.php' => 'Guide «Come si fa» scritte per ruolo: studente, docente, gestore.',

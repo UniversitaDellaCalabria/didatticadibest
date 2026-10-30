@@ -6,6 +6,10 @@ Options -Indexes -MultiViews
 <Files "functions.php">
     Require all denied
 </Files>
+# Installazione già fatta: il programma di installazione non deve essere raggiungibile dal web
+<Files "install.php">
+    Require all denied
+</Files>
 <FilesMatch "^\.env">
     Require all denied
 </FilesMatch>
@@ -47,6 +51,9 @@ Options -Indexes -MultiViews
 
 RewriteEngine On
 RewriteRule ^(assets/vendor|uploads/slide_home)/ - [E=LUNGA:1]
+# Mappa del sito e indicazioni per i motori di ricerca, generate dal portale
+RewriteRule ^sitemap\.xml$ sitemap.php [L]
+RewriteRule ^robots\.txt$ robots.php [L]
 # Librerie di Composer (vendor/, solo in sviluppo): mai raggiungibili dal web (src/ e tests/ hanno il loro .htaccess)
 RewriteRule (^|/)vendor/ - [F,L]
 # Nessun RewriteBase: le regole valgono qualunque sia la cartella del portale (/didattica, /eventi…)

@@ -50,10 +50,11 @@ final class CatalogoPagineMenuTest extends DatabaseDiProva
                 $url[] = $u;
             }
         }
-        foreach (['agenda.php', 'agenda.php?ambito=ricerca', 'openlab.php', 'openlab_archivio.php', 'fsl.php', 'aule-laboratori.php', 'modulistica.php', 'pratiche.php', 'ricevimento.php',
+        foreach (['agenda.php', 'agenda.php?ambito=ricerca', 'openlab.php', 'openlab_archivio.php', 'fsl.php', 'aule-laboratori.php', 'modulistica.php', 'pratiche.php', 'docenti.php', 'tirocini_motorie.php',
             'aziende_convenzionate_tesi.php', 'richiedi_convenzione_tesi.php', 'area_personale.php', 'guida.php', 'verifica_attestato.php', 'privacy.php'] as $atteso) {
             $this->assertContains($atteso, $url, $atteso);
         }
+        $this->assertNotContains('ricevimento.php', $url, 'ricevimento.php è la pagina del docente, non degli studenti');
         $this->assertNotContains('vecchia.php', $url, 'un\'area non visibile non entra');
         $this->assertNotContains('aule-laboratori_archivio.php', $url, 'le aule non hanno l\'archivio degli eventi');
         $this->assertSame(count($url), count(array_unique($url)), 'nessun indirizzo ripetuto');

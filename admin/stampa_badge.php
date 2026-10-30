@@ -24,6 +24,7 @@ $info = null;
 $col_primaria = $page_cfg['colore_primario'] ?? '#990000';
 
 if (isset($_POST['avvia_stampa'])) {
+    csrf_verify($_POST['csrf_token'] ?? '');
     $t_id = (int)$_POST['turno_id'];
     if (!turno_autorizzato($conn, $t_id, $filtro_p, $sql_filtro_eventi_rbac)) nega_accesso(); // solo turni dell'area/eventi del gestore
 
@@ -110,6 +111,7 @@ if (isset($_POST['avvia_stampa'])) {
     
     <div class="card shadow-sm border-0 p-4 bg-white border-top border-primary border-4">
         <form method="POST">
+            <?php csrf_field(); ?>
             
             <h6 class="fw-bold text-primary mb-3">1. Seleziona l'Evento e il Turno</h6>
             <select name="turno_id" class="form-select form-select-lg mb-4 fw-bold border-primary text-primary" required>

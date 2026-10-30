@@ -99,3 +99,12 @@ Nessuna `meta description`, nessuna immagine di anteprima (`og:`), nessun `canon
 5. **Una email sola per docente e attività** (punto 4) con il riepilogo di tutte le classi.
 6. **Calendario personale in abbonamento** (ICS) per studenti e docenti: i file ICS esistono già per singoli eventi; l'abbonamento unico è un piccolo passo.
 7. **Accessi di prova in sola lettura per chi dà assistenza** (ora solo gli amministratori possono usare «Entra come…»; si potrebbe estendere all'ufficio Assistenza).
+
+## Stato dei punti 5-10 (30/10/2026, in locale, da caricare)
+- **5 File inutili:** `.htaccess` blocca ora anche `install.php` (README, composer, phpunit erano già bloccati nel .htaccess locale: va caricato quello nuovo con scp). Restano **a tuo carico sul server**: cancellare `install.php`, `README.md`, `MIGRATION_PLAN.md`; `ServerTokens Prod` e `expose_php=Off` (configurazione di Apache/PHP, non del portale); Apache con OpenSSL 3.
+- **6 Sicurezza:** `stampa_badge.php` ora ha il token CSRF; aggiunta l'intestazione `Permissions-Policy` (geolocalizzazione, microfono, pagamenti, USB negati; fotocamera solo per il portale, serve allo scanner QR). La CSP severa resta da fare a gradini (prima `report-only`): non l'ho toccata per non rompere le pagine con script nella pagina.
+- **7 Backup:** lo strumento esiste (`strumenti/ripristina_backup.php verifica|prova|file`). Resta da fare **da te**: una copia fuori sede e una prova di ripristino con `prova` su un database di prova, una volta l'anno.
+- **8 Menu:** il catalogo non propone più `ricevimento.php` (pagina del docente) e propone `tirocini_motorie.php` sotto Studenti. Le voci già nel menu vivo non cambiano da sole: da Menu, correggere il link di «Ricevimento» in `docenti.php` e aggiungere «Tirocini Scienze motorie» (il pulsante «crea» del catalogo la aggiunge nascosta).
+- **9 Motori di ricerca:** descrizione, `og:` e indirizzo canonico nella testata; `sitemap.xml` e `robots.txt` generati dal portale (il pannello e `uploads/` esclusi). La dichiarazione di accessibilità AgID resta da chiedere all'Ateneo.
+- **10 Debito tecnico:** non toccato di proposito: sono refactoring grandi (`master_template.php`, pagine sopra le 900 righe) da fare un pezzo alla volta con prove, non in blocco.
+

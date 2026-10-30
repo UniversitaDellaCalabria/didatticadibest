@@ -80,6 +80,24 @@ if ($u_logged_header) {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <title><?php echo htmlspecialchars(isset($page_cfg['titolo']) ? $page_cfg['titolo'] . ' - ' . $titolo_portale : $titolo_portale); ?></title>
+    <?php
+    // Anteprima e motori di ricerca: descrizione (una pagina può impostare $meta_descrizione), titolo e immagine per le condivisioni, indirizzo canonico (solo senza parametri)
+    $meta_titolo = isset($page_cfg['titolo']) ? $page_cfg['titolo'] . ' - ' . $titolo_portale : $titolo_portale;
+    $meta_descrizione = $meta_descrizione ?? 'Didattica, eventi, orientamento, tirocini e Formazione Scuola Lavoro del Dipartimento di Biologia, Ecologia e Scienze della Terra (DiBEST), Università della Calabria.';
+    $meta_base = rtrim(url_base_sito(), '/');
+    $meta_percorso = (string) parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH);
+    $meta_dentro = substr($meta_percorso, strlen((string) parse_url($meta_base, PHP_URL_PATH)));
+    ?>
+    <meta name="description" content="<?php echo htmlspecialchars($meta_descrizione); ?>">
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="it_IT">
+    <meta property="og:site_name" content="<?php echo htmlspecialchars($titolo_portale); ?>">
+    <meta property="og:title" content="<?php echo htmlspecialchars($meta_titolo); ?>">
+    <meta property="og:description" content="<?php echo htmlspecialchars($meta_descrizione); ?>">
+    <meta property="og:image" content="<?php echo htmlspecialchars($meta_base . '/assets/icon-192.png'); ?>">
+    <?php if (empty($_SERVER['QUERY_STRING']) && str_starts_with($meta_percorso, (string) parse_url($meta_base, PHP_URL_PATH)) && $meta_dentro !== '' && !str_contains($meta_dentro, 'admin/')): ?>
+    <link rel="canonical" href="<?php echo htmlspecialchars($meta_base . $meta_dentro); ?>">
+    <?php endif; ?>
     
     <!-- PWA / App Mobile -->
     <link rel="manifest" href="manifest.json">

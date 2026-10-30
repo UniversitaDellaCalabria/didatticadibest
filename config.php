@@ -40,6 +40,8 @@ header("X-Frame-Options: SAMEORIGIN");
 header("X-Content-Type-Options: nosniff");
 header("Referrer-Policy: strict-origin-when-cross-origin");
 header("X-XSS-Protection: 1; mode=block");
+// Il portale non usa mai questi sensori: se una pagina (o uno script esterno) li chiedesse, il browser li nega. La fotocamera resta per lo scanner QR.
+header("Permissions-Policy: geolocation=(), microphone=(), payment=(), usb=(), camera=(self)");
 header("Content-Security-Policy: default-src 'self'; " .
     "script-src 'self' 'unsafe-inline' cdn.jsdelivr.net cdnjs.cloudflare.com; " .
     "style-src 'self' 'unsafe-inline' cdn.jsdelivr.net cdnjs.cloudflare.com; " .
