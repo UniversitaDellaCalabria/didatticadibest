@@ -221,6 +221,7 @@ final class PrenotazioneRepository
     public function impostaScuolaUtente(int $utenteId, ?string $codiceScuola): void
     {
         $this->db->esegui('UPDATE utenti SET scuola_codice = ? WHERE id = ?', [$codiceScuola, $utenteId]);
+        (new \App\Auth\GruppoScuole($this->db))->allinea($utenteId, $codiceScuola);
     }
 
     // ---- check-in ----

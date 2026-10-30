@@ -119,7 +119,7 @@ $apri_nuova = isset($_GET['nuova']);
 </style>
 <?php
 echo pn_testata('Tirocini', 'fa-briefcase', "I posti dove si svolgono i tirocini curriculari: le aziende esterne con convenzione attiva (dal report del TSP di Cineca) e i laboratori interni dell'Ateneo. Si pubblica solo ciò che è completo.",
-    '<a class="btn btn-outline-secondary btn-sm" href="../tirocini.php" target="_blank" rel="noopener"><i class="fa fa-list me-1" aria-hidden="true"></i>Pagina pubblica</a>');
+    '<a class="btn btn-outline-secondary btn-sm" href="tirocini_motorie.php"><i class="fa fa-person-running me-1" aria-hidden="true"></i>Scienze motorie</a> <a class="btn btn-outline-secondary btn-sm" href="../tirocini.php" target="_blank" rel="noopener"><i class="fa fa-list me-1" aria-hidden="true"></i>Pagina pubblica</a>');
 echo pn_schede([
     'esterni' => ['href' => $url('esterni'), 'testo' => 'Aziende esterne', 'icona' => 'fa-building', 'numero' => $cont['senza_indirizzo'] + $cont['da_confermare'], 'avviso' => true, 'titolo' => 'Aziende da completare o confermare'],
     'interni' => ['href' => $url('interni'), 'testo' => 'Laboratori interni', 'icona' => 'fa-flask'],

@@ -383,6 +383,16 @@ final class Definizioni
             descrizione TEXT DEFAULT NULL, infrastruttura VARCHAR(150) DEFAULT '', superficie VARCHAR(20) DEFAULT '', pubblica TINYINT(1) NOT NULL DEFAULT 1,
             aggiornato_il DATETIME DEFAULT CURRENT_TIMESTAMP, INDEX idx_dip (dip_cod, pubblica)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        // v105: tirocini di Scienze motorie. Per ogni azienda scelta tra le convenzionate il numero di posti contemporanei (di partenza 2) e i periodi
+        // di tirocinio (nome e matricola restano solo nel pannello; la pagina per gli studenti mostra soltanto libera/satura e la data in cui si libera un posto).
+        'tirocini_motorie_posti' => "CREATE TABLE IF NOT EXISTS tirocini_motorie_posti (
+            azienda_id INT NOT NULL PRIMARY KEY, posti TINYINT NOT NULL DEFAULT 2, note VARCHAR(300) DEFAULT '', creato_il DATETIME DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        'tirocini_motorie_periodi' => "CREATE TABLE IF NOT EXISTS tirocini_motorie_periodi (
+            id INT AUTO_INCREMENT PRIMARY KEY, azienda_id INT NOT NULL, matricola VARCHAR(20) DEFAULT '', studente VARCHAR(150) DEFAULT '',
+            inizio DATE NOT NULL, fine DATE NOT NULL, origine VARCHAR(10) NOT NULL DEFAULT 'manuale', annullato TINYINT(1) NOT NULL DEFAULT 0,
+            creato_il DATETIME DEFAULT CURRENT_TIMESTAMP, INDEX idx_azienda (azienda_id, annullato, fine)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         // v61: diario di bordo (auto e mezzi): un diario per prenotazione, compilato da chi ha prenotato, dagli altri conducenti o dal responsabile
         'risorse_diario' => "CREATE TABLE IF NOT EXISTS risorse_diario (
             id INT AUTO_INCREMENT PRIMARY KEY, risorsa_id INT NOT NULL, prenotazione_id INT NOT NULL, data DATE DEFAULT NULL, conducente VARCHAR(200) DEFAULT '',

@@ -17,7 +17,7 @@ use Closure;
 final class Migrazioni
 {
     /** 102: lettura automatica di unical.it per Didacticus (tabelle didacticus_sito, didacticus_sito_brani con indice FULLTEXT, didacticus_sito_impostazioni). 100: pagine del sito di Ateneo che Didacticus legge come fonti (tabella didacticus_pagine). 99: area personale con icone di servizio a tre per riga e righe di lavoro (nuovi riquadri «messaggi» e «cerca»). 98: disponibilità dei docenti per tesi e tirocini (tabella disponibilita_docenti). 97: area personale con «Il mio lavoro» (riquadro di sistema «lavoro»: le postazioni di chi gestisce pratiche, protocollo, sedute, convenzioni, tutorato, assistenza). 96: Didacticus separa i tirocini (studenti) dalla Formazione Scuola Lavoro (scuole): nuovo argomento «fsl». 95: calendario personale (tabella calendario_token) e interruttore del riepilogo settimanale con l'agenda (colonne riepilogo_agenda* di impostazioni_sistema). 94: area personale a cruscotto (riquadro «Il mio profilo»). 93: area personale per profilo (tabella area_riquadri e riquadri di sistema di partenza). 89: Didacticus (tabelle didacticus_voci e didacticus_mancate, colonne dell'assistenza e voci di partenza). 88: notifiche push (tabella push_sottoscrizioni). 87: assistenza acceso/spento e orari (colonne assistenza_attiva e assistenza_orari di impostazioni_sistema). 86: assistenza (tabelle assistenza_conversazioni e assistenza_messaggi, ufficio fisso «assistenza»). 82: testi delle email modificabili dal pannello (tabella email_modelli). 80: verbali pubblici in sola visualizzazione, download con le credenziali di Ateneo (ufficio «verbali_scarico»). 75: dati del Direttore nel testo della convenzione di tesi (colonne tesi_direttore_* di impostazioni_sistema). 74: nella richiesta di tesi la sede esterna sceglie l'azienda tra le convenzionate (aggiorna il modulo già creato). 73: convenzioni di tesi con enti e aziende (tabella convenzioni_tesi e ufficio «convenzioni_tesi»). 72: interruttore per sospendere i promemoria al Direttore e agli uffici. 71: uffici di Dipartimento e di Ateneo in un'unica anagrafe (tabelle uffici e uffici_persone): la migrazione copia i dati delle quattro tabelle di prima. */
-    public const VERSIONE = 103;
+    public const VERSIONE = 105;
 
     /**
      * @param list<string> $gruppiPersonale gruppi assegnati al login in base al ruolo in Ateneo (GRUPPI_PERSONALE)
@@ -132,6 +132,17 @@ final class Migrazioni
             }
         }
         $this->db->esegui("UPDATE didacticus_voci SET argomento = 'fsl' WHERE argomento = 'tirocini' AND titolo = 'Scuole: Formazione Scuola Lavoro e convenzione online'");
+
+        // 4a2c. v104: il gruppo «Scuole» (chi ha indicato una scuola) e il profilo «Scuola» dell'area personale. Lo storico: il gruppo a tutti quelli che hanno già una scuola,
+        // e i riquadri che vedevano gli esterni li vedono anche le scuole (una volta sola: se l'amministratore li toglie non tornano)
+        // e il gruppo «Aziende» (chi ha un'email di convenzione di tesi) con il profilo «Azienda»
+        (new \App\Auth\GruppoScuole($this->db))->allineaTutti();
+        (new \App\Auth\GruppoAziende($this->db))->allineaTutti();
+        foreach (['scuola', 'azienda'] as $nuovoProfilo) {
+            if ((int) ($this->db->valore("SELECT COUNT(*) FROM area_riquadri WHERE FIND_IN_SET('$nuovoProfilo', profili) > 0") ?? 1) === 0) {
+                $this->db->esegui("UPDATE area_riquadri SET profili = CONCAT(profili, ',$nuovoProfilo') WHERE FIND_IN_SET('esterno', profili) > 0");
+            }
+        }
 
         // 4a3. v93-94: i riquadri di sistema dell'area personale (quelli che mancano: i presenti, anche spenti o cambiati dal pannello, non si toccano)
         (new \App\Portale\Area\RiquadriRepository($this->db))->semina(date('Y-m-d H:i:s'));
@@ -249,6 +260,7 @@ final class Migrazioni
         // Uffici fissi che servono al portale (se mancano si creano): convenzioni FSL e persone che possono scaricare i verbali
         foreach ([['convenzioni_fsl', 'Ufficio convenzioni FSL', 'Prende in carico le convenzioni delle scuole (Formazione Scuola Lavoro): protocollo in entrata e definitivo', 90],
                   ['verbali_scarico', 'Download dei verbali', 'Persone che possono scaricare i verbali dalla pagina pubblica (accedendo con le credenziali di Ateneo)', 91],
+                  ['tirocini_motorie', 'Ufficio tirocini (Scienze motorie)', 'Compila i posti delle aziende e i tirocini in corso per Scienze motorie (Didattica › Tirocini › Scienze motorie)', 93],
                   ['assistenza', 'Assistenza a studenti e utenti', 'Risponde alle chat di assistenza (le richieste che Didacticus non risolve arrivano qui)', 92]] as [$chiave, $nome, $descr, $ord]) {
             if ((int) $this->db->valore('SELECT COUNT(*) FROM uffici WHERE chiave = ?', [$chiave]) === 0) {
                 $this->db->inserisci("INSERT INTO uffici (nome, descrizione, chiave, ambito, ordine) VALUES (?, ?, ?, 'dipartimento', ?)", [$nome, $descr, $chiave, $ord]);

@@ -186,5 +186,6 @@
         }
     });
 </script>
+<?php include __DIR__ . '/../inc/barra_simulazione.php'; ?>
 </body>
 </html>

@@ -131,6 +131,8 @@ $consigli_referente  = $puo_didattica_tutto ? [] : consigli_referente($conn, $ut
 $puo_didattica       = $puo_didattica_tutto || (bool)$consigli_referente;
 // Convenzioni di tesi con enti e aziende: chi lavora in Didattica e le persone dell'ufficio «Ufficio convenzioni di tesi» (Gestione del portale → Uffici)
 $puo_conv_tesi        = $puo_didattica_tutto || \App\Core\App::per($conn)->get(\App\ConvenzioniTesi\ServizioConvenzioniTesi::class)->utenteDellUfficio($utente_admin);
+// Tirocini di Scienze motorie (posti delle aziende): chi lavora in Didattica e le persone dell'ufficio «Ufficio tirocini (Scienze motorie)»
+$puo_tir_motorie     = $puo_didattica_tutto || \App\Core\App::per($conn)->get(\App\Uffici\ServizioUffici::class)->utenteMembro($utente_admin, 'tirocini_motorie');
 $puo_tutorato        = $is_full_admin || ha_modulo($conn, $uid_rbac, 'didattica') || utente_operatore_ufficio($conn, $utente_admin, 'bandi');
 // Assistenza a studenti e utenti: le persone dell'ufficio fisso «Assistenza» (Gestione del portale → Uffici) e gli amministratori rispondono alle chat
 $puo_assistenza      = \App\Core\App::per($conn)->get(\App\Assistenza\OperatoriAssistenza::class)->eOperatore($utente_admin);
@@ -164,9 +166,9 @@ if (!$is_full_admin && $page_cfg) {
 
 // Abilitati senza aree (solo una parte della FSL o il modulo Didattica): la loro pagina di partenza è quella
 if (!$is_full_admin && !$pagine_disponibili && in_array(basename($_SERVER['PHP_SELF']), ['index.php', 'inizio.php', 'dashboard.php', 'aree.php'], true)
-    && ($puo_fsl_convenzioni || $puo_fsl_scuole || $puo_didattica || $puo_conv_tesi || $puo_assistenza)) {
+    && ($puo_fsl_convenzioni || $puo_fsl_scuole || $puo_didattica || $puo_conv_tesi || $puo_assistenza || $puo_tir_motorie)) {
     while (ob_get_level() > 0) ob_end_clean();
-    header('Location: ' . ($puo_fsl_convenzioni ? 'fsl.php' : ($puo_fsl_scuole ? 'scuole.php' : ($puo_didattica ? 'didattica.php' : ($puo_conv_tesi ? 'convenzioni_tesi.php' : 'assistenza.php')))));
+    header('Location: ' . ($puo_fsl_convenzioni ? 'fsl.php' : ($puo_fsl_scuole ? 'scuole.php' : ($puo_didattica ? 'didattica.php' : ($puo_conv_tesi ? 'convenzioni_tesi.php' : ($puo_assistenza ? 'assistenza.php' : 'tirocini_motorie.php'))))));
     exit;
 }
 
@@ -185,7 +187,7 @@ if ($puo_didattica && basename($_SERVER['PHP_SELF']) === 'inizio.php' && ($_GET[
 $moduli_utente = [];
 foreach ($pagine_disponibili as $p_m) $moduli_utente[modulo_di_area($p_m)] = true;
 if ($puo_fsl_convenzioni) $moduli_utente['fsl'] = true;
-if ($puo_didattica || $puo_conv_tesi || $puo_assistenza) $moduli_utente['didattica'] = true;
+if ($puo_didattica || $puo_conv_tesi || $puo_assistenza || $puo_tir_motorie) $moduli_utente['didattica'] = true;
 if ($is_full_admin || $puo_fsl_scuole) $moduli_utente['portale'] = true;
 $moduli_utente = array_values(array_filter(array_keys(MODULI_PORTALE), fn($k) => isset($moduli_utente[$k])));
 $pagina_corrente = basename($_SERVER['PHP_SELF']);
@@ -428,7 +430,7 @@ $colore_lato = $modulo_corrente === 'portale' ? '#64748b' : $colore_modulo; // l
                     $voce_menu(['fsl.php', 'convenzione_file.php'], 'fsl.php', 'fa-briefcase', $puo_fsl ? 'Formazione Scuola Lavoro' : 'Convenzioni FSL', false, $n_conv_firmate); ?>
                 <?php endif; ?>
 
-                <?php if ($modulo_corrente === 'didattica' && ($puo_didattica || $puo_conv_tesi || $puo_assistenza)): ?>
+                <?php if ($modulo_corrente === 'didattica' && ($puo_didattica || $puo_conv_tesi || $puo_assistenza || $puo_tir_motorie)): ?>
                     <?php $tab_did = $current_page === 'didattica.php' ? (in_array($_GET['tab'] ?? '', ['pratiche', 'sedute', 'moduli', 'ufficio', 'statistiche'], true) ? $_GET['tab'] : 'home') : '';
                     if (!$puo_didattica_tutto) $tab_did = $current_page === 'didattica.php' ? 'sedute' : '';
                     // Numeri accanto alle voci: se non si riescono a contare (file non ancora caricato) il menu resta senza numeri
@@ -449,6 +451,7 @@ $colore_lato = $modulo_corrente === 'portale' ? '#64748b' : $colore_modulo; // l
                         $voce_menu(['sostituzioni.php'], 'sostituzioni.php', 'fa-people-arrows', 'Sostituzioni');
                         $voce_menu([], 'didattica.php?tab=statistiche', 'fa-chart-column', 'Statistiche', $tab_did === 'statistiche');
                     }
+                    if ($puo_tir_motorie) $voce_menu(['tirocini_motorie.php'], 'tirocini_motorie.php', 'fa-person-running', 'Tirocini Scienze motorie');
                     if ($puo_assistenza) { $n_as = 0; try { $n_as = \App\Core\App::get(\App\Assistenza\ServizioAssistenza::class)->contatori((int)$uid_rbac)['da_prendere']; } catch (\Throwable $e) { error_log('Menu, assistenza: ' . $e->getMessage()); } $voce_menu(['assistenza.php'], 'assistenza.php', 'fa-headset', 'Assistenza', false, $n_as); $n_dm = 0; try { $n_dm = \App\Core\App::get(\App\Assistenza\Didacticus\MancateRepository::class)->contaDaVedere(); } catch (\Throwable $e) { error_log('Menu, Didacticus: ' . $e->getMessage()); } $voce_menu(['didacticus.php'], 'didacticus.php', 'fa-robot', 'Domande e risposte', false, $n_dm); }
                     if ($puo_conv_tesi) { $n_ct = 0; try { $n_ct = \App\Core\App::get(\App\ConvenzioniTesi\ServizioConvenzioniTesi::class)->daFare(); } catch (\Throwable $e) { error_log('Menu, convenzioni di tesi: ' . $e->getMessage()); } $voce_menu(['convenzioni_tesi.php'], 'convenzioni_tesi.php', 'fa-handshake', 'Convenzioni di tesi', false, $n_ct); }
                     if ($puo_tutorato) { $n_tut_val = 0; try { $n_tut_val = \App\Core\App::get(\App\Portale\CoseDaFare::class)->tutoratoDaValidare(); } catch (\Throwable $e) { error_log('Menu, tutorato: ' . $e->getMessage()); } $voce_menu(['tutorato.php'], 'tutorato.php', 'fa-user-graduate', 'Tutorato · lettere di incarico', false, $n_tut_val); } ?>
@@ -470,12 +473,13 @@ $colore_lato = $modulo_corrente === 'portale' ? '#64748b' : $colore_modulo; // l
                     <?php $chiudi_gruppo(); ?>
                     <?php if ($is_full_admin): ?>
                         <?php $voce_menu(['aree.php', 'nuova_area.php'], 'aree.php', 'fa-layer-group', 'Aree di tutti i moduli'); ?>
-                        <?php $apri_gruppo('sito', 'fa-globe', 'Sito pubblico', ['testata.php', 'menu.php', 'contatti.php', 'comunicazioni.php', 'area_personale.php']); ?>
+                        <?php $apri_gruppo('sito', 'fa-globe', 'Sito pubblico', ['testata.php', 'menu.php', 'contatti.php', 'comunicazioni.php', 'area_personale.php', 'simula.php']); ?>
                             <?php $voce_menu(['testata.php'], 'testata.php', 'fa-image', 'Testata e home'); ?>
                             <?php $voce_menu(['menu.php'], 'menu.php', 'fa-link', 'Menu'); ?>
                             <?php $voce_menu(['contatti.php'], 'contatti.php', 'fa-address-card', 'Contatti per gli studenti'); ?>
                             <?php $voce_menu(['comunicazioni.php'], 'comunicazioni.php', 'fa-bullhorn', 'Notizie e pagine'); ?>
                             <?php $voce_menu(['area_personale.php'], 'area_personale.php', 'fa-table-cells-large', 'Area personale'); ?>
+                            <?php $voce_menu(['simula.php'], 'simula.php', 'fa-user-secret', 'Entra come…'); ?>
                         <?php $chiudi_gruppo(); ?>
                         <?php $voce_menu(['utenti.php'], 'utenti.php', 'fa-users-cog', 'Utenti e abilitazioni'); ?>
                         <?php $voce_menu(['uffici.php', 'uffici_ateneo.php'], 'uffici.php', 'fa-sitemap', 'Uffici e persone'); ?>

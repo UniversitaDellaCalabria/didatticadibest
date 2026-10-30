@@ -13,6 +13,8 @@ final class Profili
     public const PERSONALE = 'personale';
     public const GESTORE = 'gestore';
     public const AMMINISTRATORE = 'amministratore';
+    public const SCUOLA = 'scuola';
+    public const AZIENDA = 'azienda';
     public const ESTERNO = 'esterno';
 
     /** Chiave => nome, nell'ordine in cui si mostrano. */
@@ -23,7 +25,9 @@ final class Profili
         self::PERSONALE => 'Personale e uffici',
         self::GESTORE => 'Gestore di area o evento',
         self::AMMINISTRATORE => 'Amministratore',
-        self::ESTERNO => 'Scuola, azienda o ospite',
+        self::SCUOLA => 'Scuola',
+        self::AZIENDA => 'Azienda',
+        self::ESTERNO => 'Ospite',
     ];
 
     /** Icona Font Awesome di ogni profilo. */
@@ -34,6 +38,8 @@ final class Profili
         self::PERSONALE => 'fa-briefcase',
         self::GESTORE => 'fa-calendar-check',
         self::AMMINISTRATORE => 'fa-user-shield',
+        self::SCUOLA => 'fa-school',
+        self::AZIENDA => 'fa-building',
         self::ESTERNO => 'fa-door-open',
     ];
 

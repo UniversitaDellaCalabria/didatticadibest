@@ -171,6 +171,7 @@ final class AreaPersonaleRepository
     public function impostaScuolaUtente(int $utenteId, ?string $codice): void
     {
         $this->db->esegui('UPDATE utenti SET scuola_codice = ? WHERE id = ?', [$codice, $utenteId]);
+        (new \App\Auth\GruppoScuole($this->db))->allinea($utenteId, $codice);
     }
 
     public function messaggioErrore(): string

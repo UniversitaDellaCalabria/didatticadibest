@@ -188,5 +188,6 @@ document.addEventListener("DOMContentLoaded", function() {
 });
 </script>
 
+<?php include __DIR__ . '/inc/barra_simulazione.php'; ?>
 </body>
 </html>

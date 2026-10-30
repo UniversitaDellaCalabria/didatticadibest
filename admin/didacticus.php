@@ -162,6 +162,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         flash_set($ko_sg ? "Significato: $ok_sg voci calcolate, $ko_sg non calcolate (il servizio non ha risposto: controlla EMB_URL e che il modello sia scaricato)." : ($ok_sg ? "✅ Significato calcolato per $ok_sg voci." : 'Tutte le voci erano già aggiornate.'), $ko_sg ? 'warning' : 'success');
         $redirect_d('scheda=impostazioni');
     }
+    if ($azione === 'modello_prova') {
+        $pr_ml = $app_d->get(ModelloLinguistico::class)->prova();
+        registra_log_audit($conn, 'Prova della connessione di Didacticus al modello linguistico', ['Esito' => $pr_ml['ok'] ? 'ok' : 'errore']);
+        flash_set($pr_ml['ok'] ? '✅ Il modello linguistico ha risposto in ' . $pr_ml['ms'] . ' ms.' : 'Il modello linguistico non risponde: ' . $pr_ml['messaggio'], $pr_ml['ok'] ? 'success' : 'warning');
+        $redirect_d('scheda=pagine');
+    }
     if (in_array($azione, ['pagine_aggiungi', 'pagina_aggiorna', 'pagine_aggiorna_tutte', 'pagina_attiva', 'pagina_elimina'], true)) {
         $pag_rep = $app_d->get(PagineRepository::class);
         $pag_srv = $app_d->get(ServizioPagine::class);
@@ -466,6 +472,14 @@ $schede_d = ['voci' => ['Domande e risposte', 'fa-book-open'], 'argomenti' => ['
     <p class="small mb-0"><strong>Modello linguistico:</strong>
         <?php if ($modello_ml->attivo()): ?><span class="badge bg-success">collegato</span> <?php echo $h($modello_ml->nome()); ?>, modalità «<?php echo $h($modello_ml->modalita()); ?>»
         <?php else: ?><span class="badge bg-secondary">non collegato</span> <span class="text-secondary">(si collega con LLM_URL nel file .env del server)</span><?php endif; ?></p>
+    <?php if ($modello_ml->attivo()): $uso_ml = $modello_ml->uso(); ?>
+    <p class="small mb-2 text-secondary"><?php if ($modello_ml->esterno()): ?>Servizio esterno: alla chiamata vanno solo la domanda (senza email, codici fiscali e numeri lunghi) e i brani delle fonti.
+        Chiamate oggi: <strong><?php echo (int)$uso_ml['oggi']; ?></strong><?php echo $modello_ml->maxGiorno() > 0 ? ' su ' . (int)$modello_ml->maxGiorno() : ' (nessun tetto)'; ?> · in questo mese: <strong><?php echo (int)$uso_ml['mese']; ?></strong> · con errore oggi: <?php echo (int)$uso_ml['errori_oggi']; ?> · senza risposta (NON_SO) oggi: <?php echo (int)$uso_ml['non_so_oggi']; ?>.
+        <?php if ($modello_ml->maxGiorno() > 0 && $uso_ml['oggi'] >= $modello_ml->maxGiorno()): ?><strong class="text-danger">Tetto di oggi raggiunto: Didacticus risponde a regole fino a domani.</strong><?php endif; ?>
+        <?php if ($uso_ml['ultimo_errore'] !== ''): ?><br>Ultimo errore (<?php echo $h(date('d/m/Y H:i', strtotime($uso_ml['ultimo_errore_ora']))); ?>): <?php echo $h($uso_ml['ultimo_errore']); ?><?php endif; ?>
+        <?php else: ?>Servizio locale dell'Ateneo: nessun dato esce.<?php endif; ?></p>
+    <form method="POST"><?php csrf_field(); ?><input type="hidden" name="azione" value="modello_prova"><button class="btn btn-sm btn-outline-secondary fw-bold"><i class="fa fa-plug me-1" aria-hidden="true"></i>Prova la connessione</button></form>
+    <?php endif; ?>
 </div></div>
 <?php $sito_rep = $app_d->get(\App\Assistenza\Didacticus\SitoRepository::class); $sito_imp = $sito_rep->impostazioni(); $sito_n = $sito_rep->conteggi(); ?>
 <div class="card border-0 shadow-sm mb-3" style="border-radius:12px;"><div class="card-body">

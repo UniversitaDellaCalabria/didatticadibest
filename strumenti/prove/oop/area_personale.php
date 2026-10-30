@@ -138,7 +138,40 @@ prova($dir_ap ? $di_ap(99507) === ['direttore'] : true, "profili della persona: 
 prova($di_ap(99509) === ['personale'], "profili della persona: chi fa parte di un ufficio è personale");
 $q("UPDATE utenti SET ruoli_secondari = '$id_doc_ruolo,3' WHERE id = 99501");
 prova($di_ap(99501) === ['studente', 'docente'], "profili della persona: più profili, nell'ordine di sempre");
-foreach (["DELETE FROM utenti WHERE id BETWEEN 99501 AND 99509", "DELETE FROM uffici_persone WHERE email LIKE '%-ap995@example.org'", "DELETE FROM personale_ateneo WHERE id = 'prova.ap995'"] as $sql) $q($sql);
+// Il gruppo «Scuole» e il profilo «Scuola»
+$gs_ap = new \App\Auth\GruppoScuole($db_oop);
+$id_gs = $gs_ap->id();
+prova($id_gs > 0 && $gs_ap->id() === $id_gs && (int) $db_oop->valore("SELECT COUNT(*) FROM ruoli WHERE nome = 'Scuole'") === 1, "gruppo Scuole: esiste una volta sola");
+$q("INSERT INTO utenti (id, nome, cognome, email, ruolo_id, ruoli_secondari, scuola_codice) VALUES (99510, 'Doc', 'Scuola', 'sc-ap995@example.org', 5, '', 'CSTF00003C'), (99511, 'Vec', 'Chio', 'vec-ap995@example.org', 5, '7', 'CSTF00003C'), (99512, 'Sen', 'Za', 'sen-ap995@example.org', 5, '', NULL)");
+$rs_ap = fn(int $id) => (string) $db_oop->valore('SELECT ruoli_secondari FROM utenti WHERE id = ?', [$id]);
+prova($di_ap(99510) === ['scuola'] && $di_ap(99512) === ['esterno'], "profili della persona: chi ha indicato una scuola è «scuola», chi non ha niente resta esterno", json_encode($di_ap(99510)));
+$n_gs = $gs_ap->allineaTutti();
+prova($n_gs >= 2 && $rs_ap(99510) === (string) $id_gs && $rs_ap(99511) === '7,' . $id_gs && $rs_ap(99512) === '' && $gs_ap->allineaTutti() === 0, "gruppo Scuole: lo storico lo riceve (senza toccare gli altri gruppi) e rifarlo non cambia niente", $rs_ap(99510) . ' | ' . $rs_ap(99511));
+$gs_ap->assegna(99512); $gs_ap->assegna(99512);
+prova($rs_ap(99512) === (string) $id_gs && $di_ap(99512) === ['scuola'], "gruppo Scuole: dato a mano una volta sola, basta per il profilo", $rs_ap(99512));
+$gs_ap->allinea(99511, null);
+prova($rs_ap(99511) === '7', "gruppo Scuole: tolta la scuola, il gruppo va via e gli altri restano", $rs_ap(99511));
+$cont_ap->get(\App\Iscrizioni\PrenotazioneRepository::class)->impostaScuolaUtente(99511, 'CSTF00003C');
+prova($rs_ap(99511) === '7,' . $id_gs, "gruppo Scuole: quando il docente sceglie la scuola il gruppo arriva da solo", $rs_ap(99511));
+$riq_sc = array_column($rep_ap->perProfili(['scuola']), 'chiave');
+prova(in_array('da_fare', $riq_sc, true) && in_array('assistenza', $riq_sc, true) && in_array('tirocini', $riq_sc, true), "profilo Scuola: vede i riquadri di tutti (da fare, assistenza) e i tirocini", implode(',', $riq_sc));
+// Il gruppo «Aziende» e il profilo «Azienda»: dall'email di una convenzione di tesi o dal gruppo dato a mano
+$ga_ap = new \App\Auth\GruppoAziende($db_oop);
+$id_ga = $ga_ap->id();
+$q("INSERT INTO utenti (id, nome, cognome, email, ruolo_id, ruoli_secondari) VALUES (99513, 'Az', 'Ienda', 'Rossi@Azienda-AP995.example.org', 5, ''), (99514, 'Ma', 'Nuale', 'man-ap995@example.org', 5, '')");
+$q("INSERT INTO convenzioni_tesi (token, azienda, email) VALUES ('tok-ap995', 'Azienda Prova Srl', 'rossi@azienda-ap995.example.org')");
+prova($id_ga > 0 && $id_ga !== $id_gs && $ga_ap->haConvenzione('ROSSI@azienda-ap995.example.org') && !$ga_ap->haConvenzione('') && !$ga_ap->haConvenzione('altro@example.org'), "gruppo Aziende: l'email di una convenzione di tesi si riconosce (maiuscole a parte)");
+prova($di_ap(99513) === ['azienda'] && $di_ap(99514) === ['esterno'], "profili della persona: l'email di una convenzione fa «azienda», gli altri restano ospiti", json_encode($di_ap(99513)));
+$rs_ap = fn(int $id) => (string) $db_oop->valore('SELECT ruoli_secondari FROM utenti WHERE id = ?', [$id]);
+prova($ga_ap->allineaTutti() === 1 && $rs_ap(99513) === (string) $id_ga && $rs_ap(99514) === '' && $ga_ap->allineaTutti() === 0, "gruppo Aziende: lo storico lo riceve una volta sola", $rs_ap(99513));
+$ga_ap->assegna(99514);
+prova($di_ap(99514) === ['azienda'], "gruppo Aziende: dato a mano basta per il profilo");
+$ga_ap->togli(99514); $ga_ap->togli(99514);
+prova($rs_ap(99514) === '' && $di_ap(99514) === ['esterno'], "gruppo Aziende: tolto a mano torna ospite");
+$riq_az = array_column($rep_ap->perProfili(['azienda']), 'chiave');
+prova(in_array('da_fare', $riq_az, true) && in_array('assistenza', $riq_az, true) && in_array('tirocini', $riq_az, true), "profilo Azienda: vede i riquadri di tutti e i tirocini", implode(',', $riq_az));
+$q("DELETE FROM convenzioni_tesi WHERE token = 'tok-ap995'");
+foreach (["DELETE FROM utenti WHERE id BETWEEN 99501 AND 99514", "DELETE FROM uffici_persone WHERE email LIKE '%-ap995@example.org'", "DELETE FROM personale_ateneo WHERE id = 'prova.ap995'"] as $sql) $q($sql);
 
 // ---- La pagina: ogni riquadro «speciale» ha il suo file, la pagina li include e tiene fuori i pagamenti del tutorato ----
 sezione("Area personale — pagina");

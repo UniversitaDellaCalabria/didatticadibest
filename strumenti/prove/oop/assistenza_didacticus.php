@@ -341,6 +341,14 @@ prova(str_contains($msg_ml, "[1] Iscrizione: Vai su Esse3") && str_contains($msg
 $did_ml = new ServizioDidacticus($voci_rep, $imp_rep, new ModelloLinguistico('http://127.0.0.1:1/v1', 'm', 5, 'sempre'));
 $r_ml = $did_ml->risposta('Come faccio a fare il tirocinio?', null, true);
 prova($r_ml['tipo'] !== 'generata' && $r_ml['tipo'] !== '' && $r_ml['testo'] !== '', "modello linguistico: se il servizio non risponde Didacticus risponde a regole come prima");
+// Servizio esterno (Gemini): la chiave lo rende «esterno»; la domanda esce senza dati personali; il tetto del giorno ferma le chiamate (senza rete: il tetto è già pieno)
+$ml_an = ModelloLinguistico::anonimizza('Scrivo a mario.rossi@studenti.unical.it, CF RSSMRA80A01H501U, tel. 0984 49 3000: quando scade il 2026-11-15 o il 15.11.2026? matricola 249123');
+prova(!str_contains($ml_an, '@') && !str_contains($ml_an, 'RSSMRA80A01H501U') && !str_contains($ml_an, '3000') && str_contains($ml_an, '2026-11-15') && str_contains($ml_an, '15.11.2026') && str_contains($ml_an, '249123'), "modello esterno: dalla domanda si tolgono email, codice fiscale e telefono; date e matricole corte restano", $ml_an);
+$ml_uso = sys_get_temp_dir() . '/didacticus_uso_prova_' . getmypid() . '.json';
+file_put_contents($ml_uso, json_encode(['giorni' => [date('Y-m-d') => ['ok' => 3, 'ko' => 0, 'nonso' => 0]], 'ultimo_errore' => '', 'ultimo_errore_ora' => '']));
+$ml_est = new ModelloLinguistico('http://127.0.0.1:1/v1', 'm', 5, 'incerto', 'chiave-finta', 3, '', $ml_uso);
+prova($ml_est->esterno() && !(new ModelloLinguistico('http://127.0.0.1:1/v1', 'm', 5, 'incerto', '', 3, '', $ml_uso))->esterno() && $ml_est->uso()['oggi'] === 3 && $ml_est->rispondi('quando scade?', [['titolo' => 'x', 'testo' => 'y']]) === null && $ml_est->uso()['oggi'] === 3, "modello esterno: a tetto raggiunto non chiama il servizio e non conta altre chiamate");
+@unlink($ml_uso);
 
 // Pagine di Ateneo come fonti: indirizzi ammessi, lettura del testo, brani e ricerca
 use App\Assistenza\Didacticus\LettorePagine;

@@ -7,6 +7,8 @@ namespace App\Portale\Area;
 use App\Anagrafi\Anagrafe;
 use App\Anagrafi\PersonaRepository;
 use App\Auth\Abilitazioni\ServizioAbilitazioni;
+use App\Auth\GruppoAziende;
+use App\Auth\GruppoScuole;
 use App\Core\Database;
 use App\Uffici\Direzione;
 
@@ -56,6 +58,10 @@ final class ProfiliPersona
             Profili::PERSONALE => $personale,
             Profili::GESTORE => in_array(self::RUOLO_GESTORE, $ruoli, true) || $this->haAbilitazioni((int) $utente['id']),
             Profili::AMMINISTRATORE => in_array(self::RUOLO_AMMINISTRATORE, $ruoli, true),
+            // una scuola: ha indicato la scuola in cui insegna o fa parte del gruppo «Scuole» (si può dare a mano da Utenti)
+            Profili::SCUOLA => trim((string) ($utente['scuola_codice'] ?? '')) !== '' || in_array(mb_strtolower(GruppoScuole::NOME), $nomiRuoli, true),
+            // un'azienda: fa parte del gruppo «Aziende» o la sua email è quella di una convenzione di tesi
+            Profili::AZIENDA => in_array(mb_strtolower(GruppoAziende::NOME), $nomiRuoli, true) || $this->haConvenzione($email),
         ];
         $profili = array_keys(array_filter($p));
 
@@ -101,6 +107,17 @@ final class ProfiliPersona
             return (int) $this->db->valore("SELECT COUNT(*) FROM uffici_persone p JOIN uffici u ON u.id = p.ufficio_id WHERE LOWER(p.email) = ? AND u.chiave <> 'direzione'", [$email]) > 0;
         } catch (\Throwable $e) {
             error_log('Profili, uffici della persona: ' . $e->getMessage());
+
+            return false;
+        }
+    }
+
+    private function haConvenzione(string $email): bool
+    {
+        try {
+            return (new GruppoAziende($this->db))->haConvenzione($email);
+        } catch (\Throwable $e) {
+            error_log('Profili, convenzioni di tesi: ' . $e->getMessage());
 
             return false;
         }

@@ -27,6 +27,9 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// «Entra come…» dell'amministratore: se si sta guardando il portale come un'altra persona, la guardia blocca ogni modifica (inc/simulazione_guardia.php)
+require_once __DIR__ . '/inc/simulazione_guardia.php';
+
 // Previene la cache del browser sulle pagine dinamiche (protegge dallo stato sessione stale)
 header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
 header("Pragma: no-cache");

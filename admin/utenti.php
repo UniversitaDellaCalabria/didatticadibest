@@ -544,6 +544,15 @@ $etichette_perm = ['full' => 'Admin area', 'eventi' => 'Eventi', 'iscritti' => '
             <?php echo !empty($u['ultimo_accesso']) ? date('d/m/y H:i', strtotime($u['ultimo_accesso'])) : 'mai'; ?>
         </div>
 
+        <!-- Entra come… (solo visione) -->
+        <?php if (!$is_me && !\App\Auth\SimulazioneAccesso::eAmministratore($u)): ?>
+        <form method="POST" action="simula.php" class="d-inline" onclick="event.stopPropagation()">
+            <?php csrf_field(); ?>
+            <input type="hidden" name="utente_id" value="<?php echo $uid; ?>">
+            <button type="submit" style="width:28px;height:28px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;font-size:.75rem;border:1px solid #cbd5e1;background:#f8fafc;color:#334155;cursor:pointer;" data-confirm="Vedere il portale come <?php echo htmlspecialchars(trim(($u['nome'] ?? '') . ' ' . ($u['cognome'] ?? '')), ENT_QUOTES); ?>? È solo una visione: non si può modificare niente." title="Entra come questa persona (solo visione)"><i class="fa fa-user-secret"></i></button>
+        </form>
+        <?php endif; ?>
+
         <!-- Delete -->
         <?php if (!$is_me): ?>
         <form method="POST" class="d-inline" onclick="event.stopPropagation()">
