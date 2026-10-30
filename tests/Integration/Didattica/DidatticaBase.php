@@ -250,6 +250,7 @@ abstract class DidatticaBase extends DatabaseDiProva
                   `accesso_json` text DEFAULT NULL,
                   `solleciti` tinyint(4) NOT NULL DEFAULT 0,
                   `sollecito_il` datetime DEFAULT NULL,
+                  `persona_id` varchar(80) DEFAULT NULL,
                   PRIMARY KEY (`id`),
                   UNIQUE KEY `uq_token` (`token`)
                 )
@@ -272,6 +273,7 @@ abstract class DidatticaBase extends DatabaseDiProva
                   `motivo` varchar(500) DEFAULT '',
                   `solleciti` tinyint(4) NOT NULL DEFAULT 0,
                   `sollecito_il` datetime DEFAULT NULL,
+                  `persona_id` varchar(80) DEFAULT NULL,
                   PRIMARY KEY (`id`),
                   UNIQUE KEY `uq_token` (`token`)
                 )

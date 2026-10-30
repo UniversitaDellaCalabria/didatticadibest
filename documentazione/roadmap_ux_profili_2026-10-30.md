@@ -91,6 +91,10 @@ lato docente; bozze delle pratiche; percorsi a passi per convenzione FSL e conve
 - **Peso.** M.
 
 ### 0.2 Docenti con più indirizzi (alias) non riconosciuti
+
+> **Stato 30/10/2026: FATTO in locale (schema v108), da caricare.** Firme e conferme delle pratiche salvano `persona_id` del docente scelto nell'anagrafe;
+> `puoFirmare`/`puoConfermare` accettano anche la stessa scheda (`src/Auth/Identita::stessaScheda`). L'anagrafe non ha il codice fiscale, quindi il confronto è per `persona_id`.
+> Le richieste già create prima della v108 non hanno `persona_id` e restano valide solo per email. Non toccato: «Da fare per te» cerca ancora per email.
 - **Problema.** Stessi confronti per uguaglianza esatta dell'email: un docente registrato in un modulo come `nome.cognome@unical.it` che entra con un alias
   diverso non può confermare (`ServizioConfermeDocenti.php:255`).
 - **Soluzione.** In `Identita` accettare anche l'email di Ateneo presente nell'anagrafe persone (`PersonaRepository`) per lo stesso `persona_id`/CF; quando si

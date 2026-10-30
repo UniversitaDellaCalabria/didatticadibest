@@ -132,6 +132,11 @@ final class AttestatiPraticheTest extends DidatticaBase
         $this->assertTrue($this->conferme()->puoConfermare($conf[0], ['id' => 9, 'email' => 'Anna.Verdi@x.it']));
         $this->assertFalse($this->conferme()->puoConfermare($conf[0], ['id' => 9, 'email' => 'altro@x.it']));
         $this->assertFalse($this->conferme()->puoConfermare($conf[0], null));
+        // stessa persona dell'anagrafe che entra con un altro indirizzo: può confermare; con un'altra scheda (o nessuna) no
+        $this->assertSame('a.verdi', $conf[0]['persona_id']);
+        $this->assertTrue($this->conferme()->puoConfermare($conf[0], ['id' => 9, 'email' => 'alias@x.it', 'persona_id' => 'a.verdi']));
+        $this->assertFalse($this->conferme()->puoConfermare($conf[0], ['id' => 9, 'email' => 'alias@x.it', 'persona_id' => 'g.neri']));
+        $this->assertFalse($this->conferme()->puoConfermare($conf[0], ['id' => 9, 'email' => 'alias@x.it', 'persona_id' => '']));
         // la prima conferma non basta, la seconda sì
         $this->assertNull($this->conferme()->conferma($conf[0]));
         $this->assertFalse($this->conferme()->tutteConfermate($id));

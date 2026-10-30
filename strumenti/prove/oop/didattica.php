@@ -288,3 +288,13 @@ prova($ver_bk_->zip($zf_bk_, 2) === null && str_contains((string) $ver_bk_->zip(
 foreach ([$f_bk_, $f_bk_ . '.tr', $zf_bk_] as $x_bk_) {
     @unlink($x_bk_);
 }
+
+// Docente che entra con un altro indirizzo: conferma e firma valgono per la stessa scheda dell'anagrafe (mai per un'altra)
+$cf_al_ = $c_did->get(\App\Didattica\ServizioConfermeDocenti::class);
+$fp_al_ = $c_did->get(\App\Didattica\FirmaPratica::class);
+$riga_al_ = ['email' => 'anna.verdi@x.it', 'persona_id' => 'a.verdi', 'tipo' => 'persona'];
+prova($cf_al_->puoConfermare($riga_al_, ['id' => 9, 'email' => 'alias@x.it', 'persona_id' => 'a.verdi']), "Conferma: stesso docente con un altro indirizzo (stessa scheda) può confermare");
+prova(!$cf_al_->puoConfermare($riga_al_, ['id' => 9, 'email' => 'alias@x.it', 'persona_id' => 'g.neri']) && !$cf_al_->puoConfermare($riga_al_, ['id' => 9, 'email' => 'alias@x.it', 'persona_id' => '']) && !$cf_al_->puoConfermare($riga_al_, ['id' => 9, 'email' => 'alias@x.it']), "Conferma: un'altra scheda, o nessuna, non può confermare");
+prova(!$cf_al_->puoConfermare(['email' => 'anna.verdi@x.it', 'persona_id' => null], ['id' => 9, 'email' => 'alias@x.it', 'persona_id' => '']), "Conferma: richiesta senza scheda e utente senza scheda non si corrispondono");
+prova($fp_al_->puoFirmare($riga_al_, ['id' => 9, 'email' => 'alias@x.it', 'persona_id' => 'a.verdi']) && !$fp_al_->puoFirmare($riga_al_, ['id' => 9, 'email' => 'alias@x.it', 'persona_id' => 'g.neri']), "Firma: stessa scheda sì, altra scheda no");
+prova((int) $conn->query("SELECT COUNT(*) n FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND COLUMN_NAME = 'persona_id' AND TABLE_NAME IN ('pratiche_firme', 'pratiche_conferme')")->fetch_assoc()['n'] === 2, "Schema v108: persona_id in pratiche_firme e pratiche_conferme");

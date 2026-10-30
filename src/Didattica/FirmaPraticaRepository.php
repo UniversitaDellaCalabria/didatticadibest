@@ -13,11 +13,11 @@ final class FirmaPraticaRepository
     {
     }
 
-    public function crea(int $praticaId, int $passo, string $tipo, string $nome, string $email, string $token, string $fileOrigine): int
+    public function crea(int $praticaId, int $passo, string $tipo, string $nome, string $email, string $token, string $fileOrigine, ?string $personaId = null): int
     {
         return $this->db->inserisci(
-            'INSERT INTO pratiche_firme (pratica_id, passo, tipo, nome, email, token, file_origine) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [$praticaId, $passo, $tipo, $nome, strtolower($email), $token, $fileOrigine]
+            'INSERT INTO pratiche_firme (pratica_id, passo, tipo, nome, email, token, file_origine, persona_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [$praticaId, $passo, $tipo, $nome, strtolower($email), $token, $fileOrigine, $personaId !== '' ? $personaId : null]
         );
     }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Didattica;
 
+use App\Auth\Identita;
 use App\Auth\Sessione;
 use App\Core\Sito;
 
@@ -85,7 +86,7 @@ final class ServizioConfermeDocenti
     /**
      * Il docente scelto dallo studente come persona dell'anagrafe con l'email (null se non c'è o ce n'è più d'uno con lo stesso nome).
      *
-     * @return array{cognome: string, nome: string, email: string}|null
+     * @return array{id: string, cognome: string, nome: string, email: string}|null
      */
     public function docente(string $nome): ?array
     {
@@ -94,7 +95,7 @@ final class ServizioConfermeDocenti
             return null;
         }
 
-        return ['cognome' => (string) $d['cognome'], 'nome' => (string) $d['nome'], 'email' => strtolower((string) $d['email'])];
+        return ['id' => (string) $d['id'], 'cognome' => (string) $d['cognome'], 'nome' => (string) $d['nome'], 'email' => strtolower((string) $d['email'])];
     }
 
     /** «Nome Cognome» del docente come lo si legge sull'attestato (se non si riconosce resta il testo scritto). */
@@ -160,7 +161,7 @@ final class ServizioConfermeDocenti
         $invio = [];
         foreach ($docenti as $nome => $d) {
             $token = bin2hex(random_bytes(20));
-            $this->conferme->crea($id, $passo, $nome, $d['email'], $token);
+            $this->conferme->crea($id, $passo, $nome, $d['email'], $token, $d['id']);
             $invio[] = [trim($d['nome'] . ' ' . $d['cognome']), $d['email'], $token, count($gruppi[$nome])];
         }
         $this->pratiche->impostaPasso($id, $passo);
@@ -243,7 +244,7 @@ final class ServizioConfermeDocenti
     }
 
     /**
-     * Chi entra è il docente a cui è arrivato il link (stessa email).
+     * Chi entra è il docente a cui è arrivato il link (stessa email o stessa scheda dell'anagrafe, se entra con un altro indirizzo).
      *
      * @param array<string, mixed> $c
      * @param array<string, mixed>|null $utente
@@ -252,7 +253,11 @@ final class ServizioConfermeDocenti
     {
         $email = strtolower(trim((string) ($utente['email'] ?? '')));
 
-        return !empty($utente['id']) && $email !== '' && $email === strtolower((string) $c['email']);
+        if (empty($utente['id'])) {
+            return false;
+        }
+
+        return ($email !== '' && $email === strtolower((string) $c['email'])) || Identita::stessaScheda($utente, $c['persona_id'] ?? null);
     }
 
     /**

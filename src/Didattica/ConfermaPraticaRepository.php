@@ -13,11 +13,11 @@ final class ConfermaPraticaRepository
     {
     }
 
-    public function crea(int $praticaId, int $passo, string $nome, string $email, string $token): int
+    public function crea(int $praticaId, int $passo, string $nome, string $email, string $token, ?string $personaId = null): int
     {
         return $this->db->inserisci(
-            'INSERT INTO pratiche_conferme (pratica_id, passo, nome, email, token) VALUES (?, ?, ?, ?, ?)',
-            [$praticaId, $passo, mb_substr($nome, 0, 200), strtolower($email), $token]
+            'INSERT INTO pratiche_conferme (pratica_id, passo, nome, email, token, persona_id) VALUES (?, ?, ?, ?, ?, ?)',
+            [$praticaId, $passo, mb_substr($nome, 0, 200), strtolower($email), $token, $personaId !== '' ? $personaId : null]
         );
     }
 

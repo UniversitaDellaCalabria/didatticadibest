@@ -1053,6 +1053,13 @@ final class Definizioni
             'affiancata_in_alto' => ["ADD COLUMN affiancata_in_alto TINYINT(1) NOT NULL DEFAULT 0",
                 "UPDATE sottocategorie SET affiancata_in_alto = 1 WHERE nome LIKE '%Online%' OR nome LIKE '%Generali%' OR nome LIKE '%Speciali%' OR nome LIKE '%Conclusive%'"],
         ],
+        // v108: la persona dell'anagrafe a cui è rivolta la richiesta: chi entra con un altro indirizzo ma è la stessa persona (stessa scheda) può comunque firmare o confermare
+        'pratiche_firme' => [
+            'persona_id' => "ADD COLUMN persona_id VARCHAR(80) DEFAULT NULL, ADD INDEX idx_persona (persona_id)",
+        ],
+        'pratiche_conferme' => [
+            'persona_id' => "ADD COLUMN persona_id VARCHAR(80) DEFAULT NULL, ADD INDEX idx_persona (persona_id)",
+        ],
         'utenti' => [
             'matricola_studente'   => "ADD COLUMN matricola_studente VARCHAR(50) DEFAULT NULL",
             'matricola_dipendente' => "ADD COLUMN matricola_dipendente VARCHAR(50) DEFAULT NULL",

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Didattica;
 
+use App\Auth\Identita;
 use App\Core\Sito;
 use App\Fsl\ServizioFirmaDirettore;
 use App\Portale\SospensionePromemoria;
@@ -97,6 +98,7 @@ final class FirmaPratica
         if ($def['t'] === 'direttore') {
             $d = $this->direzione->chiFirma();
             [$nome, $email, $ruolo] = [$d['nome'], $d['email'], 'Direttore'];
+            $personaId = null;
             if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 return 'Indica prima il Direttore (nome ed email) in Gestione del portale → Sistema e registri → «Direttore del Dipartimento»: si indica una volta sola e vale per tutte le firme.';
             }
@@ -118,6 +120,7 @@ final class FirmaPratica
                 return 'Non trovo l\'email di «' . $nome . '» nell\'anagrafe del personale (il nome deve coincidere con uno e un solo docente): scrivigli tu e carica la firma dalla scheda.';
             }
             $nome = trim($doc['cognome'] . ' ' . $doc['nome']);
+            $personaId = (string) $doc['id'];
         }
         $file = $this->documento($p, $def['t']);
         if ($file === null) {
@@ -125,7 +128,7 @@ final class FirmaPratica
         }
         $this->firme->annullaAttese($id);
         $token = bin2hex(random_bytes(20));
-        $this->firme->crea($id, $passo, $def['t'], $nome, $email, $token, $file);
+        $this->firme->crea($id, $passo, $def['t'], $nome, $email, $token, $file, $personaId);
         $this->pratiche->impostaPasso($id, $passo);
         $this->storico->evento($id, 'passaggio', 'ufficio', 0, null, 'In attesa di firma: ' . $nome . ' (' . $ruolo . ')');
         $this->emailFirma($p, $nome, $email, $token, $ruolo, false);
@@ -160,7 +163,7 @@ final class FirmaPratica
     }
 
     /**
-     * La persona collegata è chi deve firmare (stessa email; per il Direttore anche lo stesso codice fiscale).
+     * La persona collegata è chi deve firmare (stessa email o stessa scheda dell'anagrafe; per il Direttore anche lo stesso codice fiscale).
      *
      * @param array<string, mixed> $f
      * @param array<string, mixed>|null $utente
@@ -172,6 +175,9 @@ final class FirmaPratica
         }
         $email = strtolower(trim((string) ($utente['email'] ?? '')));
         if ($email !== '' && $email === strtolower((string) $f['email'])) {
+            return true;
+        }
+        if (Identita::stessaScheda($utente, $f['persona_id'] ?? null)) {
             return true;
         }
         if ($f['tipo'] === 'direttore') {
