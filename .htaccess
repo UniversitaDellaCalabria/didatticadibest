@@ -24,7 +24,29 @@ Options -Indexes -MultiViews
     Require all denied
 </FilesMatch>
 
+# Pagine e file di testo compressi (da 3 a 4 volte più leggeri); se il modulo non c'è, non succede niente
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/css text/xml text/javascript application/javascript application/json application/xml image/svg+xml
+</IfModule>
+# Librerie e foto della home: il nome cambia quando cambia il contenuto, quindi il browser può tenerli a lungo (la regola che imposta LUNGA è più sotto).
+# Il resto di CSS, JS e immagini si ricontrolla ogni giorno.
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 1 day"
+    ExpiresByType application/javascript "access plus 1 day"
+    ExpiresByType text/javascript "access plus 1 day"
+    ExpiresByType image/png "access plus 1 day"
+    ExpiresByType image/jpeg "access plus 1 day"
+    ExpiresByType image/webp "access plus 1 day"
+    ExpiresByType image/svg+xml "access plus 1 day"
+    ExpiresByType font/woff2 "access plus 1 month"
+</IfModule>
+<IfModule mod_headers.c>
+    Header set Cache-Control "public, max-age=31536000, immutable" env=LUNGA
+</IfModule>
+
 RewriteEngine On
+RewriteRule ^(assets/vendor|uploads/slide_home)/ - [E=LUNGA:1]
 # Librerie di Composer (vendor/, solo in sviluppo): mai raggiungibili dal web (src/ e tests/ hanno il loro .htaccess)
 RewriteRule (^|/)vendor/ - [F,L]
 # Nessun RewriteBase: le regole valgono qualunque sia la cartella del portale (/didattica, /eventi…)

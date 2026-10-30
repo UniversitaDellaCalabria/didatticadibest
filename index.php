@@ -110,7 +110,8 @@ ob_start(); ?>
             <?php if (!empty($sl['link'])): ?>
                 <a href="<?php echo htmlspecialchars($sl['link']); ?>">
             <?php endif; ?>
-            <img src="<?php echo htmlspecialchars($sl['immagine_path']); ?>" class="d-block w-100" alt="<?php echo htmlspecialchars($sl['titolo'] ?? ''); ?>" style="max-height:480px;object-fit:cover;object-position:center;">
+            <?php $mis_sl = \App\Core\App::get(\App\Infrastructure\Storage\Immagini::class)->misure(__DIR__ . '/' . $sl['immagine_path']); ?>
+            <img src="<?php echo htmlspecialchars($sl['immagine_path']); ?>" class="d-block w-100" alt="<?php echo htmlspecialchars($sl['titolo'] ?? ''); ?>"<?php echo $mis_sl ? ' width="' . $mis_sl[0] . '" height="' . $mis_sl[1] . '"' : ''; ?> <?php echo $i === 0 ? 'fetchpriority="high"' : 'loading="lazy" decoding="async"'; ?> style="max-height:480px;object-fit:cover;object-position:center;">
             <?php if (!empty($sl['link'])): ?></a><?php endif; ?>
 
             <?php if ($has_text): ?>

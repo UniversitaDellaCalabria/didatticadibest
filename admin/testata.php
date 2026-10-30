@@ -84,11 +84,25 @@ if (isset($_POST['add_slide'])) {
         if (!is_dir($upload_dir)) mkdir($upload_dir, 0775, true);
         $fn = secure_upload($_FILES['slide_img'], $upload_dir, ['jpg','jpeg','png','gif','webp'], ['image/jpeg','image/png','image/gif','image/webp']);
         if ($fn) {
+            \App\Core\App::get(\App\Infrastructure\Storage\Immagini::class)->riduci($upload_dir . $fn); // foto più leggere: la home le carica tutte
             \App\Core\App::get(\App\Portale\ConfigurazioneRepository::class)->aggiungiSlide('uploads/slide_home/' . $fn, trim($_POST['slide_titolo'] ?? ''), trim($_POST['slide_sottotitolo'] ?? ''), trim($_POST['slide_link'] ?? ''));
             flash_set("Slide aggiunta!");
         } else {
             flash_set("Errore upload immagine.", 'danger');
         }
+    }
+    admin_redirect("testata.php?p_id=$filtro_p&sezione=slideshow");
+}
+
+if (isset($_POST['ottimizza_slide'])) {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    $imm = \App\Core\App::get(\App\Infrastructure\Storage\Immagini::class);
+    if (!$imm->disponibile()) {
+        flash_set("Su questo server non si possono ridurre le immagini (manca l'estensione GD).", 'danger');
+    } else {
+        $r = $imm->riduciCartella(dirname(__DIR__) . '/uploads/slide_home');
+        registra_log_audit($conn, 'Home: immagini delle slide alleggerite', $r);
+        flash_set("Immagini controllate: {$r['viste']}, alleggerite {$r['ridotte']}, risparmiati " . round($r['byte'] / 1048576, 1) . ' MB.');
     }
     admin_redirect("testata.php?p_id=$filtro_p&sezione=slideshow");
 }
@@ -302,7 +316,11 @@ $_tmap[array_key_exists($_st, $_tmap) ? $_st : 'testata'] = 'active show';
 <!-- ===== TAB: SLIDESHOW ===== -->
 <div class="tab-pane fade <?php echo $_tmap['slideshow']; ?>" id="tab-slideshow" role="tabpanel">
     <h5 class="fw-bold text-success border-bottom pb-2 mb-4"><i class="fa fa-images me-2"></i>Slideshow Home — Foto Dipartimento / Eventi</h5>
-    <p class="text-secondary small mb-4">Le slide attive appaiono in un carousel in cima alla home page. Dimensione consigliata: <strong>1400×500 px</strong>, formato JPG/PNG/WebP.</p>
+    <p class="text-secondary small mb-4">Le slide attive appaiono in un carousel in cima alla home page. Dimensione consigliata: <strong>1400×500 px</strong>, formato JPG/PNG/WebP. Le foto caricate vengono ridotte a 1600 px di lato massimo per tenere la home leggera.</p>
+    <form method="POST" class="mb-3"><?php csrf_field(); ?>
+        <button type="submit" name="ottimizza_slide" value="1" class="btn btn-outline-secondary btn-sm"><i class="fa fa-compress me-1" aria-hidden="true"></i>Alleggerisci le immagini già caricate</button>
+        <span class="text-secondary small ms-2">Riduce le foto più pesanti (oltre 600 KB o 1600 px): la pagina si apre più in fretta, soprattutto da telefono.</span>
+    </form>
 
     <?php
     $slides = [];
