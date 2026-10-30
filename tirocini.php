@@ -37,7 +37,7 @@ if ($tipo === 'esterni') {
     }
     $elenco = array_values(array_filter($tutte, function (array $a) use ($f, $trova): bool {
         foreach ($f as $c => $v) if ($v !== '' && (string)$a[$c] !== $v) return false;
-        return $trova($a['nome'] . ' ' . $a['sigla'] . ' ' . $a['direttore'] . ' ' . $a['descrizione']);
+        return $trova($a['nome'] . ' ' . $a['sigla'] . ' ' . $a['direttore'] . ' ' . $a['docenti'] . ' ' . $a['descrizione']);
     }));
 }
 $etichette = ['regione' => 'Tutte le regioni', 'provincia' => 'Tutte le province', 'comune' => 'Tutti i comuni', 'settore' => 'Tutti i settori', 'dipartimento' => 'Tutti i dipartimenti', 'area' => 'Tutte le aree'];
@@ -85,7 +85,13 @@ require_once 'header.php';
             <div class="small"><i class="fa fa-building-columns me-1 text-secondary" aria-hidden="true"></i><?php echo $h(trim(preg_replace('/,?\s*DIBEST$/i', '', $l['dipartimento']))); ?><?php echo (int)$l['interdipartimentale'] ? ' · interdipartimentale' : ''; ?></div>
             <?php if ($l['direttore'] !== ''): ?><div class="small"><i class="fa fa-user me-1 text-secondary" aria-hidden="true"></i>Responsabile scientifico: <?php echo $h($l['direttore']); ?></div><?php endif; ?>
             <?php if ($l['ambiti'] !== ''): ?><div class="small"><i class="fa fa-flask me-1 text-secondary" aria-hidden="true"></i><?php echo $h($l['ambiti']); ?><?php echo $l['area'] !== '' ? ' · ' . $h($l['area']) : ''; ?></div><?php endif; ?>
-            <?php if ($l['descrizione'] !== ''): ?><p class="small text-secondary mt-2 mb-0"><?php echo $h(mb_strlen($l['descrizione']) > 260 ? mb_substr($l['descrizione'], 0, 257) . '…' : $l['descrizione']); ?></p><?php endif; ?>
+            <?php $doc_l = array_values(array_filter(array_map('trim', explode(';', (string)$l['docenti'])))); if ($doc_l): ?>
+            <div class="small"><i class="fa fa-users me-1 text-secondary" aria-hidden="true"></i>Docenti coinvolti: <?php echo $h(implode(', ', array_slice($doc_l, 0, 5))); ?><?php if (count($doc_l) > 5): ?>
+                <details class="d-inline"><summary class="d-inline text-primary" style="cursor:pointer">e altri <?php echo count($doc_l) - 5; ?></summary> <?php echo $h(implode(', ', array_slice($doc_l, 5))); ?></details><?php endif; ?></div><?php endif; ?>
+            <?php if ($l['descrizione'] !== ''): $breve_l = mb_strlen($l['descrizione']) > 150; ?>
+            <p class="small text-secondary mt-2 mb-0"><?php echo $h($breve_l ? rtrim((string)preg_replace('/\s+\S*$/u', '', mb_substr($l['descrizione'], 0, 150)), ' ,;:.') . '…' : $l['descrizione']); ?></p>
+            <?php if ($breve_l): ?><details class="small mt-1"><summary class="text-primary" style="cursor:pointer">Leggi tutta la descrizione</summary><p class="text-secondary mt-1 mb-0"><?php echo $h($l['descrizione']); ?></p></details><?php endif; ?>
+            <?php endif; ?>
         </div></div></div>
         <?php endforeach; endif; ?>
     </div>

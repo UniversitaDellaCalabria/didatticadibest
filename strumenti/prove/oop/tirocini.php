@@ -85,7 +85,8 @@ $finto = new class implements \App\Anagrafi\ClientApiAteneo {
 $finto->labs = [
     ['LaboratoryId' => 990001, 'LaboratoryName' => 'Laboratorio di Prova', 'LaboratoryAcronym' => 'None', 'Area' => 'Scientifico', 'DepartmentName' => 'Dipartimento di Prova,  DIBEST', 'Interdepartmental' => 'NO',
      'ScientificDirector' => 'BRUNO Leonardo', 'LaboratoryScopes' => [['ScopeDescription' => 'Ricerca'], ['ScopeDescription' => 'Didattica']], 'LaboratoryTeachingScope' => 'None',
-     'LaboratoryResearchScope' => '<p>Analisi&nbsp;di <b>campioni</b></p><p>ambientali</p>', 'Visible' => true, 'Dimension' => '120'],
+     'LaboratoryResearchScope' => '<p>Analisi&nbsp;di <b>campioni</b></p><p>ambientali</p>', 'Visible' => true, 'Dimension' => '120',
+     'LaboratoryResearchPersonnel' => [['ResearchPersonnelName' => 'COZZA RADIANA'], ['ResearchPersonnelName' => 'BRUNO LEONARDO'], ['ResearchPersonnelName' => 'PALERMO Anna Maria'], ['ResearchPersonnelName' => 'DE FRANCESCO ANNA MARIA'], ['ResearchPersonnelName' => null], ['ResearchPersonnelName' => 'COZZA RADIANA']]],
     ['LaboratoryId' => 990002, 'LaboratoryName' => 'Altro', 'DepartmentName' => 'Dipartimento di Prova', 'Interdepartmental' => 'SI', 'LaboratoryScopes' => []],
 ];
 $str_ti = AppTi::per($conn)->get(\App\Anagrafi\StruttureRepository::class);
@@ -96,6 +97,8 @@ $es = $lab_ti->sincronizza('TI9');
 $l1 = $conn->query("SELECT * FROM tirocini_laboratori WHERE id = 990001")->fetch_assoc();
 prova($es['TI9']['ok'] && (int)$conn->query("SELECT COUNT(*) c FROM tirocini_laboratori WHERE dip_cod = 'TI9'")->fetch_assoc()['c'] === 2, "laboratori: scaricati per la struttura scelta");
 prova($l1['sigla'] === '' && $l1['direttore'] === 'Leonardo Bruno' && $l1['ambiti'] === 'Ricerca, Didattica' && $l1['descrizione'] === 'Analisi di campioni ambientali' && $l1['dipartimento'] === 'Dipartimento di Prova', "laboratori: sigla «None» vuota, responsabile «Nome Cognome», testo senza HTML, dipartimento senza la sigla in coda");
+prova($l1['docenti'] === 'Radiana Cozza; Anna Maria De Francesco; Anna Maria Palermo', "laboratori: i docenti coinvolti in ordine di cognome, «Nome Cognome», senza doppioni, voci vuote e responsabile", $l1['docenti']);
+prova(\App\Tirocini\ServizioLaboratori::nomeProprio('LA RUSSA Mauro Francesco') === 'Mauro Francesco La Russa' && \App\Tirocini\ServizioLaboratori::nomeProprio('XU FANG') === 'Fang Xu' && \App\Tirocini\ServizioLaboratori::nomeProprio('MANDALA\' Maurizio') === 'Maurizio Mandala\'' && \App\Tirocini\ServizioLaboratori::nomeProprio('ROSSI') === 'Rossi', "laboratori: i nomi delle API si riordinano anche con cognomi composti, tutto maiuscolo o mononimi");
 $lab_ti->impostaPubblica(990001, false);
 prova(!in_array(990001, array_map('intval', array_column($lab_ti->pubblici(), 'id')), true) && in_array(990002, array_map('intval', array_column($lab_ti->pubblici(), 'id')), true), "un laboratorio si può nascondere dall'elenco pubblico");
 $finto->labs = [$finto->labs[1]];

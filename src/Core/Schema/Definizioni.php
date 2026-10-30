@@ -593,6 +593,10 @@ final class Definizioni
     public static function colonne(): array
     {
     return [
+        // v106: docenti e ricercatori coinvolti in un laboratorio interno (nomi «Nome Cognome» separati da punto e virgola, senza il responsabile)
+        'tirocini_laboratori' => [
+            'docenti' => "ADD COLUMN docenti VARCHAR(1500) NOT NULL DEFAULT ''",
+        ],
         // v91: a chi si rivolge una domanda frequente (pubblici separati da virgola: studenti, scuole, aziende, docenti; vuoto = tutti)
         'didacticus_voci' => [
             'pubblico' => ["ADD COLUMN pubblico VARCHAR(100) NOT NULL DEFAULT 'studenti'", "UPDATE didacticus_voci SET pubblico = 'scuole' WHERE titolo LIKE '%FSL%' OR titolo LIKE '%scuol%' OR titolo LIKE '%Formazione Scuola%'"],

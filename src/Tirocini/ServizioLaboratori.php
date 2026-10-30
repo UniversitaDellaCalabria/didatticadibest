@@ -46,15 +46,16 @@ final class ServizioLaboratori
                     $dip = preg_replace('/,\s*[A-Z]{3,10}$/u', '', $dip) ?? $dip; // «…della Terra, DIBEST» → «…della Terra»
                     $sigla = (string) ($l['LaboratoryAcronym'] ?? '');
                     $this->db->esegui(
-                        'INSERT INTO tirocini_laboratori (id, nome, sigla, area, dip_cod, dipartimento, interdipartimentale, direttore, ambiti, descrizione, infrastruttura, superficie)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        'INSERT INTO tirocini_laboratori (id, nome, sigla, area, dip_cod, dipartimento, interdipartimentale, direttore, ambiti, descrizione, infrastruttura, superficie, docenti)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                          ON DUPLICATE KEY UPDATE nome = VALUES(nome), sigla = VALUES(sigla), area = VALUES(area), dip_cod = VALUES(dip_cod), dipartimento = VALUES(dipartimento),
                            interdipartimentale = VALUES(interdipartimentale), direttore = VALUES(direttore), ambiti = VALUES(ambiti), descrizione = VALUES(descrizione),
-                           infrastruttura = VALUES(infrastruttura), superficie = VALUES(superficie), aggiornato_il = NOW()',
+                           infrastruttura = VALUES(infrastruttura), superficie = VALUES(superficie), docenti = VALUES(docenti), aggiornato_il = NOW()',
                         [$id, mb_substr(trim((string) ($l['LaboratoryName'] ?? '')), 0, 255), mb_substr(in_array($sigla, ['', 'None'], true) ? '' : $sigla, 0, 60),
                          mb_substr((string) ($l['Area'] ?? ''), 0, 100), $cod, mb_substr($dip, 0, 255), (($l['Interdepartmental'] ?? '') === 'SI') ? 1 : 0,
                          mb_substr(self::nomeProprio((string) ($l['ScientificDirector'] ?? '')), 0, 150), mb_substr($ambiti, 0, 150),
-                         self::descrizione($l), mb_substr((string) ($l['InfrastructureName'] ?? ''), 0, 150), mb_substr((string) ($l['Dimension'] ?? ''), 0, 20)]
+                         self::descrizione($l), mb_substr((string) ($l['InfrastructureName'] ?? ''), 0, 150), mb_substr((string) ($l['Dimension'] ?? ''), 0, 20),
+                         mb_substr(implode('; ', self::docenti($l)), 0, 1500)]
                     );
                 }
                 if ($visti) {
@@ -86,22 +87,61 @@ final class ServizioLaboratori
         return $this->db->righe('SELECT * FROM tirocini_laboratori WHERE pubblica = 1 ORDER BY nome');
     }
 
-    /** «BRUNO Leonardo» → «Leonardo Bruno» */
+    /** Particelle che fanno parte del cognome quando il nome è tutto in maiuscolo («DE FRANCESCO ANNA» → «De Francesco» + «Anna»). */
+    private const PARTICELLE = ['DE', 'DI', 'DA', 'DEL', 'DELLA', 'DELLO', 'DEI', 'DEGLI', 'DAL', 'DALLA', 'LA', 'LE', 'LO', 'VAN', 'VON', 'DEN', 'DER'];
+
+    /**
+     * «BRUNO Leonardo» → «Leonardo Bruno». Le API scrivono prima il cognome: se è in maiuscolo e il nome no, il cognome sono le parole in maiuscolo; se è tutto in
+     * maiuscolo («COZZA RADIANA») il cognome è la prima parola, con le particelle che la precedono («DE FRANCESCO ANNA MARIA»).
+     */
     public static function nomeProprio(string $api): string
     {
-        $parole = preg_split('/\s+/u', trim($api)) ?: [];
+        $parole = array_values(array_filter(preg_split('/\s+/u', trim($api)) ?: [], static fn (string $p): bool => $p !== ''));
+        $f = static fn (string $s): string => mb_convert_case(mb_strtolower($s), MB_CASE_TITLE);
+        if (count($parole) >= 2 && !array_filter($parole, static fn (string $p): bool => $p !== mb_strtoupper($p))) {
+            $n = 1;
+            while ($n < count($parole) - 1 && in_array($parole[$n - 1], self::PARTICELLE, true)) {
+                ++$n;
+            }
+
+            return trim(implode(' ', array_map($f, array_slice($parole, $n))) . ' ' . implode(' ', array_map($f, array_slice($parole, 0, $n))));
+        }
         $cogn = [];
         $nomi = [];
         foreach ($parole as $p) {
-            if ($p !== '' && $p === mb_strtoupper($p) && !$nomi) {
+            if ($p === mb_strtoupper($p) && !$nomi) {
                 $cogn[] = $p;
             } else {
                 $nomi[] = $p;
             }
         }
-        $f = static fn (string $s): string => mb_convert_case(mb_strtolower($s), MB_CASE_TITLE);
 
         return trim(implode(' ', array_map($f, $nomi)) . ' ' . implode(' ', array_map($f, $cogn)));
+    }
+
+    /**
+     * I docenti e ricercatori coinvolti nel laboratorio (nomi «Nome Cognome»), in ordine di cognome, senza doppioni, senza voci vuote e senza il responsabile
+     * scientifico, che si mostra a parte.
+     *
+     * @return list<string>
+     */
+    public static function docenti(array $l): array
+    {
+        $responsabile = mb_strtolower(self::nomeProprio((string) ($l['ScientificDirector'] ?? '')));
+        $out = [];
+        foreach ((array) ($l['LaboratoryResearchPersonnel'] ?? []) as $p) {
+            $api = trim((string) (is_array($p) ? ($p['ResearchPersonnelName'] ?? '') : ''));
+            if ($api === '' || $api === 'None') {
+                continue;
+            }
+            $nome = self::nomeProprio($api);
+            if ($nome !== '' && mb_strtolower($nome) !== $responsabile) {
+                $out[mb_strtolower($nome)] = [mb_strtolower($api), $nome];
+            }
+        }
+        uasort($out, static fn (array $a, array $b): int => strcmp($a[0], $b[0]));
+
+        return array_values(array_map(static fn (array $x): string => $x[1], $out));
     }
 
     /** Testo semplice (senza HTML) di ricerca, didattica o servizi: il primo che c'è, al massimo 700 caratteri */
