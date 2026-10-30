@@ -38,7 +38,7 @@ final class DaFarePersona
             return [];
         }
         $out = [];
-        foreach (['conferme', 'firme', 'convenzioniTesiFirma', 'convenzioniTesiUfficio', 'verbali', 'tutoratoLettere', 'tutoratoRegistri', 'valutazioni', 'elenchi', 'risorse', 'pratiche'] as $metodo) {
+        foreach (['convenzioniFsl', 'conferme', 'firme', 'convenzioniTesiFirma', 'convenzioniTesiUfficio', 'verbali', 'tutoratoLettere', 'tutoratoRegistri', 'valutazioni', 'elenchi', 'risorse', 'pratiche'] as $metodo) {
             try {
                 $g = $this->$metodo($email);
                 if ($g['n'] > 0) {
@@ -71,6 +71,7 @@ final class DaFarePersona
             "SELECT docente_email FROM tutorato_incarichi WHERE stato IN ('confermata', 'protocollata') AND docente_email <> ''",
             "SELECT email FROM prenotazioni WHERE valutazione_inviata IS NOT NULL AND valutazione_inviata >= NOW() - INTERVAL 90 DAY",
             "SELECT pr.email FROM prenotazioni pr JOIN turni t ON t.id = pr.turno_id JOIN progetti_dettagli pd ON pd.evento_id = t.evento_id WHERE pd.attestati = 1 AND pr.email <> ''",
+            "SELECT email FROM convenzioni_compilate WHERE stato_iter IN ('', 'rifiutata') AND email <> '' AND creata_il >= NOW() - INTERVAL 1 YEAR",
             "SELECT email FROM risorse_responsabili WHERE puo_approvare = 1",
             "SELECT email FROM didattica_consigli_persone WHERE ruolo IN ('segretario', 'coordinatore')",
             "SELECT email FROM uffici_persone",
@@ -105,6 +106,29 @@ final class DaFarePersona
     private static function nome(array $r): string
     {
         return trim((string) ($r['cognome'] ?? '') . ' ' . (string) ($r['nome'] ?? ''));
+    }
+
+    /** Convenzione della scuola con il Dipartimento (FSL): compilata online ma non ancora caricata firmata, o rifiutata dall'ufficio e da ricaricare. */
+    private function convenzioniFsl(string $email): array
+    {
+        $dove = "LOWER(cc.email) = ? AND cc.stato_iter IN ('', 'rifiutata') AND cc.dati_json NOT LIKE '%\"convenzione\":\"si\"%'
+            AND IFNULL(pr.stato, 'confermata') IN ('confermata', 'da_approvare') AND e.archiviato = 0 AND cc.creata_il >= NOW() - INTERVAL 1 YEAR";
+        $da = "FROM convenzioni_compilate cc JOIN prenotazioni pr ON pr.id = cc.prenotazione_id JOIN turni t ON t.id = pr.turno_id JOIN eventi e ON e.id = t.evento_id";
+        $n = (int) $this->db->valore("SELECT COUNT(DISTINCT cc.id) $da WHERE $dove", [$email]);
+        $r = $this->db->righe("SELECT cc.token, cc.stato_iter, cc.nota_ufficio, cc.dati_json, MIN(e.titolo) AS titolo, DATEDIFF(NOW(), COALESCE(cc.aggiornata_il, cc.creata_il)) AS gg
+            $da WHERE $dove GROUP BY cc.id ORDER BY cc.creata_il LIMIT 15", [$email]);
+
+        return $this->gruppo('convenzioni_fsl', 'Convenzione della scuola da caricare', 'fa-file-signature', '#B30000', $n, $r, function (array $x): array {
+            $dati = json_decode((string) ($x['dati_json'] ?? ''), true) ?: [];
+            $scuola = trim((string) ($dati['scuola']['denominazione'] ?? ''));
+            $rifiutata = (string) $x['stato_iter'] === 'rifiutata';
+
+            return [
+                'testo' => ($scuola !== '' ? $scuola . ' · ' : '') . (string) $x['titolo'],
+                'dettaglio' => $rifiutata ? 'la convenzione firmata è stata rifiutata' . ((string) $x['nota_ufficio'] !== '' ? ': ' . $x['nota_ufficio'] : '') . ': ricaricala corretta' : 'scarica la convenzione, falla firmare digitalmente (PAdES) dal Dirigente e caricala qui',
+                'link' => 'convenzione_online.php?t=' . urlencode((string) $x['token']) . '#firmata', 'giorni' => max(0, (int) $x['gg']),
+            ];
+        });
     }
 
     /** Conferme richieste al docente sugli attestati degli studenti (frequenza, esame sostenuto). */

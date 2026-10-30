@@ -215,6 +215,20 @@ if ($u_logged_header) {
             .navbar .megamenu { width: 100%; left: 0; right: 0; top: 100%; margin-top: 0; border-radius: 0 0 8px 8px; padding: 1.5rem; box-shadow: 0 10px 30px rgba(0,0,0,0.08) !important; border: 1px solid #e2e8f0 !important; border-top: 4px solid #B30000 !important; }
             .hover-dropdown:hover > .dropdown-menu { display: block; }
         }
+        /* Menu a tendina del sito (secondo e terzo livello): collegamenti singoli in elenco, voci con sottovoci in colonne con titolo */
+        .mm-elenco { display: block; }
+        .mm-elenco.mm-colonne { column-count: 3; column-gap: 2rem; }
+        .mm-elenco li { break-inside: avoid; }
+        .mm-link { display: block; color: #1e293b !important; font-size: 0.97rem; font-weight: 500; text-decoration: none; padding: 7px 12px 7px 14px; margin: 1px 0; border-left: 3px solid transparent; border-radius: 0 6px 6px 0; transition: background .15s, border-color .15s, color .15s; }
+        .mm-link:hover, .mm-link:focus { background: #fdf2f2; border-left-color: #B30000; color: #B30000 !important; outline: none; }
+        .mm-link:focus-visible { outline: 2px solid #B30000; outline-offset: -2px; }
+        .mm-esterno { font-size: 0.65rem; opacity: .6; margin-left: 4px; }
+        .mm-spento { color: #94a3b8 !important; cursor: default; }
+        .mm-titolo { font-size: 0.78rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #B30000; padding: 0 0 6px 14px; margin-bottom: 6px; border-bottom: 1px solid #e2e8f0; }
+        .mm-titolo a { color: inherit !important; text-decoration: none; }
+        .mm-titolo a:hover { text-decoration: underline; }
+        @media (max-width: 1199.98px) { .mm-elenco.mm-colonne { column-count: 2; } }
+        @media all and (min-width: 992px) { .navbar .mm-li-piccolo { position: relative; } .navbar .mm-li-piccolo .megamenu { width: max-content; min-width: 280px; max-width: 420px; left: 0; right: auto; padding: .6rem .5rem; border-radius: 0 0 8px 8px; } }
         .megamenu-header { color: #0f172a !important; font-weight: 700; font-size: 1.1rem; margin-bottom: 12px; display: block; text-decoration: none; }
         .megamenu-header:hover, .megamenu-header:focus { color: #B30000 !important; }
         .megamenu-link { color: #475569 !important; font-size: 0.95rem; text-decoration: none; display: block; padding: 5px 0; transition: color 0.2s; }
@@ -525,36 +539,49 @@ if ($u_logged_header) {
                         $target = $voce_menu->target();
                         if ($voce_menu->conSottovoci):
                     ?>
-                                        <li class="nav-item dropdown hover-dropdown megamenu-li">
+                                        <?php
+                                        // Solo collegamenti singoli: una tendina compatta sotto la voce; con colonne (sottovoci) il pannello è largo quanto il menu
+                                        $sub_foglie = array_values(array_filter($voce_menu->figli, fn($x) => !$x->conSottovoci));
+                                        $sub_gruppi = array_values(array_filter($voce_menu->figli, fn($x) => $x->conSottovoci));
+                                        ?>
+                                        <li class="nav-item dropdown hover-dropdown <?php echo $sub_gruppi ? 'megamenu-li' : 'mm-li-piccolo'; ?>">
                                             <a class="nav-link px-lg-3" href="#" id="drop<?php echo $m_id; ?>" role="button" data-bs-toggle="dropdown" aria-expanded="false" style="color: #000000 !important; font-weight: 400 !important;">
                                                 <?php echo htmlspecialchars($voce_menu->etichetta); ?> <i class="fa fa-chevron-down ms-1" style="font-size: 0.7rem; color: #B30000;" aria-hidden="true"></i>
                                             </a>
                                             <div class="dropdown-menu megamenu bg-white" aria-labelledby="drop<?php echo $m_id; ?>">
-                                                <div class="row g-4">
-                                                    <?php foreach ($voce_menu->figli as $sub):
-                                                        $target_sub = $sub->target();
-                                                        $header_url = htmlspecialchars($sub->urlOppure('javascript:void(0);'));
-                                                    ?>
-                                                        <div class="col-md-6 col-lg-3 mb-3">
-                                                            <a href="<?php echo $header_url; ?>" <?php echo $target_sub; ?> class="megamenu-header pb-2 mb-2" style="border-bottom: 1px solid #e2e8f0;">
-                                                                <?php echo htmlspecialchars($sub->etichetta); ?>
-                                                            </a>
-                                                            <?php if ($sub->conSottovoci): ?>
-                                                                <ul class="list-unstyled m-0 p-0">
-                                                                    <?php foreach ($sub->figli as $subsub):
-                                                                        $target_subsub = $subsub->target();
-                                                                    ?>
-                                                                        <li>
-                                                                            <a href="<?php echo htmlspecialchars($subsub->url); ?>" <?php echo $target_subsub; ?> class="megamenu-link">
-                                                                                <?php echo htmlspecialchars($subsub->etichetta); ?>
-                                                                            </a>
-                                                                        </li>
-                                                                    <?php endforeach; ?>
+                                                <?php
+                                                // Voci di secondo livello: quelle senza sottovoci sono semplici collegamenti (un elenco ordinato in colonne);
+                                                // quelle con sottovoci diventano una colonna con il titolo e i collegamenti sotto. Se ci sono entrambe, i collegamenti singoli stanno nella prima colonna.
+                                                $mm_voce = function ($v) {
+                                                    $u = $v->urlOppure('');
+                                                    $ico = $v->nuovaScheda ? ' <i class="fa fa-arrow-up-right-from-square mm-esterno" aria-hidden="true"></i>' : '';
+                                                    return $u !== '' ? '<a href="' . htmlspecialchars($u) . '" ' . $v->target() . ' class="mm-link">' . htmlspecialchars($v->etichetta) . $ico . '</a>' : '<span class="mm-link mm-spento">' . htmlspecialchars($v->etichetta) . '</span>';
+                                                };
+                                                ?>
+                                                <?php if (!$sub_gruppi): ?>
+                                                    <ul class="mm-elenco list-unstyled m-0 p-0<?php echo count($sub_foglie) > 6 ? ' mm-colonne' : ''; ?>">
+                                                        <?php foreach ($sub_foglie as $f_mm): ?><li><?php echo $mm_voce($f_mm); ?></li><?php endforeach; ?>
+                                                    </ul>
+                                                <?php else: ?>
+                                                    <div class="row g-4">
+                                                        <?php if ($sub_foglie): ?>
+                                                            <div class="col-md-6 col-lg-3">
+                                                                <div class="mm-titolo">In evidenza</div>
+                                                                <ul class="mm-elenco list-unstyled m-0 p-0"><?php foreach ($sub_foglie as $f_mm): ?><li><?php echo $mm_voce($f_mm); ?></li><?php endforeach; ?></ul>
+                                                            </div>
+                                                        <?php endif; ?>
+                                                        <?php foreach ($sub_gruppi as $sub):
+                                                            $u_sub = $sub->urlOppure('');
+                                                        ?>
+                                                            <div class="col-md-6 col-lg-3">
+                                                                <div class="mm-titolo"><?php echo $u_sub !== '' ? '<a href="' . htmlspecialchars($u_sub) . '" ' . $sub->target() . '>' . htmlspecialchars($sub->etichetta) . '</a>' : htmlspecialchars($sub->etichetta); ?></div>
+                                                                <ul class="mm-elenco list-unstyled m-0 p-0">
+                                                                    <?php foreach ($sub->figli as $subsub): ?><li><?php echo $mm_voce($subsub); ?></li><?php endforeach; ?>
                                                                 </ul>
-                                                            <?php endif; ?>
-                                                        </div>
-                                                    <?php endforeach; ?>
-                                                </div>
+                                                            </div>
+                                                        <?php endforeach; ?>
+                                                    </div>
+                                                <?php endif; ?>
                                             </div>
                                         </li>
                                     <?php else: ?>

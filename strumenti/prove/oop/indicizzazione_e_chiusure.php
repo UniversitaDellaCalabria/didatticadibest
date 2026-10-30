@@ -14,3 +14,4 @@ prova(str_contains($badge, "csrf_verify(\$_POST['csrf_token'] ?? '')") && str_co
 $testa = (string) file_get_contents($r . 'header.php');
 prova(str_contains($testa, 'name="description"') && str_contains($testa, 'property="og:title"') && str_contains($testa, 'rel="canonical"') && str_contains($testa, 'og:image'), "testata: descrizione, anteprima per le condivisioni e indirizzo canonico");
 prova(!str_contains((string) file_get_contents($r . 'src/Portale/CatalogoPagineMenu.php'), "'Ricevimento dei docenti', 'ricevimento.php'"), "catalogo menu: il ricevimento per gli studenti non punta più alla pagina del docente");
+prova(str_contains($testa, 'mm-li-piccolo') && str_contains($testa, 'class="mm-titolo"') && str_contains($testa, 'mm-link') && str_contains($testa, '$sub_gruppi'), "menu: i collegamenti singoli in una tendina compatta, le voci con sottovoci in colonne con titolo");

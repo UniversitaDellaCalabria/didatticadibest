@@ -70,7 +70,7 @@ echo ui_tema_script();
     <?php if ($vedi_come !== null): ?>
         <div class="alert alert-info d-flex flex-wrap align-items-center gap-2 py-2 shadow-sm">
             <i class="fa fa-eye" aria-hidden="true"></i>
-            <span>Stai guardando l'area personale come <strong><?php echo htmlspecialchars(\App\Portale\Area\Profili::NOMI[$vedi_come]); ?></strong>: è solo un'anteprima, i dati sono i tuoi.</span>
+            <span>Stai guardando l'area personale come <strong><?php echo htmlspecialchars(\App\Portale\Area\Profili::NOMI[$vedi_come]); ?></strong>: è solo un'anteprima: «Il mio lavoro» non compare perché dipende da cosa gestisce ogni persona; le altre tessere mostrano i tuoi dati.</span>
             <a href="area_personale.php" class="btn btn-sm btn-outline-primary fw-bold ms-auto">Torna alla mia</a>
             <a href="admin/area_personale.php?profilo=<?php echo urlencode($vedi_come); ?>" class="btn btn-sm btn-outline-secondary fw-bold">Cambia i riquadri</a>
         </div>
@@ -113,6 +113,8 @@ echo ui_tema_script();
     $html_icone = '';
     $html_tessere = '';
     foreach ($riquadri as $riq) {
+        // Guardando l'area «come» un profilo, «Il mio lavoro» seguirebbe i permessi dell'amministratore (tutte le postazioni): non è ciò che vede quel profilo, quindi si salta
+        if ($vedi_come !== null && $riq['tipo'] === \App\Portale\Area\CatalogoRiquadri::SPECIALE && $riq['chiave'] === 'lavoro') continue;
         ob_start();
         if ($riq['tipo'] === \App\Portale\Area\CatalogoRiquadri::SPECIALE) {
             $file_riq = __DIR__ . '/inc/area/' . $riq['chiave'] . '.php';
