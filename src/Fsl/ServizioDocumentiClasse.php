@@ -174,6 +174,8 @@ final class ServizioDocumentiClasse
     {
         $promemoria = 0;
         $ultimi = 0;
+        // Una sola email per docente e attività, anche se ha prenotato più classi: dentro l'elenco di cosa manca a ciascuna
+        $gruppi = [];
         foreach ($this->repo->incomplete() as $p) {
             if (empty($p['email']) || !filter_var($p['email'], FILTER_VALIDATE_EMAIL)) {
                 continue;
@@ -182,16 +184,27 @@ final class ServizioDocumentiClasse
             if ($avviso === null) {
                 continue;
             }
-            $ultimo = $avviso === 'ultimo';
-            $stato = $this->regole->stato($p, (int) $p['studenti'], (int) ($p['num_posti'] ?? 0));
-            $dati = $this->avvisi->datiPromemoria($p, $stato, $ultimo, $this->regole->inizio($p));
-            if ($this->invio->invia((string) $p['email'], $ultimo ? 'fsl_documenti_ultimo_avviso' : 'fsl_documenti_promemoria', $dati, $this->avvisi->link((string) $p['codice_prenotazione']), [], '', $this->colori->delTurno((int) $p['turno_id']))) {
-                $ultimo ? $this->repo->segnaUltimoAvviso((int) $p['id']) : $this->repo->contaPromemoria((int) $p['id']);
-                $ultimo ? ++$ultimi : ++$promemoria;
+            $gruppi[mb_strtolower(trim((string) $p['email'])) . '|' . (string) ($p['titolo'] ?? '')][] = [$p, $avviso];
+        }
+        foreach ($gruppi as $voci) {
+            $ultimo = in_array('ultimo', array_column($voci, 1), true);
+            [$prima] = $voci[0];
+            $stati = array_map(fn (array $v): array => $this->regole->stato($v[0], (int) $v[0]['studenti'], (int) ($v[0]['num_posti'] ?? 0)), $voci);
+            $dati = $this->avvisi->datiPromemoria($prima, $stati[0], $ultimo, $this->regole->inizio($prima));
+            if (count($voci) > 1) {
+                $dati = $this->avvisi->unisciClassi($dati, array_column($voci, 0), $stati);
             }
+            if (!$this->invio->invia((string) $prima['email'], $ultimo ? 'fsl_documenti_ultimo_avviso' : 'fsl_documenti_promemoria', $dati, $this->avvisi->link((string) $prima['codice_prenotazione']), [], '', $this->colori->delTurno((int) $prima['turno_id']))) {
+                continue;
+            }
+            foreach ($voci as [$p, $avviso]) {
+                $avviso === 'ultimo' ? $this->repo->segnaUltimoAvviso((int) $p['id']) : $this->repo->contaPromemoria((int) $p['id']);
+            }
+            $ultimo ? ++$ultimi : ++$promemoria;
         }
 
-        return "- Documenti FSL (elenco studenti e autorizzazione): $promemoria promemoria, $ultimi ultimi avvisi.\n";
+        return "- Documenti FSL (elenco studenti e autorizzazione): $promemoria promemoria, $ultimi ultimi avvisi.
+";
     }
 
     private function cartella(): string

@@ -38,6 +38,7 @@ conferma che esiste sempre. Si può misurare dal pannello: filtro «senza email�
 Il cron dei documenti FSL manda **un'email per ogni prenotazione**. Il 29/10 alle 23:15 lo stesso docente ha ricevuto lo stesso oggetto 3 volte
 (Macro-Area: Fisiologia), altri 2 volte (Macro-Area: Biochimica, Conservazione e Restauro…). Sono classi diverse, ma l'oggetto è uguale e sembra un errore.
 **Rimedio:** una sola email per docente e attività con l'elenco delle classi che mancano (`ServizioDocumentiClasse::promemoria()`).
+**Fatto in locale il 30/10/2026 (da caricare):** il cron raggruppa per email del docente e titolo dell'attività: una sola email con l'elenco «per la prenotazione FS-… manca …» e tutti i codici; il contatore dei promemoria avanza per ogni classe inclusa. Con una sola classe l'email è identica a prima.
 
 ### 5. File inutili raggiungibili dall'esterno (medio-basso, 5 minuti)
 Rispondono 200 da fuori: `install.php` (oggi dice «già installato», ma va tolto), `composer.json`, `README.md`, `MIGRATION_PLAN.md`, `phpunit.xml.dist`.

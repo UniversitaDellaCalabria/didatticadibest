@@ -93,6 +93,33 @@ final class AvvisoDocumenti
         ];
     }
 
+    /**
+     * Più classi dello stesso docente per la stessa attività: l'email è una sola e dice cosa manca a ciascuna (con il codice).
+     *
+     * @param array<string, string> $dati risultato di datiPromemoria() per la prima classe
+     * @param list<array<string, mixed>> $prenotazioni
+     * @param list<array{studenti: int, elenco: bool, autorizzazione: bool, scadenza: ?string, scaduti: bool}> $stati nello stesso ordine
+     * @return array<string, string>
+     */
+    public function unisciClassi(array $dati, array $prenotazioni, array $stati): array
+    {
+        $righe = [];
+        foreach ($prenotazioni as $i => $p) {
+            $manca = [];
+            if (!$stati[$i]['elenco']) {
+                $manca[] = "l'elenco degli studenti";
+            }
+            if (!$stati[$i]['autorizzazione']) {
+                $manca[] = "l'autorizzazione della scuola (PDF)";
+            }
+            $righe[] = 'per la prenotazione ' . $p['codice_prenotazione'] . ' ' . implode(' e ', $manca);
+        }
+        $dati['manca'] = implode('; ', $righe);
+        $dati['codice'] = implode(', ', array_map(fn (array $p): string => (string) $p['codice_prenotazione'], $prenotazioni));
+
+        return $dati;
+    }
+
     private function bottone(string $codice, string $etichetta, bool $perEmail): string
     {
         $link = htmlspecialchars($this->link($codice), ENT_QUOTES, 'UTF-8');

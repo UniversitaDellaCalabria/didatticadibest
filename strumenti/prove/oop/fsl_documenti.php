@@ -49,7 +49,7 @@ prova($regole_doc->prossimoAvviso(['doc_ultimo_avviso' => 1] + $vicina_doc) === 
 prova($regole_doc->prossimoAvviso(['data_turno' => '2026-10-06'] + $vicina_doc) === null, "avviso: attività già iniziata, niente");
 
 // Servizio con il database: promemoria del cron, avviso dopo la prenotazione
-foreach (["DELETE FROM prenotazioni WHERE id IN (98703, 98704)", "DELETE FROM turni WHERE id = 98702", "DELETE FROM progetti_dettagli WHERE evento_id = 98701", "DELETE FROM eventi WHERE id = 98701", "DELETE FROM pagine_eventi WHERE id = 98700"] as $sql) $q($sql);
+foreach (["DELETE FROM prenotazioni WHERE id IN (98703, 98704, 98705)", "DELETE FROM turni WHERE id = 98702", "DELETE FROM progetti_dettagli WHERE evento_id = 98701", "DELETE FROM eventi WHERE id = 98701", "DELETE FROM pagine_eventi WHERE id = 98700"] as $sql) $q($sql);
 $q("INSERT INTO pagine_eventi (id, titolo, slug, tipo_area, visibile, colore_primario) VALUES (98700, 'FSL documenti 987', 'fsl_documenti_987', 'fsl', 1, '#445566')");
 $q("INSERT INTO eventi (id, pagina_id, titolo, tipo, descrizione_breve) VALUES (98701, 98700, 'Progetto FSL documenti', 'progetto', 'Prova documenti.')");
 $q("INSERT INTO progetti_dettagli (evento_id, convenzione, per_scuole, attestati, data_inizio, data_fine, ore_totali) VALUES (98701, 1, 1, 0, '" . $giorni(40) . "', '" . $giorni(70) . "', 20)");
@@ -72,6 +72,19 @@ $n_prima = count($EMAIL);
 $doc_srv->promemoria();
 prova(count(array_filter(array_slice($EMAIL, $n_prima), fn($e) => str_contains($e['oggetto'], 'autorizzazione della scuola'))) === 0, "cron: subito dopo non ne parte un altro");
 
+// Due classi dello stesso docente per la stessa attività: una sola email con entrambi i codici
+$q("INSERT INTO prenotazioni (id, turno_id, codice_prenotazione, stato, nome, cognome, email, data_prenotazione, convenzione)
+    VALUES (98705, 98702, 'FS-DOC989', 'da_approvare', 'Rosa', 'Docente', 'rosa987@example.org', NOW() - INTERVAL 8 DAY, 'no')");
+$q("UPDATE prenotazioni SET doc_promemoria_il = NOW() - INTERVAL 8 DAY WHERE id = 98703");
+$n_prima = count($EMAIL);
+$doc_srv->promemoria();
+$due = array_values(array_filter(array_slice($EMAIL, $n_prima), fn($e) => str_contains($e['oggetto'], 'autorizzazione della scuola')));
+prova(count($due) === 1 && str_contains($due[0]['corpo'] ?? '', 'FS-DOC987') && str_contains($due[0]['corpo'] ?? '', 'FS-DOC989'), "cron: due classi dello stesso docente e attività = una sola email con i due codici", json_encode(array_column($due, 'oggetto')));
+$r5 = $conn->query("SELECT doc_promemoria FROM prenotazioni WHERE id IN (98703, 98705)")->fetch_all(MYSQLI_ASSOC);
+prova(count($r5) === 2 && (int) $r5[0]['doc_promemoria'] >= 1 && (int) $r5[1]['doc_promemoria'] === 1, "cron: il promemoria è contato per ogni classe inclusa");
+$q("DELETE FROM prenotazioni WHERE id = 98705");
+$q("UPDATE prenotazioni SET doc_promemoria_il = NOW() WHERE id = 98703");
+
 // Con elenco e autorizzazione il promemoria non serve più
 $q("INSERT INTO partecipanti_prenotazione (prenotazione_id, cognome, nome, ordine) VALUES (98703, 'Rossi', 'Mario', 1)");
 $q("UPDATE prenotazioni SET autorizzazione_file = 'uploads/autorizzazioni/" . str_repeat('a', 32) . ".pdf', autorizzazione_nome = 'aut.pdf', doc_promemoria_il = NOW() - INTERVAL 8 DAY WHERE id = 98703");
@@ -93,4 +106,4 @@ prova(str_contains($doc_srv->avvisoPerCodice('FS-DOC987'), 'Elenco degli student
 prova(AppDoc::per($conn)->get(\App\Iscrizioni\RegoleFsl::class)->avvisoDocumentiClasse(['convenzione' => 1, 'per_scuole' => 1, 'data_inizio' => $giorni(40)], true, 'FS-NUOVO', null) === $avv, "RegoleFsl serve l'avviso al modulo Iscrizioni");
 
 // Pulizia
-foreach (["DELETE FROM partecipanti_prenotazione WHERE prenotazione_id = 98703", "DELETE FROM prenotazioni WHERE id IN (98703, 98704)", "DELETE FROM turni WHERE id = 98702", "DELETE FROM progetti_dettagli WHERE evento_id = 98701", "DELETE FROM eventi WHERE id = 98701", "DELETE FROM pagine_eventi WHERE id = 98700"] as $sql) $q($sql);
+foreach (["DELETE FROM partecipanti_prenotazione WHERE prenotazione_id = 98703", "DELETE FROM prenotazioni WHERE id IN (98703, 98704, 98705)", "DELETE FROM turni WHERE id = 98702", "DELETE FROM progetti_dettagli WHERE evento_id = 98701", "DELETE FROM eventi WHERE id = 98701", "DELETE FROM pagine_eventi WHERE id = 98700"] as $sql) $q($sql);
