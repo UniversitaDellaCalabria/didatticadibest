@@ -9,25 +9,32 @@ error_reporting(E_ALL);
 require_once __DIR__ . '/middleware.php';
 
 // =======================================================================
-// AZIONE: AGGIORNAMENTO EMAIL (TAB PROFILO)
+// AZIONE: CAMBIO EMAIL IN DUE PASSI (src/Auth/VerificaEmail): 1) nuova email → codice per posta; 2) codice → l'email cambia.
+// Senza la verifica chiunque poteva scrivere l'email di un docente e ricevere conferme, firme e registri a lui destinati.
 // =======================================================================
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['aggiorna_email'])) {
+$verifica_email = \App\Core\App::per($conn)->get(\App\Auth\VerificaEmail::class);
+$msg_email = fn(string $testo, bool $ok) => "<div class='alert alert-" . ($ok ? 'success' : 'danger') . " fw-bold text-center my-3 shadow-sm'><i class='fa " . ($ok ? 'fa-check-circle' : 'fa-times-circle') . " me-1'></i> " . htmlspecialchars($testo) . "</div>";
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && (isset($_POST['aggiorna_email']) || isset($_POST['conferma_codice_email']) || isset($_POST['annulla_verifica_email']))) {
     csrf_verify($_POST['csrf_token'] ?? '');
-    $nuova_email = strtolower(trim($_POST['nuova_email'] ?? ''));
-    if (empty($nuova_email) || !filter_var($nuova_email, FILTER_VALIDATE_EMAIL)) {
-        $_SESSION['msg_area_pers'] = "<div class='alert alert-danger fw-bold text-center my-3 shadow-sm'><i class='fa fa-times-circle me-1'></i> Inserisci un indirizzo email valido.</div>";
-    } else {
-        $risultato = aggiorna_email_utente($conn, $u_id, $nuova_email);
-        if ($risultato === true) {
-            $_SESSION['utente_email'] = $nuova_email;
-            $_SESSION['msg_area_pers'] = "<div class='alert alert-success fw-bold text-center my-3 shadow-sm'><i class='fa fa-check-circle me-1'></i> Email aggiornata correttamente.</div>";
-        } else {
-            $_SESSION['msg_area_pers'] = "<div class='alert alert-danger fw-bold text-center my-3 shadow-sm'><i class='fa fa-times-circle me-1'></i> " . htmlspecialchars($risultato) . "</div>";
+    if (isset($_POST['annulla_verifica_email'])) {
+        $verifica_email->annulla((int)$u_id);
+    } elseif (isset($_POST['conferma_codice_email'])) {
+        [$err_ve, $nuova_ve] = $verifica_email->conferma((int)$u_id, (string)($_POST['codice'] ?? ''));
+        if ($err_ve === null) {
+            $_SESSION['utente_email'] = $nuova_ve;
+            registra_log_audit($conn, "Profilo: email cambiata con codice di verifica", ["Nuova email" => $nuova_ve]);
         }
+        $_SESSION['msg_area_pers'] = $msg_email($err_ve ?? 'Email confermata e aggiornata.', $err_ve === null);
+    } elseif (!check_rate_limit($conn, 'verifica_email', 10, 3600)) {
+        $_SESSION['msg_area_pers'] = $msg_email('Troppe richieste: riprova tra un po\'.', false);
+    } else {
+        $err_ve = $verifica_email->richiedi((int)$u_id, (string)($_POST['nuova_email'] ?? ''));
+        $_SESSION['msg_area_pers'] = $msg_email($err_ve ?? 'Ti abbiamo mandato un codice di 6 cifre: scrivilo qui sotto per confermare la nuova email (controlla anche lo spam).', $err_ve === null);
     }
-    header("Location: profilo.php");
+    header("Location: profilo.php#email");
     exit;
 }
+$ve_in_corso = $verifica_email->inCorso((int)$u_id);
 
 // =======================================================================
 // AZIONE: SCHEDA DI ATENEO (dati dalle API del portale, modificabili dalla persona)
@@ -178,17 +185,32 @@ echo ui_tema_script();
                     <p class="text-muted small mb-3">
                         <i class="fa fa-info-circle me-1"></i>
                         Questa email viene usata per le notifiche di conferma, promemoria e comunicazioni relative alle tue prenotazioni.
-                        L'email fornita dall'Università al momento del login viene salvata automaticamente; puoi sovrascriverla qui se preferisci usarne un'altra.
+                        L'email fornita dall'Università al momento del login viene salvata automaticamente; puoi sostituirla con un'altra:
+                        ti mandiamo un <strong>codice di 6 cifre</strong> al nuovo indirizzo e l'email cambia solo dopo che lo hai scritto qui.
                     </p>
+                    <?php if ($ve_in_corso): ?>
+                        <div class="border rounded-3 p-3 mb-3" style="background:#f8fafc;">
+                            <p class="mb-2">Abbiamo mandato il codice a <strong><?php echo htmlspecialchars($ve_in_corso['email']); ?></strong>: vale fino alle <?php echo date('H:i', strtotime($ve_in_corso['scade_il'])); ?>.</p>
+                            <form method="POST" class="d-flex flex-wrap gap-2 align-items-end">
+                                <?php csrf_field(); ?>
+                                <div><label class="form-label small fw-bold mb-0" for="codiceEmail">Codice</label>
+                                    <input type="text" id="codiceEmail" name="codice" class="form-control font-monospace" style="max-width:160px;letter-spacing:4px;" inputmode="numeric" pattern="[0-9 ]{6,7}" maxlength="7" autocomplete="one-time-code" required autofocus></div>
+                                <button type="submit" name="conferma_codice_email" value="1" class="btn btn-primary fw-bold"><i class="fa fa-check me-1" aria-hidden="true"></i>Conferma la nuova email</button>
+                                <button type="submit" name="annulla_verifica_email" value="1" class="btn btn-link text-secondary" formnovalidate>Annulla</button>
+                            </form>
+                            <div class="form-text">Non è arrivato? Controlla lo spam o chiedi un nuovo codice qui sotto (dopo un minuto).</div>
+                        </div>
+                    <?php endif; ?>
                     <form method="POST" novalidate>
                         <?php csrf_field(); ?>
                         <input type="hidden" name="aggiorna_email" value="1">
+                        <label class="form-label small fw-bold mb-1" for="nuovaEmail">Nuova email</label>
                         <div class="input-group">
-                            <input type="email" name="nuova_email" class="form-control"
+                            <input type="email" id="nuovaEmail" name="nuova_email" class="form-control"
                                    placeholder="nuova@email.it"
-                                   value="<?php echo htmlspecialchars($user_info['email'] ?? ''); ?>"
-                                   required aria-label="Nuovo indirizzo email">
-                            <button type="submit" class="btn btn-primary"><i class="fa fa-save me-1"></i> Salva</button>
+                                   value="<?php echo htmlspecialchars($ve_in_corso['email'] ?? ''); ?>"
+                                   required>
+                            <button type="submit" class="btn btn-outline-primary fw-bold"><i class="fa fa-paper-plane me-1" aria-hidden="true"></i> <?php echo $ve_in_corso ? 'Manda un nuovo codice' : 'Mandami il codice'; ?></button>
                         </div>
                     </form>
                 </div>

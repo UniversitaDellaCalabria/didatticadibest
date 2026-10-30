@@ -4,24 +4,14 @@ declare(strict_types=1);
 
 namespace App\Auth;
 
-/** Casi d'uso sugli utenti del portale: email del profilo, amministratori da avvisare. */
+/**
+ * Casi d'uso sugli utenti del portale: amministratori da avvisare. Il cambio dell'email del profilo passa da VerificaEmail (con il codice):
+ * il vecchio aggiornaEmail() senza verifica è stato tolto il 30/10/2026.
+ */
 final class ServizioUtenti
 {
     public function __construct(private UtenteRepository $utenti)
     {
-    }
-
-    /**
-     * Aggiorna l'email dell'utente e la marca come personalizzata (spostata da aggiorna_email_utente() di inc/dati.php).
-     * Ritorna true in caso di successo, oppure il messaggio di errore.
-     */
-    public function aggiornaEmail(int $utenteId, string $nuovaEmail): true|string
-    {
-        if ($this->utenti->emailUsataDaAltri($nuovaEmail, $utenteId)) {
-            return 'Questa email è già associata a un altro account.';
-        }
-
-        return $this->utenti->impostaEmailPersonalizzata($utenteId, $nuovaEmail) ? true : 'Errore durante il salvataggio. Riprova.';
     }
 
     /**

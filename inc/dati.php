@@ -130,15 +130,7 @@ if (!function_exists('get_turno_con_evento')) {
 // =======================================================================
 // PROFILO UTENTE
 // =======================================================================
-if (!function_exists('aggiorna_email_utente')) {
-    /**
-     * Aggiorna l'email dell'utente e la marca come personalizzata.
-     * Ritorna true in caso di successo, oppure una stringa di errore.
-     */
-    function aggiorna_email_utente($conn, int $u_id, string $nuova_email) {
-        return \App\Core\App::per($conn)->get(\App\Auth\ServizioUtenti::class)->aggiornaEmail($u_id, $nuova_email);
-    }
-}
+// aggiorna_email_utente() è stata tolta il 30/10/2026: cambiava l'email senza verifica. Ora si usa \App\Auth\VerificaEmail (profilo.php).
 
 // =======================================================================
 // RICERCA GLOBALE

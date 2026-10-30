@@ -81,10 +81,13 @@ final class UtenteRepository
         return $this->db->riga('SELECT id FROM utenti WHERE LOWER(email) = ? AND id != ? LIMIT 1', [$email, $escludiId]) !== null;
     }
 
-    /** Email scelta dall'utente: marcata come personalizzata (l'accesso SSO non la sovrascrive più). Ritorna false se la query non riesce. */
-    public function impostaEmailPersonalizzata(int $id, string $email): bool
+    /**
+     * Email scelta dall'utente e confermata con il codice (VerificaEmail): marcata come personalizzata (l'accesso SSO non la sovrascrive più)
+     * e verificata. Ritorna false se la query non riesce.
+     */
+    public function impostaEmailVerificata(int $id, string $email, string $quando): bool
     {
-        return $this->db->esegui('UPDATE utenti SET email = ?, email_personalizzata = 1 WHERE id = ?', [$email, $id]) >= 0;
+        return $this->db->esegui('UPDATE utenti SET email = ?, email_personalizzata = 1, email_verificata_il = ? WHERE id = ?', [$email, $quando, $id]) >= 0;
     }
 
     /** @return list<string> email (grezze) degli amministratori globali: ruolo principale o secondario 1 */

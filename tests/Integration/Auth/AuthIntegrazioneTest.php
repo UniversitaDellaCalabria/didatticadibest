@@ -70,14 +70,6 @@ final class AuthIntegrazioneTest extends DatabaseDiProva
         self::assertSame(['ada@unical.it', 'gino@unical.it'], (new ServizioUtenti($this->utenti))->emailAmministratori());
     }
 
-    public function testAggiornaEmailRifiutaQuellaDiUnAltro(): void
-    {
-        $s = new ServizioUtenti($this->utenti);
-        self::assertSame('Questa email è già associata a un altro account.', $s->aggiornaEmail(4, 'gino@unical.it'));
-        self::assertTrue($s->aggiornaEmail(4, 'nuova@x.it'));
-        self::assertSame('1', (string) $this->db->valore('SELECT email_personalizzata FROM utenti WHERE id = 4'));
-    }
-
     public function testAggiornaDaAdminEEliminaConPrenotazioni(): void
     {
         $this->utenti->aggiornaDaAdmin(4, 3, '1,2', 'Ugo2', 'Uno2', 'u2@x.it');

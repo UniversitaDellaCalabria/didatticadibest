@@ -38,9 +38,16 @@ $q("INSERT INTO utenti (id, nome, cognome, email, ruolo_id, ruoli_secondari) VAL
 $amm = email_amministratori($conn);
 prova(in_array('admin.a@prova.it', $amm, true) && in_array('admin.b@prova.it', $amm, true) && !in_array('doc@prova.it', $amm, true), "email_amministratori(): ruolo principale o secondario 1, minuscole");
 prova(count(get_ruoli($conn)) >= 5 && get_ruoli($conn)[0]['id'] <= get_ruoli($conn)[1]['id'], "get_ruoli(): in ordine di id");
-prova(aggiorna_email_utente($conn, 9104, 'admin.b@prova.it') === 'Questa email è già associata a un altro account.'
-   && aggiorna_email_utente($conn, 9104, 'nuova@prova.it') === true
-   && db_riga($conn, "SELECT email, email_personalizzata FROM utenti WHERE id = 9104") === ['email' => 'nuova@prova.it', 'email_personalizzata' => 1], "aggiorna_email_utente()");
+// Cambio dell'email del profilo solo con il codice arrivato al nuovo indirizzo (VerificaEmail, v107): la vecchia aggiorna_email_utente() non c'è più
+$ve = \App\Core\App::per($conn)->get(\App\Auth\VerificaEmail::class);
+$EMAIL = [];
+prova(!function_exists('aggiorna_email_utente') && $ve->richiedi(9104, 'admin.b@prova.it') === 'Questa email è già associata a un altro account.'
+   && $ve->richiedi(9104, 'nuova@prova.it') === null && count($EMAIL) === 1 && $EMAIL[0]['a'] === 'nuova@prova.it'
+   && db_valore($conn, "SELECT email FROM utenti WHERE id = 9104") === 'doc@prova.it', "cambio email: il codice parte verso il nuovo indirizzo e l'email non cambia ancora");
+preg_match('/>(\d{6})</', (string)($EMAIL[0]['corpo'] ?? ''), $m_ve);
+prova(($ve->conferma(9104, '000000' === ($m_ve[1] ?? '') ? '111111' : '000000')[0] ?? '') !== '' && $ve->conferma(9104, $m_ve[1] ?? '')[0] === null
+   && db_riga($conn, "SELECT email, email_personalizzata FROM utenti WHERE id = 9104") === ['email' => 'nuova@prova.it', 'email_personalizzata' => 1]
+   && db_valore($conn, "SELECT email_verificata_il FROM utenti WHERE id = 9104") !== null && count($EMAIL) === 2 && $EMAIL[1]['a'] === 'doc@prova.it', "cambio email: codice sbagliato rifiutato, con quello giusto l'email cambia ed è avvisato il vecchio indirizzo");
 
 // Gestori e perimetri
 $q("INSERT INTO pagine_eventi (id, titolo, slug, gestore_utente_id, permessi_gestori_json) VALUES (9190, 'Area auth', 'area-auth', 9104, '{\"9102\":[\"full\"]}')");

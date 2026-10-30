@@ -1925,6 +1925,40 @@ var PACCHETTI = [
     ],
     nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/…</code>, <code>materiali/…</code> e <code>documentazione/…</code>.",
     commit: "Didacticus: capisce il significato delle domande (embedding con un piccolo modello locale, facoltativo): trova la voce giusta anche senza parole in comune, non scrive risposte; vettori delle voci, aggiornamento notturno, stato nel pannello e confronto nella Prova (schema v101)"
+  },
+  {
+    id: "verifica-email",
+    titolo: "Pacchetto 43 · Sicurezza: l'email del profilo cambia solo con un codice",
+    stato: "pronto",
+    statoTesto: "Pronto da caricare (urgente: chiude una falla dei permessi)",
+    schema: "v107 (tabella verifiche_email e colonna utenti.email_verificata_il: si creano da sole alla prima pagina)",
+    riassunto: "Prima chiunque poteva scrivere nel <strong>profilo</strong> l'email di un docente che non aveva ancora un account e ricevere in «Da fare per te» le sue conferme di attestati, firme e registri del tutorato, e usarli (i permessi si basano sull'email). Ora la nuova email vale solo dopo aver scritto il <strong>codice di 6 cifre</strong> arrivato a quell'indirizzo (30 minuti, 5 tentativi, al massimo 10 codici al giorno); il vecchio indirizzo riceve un avviso. I testi delle due email sono nel catalogo («Profilo · Email della persona»). Uno script controlla le email scelte prima di oggi senza verifica.",
+    passi: [["0.1", "Verifica dell'email con codice"], ["0.1b", "Controllo delle email già scelte"]],
+    cartelle: [
+      { cartella: "src/Auth/", file: [
+        ["VerificaEmail.php", "nuovo", "0.1", "codice al nuovo indirizzo, controllo, cambio dell'email e avviso al vecchio"],
+        ["ControlloEmailPersonalizzate.php", "nuovo", "0.1b", "elenco delle email scelte senza verifica che coincidono con docenti, firmatari, uffici, anagrafe"],
+        ["UtenteRepository.php", "mod", "0.1", "impostaEmailVerificata() al posto di impostaEmailPersonalizzata()"],
+        ["ServizioUtenti.php", "mod", "0.1", "tolto aggiornaEmail() (cambiava l'email senza verifica)"]
+      ]},
+      { cartella: "src/Core/Schema/ e src/Email/", file: [
+        ["src/Core/Schema/Definizioni.php", "mod", "0.1", "tabella verifiche_email, colonna utenti.email_verificata_il"],
+        ["src/Core/Schema/Migrazioni.php", "mod", "0.1", "versione 107"],
+        ["src/Email/CatalogoSistema.php", "mod", "0.1", "modelli profilo_codice_email e profilo_email_cambiata"]
+      ]},
+      { cartella: "radice, inc/ e strumenti/", file: [
+        ["profilo.php", "mod", "0.1", "cambio dell'email in due passi (nuova email → codice)"],
+        ["inc/dati.php", "mod", "0.1", "tolta aggiorna_email_utente()"],
+        ["strumenti/controllo_email_personalizzate.php", "nuovo", "0.1b", "da riga di comando, sul server (questa volta va caricato)"]
+      ]}
+    ],
+    dopo: [
+      "Apri una pagina del sito: lo schema v107 crea la tabella e la colonna.",
+      "Dal tuo profilo prova a cambiare l'email: deve arrivare il codice e l'email deve cambiare solo dopo averlo scritto.",
+      "Sul server, una volta: <code>php strumenti/controllo_email_personalizzate.php</code>. Elenca chi ha scelto a mano, prima di oggi, l'email di un docente, di un firmatario, di un ufficio o di un'altra persona dell'anagrafe. Se un'email non è della persona: <code>php strumenti/controllo_email_personalizzate.php --azzera=ID</code> (al prossimo accesso torna quella del login). Con <code>--tutte</code> vedi tutte le email scelte senza verifica."
+    ],
+    nonServe: "Non vanno sul server: <code>tests/…</code>, <code>strumenti/prove/…</code> e <code>documentazione/…</code>.",
+    commit: "Sicurezza: l'email del profilo cambia solo con il codice di 6 cifre inviato al nuovo indirizzo (avviso al vecchio, limiti su tentativi e invii); script di controllo delle email scelte prima senza verifica (schema v107)"
   }
 ];
 

@@ -449,6 +449,11 @@ final class Definizioni
         'calendario_token' => "CREATE TABLE IF NOT EXISTS calendario_token (
             utente_id INT NOT NULL PRIMARY KEY, token VARCHAR(40) NOT NULL, creato_il DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY uq_token (token)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        // v107: cambio dell'email del profilo con il codice di 6 cifre (src/Auth/VerificaEmail): una verifica in corso per persona, il codice solo come impronta
+        'verifiche_email' => "CREATE TABLE IF NOT EXISTS verifiche_email (
+            utente_id INT NOT NULL PRIMARY KEY, email VARCHAR(150) NOT NULL, codice_hash CHAR(64) NOT NULL, scade_il DATETIME NOT NULL,
+            tentativi TINYINT NOT NULL DEFAULT 0, invii TINYINT NOT NULL DEFAULT 1, creata_il DATETIME NOT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         // v82: testi delle email del portale modificabili dal pannello (pagina «Email»): solo le modifiche, senza riga vale il testo originale del codice
         'email_modelli' => "CREATE TABLE IF NOT EXISTS email_modelli (
             chiave VARCHAR(80) NOT NULL PRIMARY KEY, oggetto VARCHAR(300) NOT NULL DEFAULT '', corpo MEDIUMTEXT DEFAULT NULL, bottone VARCHAR(120) DEFAULT '',
@@ -1058,6 +1063,8 @@ final class Definizioni
             'scuola_codice'        => "ADD COLUMN scuola_codice VARCHAR(10) DEFAULT NULL",
             // v23: persona dell'anagrafe di Ateneo collegata al login (per email)
             'persona_id'           => "ADD COLUMN persona_id VARCHAR(80) DEFAULT NULL, ADD INDEX idx_persona (persona_id)",
+            // v107: quando la persona ha confermato con il codice l'email scelta nel profilo (NULL: email del login, impostata dal pannello o scelta prima della verifica)
+            'email_verificata_il'  => "ADD COLUMN email_verificata_il DATETIME DEFAULT NULL",
         ],
         'abilitazioni_attesa' => [
             // v29: perimetro dell'abilitazione in attesa del primo accesso ('area', 'attivita', 'progetti', 'eventi', 'fsl', 'fsl_convenzioni', 'fsl_scuole')
