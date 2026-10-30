@@ -307,6 +307,124 @@ foreach ($pagine_disponibili as $pa) {
 }
 $nome_utente = fn(int $id) => isset($utenti_per_id[$id]) ? trim(mb_strtoupper($utenti_per_id[$id]['cognome'] . ' ' . $utenti_per_id[$id]['nome'])) : "Utente #$id (non più presente)";
 $etichette_perm = ['full' => 'Admin area', 'eventi' => 'Eventi', 'iscritti' => 'Iscritti', 'sondaggi' => 'Sondaggi', 'form' => 'Form'];
+// Scheda di una persona (anagrafica, gruppi, abilitazioni): si scrive solo per chi la apre (richiesta ?scheda=ID dall'elenco), non per tutti nell'elenco
+$corpo_utente = function (array $u) use ($ruoli, $filtro_p, $page_cfg, $eventi_area, $tipo_att, $arch_att, $perimetri, $PERIMETRO_VUOTO): void {
+    $uid       = (int)$u['id'];
+    $u_sec_arr = array_filter(explode(',', $u['ruoli_secondari'] ?? ''));
+    $is_admin  = (int)($u['ruolo_id'] ?? 5) === 1;
+    $pu        = $perimetri[$uid] ?? null;
+?>
+<div class="usr-body">
+
+            <!-- SEZIONE 1: ANAGRAFICA -->
+            <div class="usr-section">
+                <div class="usr-section-label"><i class="fa fa-id-card"></i>Anagrafica</div>
+                <form method="POST" class="row g-2 align-items-end">
+                    <?php csrf_field(); ?>
+                    <input type="hidden" name="utente_id" value="<?php echo $uid; ?>">
+                    <input type="hidden" name="ruolo_id" value="<?php echo $u['ruolo_id']; ?>">
+                    <?php foreach ($u_sec_arr as $sr): ?><input type="hidden" name="ruoli_secondari[]" value="<?php echo (int)$sr; ?>"><?php endforeach; ?>
+                    <div class="col-sm-3">
+                        <label class="form-label small fw-bold mb-1">Nome</label>
+                        <input type="text" name="nome" class="form-control form-control-sm" value="<?php echo htmlspecialchars($u['nome'] ?? ''); ?>" required>
+                    </div>
+                    <div class="col-sm-3">
+                        <label class="form-label small fw-bold mb-1">Cognome</label>
+                        <input type="text" name="cognome" class="form-control form-control-sm" value="<?php echo htmlspecialchars($u['cognome'] ?? ''); ?>">
+                    </div>
+                    <div class="col-sm-4">
+                        <label class="form-label small fw-bold mb-1">Email</label>
+                        <input type="email" name="email" class="form-control form-control-sm" value="<?php echo htmlspecialchars($u['email'] ?? ''); ?>">
+                    </div>
+                    <div class="col-sm-2">
+                        <button type="submit" name="change_user_role" class="btn btn-sm btn-primary fw-bold w-100">Salva</button>
+                    </div>
+                </form>
+                <?php if (!empty($u['codice_fiscale']) || !empty($u['matricola_studente']) || !empty($u['matricola_dipendente'])): ?>
+                <div class="mt-2 d-flex gap-2 flex-wrap" style="font-size:.72rem;color:#64748b;">
+                    <?php if (!empty($u['codice_fiscale'])): ?><span>CF: <code><?php echo htmlspecialchars($u['codice_fiscale']); ?></code></span><?php endif; ?>
+                    <?php if (!empty($u['matricola_studente'])): ?><span>Matricola studente: <strong><?php echo htmlspecialchars($u['matricola_studente']); ?></strong></span><?php endif; ?>
+                    <?php if (!empty($u['matricola_dipendente'])): ?><span>Matricola dipendente: <strong><?php echo htmlspecialchars($u['matricola_dipendente']); ?></strong></span><?php endif; ?>
+                </div>
+                <?php endif; ?>
+            </div>
+
+            <!-- SEZIONE 2: RUOLO & GRUPPI -->
+            <div class="usr-section">
+                <div class="usr-section-label"><i class="fa fa-user-tag"></i>Ruolo & Gruppi</div>
+                <form method="POST" class="row g-2 align-items-end">
+                    <?php csrf_field(); ?>
+                    <input type="hidden" name="utente_id" value="<?php echo $uid; ?>">
+                    <input type="hidden" name="nome" value="">
+                    <input type="hidden" name="cognome" value="">
+                    <div class="col-sm-4">
+                        <label class="form-label small fw-bold mb-1">Ruolo Principale</label>
+                        <select name="ruolo_id" class="form-select form-select-sm select2-role" style="width:100%;">
+                            <?php foreach ($ruoli as $r): ?>
+                                <option value="<?php echo $r['id']; ?>" <?php echo ($u['ruolo_id'] == $r['id']) ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($r['nome']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="form-label small fw-bold mb-1">Gruppi Secondari</label>
+                        <select name="ruoli_secondari[]" multiple class="form-select form-select-sm select2-sec-role" style="width:100%;">
+                            <?php foreach ($ruoli as $r): ?>
+                                <option value="<?php echo $r['id']; ?>" <?php echo in_array((string)$r['id'], $u_sec_arr) ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($r['nome']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="col-sm-2">
+                        <button type="submit" name="change_user_role" class="btn btn-sm btn-primary fw-bold w-100" style="height:38px;">Salva</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- SEZIONE 3: ABILITAZIONI (area corrente e Formazione Scuola Lavoro) -->
+            <div class="usr-section">
+                <div class="usr-section-label"><i class="fa fa-key" aria-hidden="true"></i>Abilitazioni
+                    <?php if ($filtro_p > 0): ?>
+                        <span style="font-size:.65rem;background:#f1f5f9;color:#64748b;padding:1px 7px;border-radius:10px;font-weight:600;"><?php echo htmlspecialchars($page_cfg['titolo'] ?? ''); ?> e FSL</span>
+                    <?php endif; ?>
+                </div>
+
+                <?php if ($filtro_p == 0): ?>
+                    <p class="text-muted small mb-0"><i class="fa fa-info-circle me-1" aria-hidden="true"></i>Seleziona un'area dal menu in alto per gestire le abilitazioni di questo utente.</p>
+
+                <?php elseif ($is_admin): ?>
+                    <span class="perm-chip" style="background:#fee2e2;color:#991b1b;font-size:.8rem;"><i class="fa fa-shield-alt me-1" aria-hidden="true"></i>Admin Globale — accesso completo a tutte le aree</span>
+
+                <?php else: $p_cur = $pu ?? $PERIMETRO_VUOTO; ?>
+                <form method="POST">
+                    <?php csrf_field(); ?>
+                    <input type="hidden" name="utente_id" value="<?php echo $uid; ?>">
+                    <p class="small text-secondary mb-2">Dentro ciò che abiliti la persona gestisce tutto: attività, iscritti e check-in, sondaggi, moduli, attestati e statistiche.</p>
+                    <?php echo html_perimetro('u' . $uid . '_', $p_cur, (string)($page_cfg['titolo'] ?? ''), $eventi_area, $tipo_att, $arch_att); ?>
+                    <div class="mt-2 d-flex gap-2">
+                        <button type="submit" name="salva_abilitazioni" value="1" class="btn btn-sm btn-primary fw-bold"><i class="fa fa-save me-1" aria-hidden="true"></i>Salva abilitazioni</button>
+                        <?php if ($pu): ?>
+                        <button type="submit" name="remove_user_all" value="1" class="btn btn-sm btn-outline-danger fw-bold" data-confirm="Togliere tutte le abilitazioni di questa persona su quest'area e sulla Formazione Scuola Lavoro?"><i class="fa fa-trash-alt me-1" aria-hidden="true"></i>Revoca tutto</button>
+                        <?php endif; ?>
+                    </div>
+                </form>
+                <?php endif; ?>
+            </div><!-- /sezione abilitazioni -->
+
+        </div><!-- /usr-body -->
+<?php
+};
+if (isset($_GET['scheda'])) {
+    $u_sc = null;
+    foreach ($utenti as $x_sc) { if ((int)$x_sc['id'] === (int)$_GET['scheda']) { $u_sc = $x_sc; break; } }
+    while (ob_get_level() > 0) ob_end_clean();
+    if ($u_sc === null) { http_response_code(404); exit; }
+    header('Content-Type: text/html; charset=UTF-8');
+    $corpo_utente($u_sc);
+    exit;
+}
 ?>
 
 <!-- ============================================================
@@ -566,108 +684,9 @@ $etichette_perm = ['full' => 'Admin area', 'eventi' => 'Eventi', 'iscritti' => '
         <i class="fa fa-chevron-down chevron-icon text-muted" style="font-size:.75rem;"></i>
     </div>
 
-    <!-- CORPO COLLASSABILE -->
-    <div class="collapse" id="usr<?php echo $uid; ?>">
-        <div class="usr-body">
-
-            <!-- SEZIONE 1: ANAGRAFICA -->
-            <div class="usr-section">
-                <div class="usr-section-label"><i class="fa fa-id-card"></i>Anagrafica</div>
-                <form method="POST" class="row g-2 align-items-end">
-                    <?php csrf_field(); ?>
-                    <input type="hidden" name="utente_id" value="<?php echo $uid; ?>">
-                    <input type="hidden" name="ruolo_id" value="<?php echo $u['ruolo_id']; ?>">
-                    <?php foreach ($u_sec_arr as $sr): ?><input type="hidden" name="ruoli_secondari[]" value="<?php echo (int)$sr; ?>"><?php endforeach; ?>
-                    <div class="col-sm-3">
-                        <label class="form-label small fw-bold mb-1">Nome</label>
-                        <input type="text" name="nome" class="form-control form-control-sm" value="<?php echo htmlspecialchars($u['nome'] ?? ''); ?>" required>
-                    </div>
-                    <div class="col-sm-3">
-                        <label class="form-label small fw-bold mb-1">Cognome</label>
-                        <input type="text" name="cognome" class="form-control form-control-sm" value="<?php echo htmlspecialchars($u['cognome'] ?? ''); ?>">
-                    </div>
-                    <div class="col-sm-4">
-                        <label class="form-label small fw-bold mb-1">Email</label>
-                        <input type="email" name="email" class="form-control form-control-sm" value="<?php echo htmlspecialchars($u['email'] ?? ''); ?>">
-                    </div>
-                    <div class="col-sm-2">
-                        <button type="submit" name="change_user_role" class="btn btn-sm btn-primary fw-bold w-100">Salva</button>
-                    </div>
-                </form>
-                <?php if (!empty($u['codice_fiscale']) || !empty($u['matricola_studente']) || !empty($u['matricola_dipendente'])): ?>
-                <div class="mt-2 d-flex gap-2 flex-wrap" style="font-size:.72rem;color:#64748b;">
-                    <?php if (!empty($u['codice_fiscale'])): ?><span>CF: <code><?php echo htmlspecialchars($u['codice_fiscale']); ?></code></span><?php endif; ?>
-                    <?php if (!empty($u['matricola_studente'])): ?><span>Matricola studente: <strong><?php echo htmlspecialchars($u['matricola_studente']); ?></strong></span><?php endif; ?>
-                    <?php if (!empty($u['matricola_dipendente'])): ?><span>Matricola dipendente: <strong><?php echo htmlspecialchars($u['matricola_dipendente']); ?></strong></span><?php endif; ?>
-                </div>
-                <?php endif; ?>
-            </div>
-
-            <!-- SEZIONE 2: RUOLO & GRUPPI -->
-            <div class="usr-section">
-                <div class="usr-section-label"><i class="fa fa-user-tag"></i>Ruolo & Gruppi</div>
-                <form method="POST" class="row g-2 align-items-end">
-                    <?php csrf_field(); ?>
-                    <input type="hidden" name="utente_id" value="<?php echo $uid; ?>">
-                    <input type="hidden" name="nome" value="">
-                    <input type="hidden" name="cognome" value="">
-                    <div class="col-sm-4">
-                        <label class="form-label small fw-bold mb-1">Ruolo Principale</label>
-                        <select name="ruolo_id" class="form-select form-select-sm select2-role" style="width:100%;">
-                            <?php foreach ($ruoli as $r): ?>
-                                <option value="<?php echo $r['id']; ?>" <?php echo ($u['ruolo_id'] == $r['id']) ? 'selected' : ''; ?>>
-                                    <?php echo htmlspecialchars($r['nome']); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-sm-6">
-                        <label class="form-label small fw-bold mb-1">Gruppi Secondari</label>
-                        <select name="ruoli_secondari[]" multiple class="form-select form-select-sm select2-sec-role" style="width:100%;">
-                            <?php foreach ($ruoli as $r): ?>
-                                <option value="<?php echo $r['id']; ?>" <?php echo in_array((string)$r['id'], $u_sec_arr) ? 'selected' : ''; ?>>
-                                    <?php echo htmlspecialchars($r['nome']); ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="col-sm-2">
-                        <button type="submit" name="change_user_role" class="btn btn-sm btn-primary fw-bold w-100" style="height:38px;">Salva</button>
-                    </div>
-                </form>
-            </div>
-
-            <!-- SEZIONE 3: ABILITAZIONI (area corrente e Formazione Scuola Lavoro) -->
-            <div class="usr-section">
-                <div class="usr-section-label"><i class="fa fa-key" aria-hidden="true"></i>Abilitazioni
-                    <?php if ($filtro_p > 0): ?>
-                        <span style="font-size:.65rem;background:#f1f5f9;color:#64748b;padding:1px 7px;border-radius:10px;font-weight:600;"><?php echo htmlspecialchars($page_cfg['titolo'] ?? ''); ?> e FSL</span>
-                    <?php endif; ?>
-                </div>
-
-                <?php if ($filtro_p == 0): ?>
-                    <p class="text-muted small mb-0"><i class="fa fa-info-circle me-1" aria-hidden="true"></i>Seleziona un'area dal menu in alto per gestire le abilitazioni di questo utente.</p>
-
-                <?php elseif ($is_admin): ?>
-                    <span class="perm-chip" style="background:#fee2e2;color:#991b1b;font-size:.8rem;"><i class="fa fa-shield-alt me-1" aria-hidden="true"></i>Admin Globale — accesso completo a tutte le aree</span>
-
-                <?php else: $p_cur = $pu ?? $PERIMETRO_VUOTO; ?>
-                <form method="POST">
-                    <?php csrf_field(); ?>
-                    <input type="hidden" name="utente_id" value="<?php echo $uid; ?>">
-                    <p class="small text-secondary mb-2">Dentro ciò che abiliti la persona gestisce tutto: attività, iscritti e check-in, sondaggi, moduli, attestati e statistiche.</p>
-                    <?php echo html_perimetro('u' . $uid . '_', $p_cur, (string)($page_cfg['titolo'] ?? ''), $eventi_area, $tipo_att, $arch_att); ?>
-                    <div class="mt-2 d-flex gap-2">
-                        <button type="submit" name="salva_abilitazioni" value="1" class="btn btn-sm btn-primary fw-bold"><i class="fa fa-save me-1" aria-hidden="true"></i>Salva abilitazioni</button>
-                        <?php if ($pu): ?>
-                        <button type="submit" name="remove_user_all" value="1" class="btn btn-sm btn-outline-danger fw-bold" data-confirm="Togliere tutte le abilitazioni di questa persona su quest'area e sulla Formazione Scuola Lavoro?"><i class="fa fa-trash-alt me-1" aria-hidden="true"></i>Revoca tutto</button>
-                        <?php endif; ?>
-                    </div>
-                </form>
-                <?php endif; ?>
-            </div><!-- /sezione abilitazioni -->
-
-        </div><!-- /usr-body -->
+    <!-- CORPO COLLASSABILE: la scheda si carica solo quando si apre (?scheda=ID), così l'elenco resta leggero -->
+    <div class="collapse" id="usr<?php echo $uid; ?>" data-scheda="<?php echo $uid; ?>">
+        <div class="usr-body"><p class="p-3 mb-0 text-muted small"><i class="fa fa-spinner fa-spin me-1" aria-hidden="true"></i>Caricamento…</p></div>
     </div><!-- /collapse -->
 </div><!-- /usr-card -->
 <?php endforeach; ?>
@@ -744,6 +763,30 @@ document.getElementById('formAbAn').addEventListener('persona-scelta', function 
 </div>
 
 <script>
+// Select2 dentro una scheda appena aperta (le schede si caricano all'apertura)
+function iniziaSelect2(target) {
+    if (typeof jQuery === 'undefined' || !$.fn.select2) return;
+    $(target).find('.select2-multi-abil').each(function() {
+        if (!$(this).hasClass('select2-hidden-accessible')) $(this).select2({ width: '100%', theme: 'bootstrap-5', placeholder: 'Cerca eventi...' });
+    });
+    $(target).find('.select2-role').each(function() {
+        if (!$(this).hasClass('select2-hidden-accessible')) $(this).select2({ width: '100%', theme: 'bootstrap-5', placeholder: 'Cerca ruolo...' });
+    });
+    $(target).find('.select2-sec-role').each(function() {
+        if (!$(this).hasClass('select2-hidden-accessible')) $(this).select2({ width: '100%', theme: 'bootstrap-5', placeholder: 'Seleziona gruppi...', allowClear: true });
+    });
+}
+// La scheda di una persona si scarica alla prima apertura
+document.addEventListener('show.bs.collapse', function (e) {
+    var c = e.target;
+    if (!c.dataset || !c.dataset.scheda || c.dataset.caricata) return;
+    c.dataset.caricata = '1';
+    fetch('utenti.php?scheda=' + encodeURIComponent(c.dataset.scheda) + '&p_id=<?php echo (int)$filtro_p; ?>', { credentials: 'same-origin' })
+        .then(function (r) { return r.ok ? r.text() : Promise.reject(); })
+        .then(function (html) { c.innerHTML = html; iniziaSelect2(c); })
+        .catch(function () { c.dataset.caricata = ''; c.innerHTML = '<div class="usr-body"><p class="p-3 mb-0 text-danger small">Non riesco a caricare la scheda: riprova.</p></div>'; });
+});
+
 document.addEventListener('DOMContentLoaded', function() {
     // Select2 per eventi specifici: inizializza all'apertura del collapse
     document.querySelectorAll('[data-bs-toggle="collapse"]').forEach(function(btn) {

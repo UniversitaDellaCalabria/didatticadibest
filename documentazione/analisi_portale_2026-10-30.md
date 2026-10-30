@@ -26,7 +26,7 @@ pagine, non ho guardato il database direttamente. Il giudizio visivo (restyling)
 ### 2. Pagine di pannello enormi (medio, peggiora con i dati)
 `admin/utenti.php` genera **7,5 MB** di HTML (439 persone, ognuna con 4 moduli già dentro la pagina); `admin/menu.php` 1,2 MB; `admin/audit_log.php` 951 KB.
 Funziona oggi (167 ms), ma sul telefono o a 2.000 utenti diventa lenta e fa bloccare il browser (mi è successo anche a me nel caricare le modifiche in blocco).
-**Rimedio:** elenco leggero con paginazione e scheda della persona caricata solo quando si apre; stesso discorso per registro operazioni e menu.
+**Fatto in locale il 30/10/2026 (da caricare):** in `admin/utenti.php` la scheda di ogni persona (anagrafica, gruppi, abilitazioni) si scarica solo alla prima apertura (`?scheda=ID`): l'elenco passa da ~17 KB a ~2 KB per persona (7,5 MB → circa 1 MB con 439 utenti). Il registro operazioni è già limitato alle ultime 1000 righe (951 KB, accettabile). `menu.php` (1,2 MB) resta com'è: ogni voce porta con sé la sua finestra di modifica, si può rendere differita allo stesso modo se servirà.
 
 ### 3. Una persona su tre non ha l'email (alto per il lavoro quotidiano)
 **143 utenti su 439 (32%), 142 dei quali studenti, non hanno nessuna email** nel portale (il login di Ateneo non l'ha passata). A loro non arrivano conferme di
