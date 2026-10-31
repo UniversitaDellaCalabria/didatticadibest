@@ -12,4 +12,4 @@ foreach (\App\Disponibilita\DisponibilitaRepository::TIPI as $dsp_tipo => $dsp_n
     if ($dsp_s['scaduta'] && !empty($dsp_d['accetta'])) $dsp_da_riconfermare++;
 }
 area_icona('fa-traffic-light', '#0e7490', 'La mia disponibilità', 'la_mia_disponibilita.php', $dsp_da_riconfermare,
-    implode(' · ', $dsp_righe) . ($dsp_da_riconfermare ? ' · da riconfermare' : ''));
+    implode(' · ', $dsp_righe) . ($dsp_da_riconfermare ? ' · da riconfermare' : ''), $dsp_da_riconfermare ? 'Da riconfermare' : '');

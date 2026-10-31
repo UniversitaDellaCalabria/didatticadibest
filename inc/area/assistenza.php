@@ -8,5 +8,5 @@ if ($assist_on || $assist_storico) {
     foreach ($assist_storico as $c_as) if ($c_as['stato'] !== 'chiusa') $da_leggere_as += (int)$c_as['non_letti'];
     area_icona('fa-headset', '#B30000', 'Assistenza',
         $assist_on ? 'assistenza.php' : 'assistenza_storico.php', $da_leggere_as,
-        $assist_on ? 'Scrivi a Didacticus o a una persona dell\'ufficio: tirocini, certificati, pratiche, tesi, eventi' : 'Il servizio è sospeso: puoi rileggere le tue conversazioni');
+        $assist_on ? 'Scrivi a Didacticus o a una persona dell\'ufficio: tirocini, certificati, pratiche, tesi, eventi' : 'Il servizio è sospeso: puoi rileggere le tue conversazioni', $da_leggere_as > 0 ? ($da_leggere_as === 1 ? 'Una risposta nuova' : $da_leggere_as . ' risposte nuove') : '');
 }

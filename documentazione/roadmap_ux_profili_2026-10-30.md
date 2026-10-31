@@ -324,6 +324,8 @@ lato docente; bozze delle pratiche; percorsi a passi per convenzione FSL e conve
   quali moduli pubblicare (Pannello → Moduli e documenti → «Anteprima e pubblica»).
 
 **3.St4 Prenotazioni** (S)
+
+> **Stato 31/10/2026: FATTO in locale (la riga di stato).** `area_icona()` ha un settimo parametro `$stato`: riga breve e visibile sotto il nome (anche sul telefono), solo quando c'è una novità; messa su Eventi e attestati («Posto da confermare»), Il mio calendario, La mia disponibilità, Messaggi, Le mie risorse e Assistenza. Prove: `area_icone_stato.php`. **Non fatto:** il posto da confermare in «Da fare» con la scadenza (resta legato a 1.2).
 - **Problema.** Lo stato delle icone (es. «posto liberato da confermare») è solo nel `title` (`inc/area/_tessera.php:44-49`): su telefono non si vede.
 - **Soluzione.** Riga di stato breve sotto il nome dell'icona quando c'è una novità; il posto da confermare va anche in «Da fare» con la scadenza (1.2).
 

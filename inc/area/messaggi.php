@@ -7,5 +7,5 @@ if ($msg_perm['aree'] || $msg_perm['fsl_convenzioni'] || $msg_perm['assistenza']
     $msg_n = 0;
     try { $msg_n = \App\Core\App::get(\App\Iscritti\CasellaMessaggi::class)->nonLetti((int)$u_id, $msg_perm['admin'], $msg_perm['fsl_convenzioni'], $msg_perm['assistenza']); }
     catch (\Throwable $e_msg) { error_log('[Area personale] messaggi: ' . $e_msg->getMessage()); }
-    area_icona('fa-envelope', '#1d4ed8', 'Messaggi', 'admin/messaggi.php', $msg_n, 'La casella unica: messaggi delle aree, delle convenzioni FSL e dell\'assistenza');
+    area_icona('fa-envelope', '#1d4ed8', 'Messaggi', 'admin/messaggi.php', $msg_n, 'La casella unica: messaggi delle aree, delle convenzioni FSL e dell\'assistenza', $msg_n > 0 ? ($msg_n === 1 ? 'Una conversazione da leggere' : $msg_n . ' conversazioni da leggere') : '');
 }

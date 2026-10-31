@@ -39,14 +39,18 @@ if (!function_exists('area_tessera')) {
 if (!function_exists('area_icona')) {
     /**
      * Una piccola tessera «icona» (tre per riga): il simbolo in alto, il nome sotto in piccolo e, se serve, il numero in rosso.
-     * Per i servizi che si usano spesso (assistenza, messaggi, calendario, profilo, guide…): la riga di stato sta nel suggerimento al passaggio del mouse.
+     * Per i servizi che si usano spesso (assistenza, messaggi, calendario, profilo, guide…): la spiegazione lunga sta nel suggerimento al passaggio del mouse;
+     * $stato è la riga breve sotto il nome ("2 da leggere"), sempre visibile anche sul telefono dove il suggerimento non c'è: si dà solo quando c'è una novità.
      */
-    function area_icona(string $icona, string $colore, string $titolo, string $href, int $novita = 0, string $nota = ''): void
+    function area_icona(string $icona, string $colore, string $titolo, string $href, int $novita = 0, string $nota = '', string $stato = ''): void
     {
         $h = static fn (string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
         echo '<div class="col-4"><a href="' . $h($href) . '" class="ui-icona' . ($novita > 0 ? ' ha-novita' : '') . '" style="--tc:' . $h($colore) . ';"'
             . ($nota !== '' ? ' title="' . $h($nota) . '"' : '') . '>';
         echo '<span class="ui-icona-simbolo" aria-hidden="true"><i class="fa ' . $h($icona) . '"></i></span><span class="ui-icona-testo">' . $h($titolo) . '</span>';
+        if ($stato !== '') {
+            echo '<span class="ui-icona-stato">' . $h($stato) . '</span>';
+        }
         if ($novita > 0) {
             echo '<span class="ui-badge-rosso" aria-label="' . $novita . ' da vedere">' . $novita . '</span>';
         }

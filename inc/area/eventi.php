@@ -11,4 +11,4 @@ foreach (array_merge($lista_ev['attive'], $lista_ev['passate']) as $pr_s) {
 }
 foreach ($lista_ev['attive'] as $pr_s) if (($pr_s['stato'] ?? '') === 'richiesta_conferma') $ev_offerte++;
 area_icona('fa-calendar-check', '#0d6efd', 'Eventi e attestati', 'miei_eventi.php', $ev_offerte,
-    count($lista_ev['attive']) . ' prossimi · ' . $ev_presenze . ' presenze · ' . $ev_attestati . ' attestati' . ($ev_offerte ? ' · posto liberato da confermare' : '') . '. Dalla pagina si registra anche la presenza (QR).');
+    count($lista_ev['attive']) . ' prossimi · ' . $ev_presenze . ' presenze · ' . $ev_attestati . ' attestati' . ($ev_offerte ? ' · posto liberato da confermare' : '') . '. Dalla pagina si registra anche la presenza (QR).', $ev_offerte ? ($ev_offerte === 1 ? 'Posto da confermare' : $ev_offerte . ' posti da confermare') : '');

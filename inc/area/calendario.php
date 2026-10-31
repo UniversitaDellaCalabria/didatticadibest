@@ -7,4 +7,5 @@ $prossima_cal = $voci_cal ? $voci_cal[0] : null;
 area_icona('fa-calendar-days', '#0891b2', 'Il mio calendario', 'calendario.php', $scad_cal,
     $prossima_cal
         ? count($voci_cal) . ' in questa settimana · prossimo: ' . mb_strimwidth($prossima_cal['titolo'], 0, 40, '…') . ' (' . date('d/m', strtotime($prossima_cal['inizio'])) . ')'
-        : 'Niente in agenda questa settimana · eventi, aule, ricevimenti e scadenze con il calendario del telefono');
+        : 'Niente in agenda questa settimana · eventi, aule, ricevimenti e scadenze con il calendario del telefono',
+    $scad_cal ? ($scad_cal === 1 ? 'Una scadenza questa settimana' : $scad_cal . ' scadenze questa settimana') : '');
