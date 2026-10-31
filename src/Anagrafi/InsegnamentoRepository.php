@@ -170,7 +170,7 @@ final class InsegnamentoRepository
 
         return $this->db->righe(
             'SELECT i.*, (SELECT COUNT(*) FROM progetti_dettagli d JOIN eventi e ON e.id = d.evento_id WHERE d.insegnamento_id = i.id AND e.archiviato = 0) AS n_att
-                            FROM insegnamenti i WHERE ' . implode(' AND ', $where) . ' ORDER BY cds_nome, anno_corso, e_integrato DESC, padre_nome, nome, partizione LIMIT 3000',
+                            FROM insegnamenti i WHERE ' . implode(' AND ', $where) . ' ORDER BY cds_nome, anno_corso, COALESCE(NULLIF(padre_nome, \'\'), nome), e_integrato DESC, nome, partizione LIMIT 3000',
             $par
         );
     }

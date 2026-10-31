@@ -350,8 +350,10 @@ final class ServizioCron
 
             return '- Anagrafe di Ateneo aggiornata (' . ($esiti ? implode('; ', $esiti) : 'nessuna struttura') . ").\n";
         }
+        // Gli altri giorni si continua a scaricare le schede degli insegnamenti per i CFU (migliaia: ci vogliono più passate)
+        $n = $this->anagrafe->completaInsegnamenti(120);
 
-        return '';
+        return $n > 0 ? "- Insegnamenti di Ateneo: scaricati i CFU di $n schede.\n" : '';
     }
 
     /** @param array<string, string|null> $prenotazione */

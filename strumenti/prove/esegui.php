@@ -949,7 +949,8 @@ prova(array_column($cl[2]['colonne'], 'tipo') === ['insegnamento', 'cfu', 'data'
 prova(array_column(colonne_tabella(['Insegnamento convalidato', 'Anno insegnamento', 'Tot CFU insegn.', 'CFU da integrare', 'Voto', 'S.S.D.', 'Relatore']), 'tipo') === ['insegnamento', 'testo', 'cfu', 'testo', 'voto', 'ssd', 'docente'], "tipi delle colonne scritte prima, riconosciuti dal nome");
 prova(testo_colonne_tabella($cl[2]['colonne']) === 'Insegnamento:insegnamento, CFU:cfu, Data:data, Esito:scelta(Sì|No)', "colonne di nuovo in testo per il costruttore");
 $_POST = ['campo_c1' => 'in questo Ateneo', 'campo_c3' => [['Chimica', ''], ['6', ''], ['2026-02-15', ''], ['Forse', '']], 'campo_c4' => 'part-time', 'campo_c5' => 'piene', 'campo_c6' => ['inglese', 'cinese'],
-          'campo_c7' => 'abc', 'campo_c9' => 'Chimica generale – Biologia (a.a. 2024/2025)', 'campo_c9_meta' => json_encode(['id' => 7, 'nome' => 'Chimica generale', 'corso' => 'Biologia', 'aa' => '2024/2025', 'cfu' => 6, 'ssd' => 'CHIM/03'])];
+          'campo_c7' => 'abc', 'campo_c9' => 'Chimica generale – Biologia (a.a. 2024/2025)', 'campo_c9_meta' => json_encode(['id' => 7, 'nome' => 'Chimica generale', 'corso' => 'Biologia', 'cds' => '0860', 'aa' => '2024/2025', 'cfu' => 9, 'ssd' => 'CHIM/03', 'ssd_nome' => 'Chimica', 'codice' => '27001', 'semestre' => 'Primo Semestre', 'integrato' => true,
+          'link' => 'https://www.unical.it/storage/activities/7/', 'moduli' => [['nome' => 'Chimica A', 'codice' => '27002', 'cfu' => 6, 'ssd' => 'CHIM/03', 'semestre' => 'Primo Semestre', 'link' => 'https://www.unical.it/storage/activities/8/'], ['nome' => 'Chimica B', 'cfu' => 3, 'link' => 'http://altro.example/x']]])];
 [$rl, $el] = leggi_risposte_modulo($cl, $conn);
 $_POST = [];
 $per = []; foreach ($rl as $r) $per[$r['etichetta']] = $r;
@@ -957,7 +958,11 @@ prova(!empty($per['Ateneo']['nascosto']) && !in_array('Ateneo: campo obbligatori
 prova($per['Tasse']['valore'] === 'ridotte', "valore automatico imposto dal server");
 prova($per['Esami']['righe'] === [['Chimica', '6', '15/02/2026', '']], "tabella: date in formato italiano, scelta non prevista scartata", json_encode($per['Esami']['righe']));
 prova($per['Lingue']['valore'] === 'inglese' && in_array('Codice fiscale del genitore: codice fiscale non valido', $el, true) && in_array('Dichiaro il vero: devi accettare la dichiarazione', $el, true), "scelta multipla, codice fiscale e dichiarazione controllati", json_encode($el));
-prova(($per['Insegnamento a scelta']['meta']['cfu'] ?? null) === 6.0 && !isset($per['Sezione']), "insegnamento dal catalogo con corso, a.a., CFU e S.S.D.; i titoli non sono risposte");
+prova(($per['Insegnamento a scelta']['meta']['cfu'] ?? null) === 9.0 && !isset($per['Sezione']), "insegnamento dal catalogo con corso, a.a., CFU e S.S.D.; i titoli non sono risposte");
+$mi = $per['Insegnamento a scelta']['meta'];
+prova($mi['integrato'] === true && $mi['codice'] === '27001' && $mi['cds'] === '0860' && $mi['semestre'] === 'Primo Semestre' && $mi['link'] === 'https://www.unical.it/storage/activities/7/' && count($mi['moduli']) === 2 && $mi['moduli'][0]['link'] === 'https://www.unical.it/storage/activities/8/' && $mi['moduli'][1]['link'] === '', "insegnamento integrato scelto: codice, corso, semestre, link e moduli; solo i link alle pagine di Ateneo si accettano", json_encode($mi));
+$hi = \App\Core\App::per($conn)->get(\App\Didattica\HtmlCampi::class)->risposta($per['Insegnamento a scelta']);
+prova(str_contains($hi, 'Biologia (0860)') && str_contains($hi, 'cod. 27001') && str_contains($hi, '9 CFU') && str_contains($hi, 'Modulo Chimica A') && str_contains($hi, 'Modulo Chimica B') && str_contains($hi, 'Integrato:'), "la risposta mostra corso e codice, CFU, S.S.D., semestre, link e moduli", $hi);
 $_POST = ['campo_c1' => 'in un altro Ateneo', 'campo_c6' => ['tedesco'], 'campo_c8' => '1', 'campo_c4' => 'tempo pieno', 'campo_c5' => 'piene'];
 [$rl2, $el2] = leggi_risposte_modulo($cl, $conn);
 $_POST = [];

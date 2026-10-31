@@ -120,7 +120,7 @@ final class SincronizzazioneAnagrafe
             $nIns = $this->sincronizzaInsegnamenti();
             $riepilogo[$prima]['esito'] .= $nIns !== null ? ", $nIns insegnamenti di Ateneo" : ', insegnamenti non disponibili';
             if ($nIns !== null) {
-                $nDet = $this->catalogo->completaDettagli(150);
+                $nDet = $this->catalogo->completaDettagli(240);
                 $riepilogo[$prima]['esito'] .= $nDet > 0 ? " ($nDet schede con i CFU)" : '';
             }
         }
@@ -137,6 +137,12 @@ final class SincronizzazioneAnagrafe
         }
 
         return $riepilogo;
+    }
+
+    /** Scarica le schede degli insegnamenti per i CFU, per i secondi indicati: ritorna quante ne ha completate */
+    public function completaInsegnamenti(int $secondi): int
+    {
+        return $this->catalogo->completaDettagli($secondi);
     }
 
     /**
