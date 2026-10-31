@@ -333,6 +333,8 @@ con lo stato; utile per sapere se un tesista ha inviato la richiesta.
   (`incarico.php:11`). In `area_tappe_tutorato()` aggiungere per ogni tappa «azione per il tutor» (etichetta + link) oppure null.
 
 **3.T2 Tessere del tutorato a tutti i profili** (S)
+
+> **Stato 31/10/2026: FATTO in locale (schema v109).** `tutorato_mio` e `tutorato_registro` assegnate a tutti i profili (compaiono solo con un incarico); la migrazione cambia i profili solo dove l'amministratore non li aveva modificati.
 - **Problema.** `tutorato_mio` e `tutorato_registro` sono assegnati solo a Studente/Docente/Amministratore (`CatalogoRiquadri.php:51-54`): un dottorando o un tutor
   riconosciuto come Personale o Ospite non le vede, anche se ha l'incarico.
 - **Soluzione.** Assegnarle a tutti i profili: compaiono comunque solo se ci sono dati. Migrazione come in 3.S4.

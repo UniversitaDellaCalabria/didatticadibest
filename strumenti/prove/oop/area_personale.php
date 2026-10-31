@@ -51,7 +51,19 @@ $chiavi_di = fn(array $profili) => array_column($rep_ap->perProfili($profili), '
 $stu_ap = $chiavi_di([Profili::STUDENTE]);
 prova(in_array('tirocini', $stu_ap, true) && in_array('pratiche', $stu_ap, true) && in_array('tutorato_mio', $stu_ap, true) && !in_array('cruscotto_direttore', $stu_ap, true) && !in_array('ricevimento', $stu_ap, true), "riquadri: lo studente vede tirocini, pratiche e il suo tutorato, non il cruscotto del Direttore");
 $doc_ap = $chiavi_di([Profili::DOCENTE]);
-prova(in_array('tutorato_registro', $doc_ap, true) && in_array('ricevimento', $doc_ap, true) && in_array('tirocini', $doc_ap, true) && !in_array('tutorato_mio', $doc_ap, true), "riquadri: il docente vede il tutorato (registro, lettera e fine attività), il ricevimento e i tirocini");
+prova(in_array('tutorato_registro', $doc_ap, true) && in_array('ricevimento', $doc_ap, true) && in_array('tirocini', $doc_ap, true) && in_array('tutorato_mio', $doc_ap, true), "riquadri: il docente vede il tutorato (registro, lettera e fine attività, il suo incarico), il ricevimento e i tirocini");
+foreach ([Profili::PERSONALE, Profili::SCUOLA, Profili::AZIENDA, Profili::ESTERNO, Profili::GESTORE, Profili::DIRETTORE] as $pf_t_) {
+    $k_t_ = $chiavi_di([$pf_t_]);
+    prova(in_array('tutorato_mio', $k_t_, true) && in_array('tutorato_registro', $k_t_, true), "riquadri: il profilo «{$pf_t_}» ha le tessere del tutorato (compaiono solo con un incarico)");
+}
+// Migrazione v109: i profili di partenza vecchi passano a tutti, quelli cambiati dall'amministratore restano come sono
+$q("UPDATE area_riquadri SET profili = 'studente,amministratore' WHERE chiave = 'tutorato_mio'");
+$q("UPDATE area_riquadri SET profili = 'docente,direttore' WHERE chiave = 'tutorato_registro'");
+$mig_t = new \App\Core\Schema\Migrazioni(\App\Core\App::per($conn)->get(\App\Core\Database::class), sys_get_temp_dir());
+(new ReflectionMethod($mig_t, 'datiDiPartenza'))->invoke($mig_t);
+$mig_t_ = array_column($rep_ap->tutti(), 'profili', 'chiave');
+prova(in_array(Profili::PERSONALE, $mig_t_['tutorato_mio'], true) && $mig_t_['tutorato_registro'] === [Profili::DOCENTE, Profili::DIRETTORE], "migrazione v109: tessera con i profili di partenza passa a tutti, quella cambiata dall'amministratore non si tocca");
+$q("UPDATE area_riquadri SET profili = '" . Profili::inCsv(array_map('strval', $cat_ap['tutorato_registro']['profili'])) . "' WHERE chiave = 'tutorato_registro'");
 prova(in_array('cruscotto_direttore', $chiavi_di([Profili::DIRETTORE]), true) && in_array('direttore_assente', $chiavi_di([Profili::DIRETTORE]), true), "riquadri: il Direttore vede cruscotto e «Direttore assente»");
 $adm_ap = $chiavi_di([Profili::AMMINISTRATORE]);
 prova(count(array_diff(array_keys(array_filter($cat_ap, fn($v) => ($v['attivo'] ?? 1) === 1)), $adm_ap)) === 0, "riquadri: l'amministratore vede tutti quelli accesi");
