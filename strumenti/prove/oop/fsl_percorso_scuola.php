@@ -35,11 +35,11 @@ prova($ps_stati($r)['convenzione'] === 'fatto' && $ps_stati($r)['attivita'] === 
 // Elenco studenti e autorizzazione: compare solo se l'attività li chiede, con la scadenza
 $senza = ['elenco' => false, 'autorizzazione' => false, 'completi' => false, 'scadenza' => '2026-11-20', 'scaduti' => false];
 $r = PercorsoScuola::per(['convenzione' => 'si', 'documenti' => $senza] + $ps_base, $ps_oggi);
-prova($ps_stati($r)['elenco'] === 'qui' && $r['azione']['testo'] === 'Carica elenco e autorizzazione' && $r['azione']['link'] === 'elenco_studenti.php?code=FSL-AB12', "PercorsoScuola: mancano elenco e autorizzazione");
+prova($ps_stati($r)['elenco'] === 'qui' && $r['azione']['testo'] === "Carica l'elenco studenti" && $r['azione']['link'] === 'elenco_studenti.php?code=FSL-AB12', "PercorsoScuola: manca l'elenco (l'autorizzazione è facoltativa)");
 $nota = array_column($r['passi'], 'nota', 'chiave')['elenco'];
 prova(str_contains($nota, '20/11/2026'), "PercorsoScuola: la scadenza è nella nota del passo");
-$r = PercorsoScuola::per(['convenzione' => 'si', 'documenti' => ['elenco' => true] + $senza] + $ps_base, $ps_oggi);
-prova($r['azione']['testo'] === "Carica l'autorizzazione", "PercorsoScuola: manca solo l'autorizzazione");
+$r = PercorsoScuola::per(['convenzione' => 'si', 'documenti' => ['elenco' => true, 'completi' => true] + $senza] + $ps_base, $ps_oggi);
+prova($ps_stati($r)['elenco'] === 'fatto', "PercorsoScuola: con l'elenco il passo è fatto anche senza autorizzazione");
 $r = PercorsoScuola::per(['convenzione' => 'si', 'documenti' => ['elenco' => true, 'autorizzazione' => true, 'completi' => true] + $senza] + $ps_base, $ps_oggi);
 prova($ps_stati($r)['elenco'] === 'fatto' && $ps_stati($r)['attivita'] === 'qui', "PercorsoScuola: documenti completi, si passa all'attività");
 

@@ -73,7 +73,7 @@ $studenti = get_partecipanti_prenotazione($conn, $pr_id);
 $stato_docs = $docs_fsl ? $documenti->stato($p, $max) : null;
 $col = colore_valido($p['colore_primario'] ?? '', '#0056B3');
 
-$page_cfg['titolo'] = $docs_fsl ? "Elenco studenti e autorizzazione" : "Elenco studenti";
+$page_cfg['titolo'] = "Elenco studenti";
 require_once 'header.php';
 ?>
 <div class="container my-4" style="max-width: 980px;">
@@ -93,9 +93,9 @@ require_once 'header.php';
             <div class="mt-3 d-flex align-items-center gap-3 flex-wrap">
                 <span class="badge fs-6 <?php echo count($studenti) === 0 ? 'bg-warning text-dark' : 'bg-success'; ?>"><?php echo count($studenti); ?> / <?php echo $max; ?> studenti</span>
                 <?php if ($stato_docs): ?>
-                    <span class="badge fs-6 <?php echo $stato_docs['autorizzazione'] ? 'bg-success' : 'bg-warning text-dark'; ?>"><i class="fa <?php echo $stato_docs['autorizzazione'] ? 'fa-check' : 'fa-file-pdf'; ?> me-1" aria-hidden="true"></i>Autorizzazione della scuola <?php echo $stato_docs['autorizzazione'] ? 'caricata' : 'mancante'; ?></span>
+                    <span class="badge fs-6 <?php echo $stato_docs['autorizzazione'] ? 'bg-success' : 'bg-light text-dark border'; ?>"><i class="fa <?php echo $stato_docs['autorizzazione'] ? 'fa-check' : 'fa-file-pdf'; ?> me-1" aria-hidden="true"></i>Autorizzazione della scuola <?php echo $stato_docs['autorizzazione'] ? 'caricata' : '(facoltativa)'; ?></span>
                     <?php if ($stato_docs['scadenza'] !== null && !$stato_docs['completi']): ?><span class="small fw-semibold <?php echo $stato_docs['scaduti'] ? 'text-danger' : 'text-secondary'; ?>"><i class="fa fa-clock me-1" aria-hidden="true"></i>Da consegnare entro il <?php echo date('d/m/Y', strtotime($stato_docs['scadenza'])); ?><?php echo $stato_docs['scaduti'] ? ' (scaduto)' : ''; ?></span><?php endif; ?>
-                    <?php if ($stato_docs['completi']): ?><span class="small fw-semibold text-success"><i class="fa fa-circle-check me-1" aria-hidden="true"></i>Documenti completi</span><?php endif; ?>
+                    <?php if ($stato_docs['completi']): ?><span class="small fw-semibold text-success"><i class="fa fa-circle-check me-1" aria-hidden="true"></i>Elenco completo</span><?php endif; ?>
                 <?php endif; ?>
                 <?php if (!$con_attestati): ?>
                 <?php elseif ($is_progetto && !empty($p['data_fine'])): ?><span class="small text-secondary">Gli attestati partono dopo la fine del progetto (<?php echo date('d/m/Y', strtotime($p['data_fine'])); ?>), per le classi di cui è stata registrata la presenza.</span>
@@ -145,8 +145,8 @@ require_once 'header.php';
                 <?php if ($docs_fsl): ?>
                 <div class="card border-0 shadow-sm mb-4" style="border-radius: 12px;">
                     <div class="card-body p-4">
-                        <h2 class="fs-5 fw-bold mb-2"><i class="fa fa-file-pdf me-1 text-danger" aria-hidden="true"></i>Autorizzazione della scuola</h2>
-                        <p class="small text-secondary">Carica l'<strong>autorizzazione della scuola</strong> alla partecipazione della classe all'attività, in <strong>PDF</strong> (al massimo 10 MB).</p>
+                        <h2 class="fs-5 fw-bold mb-2"><i class="fa fa-file-pdf me-1 text-danger" aria-hidden="true"></i>Autorizzazione della scuola <span class="small fw-normal text-secondary">(facoltativa)</span></h2>
+                        <p class="small text-secondary">Se vuoi, carica l'<strong>autorizzazione della scuola</strong> alla partecipazione della classe all'attività, in <strong>PDF</strong> (al massimo 10 MB). <strong>Non è obbligatoria</strong>: per completare basta l'elenco degli studenti.</p>
                         <?php if ($stato_docs['autorizzazione']): ?>
                             <div class="alert alert-success small py-2 d-flex flex-wrap align-items-center gap-2">
                                 <i class="fa fa-circle-check" aria-hidden="true"></i><span class="flex-grow-1">File caricato<?php echo !empty($p['autorizzazione_il']) ? ' il ' . h(date('d/m/Y H:i', strtotime($p['autorizzazione_il']))) : ''; ?>: <strong><?php echo h($p['autorizzazione_nome'] ?? 'autorizzazione.pdf'); ?></strong></span>

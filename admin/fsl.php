@@ -50,6 +50,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         admin_redirect("fsl.php?p_id=$filtro_p&tab=stipulare" . (($_POST['mostra'] ?? '') === 'tutte' ? '&mostra=tutte' : '') . '&r=' . time());
     }
     // Comunicazione con la scuola: promemoria «carica il PDF» (a una scuola o a tutte) e messaggi liberi
+    // Promemoria al singolo docente per i passi della scuola (elenco degli studenti, scheda di valutazione) o a tutti per l'elenco
+    if (isset($_POST['ricorda_elenco']) || isset($_POST['ricorda_valutazione']) || isset($_POST['ricorda_elenco_tutti'])) {
+        csrf_verify($_POST['csrf_token'] ?? '');
+        if (isset($_POST['ricorda_elenco_tutti'])) {
+            [$partiti_r, $saltati_r] = \App\Core\App::per($conn)->get(\App\Fsl\ServizioDocumentiClasse::class)->ricordaElencoATutti();
+            registra_log_audit($conn, "Promemoria dell'elenco studenti a tutti i docenti a cui manca", ["Mandati" => $partiti_r, "Saltati" => $saltati_r]);
+            flash_set($partiti_r . ($partiti_r === 1 ? ' promemoria mandato' : ' promemoria mandati') . ($saltati_r ? " ($saltati_r saltati: già avvisati nelle ultime 24 ore o senza email)" : '') . '.', $partiti_r ? 'success' : 'warning');
+        } else {
+            $elenco_r = isset($_POST['ricorda_elenco']);
+            $id_r = (int)($elenco_r ? $_POST['ricorda_elenco'] : $_POST['ricorda_valutazione']);
+            $err_r = $elenco_r
+                ? \App\Core\App::per($conn)->get(\App\Fsl\ServizioDocumentiClasse::class)->ricordaElenco($id_r)
+                : \App\Core\App::per($conn)->get(\App\Fsl\ServizioValutazioniFsl::class)->ricorda($id_r);
+            if ($err_r === null) registra_log_audit($conn, $elenco_r ? "Promemoria dell'elenco studenti al docente" : 'Promemoria della scheda di valutazione al docente', ['Prenotazione' => $id_r]);
+            flash_set($err_r ?? ($elenco_r ? "Promemoria mandato: il docente riceve l'email con il link diretto per inserire l'elenco degli studenti." : "Promemoria mandato: il docente riceve l'email con il link alla scheda di valutazione."), $err_r ? 'danger' : 'success');
+        }
+        admin_redirect('fsl.php?' . http_build_query($_GET) . '&r=' . time());
+    }
     if (isset($_POST['cv_letto'])) {
         \App\Core\App::per($conn)->get(\App\Fsl\MessaggiConvenzioneRepository::class)->segnaLetti((int)$_POST['cv_letto'], 'ufficio');
         admin_redirect("fsl.php?p_id=$filtro_p&tab=iter&r=" . time() . '#cv' . (int)$_POST['cv_letto']);
@@ -292,6 +310,7 @@ if ($gruppo_fsl === 'scuole' && $puo_fsl_convenzioni) {
     $voci_altro = [
         '<a class="dropdown-item" href="' . $h($url_fsl('convenzioni', '&nuova=1') . '#convForm') . '"><i class="fa fa-file-signature me-2" aria-hidden="true"></i>Registra una convenzione già firmata fuori dal portale</a>',
         $voce_post('cv_ricorda_tutte', 'Ricorda a tutte le scuole di caricare il PDF firmato', 'fa-bell', 'Mandare il promemoria «carica il PDF firmato» a tutte le scuole che lo stanno aspettando (saltando chi è stato avvisato nelle ultime 24 ore)?'),
+        $voce_post('ricorda_elenco_tutti', "Ricorda a tutti i docenti l'elenco degli studenti", 'fa-bell', "Mandare il promemoria con il link diretto a tutti i docenti che non hanno ancora inserito l'elenco degli studenti (saltando chi è stato avvisato nelle ultime 24 ore)?"),
     ];
     if ($puo_fsl) $voci_altro[] = $voce_post('conv_verifica', 'Controlla ora le iscrizioni senza convenzione', 'fa-rotate');
     $voci_altro[] = '<a class="dropdown-item" href="' . $url_email_fsl . '"><i class="fa fa-envelope-open-text me-2" aria-hidden="true"></i>Testi delle email</a>';
@@ -891,13 +910,19 @@ $indietro_s = '<a href="' . $h($url_fsl('stipulare', '&mostra=tutte')) . '" clas
     $btn_reg = $url_reg ? '<a href="' . $h($url_reg) . '" class="btn btn-danger fw-bold"><i class="fa fa-file-signature me-1" aria-hidden="true"></i>Registra la convenzione firmata</a>' : '';
     $btn_iscr = $pren_att ? '<a href="iscritti.php?p_id=' . (int)$pren_att['pagina_id'] . '&f_cerca=' . urlencode($pren_att['codice']) . '" class="btn btn-outline-secondary fw-bold">Apri le iscrizioni</a>' : '';
     $btn_stud = $pren_att ? '<a href="partecipanti.php?p_id=' . (int)$pren_att['pagina_id'] . '" class="btn btn-outline-secondary fw-bold">Studenti e attestati</a>' : '';
+    $form_r = function (string $nome, int $id, string $testo, string $classe = 'btn-danger', string $titolo = '') use ($h): string {
+        ob_start(); csrf_field(); $c_r = ob_get_clean();
+        return '<form method="POST" class="d-inline">' . $c_r . '<button type="submit" name="' . $nome . '" value="' . $id . '" class="btn ' . $classe . ' fw-bold" formnovalidate title="' . $h($titolo) . '"><i class="fa fa-bell me-1" aria-hidden="true"></i>' . $h($testo) . '</button></form>';
+    };
+    $btn_ric_elenco = implode(' ', array_map(fn($x) => $form_r('ricorda_elenco', (int)$x['id'], "Ricorda l'elenco" . (count($rg) > 1 ? ' (' . $x['codice_prenotazione'] . ')' : ''), 'btn-danger', "Email al docente: deve inserire l'elenco degli studenti, con il link diretto"), array_filter($rg, fn($x) => (int)$x['n_elenco'] === 0 && $x['stato'] === 'confermata')));
+    $btn_ric_val = implode(' ', array_map(fn($x) => $form_r('ricorda_valutazione', (int)$x['id'], 'Ricorda la valutazione' . (count($rg) > 1 ? ' (' . $x['codice_prenotazione'] . ')' : ''), 'btn-outline-danger', 'Email al docente con il link alla scheda di valutazione'), array_filter($rg, fn($x) => empty($x['val_id']) && $x['stato'] === 'confermata')));
     $prossimi = [
         'iscrizione'  => ['Conferma le prenotazioni in attesa', 'Ci sono prenotazioni non ancora confermate: il posto non è ancora della scuola.', $btn_iscr, 'attesa'],
         'convenzione' => ['Fai firmare la convenzione e registrala', 'Scarica l\'Allegato A e la Convenzione già compilati dalla scheda qui accanto, inviali alla scuola e carica il file firmato.', '<a href="' . $h($url_doc('allegato_pdf')) . '" class="btn btn-outline-danger fw-bold"><i class="fa fa-file-pdf me-1" aria-hidden="true"></i>Allegato A (PDF)</a>' . $btn_reg, ''],
         'attivita'    => ['Tutto a posto: si aspetta lo svolgimento', 'La convenzione è valida. Attività dal ' . $d($g_s['dal']) . ' al ' . $d($g_s['al']) . '.', '', 'ok'],
-        'elenco'      => ['Aspetta l\'elenco degli studenti', 'Il docente deve inserire i nomi degli studenti: da quell\'elenco partono gli attestati.', $btn_stud, 'attesa'],
+        'elenco'      => ['Aspetta l\'elenco degli studenti', 'Il docente deve inserire i nomi degli studenti: da quell\'elenco partono gli attestati. Puoi mandargli un promemoria con il link diretto.', $btn_ric_elenco . ' ' . $btn_stud, 'attesa'],
         'attestati'   => ['Manda gli attestati agli studenti', 'L\'elenco c\'è: gli attestati si inviano dalla pagina Studenti e attestati dopo la fine dell\'attività.', $btn_stud, ''],
-        'valutazione' => ['Aspetta la valutazione del docente', 'La scheda di valutazione della struttura ospitante arriva dal docente dopo l\'attività.', '', 'attesa'],
+        'valutazione' => ['Aspetta la valutazione del docente', 'La scheda di valutazione della struttura ospitante arriva dal docente dopo l\'attività. Se tarda, puoi ricordargliela.', $btn_ric_val, 'attesa'],
     ];
 ?>
     <p class="mb-2"><?php echo $indietro_s; ?></p>
@@ -964,7 +989,7 @@ $indietro_s = '<a href="' . $h($url_fsl('stipulare', '&mostra=tutte')) . '" clas
                             <td><?php echo $h($p_s['docente']); ?><div class="text-secondary"><?php echo $h($p_s['email']); ?></div></td>
                             <td><?php echo pn_stato($lp, $tp); ?></td>
                             <td><?php echo $p_s['conv'] === 'da_stipulare' ? pn_stato('Da stipulare', 'blocco') : ($p_s['conv'] === 'dichiarata' ? pn_stato('Dichiarata dalla scuola', 'spento') : pn_stato('Convenzione valida', 'ok')); ?></td>
-                            <td class="text-nowrap"><a href="iscritti.php?p_id=<?php echo (int)$p_s['pagina_id']; ?>&f_cerca=<?php echo urlencode($p_s['codice']); ?>" class="btn btn-sm btn-outline-secondary fw-bold py-0">Iscrizioni</a></td>
+                            <td class="text-nowrap"><a href="iscritti.php?p_id=<?php echo (int)$p_s['pagina_id']; ?>&f_cerca=<?php echo urlencode($p_s['codice']); ?>" class="btn btn-sm btn-outline-secondary fw-bold py-0">Iscrizioni</a><?php if ($p_s['stato'] === 'confermata' && isset($per_id[$p_s['id']]) && (int)$per_id[$p_s['id']]['n_elenco'] === 0): ?> <?php echo $form_r('ricorda_elenco', (int)$p_s['id'], "Ricorda l'elenco", 'btn-sm btn-outline-danger py-0', "Email al docente: deve inserire l'elenco degli studenti, con il link diretto"); ?><?php endif; ?></td>
                         </tr>
                     <?php endforeach; ?>
                     </tbody>

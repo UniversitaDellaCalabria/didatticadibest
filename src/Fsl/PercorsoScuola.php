@@ -58,9 +58,8 @@ final class PercorsoScuola
             ['convenzione', 'Convenzione', $convFatta, $notaConv],
         ];
         if ($docs !== null) {
-            $manca = array_filter([!$docs['elenco'] ? 'elenco studenti' : '', !$docs['autorizzazione'] ? 'autorizzazione' : '']);
-            $voci[] = ['elenco', 'Elenco studenti e autorizzazione', (bool) $docs['completi'],
-                $docs['completi'] ? '' : 'mancano ' . implode(' e ', $manca) . (!empty($docs['scadenza']) ? ' · entro il ' . date('d/m/Y', (int) strtotime((string) $docs['scadenza'])) : '')];
+            $voci[] = ['elenco', 'Elenco studenti', (bool) $docs['completi'],
+                $docs['completi'] ? '' : 'manca l\'elenco' . (!empty($docs['scadenza']) ? ' · entro il ' . date('d/m/Y', (int) strtotime((string) $docs['scadenza'])) : '')];
         }
         $voci[] = ['attivita', 'Attività svolta', $finita, ''];
         $haAtt = !empty($d['attestati']);
@@ -94,7 +93,7 @@ final class PercorsoScuola
                 }
                 break;
             case 'elenco':
-                $azione = ['testo' => $docs !== null && !$docs['elenco'] && !$docs['autorizzazione'] ? 'Carica elenco e autorizzazione' : ($docs !== null && !$docs['elenco'] ? "Carica l'elenco studenti" : "Carica l'autorizzazione"), 'link' => 'elenco_studenti.php?code=' . $codice];
+                $azione = ['testo' => "Carica l'elenco studenti", 'link' => 'elenco_studenti.php?code=' . $codice];
                 break;
             case 'attivita':
                 $attesa = 'Dopo l\'attività potrai scaricare gli attestati degli studenti.';

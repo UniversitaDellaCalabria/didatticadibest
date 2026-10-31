@@ -168,6 +168,17 @@ if (!$is_archivio) {
         admin_redirect("iscritti.php?p_id=$filtro_p&f_turno=$filtro_turno&f_stato=$filtro_stato$url_suffix");
     }
 
+    // Promemoria al docente: «inserisci l'elenco degli studenti», con il link diretto alla pagina
+    if (isset($_POST['ricorda_elenco_pren'])) {
+        csrf_verify($_POST['csrf_token'] ?? '');
+        $pr_id = (int)$_POST['ricorda_elenco_pren'];
+        if (!pren_autorizzata($conn, $pr_id, $filtro_p, $sql_filtro_eventi_rbac)) nega_accesso_isc();
+        $err_el = $documenti_fsl->ricordaElenco($pr_id);
+        if ($err_el === null) registra_log_audit($conn, "Promemoria dell'elenco studenti al docente", ["Prenotazione" => $pr_id]);
+        flash_set($err_el ?? "✅ Promemoria mandato: il docente riceve l'email con il link diretto per inserire l'elenco degli studenti.", $err_el ? 'danger' : 'success');
+        admin_redirect("iscritti.php?p_id=$filtro_p&f_turno=$filtro_turno&f_stato=$filtro_stato$url_suffix");
+    }
+
     if (isset($_POST['conv_ricevuta_pren']) || isset($_POST['chiedi_conv_pren'])) {
         csrf_verify($_POST['csrf_token'] ?? '');
         $pr_id = (int)($_POST['conv_ricevuta_pren'] ?? $_POST['chiedi_conv_pren']);
@@ -590,8 +601,9 @@ echo '</nav>';
                         <?php elseif ($cv_pr === 'si' && $cv_attiva): [$cv_dal, $cv_al] = periodo_prenotazione($pr); $cv_reg = !empty($pr['scuola_codice']) && convenzione_valida($conn, $pr['scuola_codice'], false, $cv_dal, $cv_al); ?>
                             <span class="stato-badge mt-1" style="background:<?php echo $cv_reg ? '#f0fdf4' : '#fefce8'; ?>;color:<?php echo $cv_reg ? '#166534' : '#854d0e'; ?>;" title="<?php echo $cv_reg ? 'Dichiarata dalla scuola e presente nel registro per il periodo dell\'attività' : 'Dichiarata dalla scuola ma nel registro non c\'è una convenzione che copre il periodo dell\'attività: da verificare'; ?>"><i class="fa fa-file-signature"></i><?php echo $cv_reg ? 'Convenzione in registro' : 'Convenzione dichiarata, da verificare'; ?></span>
                         <?php endif; ?>
-                        <?php if ($cv_attiva && $documenti_fsl->richiesti($pr)): $dc_el = (int)($pr['n_studenti'] ?? 0); $dc_au = !empty($pr['autorizzazione_file']); $dc_ok = $dc_el > 0 && $dc_au; ?>
-                            <span class="stato-badge mt-1" style="background:<?php echo $dc_ok ? '#f0fdf4' : '#fff7ed'; ?>;color:<?php echo $dc_ok ? '#166534' : '#9a3412'; ?>;" title="Documenti da consegnare prima dell'attività: elenco degli studenti e autorizzazione della scuola<?php echo (int)($pr['doc_promemoria'] ?? 0) > 0 ? ' · promemoria inviati: ' . (int)$pr['doc_promemoria'] : ''; ?>"><i class="fa fa-paperclip"></i>Elenco <?php echo $dc_el > 0 ? '(' . $dc_el . ')' : 'mancante'; ?> · Autorizzazione <?php echo $dc_au ? 'ricevuta' : 'mancante'; ?></span>
+                        <?php if ($cv_attiva && $documenti_fsl->richiesti($pr)): $dc_el = (int)($pr['n_studenti'] ?? 0); $dc_au = !empty($pr['autorizzazione_file']); $dc_ok = $dc_el > 0; ?>
+                            <span class="stato-badge mt-1" style="background:<?php echo $dc_ok ? '#f0fdf4' : '#fff7ed'; ?>;color:<?php echo $dc_ok ? '#166534' : '#9a3412'; ?>;" title="Documenti da consegnare prima dell'attività: elenco degli studenti (l\'autorizzazione della scuola è facoltativa)<?php echo (int)($pr['doc_promemoria'] ?? 0) > 0 ? ' · promemoria inviati: ' . (int)$pr['doc_promemoria'] : ''; ?>"><i class="fa fa-paperclip"></i>Elenco <?php echo $dc_el > 0 ? '(' . $dc_el . ')' : 'mancante'; ?> <?php echo $dc_au ? ' · Autorizzazione ricevuta' : ''; ?></span>
+                            <?php if (!$dc_ok): ?><form method="POST" class="m-0 mt-1"><?php csrf_field(); ?><button type="submit" name="ricorda_elenco_pren" value="<?php echo (int)$pr['id']; ?>" class="btn btn-sm btn-outline-danger fw-bold py-0" data-confirm="Mandare a <?php echo h($pr['nome'] . ' ' . $pr['cognome']); ?> un promemoria con il link diretto per inserire l'elenco degli studenti?" title="Email al docente: deve inserire l'elenco degli studenti, con il link diretto alla pagina"><i class="fa fa-bell me-1" aria-hidden="true"></i>Ricorda l'elenco</button></form><?php endif; ?>
                             <?php if ($dc_au): ?><a href="../autorizzazione_scuola.php?code=<?php echo urlencode($pr['codice_prenotazione']); ?>" target="_blank" class="small fw-bold d-block mt-1"><i class="fa fa-file-pdf me-1" aria-hidden="true"></i>Apri l'autorizzazione</a><?php endif; ?>
                         <?php endif; ?>
                     </td>

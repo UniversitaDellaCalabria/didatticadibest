@@ -17,7 +17,7 @@ final class AvvisoDocumenti
     {
     }
 
-    /** Indirizzo della pagina in cui il docente carica elenco e autorizzazione. */
+    /** Indirizzo della pagina in cui il docente carica l'elenco degli studenti (e, se vuole, l'autorizzazione). */
     public function link(string $codice): string
     {
         return $this->sito->urlBase() . '/elenco_studenti.php?code=' . urlencode($codice);
@@ -30,20 +30,20 @@ final class AvvisoDocumenti
      */
     public function dopoPrenotazione(string $codice, ?string $scadenza, bool $perEmail = false): string
     {
-        $titolo = '<strong>Elenco degli studenti e autorizzazione della scuola</strong>';
+        $titolo = '<strong>Elenco degli studenti</strong>';
         $quando = $scadenza !== null
             ? 'entro il <strong>' . date('d/m/Y', (int) strtotime($scadenza)) . '</strong>'
             : 'prima dell\'inizio dell\'attività';
         $elenco = "<ul style='margin:6px 0 10px;padding-left:20px;'>"
             . '<li>l\'<strong>elenco degli studenti</strong> che partecipano (cognome e nome: puoi scriverlo, incollarlo da Excel o caricare il modello compilato);</li>'
-            . '<li>l\'<strong>autorizzazione della scuola</strong> alla partecipazione, in <strong>PDF</strong>.</li></ul>';
-        $bottone = $this->bottone($codice, 'Carica elenco e autorizzazione', $perEmail);
+            . '<li>(facoltativa) l\'<strong>autorizzazione della scuola</strong> alla partecipazione, in <strong>PDF</strong>.</li></ul>';
+        $bottone = $this->bottone($codice, 'Carica l\'elenco degli studenti', $perEmail);
         $testo = "<p style='margin:0 0 4px;'>Oltre alla convenzione, $quando devi caricare nel portale:</p>$elenco"
             . '<p style=\'margin:0 0 8px;\'>Ti ricordiamo noi con un\'email se qualcosa manca. Puoi farlo anche subito, in attesa della convenzione.</p>' . $bottone;
 
         return $perEmail
             ? "<div style='margin:18px 0;padding:12px 14px;border-left:4px solid #0d6efd;background:#f1f6ff;'><p style='margin:0 0 6px;'>📎 $titolo</p>$testo</div>"
-            : "<div class='alert alert-primary text-start my-3 shadow-sm border-0 border-start border-5 border-primary small'><div class='fw-bold mb-1'><i class='fa fa-paperclip me-1' aria-hidden='true'></i> Elenco degli studenti e autorizzazione della scuola</div>$testo</div>";
+            : "<div class='alert alert-primary text-start my-3 shadow-sm border-0 border-start border-5 border-primary small'><div class='fw-bold mb-1'><i class='fa fa-paperclip me-1' aria-hidden='true'></i> Elenco degli studenti</div>$testo</div>";
     }
 
     /**
@@ -56,10 +56,10 @@ final class AvvisoDocumenti
         $quando = $scadenza !== null ? 'entro il <strong>' . date('d/m/Y', (int) strtotime($scadenza)) . '</strong>' : 'prima dell\'inizio dell\'attività';
 
         return "<div role='note' style='" . self::STILE_RIQUADRO . "'>"
-            . "<div style='" . self::STILE_TITOLO . "'><i class='fa fa-triangle-exclamation me-1' aria-hidden='true'></i> Dopo la prenotazione dovrai caricare due documenti</div>"
+            . "<div style='" . self::STILE_TITOLO . "'><i class='fa fa-triangle-exclamation me-1' aria-hidden='true'></i> Dopo la prenotazione dovrai caricare l'elenco degli studenti</div>"
             . "<ol style='margin:0 0 8px;padding-left:22px;'>"
             . "<li>l'<strong>elenco degli studenti</strong> (cognome e nome: puoi scriverlo, incollarlo da Excel o caricare il modello compilato);</li>"
-            . "<li>l'<strong>autorizzazione della scuola</strong> alla partecipazione, in <strong>PDF</strong>.</li></ol>"
+            . "<li>(facoltativa) l'<strong>autorizzazione della scuola</strong> alla partecipazione, in <strong>PDF</strong>.</li></ol>"
             . "<div style='margin-bottom:4px;'>Vanno consegnati $quando, oltre alla convenzione con il Dipartimento. Si caricano dalla tua <strong>Area personale</strong> (accesso con SPID, CIE o credenziali Unical, con la stessa email) e ti ricordiamo noi con un'email se manca qualcosa.</div>"
             . '</div>';
     }
@@ -77,9 +77,6 @@ final class AvvisoDocumenti
         if (!$stato['elenco']) {
             $manca[] = "l'elenco degli studenti";
         }
-        if (!$stato['autorizzazione']) {
-            $manca[] = "l'autorizzazione della scuola (PDF)";
-        }
         $entro = $stato['scadenza'] !== null ? '<strong>' . date('d/m/Y', (int) strtotime($stato['scadenza'])) . '</strong>' : '';
 
         return [
@@ -88,8 +85,8 @@ final class AvvisoDocumenti
             'codice' => (string) $p['codice_prenotazione'],
             'inizio_testo' => $inizio !== null ? 'inizia il ' . date('d/m/Y', (int) strtotime($inizio)) : 'sta per iniziare',
             'manca' => implode(' e ', $manca),
-            'scadenza' => $entro !== '' ? '<p>Puoi caricarli entro il ' . $entro . '.</p>' : '',
-            'consegna' => '<p>I documenti andavano consegnati' . ($entro !== '' ? ' entro il ' . $entro : '') . ': caricali al più presto.</p>',
+            'scadenza' => $entro !== '' ? '<p>Puoi inserirlo entro il ' . $entro . '.</p>' : '',
+            'consegna' => '<p>L\'elenco andava consegnato' . ($entro !== '' ? ' entro il ' . $entro : '') . ': inseriscilo al più presto.</p>',
         ];
     }
 
@@ -108,9 +105,6 @@ final class AvvisoDocumenti
             $manca = [];
             if (!$stati[$i]['elenco']) {
                 $manca[] = "l'elenco degli studenti";
-            }
-            if (!$stati[$i]['autorizzazione']) {
-                $manca[] = "l'autorizzazione della scuola (PDF)";
             }
             $righe[] = 'per la prenotazione ' . $p['codice_prenotazione'] . ' ' . implode(' e ', $manca);
         }

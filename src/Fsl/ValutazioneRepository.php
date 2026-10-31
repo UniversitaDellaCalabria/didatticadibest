@@ -14,6 +14,12 @@ final class ValutazioneRepository
     }
 
     /** Salva la scheda (una sola per prenotazione): righe inserite, 0 se esiste già, -1 se la query non riesce. */
+    /** La scheda di valutazione di questa prenotazione è già stata compilata. */
+    public function compilata(int $prenotazioneId): bool
+    {
+        return $this->db->riga('SELECT id FROM valutazioni_fsl WHERE prenotazione_id = ? LIMIT 1', [$prenotazioneId]) !== null;
+    }
+
     public function inserisci(int $prenotazioneId, int $eventoId, ?string $codiceScuola, string $compilataDa, string $risposteJson, float $media, string $ripeterebbe): int
     {
         return $this->db->esegui(

@@ -9,7 +9,7 @@ use DateTimeImmutable;
 
 /**
  * Documenti che il docente referente consegna dopo la prenotazione e prima dell'inizio di un'attività di Formazione Scuola
- * Lavoro: l'elenco degli studenti e l'autorizzazione della scuola (PDF). Qui solo le regole (chi, quando, ogni quanto): niente
+ * Lavoro: l'elenco degli studenti (obbligatorio) e l'autorizzazione della scuola in PDF (facoltativa). Qui solo le regole (chi, quando, ogni quanto): niente
  * database, così si provano con date finte.
  */
 final class DocumentiClasse
@@ -99,7 +99,7 @@ final class DocumentiClasse
     }
 
     /**
-     * Cosa manca: studenti indicati e autorizzazione.
+     * Cosa manca: gli studenti indicati. L'autorizzazione è facoltativa: non serve per essere «completi».
      *
      * @param array<string, mixed> $p riga con autorizzazione_file
      * @return array{studenti: int, max: int, elenco: bool, autorizzazione: bool, completi: bool, scadenza: ?string, scaduti: bool}
@@ -115,7 +115,7 @@ final class DocumentiClasse
             'max' => $max,
             'elenco' => $elenco,
             'autorizzazione' => $autorizzazione,
-            'completi' => $elenco && $autorizzazione,
+            'completi' => $elenco,
             'scadenza' => $scadenza,
             'scaduti' => $scadenza !== null && $scadenza < $this->oggi(),
         ];

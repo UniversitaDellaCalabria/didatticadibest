@@ -40,6 +40,27 @@ final class ServizioValutazioniFsl
         return $this->prenotazioni->perValutazione($token);
     }
 
+    /**
+     * Promemoria dell'amministratore a un docente: «compila la scheda di valutazione», con il link personale.
+     *
+     * @return string|null errore da mostrare, null se l'email è partita
+     */
+    public function ricorda(int $prenotazioneId): ?string
+    {
+        $p = $this->prenotazioni->dati($prenotazioneId);
+        if (!$p) {
+            return 'Prenotazione non trovata.';
+        }
+        if ($this->valutazioni->compilata($prenotazioneId)) {
+            return 'La scheda di valutazione è già stata compilata: il promemoria non serve.';
+        }
+        if (empty($p['email']) || !filter_var($p['email'], FILTER_VALIDATE_EMAIL)) {
+            return "Non c'è un'email valida a cui scrivere.";
+        }
+
+        return $this->invia($prenotazioneId, true) ? null : "L'email non è partita: riprova più tardi.";
+    }
+
     /** Email al docente con il link alla scheda. $promemoria = true per il secondo invio. */
     public function invia(int $prenotazioneId, bool $promemoria = false): bool
     {

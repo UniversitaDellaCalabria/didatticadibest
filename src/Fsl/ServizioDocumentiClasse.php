@@ -207,6 +207,71 @@ final class ServizioDocumentiClasse
 ";
     }
 
+    /** Ore minime tra due promemoria all'elenco per la stessa prenotazione (per non scrivere due volte di seguito). */
+    public const ORE_TRA_RICORDI = 24;
+
+    /**
+     * Promemoria dell'amministratore al docente che ha prenotato: «devi inserire l'elenco degli studenti», con il link diretto
+     * alla pagina. Vale solo se per l'attività serve l'elenco e non c'è ancora.
+     *
+     * @return string|null errore da mostrare, null se l'email è partita
+     */
+    public function ricordaElenco(int $prenotazioneId): ?string
+    {
+        $p = $this->repo->perAvviso($prenotazioneId);
+        if ($p === null) {
+            return 'Prenotazione non trovata.';
+        }
+        if (!$this->regole->richiesti($p) || !$this->regole->attiva($p)) {
+            return "Per questa prenotazione non serve l'elenco degli studenti.";
+        }
+        if ((int) $p['studenti'] > 0) {
+            return "L'elenco degli studenti è già stato inserito: il promemoria non serve.";
+        }
+        if (empty($p['email']) || !filter_var($p['email'], FILTER_VALIDATE_EMAIL)) {
+            return "Non c'è un'email valida a cui scrivere.";
+        }
+        $ultimo = (string) ($p['doc_promemoria_il'] ?? '');
+        if ($ultimo !== '' && strtotime($ultimo) > time() - self::ORE_TRA_RICORDI * 3600) {
+            return 'Il promemoria è già partito il ' . date('d/m/Y \a\l\l\e H:i', (int) strtotime($ultimo)) . ': riprova domani.';
+        }
+        $stato = $this->regole->stato($p, 0, (int) ($p['num_posti'] ?? 0));
+        $dati = $this->avvisi->datiPromemoria($p, $stato, false, $this->regole->inizio($p));
+        if (!$this->invio->invia((string) $p['email'], 'fsl_documenti_promemoria', $dati, $this->avvisi->link((string) $p['codice_prenotazione']), [], '', $this->colori->delTurno((int) $p['turno_id']))) {
+            return "L'email non è partita: riprova più tardi.";
+        }
+        $this->repo->segnaRicordo($prenotazioneId);
+
+        return null;
+    }
+
+    /**
+     * Promemoria dell'elenco a tutti i docenti a cui manca (attività FSL non ancora iniziate).
+     *
+     * @param int|null $eventoId solo le prenotazioni di quell'attività (evento)
+     * @return array{0: int, 1: int} [partiti, saltati: già avvisati da poco o senza email]
+     */
+    public function ricordaElencoATutti(?int $eventoId = null): array
+    {
+        $partiti = 0;
+        $saltati = 0;
+        $visti = [];
+        foreach ($this->repo->incomplete() as $p) {
+            if ($eventoId !== null && (int) ($p['evento_id'] ?? 0) !== $eventoId) {
+                continue;
+            }
+            // Una sola email per docente e attività anche con più classi
+            $chiave = mb_strtolower(trim((string) $p['email'])) . '|' . (string) ($p['titolo'] ?? '');
+            if (isset($visti[$chiave])) {
+                continue;
+            }
+            $visti[$chiave] = true;
+            $this->ricordaElenco((int) $p['id']) === null ? ++$partiti : ++$saltati;
+        }
+
+        return [$partiti, $saltati];
+    }
+
     private function cartella(): string
     {
         return $this->sito->radice() . '/' . Costanti::DIR_AUTORIZZAZIONI;

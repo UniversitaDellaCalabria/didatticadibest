@@ -29,9 +29,9 @@ $token = function (string $jar) use ($http, $url_doc) { $r = $http($url_doc, nul
 
 $r = $http($url_doc, null, $jar2);
 prova($r['codice'] === 200 && str_contains($r['corpo'], "Documenti da consegnare prima dell'attività") && str_contains($r['corpo'], 'name="file_autorizzazione"') && str_contains($r['corpo'], 'name="stud_cognome[]"')
-    && str_contains($r['corpo'], 'Autorizzazione della scuola mancante') && str_contains($r['corpo'], 'Da consegnare entro il ' . date('d/m/Y', strtotime('+33 days'))), "elenco_studenti.php: prenotazione FSL in attesa di convenzione, elenco e autorizzazione da consegnare");
+    && str_contains($r['corpo'], 'Autorizzazione della scuola (facoltativa)') && str_contains($r['corpo'], 'Da consegnare entro il ' . date('d/m/Y', strtotime('+33 days'))), "elenco_studenti.php: prenotazione FSL in attesa di convenzione, elenco e autorizzazione da consegnare");
 $r = $http('/eventi/fsl.php?progetto=20', null, $jar2);
-prova($r['codice'] === 200 && str_contains($r['corpo'], 'Dopo la prenotazione dovrai caricare due documenti') && str_contains($r['corpo'], 'name="turno_id" value="201"'), "modulo di iscrizione FSL: riquadro evidente con elenco e autorizzazione da caricare");
+prova($r['codice'] === 200 && str_contains($r['corpo'], "Dopo la prenotazione dovrai caricare l'elenco degli studenti") && str_contains($r['corpo'], 'name="turno_id" value="201"'), "modulo di iscrizione FSL: riquadro evidente con elenco e autorizzazione da caricare");
 prova($http($url_doc)['codice'] === 302, "elenco_studenti.php: senza accesso rimanda al login");
 
 $r = $http_file($url_doc, ['csrf_token' => 'sbagliato', 'code' => 'FS-DOCPAG', 'carica_autorizzazione' => '1'], $pdf_ok, $jar2);

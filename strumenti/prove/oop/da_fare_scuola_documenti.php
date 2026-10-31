@@ -18,11 +18,15 @@ $per = fn(array $u) => array_values(array_filter($daFare->gruppi($u), fn($g) => 
 
 $g = $per(['email' => 'Scuola9893@example.org']);
 prova(count($g) === 1 && $g[0]['n'] === 1 && $g[0]['righe'][0]['testo'] === 'Attività FSL 9893' && $g[0]['righe'][0]['link'] === 'elenco_studenti.php?code=FS-DF93A'
-    && str_contains($g[0]['righe'][0]['dettaglio'], 'l\'elenco degli studenti e l\'autorizzazione') && str_contains($g[0]['righe'][0]['dettaglio'], ' entro il '), "da fare: la scuola vede cosa manca e la scadenza, solo per l'attività non ancora iniziata", json_encode($g));
+    && str_contains($g[0]['righe'][0]['dettaglio'], 'l\'elenco degli studenti') && !str_contains($g[0]['righe'][0]['dettaglio'], 'autorizzazione') && str_contains($g[0]['righe'][0]['dettaglio'], ' entro il '), "da fare: la scuola vede cosa manca e la scadenza, solo per l'attività non ancora iniziata", json_encode($g));
 prova($per(['email' => 'altra9893@example.org']) === [], "da fare: un'altra scuola non vede niente");
 $q("UPDATE prenotazioni SET autorizzazione_file = 'x.pdf' WHERE id = 989303");
 $g = $per(['email' => 'scuola9893@example.org']);
-prova(count($g) === 1 && str_contains($g[0]['righe'][0]['dettaglio'], 'l\'elenco degli studenti') && !str_contains($g[0]['righe'][0]['dettaglio'], 'autorizzazione'), "da fare: con l'autorizzazione caricata resta solo l'elenco");
+prova(count($g) === 1 && str_contains($g[0]['righe'][0]['dettaglio'], 'l\'elenco degli studenti'), "da fare: l'autorizzazione è facoltativa, finché manca l'elenco resta da fare");
+$q("INSERT INTO partecipanti_prenotazione (prenotazione_id, cognome, nome, ordine) VALUES (989303, 'Verdi', 'Anna', 1)");
+$q("UPDATE prenotazioni SET autorizzazione_file = NULL WHERE id = 989303");
+prova($per(['email' => 'scuola9893@example.org']) === [], "da fare: con l'elenco inserito non resta niente, anche senza autorizzazione");
+$q("DELETE FROM partecipanti_prenotazione WHERE prenotazione_id = 989303");
 
 foreach (["DELETE FROM prenotazioni WHERE id IN (989303, 989304)", "DELETE FROM turni WHERE id IN (989302, 989305)", "DELETE FROM progetti_dettagli WHERE evento_id = 989301",
           "DELETE FROM eventi WHERE id = 989301", "DELETE FROM pagine_eventi WHERE id = 989300"] as $sql) $q($sql);

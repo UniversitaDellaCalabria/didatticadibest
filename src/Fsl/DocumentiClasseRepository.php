@@ -44,7 +44,7 @@ final class DocumentiClasseRepository
     }
 
     /**
-     * Prenotazioni FSL di classe, attive e con l'attività non ancora iniziata, a cui manca l'elenco o l'autorizzazione.
+     * Prenotazioni FSL di classe, attive e con l'attività non ancora iniziata, a cui manca l'elenco degli studenti (l'autorizzazione è facoltativa).
      * Il calendario degli avvisi lo decide DocumentiClasse::prossimoAvviso().
      *
      * @param string|null $email solo le prenotazioni fatte con questa email (per «Da fare» della scuola)
@@ -57,7 +57,7 @@ final class DocumentiClasseRepository
         return Righe::testo($this->db->righe(
             "SELECT pr.id, pr.nome, pr.cognome, pr.email, pr.codice_prenotazione, pr.turno_id, pr.stato, pr.data_prenotazione, pr.autorizzazione_file,
                     pr.doc_promemoria, pr.doc_promemoria_il, pr.doc_ultimo_avviso, pr.num_posti,
-                    t.nome_turno, t.data_turno, e.titolo, e.tipo AS evento_tipo, e.pagina_id, pd.data_inizio, pd.data_fine, pd.per_scuole, 1 AS fsl,
+                    t.nome_turno, t.data_turno, e.id AS evento_id, e.titolo, e.tipo AS evento_tipo, e.pagina_id, pd.data_inizio, pd.data_fine, pd.per_scuole, 1 AS fsl,
                     (SELECT COUNT(*) FROM partecipanti_prenotazione pp WHERE pp.prenotazione_id = pr.id) AS studenti
              FROM prenotazioni pr
              JOIN turni t ON pr.turno_id = t.id
@@ -66,12 +66,38 @@ final class DocumentiClasseRepository
              WHERE e.archiviato = 0 AND pd.convenzione = 1 AND pr.solo_orientamento = 0 AND (IFNULL(e.tipo, 'evento') <> 'progetto' OR pd.per_scuole = 1)
                AND IFNULL(pr.stato, 'confermata') IN ($stati)
                AND COALESCE(t.data_turno, pd.data_inizio) >= CURDATE()
-               AND (pr.autorizzazione_file IS NULL OR pr.autorizzazione_file = ''
-                    OR NOT EXISTS (SELECT 1 FROM partecipanti_prenotazione pp2 WHERE pp2.prenotazione_id = pr.id))"
+               AND NOT EXISTS (SELECT 1 FROM partecipanti_prenotazione pp2 WHERE pp2.prenotazione_id = pr.id)"
              . ($email !== null ? ' AND LOWER(pr.email) = ?' : '') . "
              ORDER BY COALESCE(t.data_turno, pd.data_inizio), pr.id",
             $email !== null ? [strtolower($email)] : []
         ));
+    }
+
+    /**
+     * Una prenotazione FSL di classe con gli stessi dati di incomplete() (anche se l'elenco c'è già), per il promemoria dell'amministratore.
+     *
+     * @return array<string, string|null>|null
+     */
+    public function perAvviso(int $prenotazioneId): ?array
+    {
+        return Righe::riga($this->db->riga(
+            "SELECT pr.id, pr.nome, pr.cognome, pr.email, pr.codice_prenotazione, pr.turno_id, pr.stato, pr.data_prenotazione, pr.autorizzazione_file,
+                    pr.doc_promemoria, pr.doc_promemoria_il, pr.doc_ultimo_avviso, pr.num_posti,
+                    t.nome_turno, t.data_turno, e.id AS evento_id, e.titolo, e.tipo AS evento_tipo, e.pagina_id, pd.data_inizio, pd.data_fine, pd.per_scuole, IF(pr.solo_orientamento = 1, 0, IFNULL(pd.convenzione, 0)) AS fsl,
+                    (SELECT COUNT(*) FROM partecipanti_prenotazione pp WHERE pp.prenotazione_id = pr.id) AS studenti
+             FROM prenotazioni pr
+             JOIN turni t ON pr.turno_id = t.id
+             JOIN eventi e ON t.evento_id = e.id
+             LEFT JOIN progetti_dettagli pd ON pd.evento_id = e.id
+             WHERE pr.id = ? LIMIT 1",
+            [$prenotazioneId]
+        ));
+    }
+
+    /** Segna che oggi la scuola è stata avvisata (l'amministratore ha mandato un promemoria): il cron aspetta prima di riscrivere. */
+    public function segnaRicordo(int $prenotazioneId): void
+    {
+        $this->db->esegui('UPDATE prenotazioni SET doc_promemoria_il = NOW() WHERE id = ?', [$prenotazioneId]);
     }
 
     /**

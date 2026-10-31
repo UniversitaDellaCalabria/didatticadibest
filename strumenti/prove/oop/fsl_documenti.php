@@ -61,16 +61,16 @@ $doc_srv = AppDoc::per($conn)->get(\App\Fsl\ServizioDocumentiClasse::class);
 
 $n_prima = count($EMAIL);
 $resoconto = $doc_srv->promemoria();
-$inviate_doc = array_values(array_filter(array_slice($EMAIL, $n_prima), fn($e) => str_contains($e['oggetto'], 'autorizzazione della scuola')));
+$inviate_doc = array_values(array_filter(array_slice($EMAIL, $n_prima), fn($e) => str_contains($e['oggetto'], 'elenco degli studenti')));
 prova(count($inviate_doc) === 1 && $inviate_doc[0]['a'] === 'rosa987@example.org' && str_starts_with($inviate_doc[0]['oggetto'], 'Promemoria:') && str_contains($resoconto, '1 promemoria'),
     "cron: promemoria al docente che non ha consegnato (non a chi ha annullato)", $resoconto);
-prova(str_contains($inviate_doc[0]['corpo'] ?? '', 'elenco degli studenti') && str_contains($inviate_doc[0]['corpo'] ?? '', 'autorizzazione della scuola') && str_contains($inviate_doc[0]['corpo'] ?? '', 'elenco_studenti.php?code=FS-DOC987'),
+prova(str_contains($inviate_doc[0]['corpo'] ?? '', 'elenco degli studenti') && !str_contains($inviate_doc[0]['corpo'] ?? '', 'autorizzazione') && str_contains($inviate_doc[0]['corpo'] ?? '', 'elenco_studenti.php?code=FS-DOC987'),
     "il promemoria dice cosa manca e rimanda alla pagina");
 $riga_doc = $conn->query("SELECT doc_promemoria, doc_promemoria_il FROM prenotazioni WHERE id = 98703")->fetch_assoc();
 prova((int)$riga_doc['doc_promemoria'] === 1 && !empty($riga_doc['doc_promemoria_il']), "il promemoria è contato");
 $n_prima = count($EMAIL);
 $doc_srv->promemoria();
-prova(count(array_filter(array_slice($EMAIL, $n_prima), fn($e) => str_contains($e['oggetto'], 'autorizzazione della scuola'))) === 0, "cron: subito dopo non ne parte un altro");
+prova(count(array_filter(array_slice($EMAIL, $n_prima), fn($e) => str_contains($e['oggetto'], 'elenco degli studenti'))) === 0, "cron: subito dopo non ne parte un altro");
 
 // Due classi dello stesso docente per la stessa attività: una sola email con entrambi i codici
 $q("INSERT INTO prenotazioni (id, turno_id, codice_prenotazione, stato, nome, cognome, email, data_prenotazione, convenzione)
@@ -78,19 +78,42 @@ $q("INSERT INTO prenotazioni (id, turno_id, codice_prenotazione, stato, nome, co
 $q("UPDATE prenotazioni SET doc_promemoria_il = NOW() - INTERVAL 8 DAY WHERE id = 98703");
 $n_prima = count($EMAIL);
 $doc_srv->promemoria();
-$due = array_values(array_filter(array_slice($EMAIL, $n_prima), fn($e) => str_contains($e['oggetto'], 'autorizzazione della scuola')));
+$due = array_values(array_filter(array_slice($EMAIL, $n_prima), fn($e) => str_contains($e['oggetto'], 'elenco degli studenti')));
 prova(count($due) === 1 && str_contains($due[0]['corpo'] ?? '', 'FS-DOC987') && str_contains($due[0]['corpo'] ?? '', 'FS-DOC989'), "cron: due classi dello stesso docente e attività = una sola email con i due codici", json_encode(array_column($due, 'oggetto')));
 $r5 = $conn->query("SELECT doc_promemoria FROM prenotazioni WHERE id IN (98703, 98705)")->fetch_all(MYSQLI_ASSOC);
 prova(count($r5) === 2 && (int) $r5[0]['doc_promemoria'] >= 1 && (int) $r5[1]['doc_promemoria'] === 1, "cron: il promemoria è contato per ogni classe inclusa");
 $q("DELETE FROM prenotazioni WHERE id = 98705");
 $q("UPDATE prenotazioni SET doc_promemoria_il = NOW() WHERE id = 98703");
 
-// Con elenco e autorizzazione il promemoria non serve più
+// Promemoria dell'amministratore: «inserisci l'elenco», con il link diretto; non più di uno al giorno, solo se l'elenco manca
+$n_prima = count($EMAIL);
+prova($doc_srv->ricordaElenco(98703) !== null && count($EMAIL) === $n_prima, "promemoria admin: appena avvisato dal cron, non riparte");
+$cont_prima = (int)$conn->query("SELECT doc_promemoria FROM prenotazioni WHERE id = 98703")->fetch_assoc()['doc_promemoria'];
+$q("UPDATE prenotazioni SET doc_promemoria_il = NOW() - INTERVAL 2 DAY WHERE id = 98703");
+prova($doc_srv->ricordaElenco(98703) === null, "promemoria admin: parte dopo più di un giorno");
+$ric = array_values(array_filter(array_slice($EMAIL, $n_prima), fn($e) => $e['a'] === 'rosa987@example.org'));
+prova(count($ric) === 1 && str_contains($ric[0]['corpo'] ?? '', 'elenco_studenti.php?code=FS-DOC987') && str_contains($ric[0]['corpo'] ?? '', 'elenco degli studenti') && !str_contains($ric[0]['corpo'] ?? '', 'autorizzazione'), "promemoria admin: l'email dice di inserire l'elenco e ha il link diretto");
+$r_ric = $conn->query("SELECT doc_promemoria, doc_promemoria_il FROM prenotazioni WHERE id = 98703")->fetch_assoc();
+prova((int)$r_ric['doc_promemoria'] === $cont_prima && strtotime($r_ric['doc_promemoria_il']) > time() - 60, "promemoria admin: segnato come avviso di oggi senza consumare i promemoria del cron");
+prova($doc_srv->ricordaElenco(98703) !== null, "promemoria admin: un secondo subito dopo è rifiutato");
+prova($doc_srv->ricordaElenco(98704) !== null && $doc_srv->ricordaElenco(1234567) !== null, "promemoria admin: prenotazione annullata o inesistente, nessun invio");
+$q("UPDATE prenotazioni SET doc_promemoria_il = NULL WHERE id = 98703");
+[$p_tutti, $s_tutti] = $doc_srv->ricordaElencoATutti(98701);
+prova($p_tutti === 1 && $s_tutti === 0, "promemoria a tutti: un'email al docente a cui manca l'elenco", "$p_tutti/$s_tutti");
+[$p_tutti, $s_tutti] = $doc_srv->ricordaElencoATutti(98701);
+prova($p_tutti === 0 && $s_tutti === 1, "promemoria a tutti: chi è stato avvisato oggi è saltato", "$p_tutti/$s_tutti");
+
+// L'autorizzazione è facoltativa: con l'elenco i documenti sono completi e il cron non scrive più
+// Con l'elenco il promemoria non serve più, anche senza l'autorizzazione
 $q("INSERT INTO partecipanti_prenotazione (prenotazione_id, cognome, nome, ordine) VALUES (98703, 'Rossi', 'Mario', 1)");
-$q("UPDATE prenotazioni SET autorizzazione_file = 'uploads/autorizzazioni/" . str_repeat('a', 32) . ".pdf', autorizzazione_nome = 'aut.pdf', doc_promemoria_il = NOW() - INTERVAL 8 DAY WHERE id = 98703");
+$q("UPDATE prenotazioni SET doc_promemoria_il = NOW() - INTERVAL 8 DAY WHERE id = 98703");
+prova($doc_srv->ricordaElenco(98703) !== null, "promemoria admin: elenco già inserito, niente da ricordare");
+$st_senza = $doc_srv->stato($conn->query("SELECT * FROM prenotazioni WHERE id = 98703")->fetch_assoc(), 14);
+prova($st_senza['completi'] && !$st_senza['autorizzazione'], "senza l'autorizzazione i documenti sono comunque completi (facoltativa)");
+$q("UPDATE prenotazioni SET autorizzazione_file = 'uploads/autorizzazioni/" . str_repeat('a', 32) . ".pdf', autorizzazione_nome = 'aut.pdf' WHERE id = 98703");
 $n_prima = count($EMAIL);
 $doc_srv->promemoria();
-prova(count(array_filter(array_slice($EMAIL, $n_prima), fn($e) => str_contains($e['oggetto'], 'autorizzazione della scuola'))) === 0, "cron: documenti completi, nessun promemoria");
+prova(count(array_filter(array_slice($EMAIL, $n_prima), fn($e) => str_contains($e['oggetto'], 'elenco degli studenti'))) === 0, "cron: documenti completi, nessun promemoria");
 $st_doc = $doc_srv->stato($conn->query("SELECT * FROM prenotazioni WHERE id = 98703")->fetch_assoc(), 14);
 prova($st_doc['completi'] && $st_doc['studenti'] === 1 && $st_doc['max'] === 14, "stato dal database: 1 studente e autorizzazione = completi");
 
@@ -100,9 +123,9 @@ prova(str_contains($avv, 'elenco degli studenti') && str_contains($avv, 'autoriz
     "avviso dopo la prenotazione: cosa caricare, link e scadenza (7 giorni prima)");
 prova($doc_srv->avvisoPrenotazione(['convenzione' => 0, 'per_scuole' => 1], true, 'FS-NUOVO', null, true) === '' && $doc_srv->avvisoPrenotazione(null, false, 'X', null, true) === '', "nessun avviso per le attività non FSL");
 $mod = $doc_srv->avvisoModulo(['convenzione' => 1, 'per_scuole' => 1, 'data_inizio' => $giorni(40)], true, null);
-prova(str_contains($mod, 'Dopo la prenotazione dovrai caricare due documenti') && str_contains($mod, 'elenco degli studenti') && str_contains($mod, 'autorizzazione della scuola') && str_contains($mod, date('d/m/Y', strtotime($giorni(33))))
+prova(str_contains($mod, "Dopo la prenotazione dovrai caricare l'elenco degli studenti") && str_contains($mod, 'elenco degli studenti') && str_contains($mod, 'autorizzazione della scuola') && str_contains($mod, date('d/m/Y', strtotime($giorni(33))))
     && str_contains($mod, 'border:1px solid #0d6efd;border-left-width:6px') && $doc_srv->avvisoModulo(['convenzione' => 0, 'per_scuole' => 1], true, null) === '' && $doc_srv->avvisoModulo(null, false, null) === '', "riquadro nel modulo di prenotazione: evidente, solo per le attività FSL");
-prova(str_contains($doc_srv->avvisoPerCodice('FS-DOC987'), 'Elenco degli studenti e autorizzazione della scuola') && $doc_srv->avvisoPerCodice('FS-DOC988') === '' && $doc_srv->avvisoPerCodice('NON-ESISTE') === '', "avviso nella pagina di conferma: solo per prenotazioni FSL attive");
+prova(str_contains($doc_srv->avvisoPerCodice('FS-DOC987'), 'Elenco degli studenti') && $doc_srv->avvisoPerCodice('FS-DOC988') === '' && $doc_srv->avvisoPerCodice('NON-ESISTE') === '', "avviso nella pagina di conferma: solo per prenotazioni FSL attive");
 prova(AppDoc::per($conn)->get(\App\Iscrizioni\RegoleFsl::class)->avvisoDocumentiClasse(['convenzione' => 1, 'per_scuole' => 1, 'data_inizio' => $giorni(40)], true, 'FS-NUOVO', null) === $avv, "RegoleFsl serve l'avviso al modulo Iscrizioni");
 
 // Pulizia

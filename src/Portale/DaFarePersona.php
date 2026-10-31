@@ -100,7 +100,7 @@ final class DaFarePersona
             "SELECT email FROM risorse_responsabili WHERE puo_approvare = 1",
             "SELECT email FROM didattica_consigli_persone WHERE ruolo IN ('segretario', 'coordinatore')",
             "SELECT email FROM uffici_persone",
-            "SELECT pr.email FROM prenotazioni pr JOIN turni t ON t.id = pr.turno_id JOIN progetti_dettagli pd ON pd.evento_id = t.evento_id WHERE pd.convenzione = 1 AND pr.solo_orientamento = 0 AND pr.autorizzazione_file IS NULL AND COALESCE(t.data_turno, pd.data_inizio) >= CURDATE() AND pr.email <> ''",
+            "SELECT pr.email FROM prenotazioni pr JOIN turni t ON t.id = pr.turno_id JOIN progetti_dettagli pd ON pd.evento_id = t.evento_id WHERE pd.convenzione = 1 AND pr.solo_orientamento = 0 AND NOT EXISTS (SELECT 1 FROM partecipanti_prenotazione pp WHERE pp.prenotazione_id = pr.id) AND COALESCE(t.data_turno, pd.data_inizio) >= CURDATE() AND pr.email <> ''",
             "SELECT email FROM convenzioni_tesi WHERE stato IN ('invitata', 'compilata', 'risposta', 'rifiutata') AND email <> ''",
             "SELECT email FROM pratiche WHERE stato = 'integrazione' AND email <> ''",
             "SELECT email FROM prenotazioni WHERE stato = 'richiesta_conferma' AND email <> ''",
@@ -265,19 +265,18 @@ final class DaFarePersona
         });
     }
 
-    /** Elenco degli studenti e autorizzazione della scuola da consegnare PRIMA di un'attività FSL di classe (dopo l'inizio resta «Elenchi degli studenti da inserire»). */
+    /** Elenco degli studenti da consegnare PRIMA di un'attività FSL di classe (dopo l'inizio resta «Elenchi degli studenti da inserire»). */
     private function documentiClasse(string $email): array
     {
         $r = array_values(array_filter($this->docClasse->incomplete($email), fn (array $p): bool => $this->regoleDoc->consegnaAperta($p)));
         $righe = array_slice($r, 0, $this->limite);
 
-        return $this->gruppo('documenti_classe', 'Elenco e autorizzazione da consegnare', 'fa-paperclip', '#B30000', count($r), $righe, function (array $p): array {
+        return $this->gruppo('documenti_classe', 'Elenco degli studenti da consegnare', 'fa-paperclip', '#B30000', count($r), $righe, function (array $p): array {
             $s = $this->regoleDoc->stato($p, (int) ($p['studenti'] ?? 0), 0);
-            $mancano = array_filter([!$s['elenco'] ? 'l\'elenco degli studenti' : '', !$s['autorizzazione'] ? 'l\'autorizzazione' : '']);
             $inizio = $this->regoleDoc->inizio($p);
 
             return [
-                'testo' => (string) $p['titolo'], 'dettaglio' => 'carica ' . implode(' e ', $mancano) . ($s['scadenza'] !== null ? ' entro il ' . date('d/m/Y', (int) strtotime($s['scadenza'])) . ($s['scaduti'] ? ' (scaduto)' : '') : ''),
+                'testo' => (string) $p['titolo'], 'dettaglio' => 'carica l\'elenco degli studenti' . ($s['scadenza'] !== null ? ' entro il ' . date('d/m/Y', (int) strtotime($s['scadenza'])) . ($s['scaduti'] ? ' (scaduto)' : '') : ''),
                 'link' => 'elenco_studenti.php?code=' . urlencode((string) $p['codice_prenotazione']), 'scadenza' => $s['scadenza'],
                 'giorni' => max(0, (int) floor((time() - (int) strtotime((string) ($p['data_prenotazione'] ?: ($inizio ?? 'now')))) / 86400)),
             ];
