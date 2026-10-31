@@ -159,6 +159,9 @@ require_once 'header.php';
     <h1 class="fw-bold h2 mb-1"><i class="fa fa-clipboard-list me-2" style="color:#B30000;" aria-hidden="true"></i>Il programma FSL della scuola</h1>
     <p class="text-secondary">Le attività di Formazione Scuola Lavoro che hai scelto. Controllale, indica i dati della scuola e conferma: <strong>le prenotiamo tutte insieme</strong> e prepariamo l'<strong>Allegato A</strong> e la <strong>Convenzione</strong> già compilati.</p>
     <?php echo flash_html(); ?>
+    <?php if (!$utente_logged && $programma->conta() > 0): ?>
+        <div class="alert alert-info small py-2"><i class="fa fa-info-circle me-1" aria-hidden="true"></i>Il programma è tenuto solo su questo computer. <a class="fw-bold" href="saml_login.php?redirect=<?php echo urlencode('programma_fsl.php'); ?>">Accedi per non perderlo</a>: si salva e lo ritrovi da qualsiasi computer.</div>
+    <?php endif; ?>
     <?php if ($errori): ?><div class="alert alert-danger" role="alert" id="errori"><strong>Controlla i dati:</strong><ul class="mb-0"><?php foreach ($errori as $e): ?><li><?php echo $h($e); ?></li><?php endforeach; ?></ul></div><?php endif; ?>
 
     <?php if (!$voci): ?>

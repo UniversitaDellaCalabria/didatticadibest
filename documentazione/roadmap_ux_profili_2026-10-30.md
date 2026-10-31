@@ -263,6 +263,8 @@ lato docente; bozze delle pratiche; percorsi a passi per convenzione FSL e conve
   La scheda in `miei_eventi.php` resta (vecchi link `#programma-fsl`).
 
 **3.S2 Programma FSL salvato per persona** (M)
+
+> **Stato 1/11/2026: FATTO in locale (schema v115).** Tabella `fsl_programmi`; `ProgrammaFsl` salva ogni modifica per chi ha fatto l'accesso (`ProgrammiSalvatiRepository`) e alla prima lettura dopo l'accesso somma il programma fatto da anonimo a quello salvato (vale la scelta più recente; se in sessione entra un'altra persona vede il suo). Senza accesso resta nella sessione come prima. Chi naviga senza accesso vede nella pagina del programma l'invito «Accedi per non perderlo». Prova: `programma_fsl_salvato.php`.
 - **Problema.** `ProgrammaFsl` è «tenuto nella sessione di chi sta navigando» (`src/Fsl/ProgrammaFsl.php:10`): uscire, scadere la sessione o cambiare computer lo svuota.
 - **Soluzione.** Per chi ha fatto l'accesso il programma si salva in una tabella; all'accesso il programma della sessione (fatto da anonimo) si unisce a quello salvato.
   Chi non ha fatto l'accesso continua con la sessione e vede l'invito «Accedi per non perdere il programma».

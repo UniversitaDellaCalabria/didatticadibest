@@ -432,6 +432,11 @@ final class Definizioni
             firmato_da VARCHAR(200) DEFAULT '', motivo VARCHAR(500) DEFAULT '', solleciti TINYINT NOT NULL DEFAULT 0, sollecito_il DATETIME DEFAULT NULL,
             UNIQUE KEY uq_token (token), INDEX idx_pratica (pratica_id, stato)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        // v115: il programma FSL di chi ha fatto l'accesso (attività scelte e non ancora prenotate): resta salvato anche se la sessione scade o cambia computer
+        'fsl_programmi' => "CREATE TABLE IF NOT EXISTS fsl_programmi (
+            id INT AUTO_INCREMENT PRIMARY KEY, utente_id INT NOT NULL, turno_id INT NOT NULL, evento_id INT NOT NULL, custom_json MEDIUMTEXT DEFAULT NULL,
+            aggiunto_il DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY uq_utente_turno (utente_id, turno_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         // v64: conferme dei docenti sugli attestati (frequenza alle lezioni, esame sostenuto): ogni docente riceve un link personale, vede le sue righe e
         // le conferma o le rifiuta nel portale (senza firma digitale); stato: attesa | confermata | rifiutata | annullata. accesso_json = come è entrato (SSO/SPID/CIE)
         'pratiche_conferme' => "CREATE TABLE IF NOT EXISTS pratiche_conferme (
