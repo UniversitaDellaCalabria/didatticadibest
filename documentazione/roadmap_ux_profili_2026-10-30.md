@@ -466,6 +466,7 @@ lasciando nella pagina solo il disegno. Da fare dopo le fasi 0-3.
 - **7.1 Scenario per profilo** (M): script in `strumenti/locale/scenario_profili.php` (sul modello di `scenario_convenzioni_tesi.php`) che crea un utente di prova per
   ogni profilo con un compito per ciascuna fonte di 1.2 e verifica, con le prove delle pagine, che ogni compito sia **a un clic** dall'area personale
   (link presente nel HTML della tessera o di «Da fare»).
+  *Stato 1/11/2026:* fatta la parte statica in `misure_sistema.php`: i link dei compiti di «Da fare» puntano a pagine esistenti e ogni riquadro speciale ha il suo file. Lo scenario con utenti di prova per profilo (con la pagina in locale) resta da fare quando l'ambiente locale è acceso.
 - **7.2 Misure nel pannello** (S): in Sistema, quattro numeri da seguire nel tempo: utenti senza email affidabile, compiti fermi da più di 7 giorni per gruppo,
   giorni medi tra «inviata al Direttore» e «firmata», incarichi di tutorato con registro vuoto.
   *Stato 1/11/2026:* fatto: `src/Sistema/MisureSistema.php` e riquadro «Misure da seguire nel tempo» in `admin/sistema.php`; i compiti fermi coprono lettere di tutorato (docente, Direttore) e convenzioni di tesi (azienda, ufficio, Direttore); giorni medi su lettere di tutorato e convenzioni di tesi. Prova `misure_sistema.php`.

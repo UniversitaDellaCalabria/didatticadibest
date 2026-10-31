@@ -31,3 +31,18 @@ prova($ms->incarichiConRegistroVuoto() === $base_ms[3] + 1, "registro vuoto: l'i
 $sis_ms = file_get_contents(dirname(__DIR__, 3) . '/admin/sistema.php');
 prova(str_contains($sis_ms, 'MisureSistema::class') && str_contains($sis_ms, 'id="misure"'), "sistema.php: il riquadro «Misure» è nella pagina");
 foreach ($pulisci_ms as $sql) $q($sql);
+
+// Scenario per profilo (7.1, parte statica): ogni compito di «Da fare per te» porta a una pagina che esiste, e ogni riquadro speciale ha il suo file.
+sezione("Profili: ogni compito e ogni tessera portano a una pagina che esiste");
+$radice_ms = dirname(__DIR__, 3);
+$src_df = (string) file_get_contents($radice_ms . '/src/Portale/DaFarePersona.php');
+preg_match_all("/'link' => '([a-z_\/]+\.php)/", $src_df, $m_df);
+$mancanti_ms = array_values(array_filter(array_unique($m_df[1]), fn ($f) => !is_file($radice_ms . '/' . $f)));
+prova(count($m_df[1]) >= 15 && $mancanti_ms === [], "«Da fare per te»: i link dei compiti puntano tutti a pagine esistenti (" . count(array_unique($m_df[1])) . " pagine)", implode(', ', $mancanti_ms));
+$senza_file_ms = [];
+foreach (\App\Portale\Area\CatalogoRiquadri::sistema() as $chiave_ms => $r_ms) {
+    if (($r_ms['tipo'] ?? '') === \App\Portale\Area\CatalogoRiquadri::SPECIALE && !is_file($radice_ms . '/inc/area/' . $chiave_ms . '.php')) {
+        $senza_file_ms[] = $chiave_ms;
+    }
+}
+prova($senza_file_ms === [], "area personale: ogni riquadro speciale ha il suo file in inc/area", implode(', ', $senza_file_ms));
