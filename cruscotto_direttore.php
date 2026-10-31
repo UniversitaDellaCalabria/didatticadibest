@@ -38,7 +38,7 @@ require_once 'header.php';
     <div class="alert alert-<?php echo $ass_c['attiva'] ? 'warning' : 'light border'; ?> small d-flex flex-wrap gap-2 align-items-center py-2">
         <i class="fa fa-user-clock" aria-hidden="true"></i>
         <span><?php echo $ass_c['attiva'] ? '<strong>Direttore assente</strong>: firme, link e avvisi vanno a ' . $h($firma_c['nome'] ?: 'il vice direttore') . ($ass_c['fino'] ? ' fino al ' . $h(date('d/m/Y', strtotime($ass_c['fino']))) : '') . '.' : 'Firme e avvisi vanno a <strong>' . $h($firma_c['nome'] ?: '(Direttore non indicato)') . '</strong>.'; ?></span>
-        <?php if ($dz_c->puoImpostareAssenza($user_info ?? null)): ?><a class="ms-auto fw-bold" href="direttore_assente.php"><?php echo $ass_c['attiva'] ? 'Il Direttore è tornato' : 'Direttore assente?'; ?></a><?php endif; ?>
+        <?php if ($dz_c->puoImpostareAssenza($user_info ?? null)): ?><a class="ms-auto fw-bold ui-tocco" href="direttore_assente.php"><?php echo $ass_c['attiva'] ? 'Il Direttore è tornato' : 'Direttore assente?'; ?></a><?php endif; ?>
     </div>
     <div class="row g-3">
     <?php foreach ($gruppi as $g): ?>
@@ -46,7 +46,7 @@ require_once 'header.php';
             <div class="d-flex align-items-center gap-2 mb-1">
                 <span class="cd-num" style="background:<?php echo $g['n'] ? $h($g['colore']) : '#94a3b8'; ?>;"><?php echo (int)$g['n']; ?></span>
                 <h2 class="h6 fw-bold mb-0"><i class="fa <?php echo $h($g['icona']); ?> me-1" style="color:<?php echo $h($g['colore']); ?>;" aria-hidden="true"></i><?php echo $h($g['titolo']); ?></h2>
-                <?php if ($g['link'] !== '' && $g['n']): ?><a class="ms-auto small" href="<?php echo $h($g['link']); ?>">Apri</a><?php endif; ?>
+                <?php if ($g['link'] !== '' && $g['n']): ?><a class="ms-auto small ui-tocco" href="<?php echo $h($g['link']); ?>">Apri</a><?php endif; ?>
             </div>
             <?php if (!$g['righe']): ?><p class="small text-secondary mb-0 mt-2"><i class="fa fa-circle-check text-success me-1" aria-hidden="true"></i><?php echo $h($g['vuoto']); ?></p>
             <?php else: foreach ($g['righe'] as $r): ?>

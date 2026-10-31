@@ -330,7 +330,7 @@ final class ServizioIter
         $passi[count($passi)] = $conclusa ? Costanti::STATI_PRATICA[$p['stato']][0] : 'Conclusa';
         $out = '<ol class="list-unstyled d-flex flex-wrap gap-1 mb-0 small" aria-label="Iter della pratica">';
         foreach ($passi as $i => $nome) {
-            $stile = $i < $att ? 'background:#dcfce7;color:#166534;' : ($i === $att ? 'background:#047857;color:#fff;' : 'background:#f1f5f9;color:#64748b;');
+            $stile = $i < $att ? 'background:#dcfce7;color:#166534;' : ($i === $att ? 'background:#047857;color:#fff;' : 'background:#f1f5f9;color:#475569;');
             $ico = $i < $att ? 'fa-check' : ($i === $att ? 'fa-location-dot' : 'fa-circle');
             $chi = ($i === $att && $o && !$conclusa) ? '<span class="d-block fw-normal" style="font-size:.7rem;">' . $h($o['nominativo']) . '</span>' : '';
             $out .= '<li class="px-2 py-1 rounded fw-bold" style="' . $stile . '"' . ($i === $att ? ' aria-current="step"' : '') . '><i class="fa ' . $ico . ' me-1" aria-hidden="true"></i>' . $h($nome) . $chi . '</li>';

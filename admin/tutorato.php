@@ -235,7 +235,7 @@ $bando_sel = !empty($_GET['bando']) ? bando_tutorato($conn, (int)$_GET['bando'])
 $passi_html = function (array $i) use ($h) {
     $o = '<ol class="list-unstyled d-flex flex-wrap gap-1 mb-0 small" aria-label="Iter della lettera">';
     foreach (passi_incarico($i) as $k => [$n, $fatto, $ora]) {
-        $st = $fatto ? 'background:#dcfce7;color:#166534;' : ($ora ? 'background:#047857;color:#fff;' : 'background:#f1f5f9;color:#64748b;');
+        $st = $fatto ? 'background:#dcfce7;color:#166534;' : ($ora ? 'background:#047857;color:#fff;' : 'background:#f1f5f9;color:#475569;');
         if ($k) $o .= '<li class="align-self-center text-secondary" aria-hidden="true">›</li>';
         $o .= '<li class="px-2 py-1 rounded fw-bold" style="' . $st . '"' . ($ora ? ' aria-current="step"' : '') . '><i class="fa ' . ($fatto ? 'fa-check' : ($ora ? 'fa-location-dot' : 'fa-circle')) . ' me-1" aria-hidden="true"></i>' . $h($n) . '</li>';
     }

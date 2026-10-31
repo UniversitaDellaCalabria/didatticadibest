@@ -163,4 +163,6 @@ html[data-tema="scuro"] body.ui-scuro-ok [style*="background:#f8fafc"], html[dat
     .ui-tabella-schede tr { border: 1px solid var(--ui-bordo); border-radius: 10px; padding: 8px 12px; margin-bottom: 10px; background: var(--ui-card); }
     .ui-tabella-schede td { border: 0; padding: 3px 0; }
     .ui-tabella-schede td[colspan] { text-align: center; }
+    /* collegamenti isolati (es. «Apri» nelle tessere del Cruscotto): area di tocco alta almeno 44 px senza cambiare il testo */
+    .ui-tocco { display: inline-flex; align-items: center; min-height: 44px; padding: 0 6px; }
 }

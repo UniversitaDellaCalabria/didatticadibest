@@ -110,6 +110,7 @@ lato docente; bozze delle pratiche; percorsi a passi per convenzione FSL e conve
 ### 1.1 «Da fare» è vuoto per chi non ha l'email
 
 > **Stato 31/10/2026: PARZIALE.** Per ora solo il tutor senza email vede «Incarico da accettare» (per codice fiscale); le altre fonti restano per email: serve ancora `IdentitaPersona`.
+> **Chiusa il 1/11/2026 così:** le altre fonti (firme, pratiche, convenzioni, prenotazioni) cercano per l'email con cui la persona è stata invitata o ha compilato: senza email non c'è nulla da cui riconoscerla, anche con un oggetto `IdentitaPersona`. La cura vera è che ognuno abbia un'email verificata (0.1, e la voce «utenti senza email affidabile» di 7.2 la segue nel tempo). Nessuna modifica di codice.
 - **Problema.** `DaFarePersona::gruppi()` restituisce `[]` se l'email è vuota (`src/Portale/DaFarePersona.php:36-38`). Tutte le fonti cercano per email.
 - **Impatto.** Il 32% degli utenti (quasi tutti studenti) non vede nessun compito, anche quelli legati al codice fiscale (tutor).
 - **Soluzione.** Le fonti ricevono l'oggetto `Identita` (email affidabili + CF + persona_id + utente_id) e cercano per tutto ciò che hanno.
@@ -449,6 +450,7 @@ caricarle alla prima apertura come fatto in `admin/utenti.php` (`?scheda=ID`).
 
 **5.4 Compressione e cache sul server** (S, sul server): il `.htaccess` locale ha `mod_deflate` e `mod_expires` (righe 32-44) ma la misura del 30/10 sul sito vero
 non trovava compressione né cache: verificare che i moduli Apache siano attivi e che `AllowOverride` permetta queste direttive nella cartella del portale.
+  *Stato 1/11/2026:* nel codice non c'è altro da fare (le regole ci sono e sono protette da `<IfModule>`); resta la verifica sul server, che spetta a chi lo amministra: `/opt/lampp/bin/apachectl -M | grep -E 'deflate|expires|headers|rewrite'` deve elencare i quattro moduli (altrimenti togliere il `#` dalle righe `LoadModule` in `/opt/lampp/etc/httpd.conf`), la cartella del portale deve avere `AllowOverride All`, poi `sudo /opt/lampp/lampp reloadapache`. Prova: `curl -sI -H 'Accept-Encoding: gzip' <sito>/assets/css/portale-ui.css` deve mostrare `Content-Encoding: gzip` e `Expires`.
 
 **5.5 `master_template.php` (2.517 righe)** (L, a pezzi): estrarre il flusso di prenotazione (validazione, posti, lista d'attesa, email) in `src/Iscrizioni` con prove,
 lasciando nella pagina solo il disegno. Da fare dopo le fasi 0-3.
@@ -461,14 +463,15 @@ lasciando nella pagina solo il disegno. Da fare dopo le fasi 0-3.
 - **6.1** Passata con axe-core (come già fatto il 25/09) sulle pagine per profilo: `area_personale.php`, `da_fare.php`, `firme.php`, `miei_eventi.php`, `programma_fsl.php`,
   `convenzione_online.php`, `elenco_studenti.php`, `convenzione_tesi.php`, `modulo.php`, `pratiche.php`, `il_mio_tutorato.php`, `registro_tutorato.php`,
   `dichiarazione_tutorato.php`, `conferma_attestato.php`, `cruscotto_direttore.php`. Zero errori «serious/critical». (M)
+  *Stato 1/11/2026:* passate con axe-core (chiaro e scuro) tutte le pagine con dati in locale; l'ultima, `modulo.php`, aveva un contrasto basso nei passi non ancora fatti (grigio su grigio chiaro), corretto in `ServizioIter` e `admin/tutorato.php`. `convenzione_online.php`, `elenco_studenti.php` e `conferma_attestato.php` si aprono solo con un link o una prenotazione che in locale non ci sono: da ripassare sul sito vero con un link reale.
   *Stato 1/11/2026:* passata con axe-core 4.9.1 sull'ambiente locale (tema chiaro e scuro, anche a 375 px) su `area_personale`, `da_fare`, `miei_eventi`, `pratiche`, `profilo`, `programma_fsl`, `il_mio_tutorato`, `firme`, `dichiarazione_tutorato` e `registro_tutorato`: 0 errori serious/critical dopo aver corretto i contrasti del tema scuro (etichette, `btn-outline-primary`, `btn-link`) in `portale-ui.css`. Non passate: `convenzione_online`, `elenco_studenti`, `modulo`, `conferma_attestato`, `cruscotto_direttore` (servono i link personali o utenti con quei ruoli).
 - **6.2** Moduli lunghi (`convenzione_online.php`, `dichiarazione_tutorato.php`, `convenzione_tesi.php`): salvataggio automatico della bozza ogni 30 secondi e avviso se si
   lascia la pagina con modifiche non salvate. (M)
   *Stato 1/11/2026:* fatto l'avviso prima di lasciare la pagina con modifiche non salvate (`ui_avviso_modifiche()`, su `convenzione_online`, `dichiarazione_tutorato`, `convenzione_tesi`). **Decisione 1/11/2026: bozza sul server solo per le convenzioni** (non per la dichiarazione del tutor: IBAN e dati personali). Fatta (schema v117): tabella `bozze_moduli`, `BozzaModulo`, endpoint `salva_bozza.php` (POST + codice di sicurezza + link personale esistente), `ui_bozza_automatica()` ogni 30 secondi e ripresa della bozza con l'ora in `convenzione_tesi.php` e `convenzione_online.php`; la bozza si cancella al salvataggio e dopo 30 giorni. Prova `bozza_modulo.php`, verificato nel browser locale.
 - **6.3** Tema scuro e stile comune anche sulle pagine raggiunte dall'area personale che oggi non lo hanno (`registro_tutorato.php`, pagine di firma). (S)
-  *Stato 1/11/2026:* `registro_tutorato.php` ora segue il tema scuro; le pagine di firma (link personali, anche da persone senza accesso) restano chiare finché non si sono viste in scuro.
+  *Stato 1/11/2026:* `registro_tutorato.php` ora segue il tema scuro; le pagine di firma (link personali, anche da persone senza accesso) restano chiare **per scelta**: sono documenti da leggere e firmare, chi le apre da un link non ha un profilo in cui scegliere il tema, e le loro tabelle e riquadri hanno colori propri non pensati per lo scuro. Chiusa così.
 - **6.4** Telefono: le tabelle del registro e del Cruscotto diventano schede sotto i 576 px; pulsanti alti almeno 44 px. (S)
-  *Stato 1/11/2026:* fatto il meccanismo in `portale-ui.css` (classe `ui-tabella-schede` sotto 576 px, pulsanti da 44 px) e applicato alla tabella di `registro_tutorato.php`; da estendere al Cruscotto dopo averlo visto sul telefono.
+  *Stato 1/11/2026:* fatto il meccanismo in `portale-ui.css` (classe `ui-tabella-schede` sotto 576 px, pulsanti da 44 px) e applicato alla tabella di `registro_tutorato.php`; Cruscotto visto a 375 px: nessuna tabella (sono già tessere che si impilano), nessuno scorrimento orizzontale; i collegamenti «Apri» e «Direttore assente?» ora hanno area di tocco di 44 px (`.ui-tocco`).
 
 ---
 
