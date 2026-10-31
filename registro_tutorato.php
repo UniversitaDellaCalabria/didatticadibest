@@ -33,6 +33,7 @@ if ($i && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $page_cfg['titolo'] = 'Registro delle attività di tutorato';
 require_once 'header.php';
+echo ui_tema_script();
 ?>
 <div class="container my-4" style="max-width: 1050px;">
     <nav aria-label="Percorso" class="mb-3 small"><a href="area_personale.php">Area personale</a> <span class="text-secondary mx-1">/</span> <span class="text-secondary">Registro delle attività di tutorato</span></nav>

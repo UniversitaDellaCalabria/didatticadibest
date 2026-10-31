@@ -458,6 +458,7 @@ lasciando nella pagina solo il disegno. Da fare dopo le fasi 0-3.
 - **6.2** Moduli lunghi (`convenzione_online.php`, `dichiarazione_tutorato.php`, `convenzione_tesi.php`): salvataggio automatico della bozza ogni 30 secondi e avviso se si
   lascia la pagina con modifiche non salvate. (M)
 - **6.3** Tema scuro e stile comune anche sulle pagine raggiunte dall'area personale che oggi non lo hanno (`registro_tutorato.php`, pagine di firma). (S)
+  *Stato 1/11/2026:* `registro_tutorato.php` ora segue il tema scuro; le pagine di firma (link personali, anche da persone senza accesso) restano chiare finché non si sono viste in scuro.
 - **6.4** Telefono: le tabelle del registro e del Cruscotto diventano schede sotto i 576 px; pulsanti alti almeno 44 px. (S)
   *Stato 1/11/2026:* fatto il meccanismo in `portale-ui.css` (classe `ui-tabella-schede` sotto 576 px, pulsanti da 44 px) e applicato alla tabella di `registro_tutorato.php`; da estendere al Cruscotto dopo averlo visto sul telefono.
 
