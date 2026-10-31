@@ -326,4 +326,20 @@ $icona_bk = fn($ok) => $ok === false ? '<i class="fa fa-circle-xmark text-danger
     <?php endif; ?>
 </div>
 
+<?php $mis_sis = \App\Core\App::per($conn)->get(\App\Sistema\MisureSistema::class); $fermi_sis = $mis_sis->compitiFermi(); $fd_sis = $mis_sis->giorniMediFirmaDirettore(); ?>
+<div class="card shadow-sm border-0 p-4 mt-4" id="misure">
+    <h5 class="fw-bold text-primary m-0 border-bottom pb-3 mb-3"><i class="fa fa-gauge-high me-1"></i> Misure da seguire nel tempo</h5>
+    <p class="small text-secondary">Quattro numeri che dicono se il portale funziona per le persone: devono scendere o restare bassi. Sono solo conteggi.</p>
+    <div class="row g-3">
+        <div class="col-md-6"><div class="border rounded p-3 h-100"><div class="display-6 fw-bold"><?php echo $mis_sis->utentiSenzaEmailAffidabile(); ?></div>
+            <div class="small text-secondary">Persone senza un'email affidabile (mancante, oppure scelta da loro e mai verificata): non ricevono gli avvisi.</div></div></div>
+        <div class="col-md-6"><div class="border rounded p-3 h-100"><div class="display-6 fw-bold"><?php echo $fd_sis['giorni'] === null ? '—' : number_format($fd_sis['giorni'], 1, ',', ''); ?></div>
+            <div class="small text-secondary">Giorni medi tra l'invio al Direttore e la sua firma (su <?php echo (int)$fd_sis['n']; ?> documenti firmati: lettere di tutorato e convenzioni di tesi).</div></div></div>
+        <div class="col-md-6"><div class="border rounded p-3 h-100"><div class="display-6 fw-bold"><?php echo $mis_sis->incarichiConRegistroVuoto(); ?></div>
+            <div class="small text-secondary">Incarichi di tutorato firmati con il registro delle attività ancora vuoto.</div></div></div>
+        <div class="col-md-6"><div class="border rounded p-3 h-100"><div class="fw-bold mb-1">Compiti fermi da più di <?php echo \App\Sistema\MisureSistema::GIORNI_FERMI; ?> giorni</div>
+            <ul class="list-unstyled small mb-0"><?php foreach ($fermi_sis as $f_sis): ?><li><span class="fw-bold"><?php echo (int)$f_sis['n']; ?></span> · <?php echo htmlspecialchars($f_sis['titolo']); ?></li><?php endforeach; ?></ul></div></div>
+    </div>
+</div>
+
 <?php require_once 'admin_footer.php'; ?>
