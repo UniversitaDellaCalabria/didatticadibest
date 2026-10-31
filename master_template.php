@@ -195,70 +195,11 @@ $eventi_per_categoria = [];
 $eventi_by_id = [];
 
 $eventi_area = $pagina_repo->eventiPubblici($p_id);
-if ($eventi_area) {
-    foreach ($eventi_area as $ev) {
-        $turni = [];
-        foreach ($pagina_repo->turniDelEvento((int)$ev['id']) as $t) {
-            $turni[] = $t;
-            
-            // Popolamento lista Piatta (Flat)
-            $t_flat = $t;
-            $t_flat['evento_titolo'] = $ev['titolo'];
-            $t_flat['evento_luogo'] = $ev['luogo'];
-            $t_flat['evento_descrizione'] = $ev['descrizione'];
-            $t_flat['evento_locandina'] = $ev['locandina_path'];
-            $t_flat['richiede_prenotazione'] = $ev['richiede_prenotazione'];
-            $t_flat['ruolo_accesso_id'] = $ev['ruolo_accesso_id'];
-            $t_flat['categoria'] = $ev['nome_sottocategoria'] ?: 'Altre Attività';
-            $t_flat['evento_id'] = $ev['id'];
-            $t_flat['is_evidenza'] = $ev['is_evidenza'];
-            $t_flat['evento_tipo'] = $ev['tipo'] ?? 'evento';
-            $all_turni_flat[] = $t_flat;
-
-            // Popolamento Eventi per FullCalendar (solo turni con data)
-            if (!empty($t['data_turno'])) {
-                $json_events_calendar[] = [
-                    'id' => 'turno_' . $t['id'],
-                    'title' => htmlspecialchars_decode($ev['titolo']) . (!empty($t['nome_turno']) ? ' – ' . $t['nome_turno'] : ''),
-                    'start' => $t['data_turno'] . (!empty($t['orario_inizio']) ? 'T' . $t['orario_inizio'] : ''),
-                    'end' => !empty($t['orario_fine']) ? $t['data_turno'] . 'T' . $t['orario_fine'] : null,
-                    'allDay' => empty($t['orario_inizio']),
-                    'color' => $col_primaria,
-                    'extendedProps' => ['turno_id' => $t['id'], 'luogo' => htmlspecialchars_decode($ev['luogo'])]
-                ];
-            }
-        }
-        $ev['turni'] = $turni;
-        $eventi_by_id[(int)$ev['id']] = $ev;
-        $eventi_per_categoria[$ev['nome_sottocategoria'] ?: 'Altri gruppi'][] = $ev;
-
-        if ((int)$ev['is_evidenza'] === 1 && $evento_evidenza === null) {
-            $evento_evidenza = $ev; 
-            continue; 
-        }
-
-        $sezione = $ev['nome_sottocategoria'] ? $ev['nome_sottocategoria'] : 'Altre Attività';
-        // Sezione affiancata in alto nel layout Griglia: opzione della sezione (admin > Eventi > Sezioni)
-        $e_superiore = (int)($ev['affiancata_in_alto'] ?? 0) === 1;
-        if ($e_superiore) {
-            $sezioni_superiori[$sezione][] = $ev;
-        } else {
-            $eventi_macro[] = $ev;
-        }
-
-        if (!empty($turni)) {
-            foreach ($turni as $t) {
-                $d = !empty($t['data_turno']) ? $t['data_turno'] : '9999-12-31';
-                $ev_giorno = $ev; $ev_giorno['turni'] = [$t]; 
-                $eventi_per_data[$d][] = $ev_giorno;
-            }
-        } else {
-            $ev_giorno = $ev; $ev_giorno['turni'] = []; 
-            $eventi_per_data['9999-12-31'][] = $ev_giorno;
-        }
-    }
-}
-ksort($eventi_per_data);
+// Raggruppamenti per i disegni della pagina (turni piatti, calendario, categorie, giorni, evidenza): src/Iscrizioni/ElencoEventiArea
+$elenco_area = \App\Iscrizioni\ElencoEventiArea::costruisci($eventi_area ?: [], fn(int $evento_id) => $pagina_repo->turniDelEvento($evento_id), $col_primaria);
+$all_turni_flat = $elenco_area['all_turni_flat']; $json_events_calendar = $elenco_area['json_events_calendar']; $eventi_by_id = $elenco_area['eventi_by_id'];
+$eventi_per_categoria = $elenco_area['eventi_per_categoria']; $evento_evidenza = $elenco_area['evento_evidenza']; $sezioni_superiori = $elenco_area['sezioni_superiori'];
+$eventi_macro = $elenco_area['eventi_macro']; $eventi_per_data = $elenco_area['eventi_per_data'];
 
 // PROGETTI: schede (periodo, referenti, limiti di studenti…) e progetto richiesto con ?progetto=ID
 $dettagli_progetti = get_dettagli_progetti($conn, array_keys($eventi_by_id));

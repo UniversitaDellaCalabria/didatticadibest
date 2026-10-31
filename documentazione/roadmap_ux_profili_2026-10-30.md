@@ -450,6 +450,7 @@ non trovava compressione né cache: verificare che i moduli Apache siano attivi 
 
 **5.5 `master_template.php` (2.517 righe)** (L, a pezzi): estrarre il flusso di prenotazione (validazione, posti, lista d'attesa, email) in `src/Iscrizioni` con prove,
 lasciando nella pagina solo il disegno. Da fare dopo le fasi 0-3.
+  *Stato 1/11/2026:* il flusso di prenotazione (controlli, posti, lista d'attesa, email) **era già** in `src/Iscrizioni/ServizioPrenotazioni`. Estratto ora il raggruppamento degli eventi e dei turni per i vari disegni (`src/Iscrizioni/ElencoEventiArea`, prova `elenco_eventi_area.php`; -60 righe in `master_template.php`, verificato su OpenLab, FSL e Orientamento). Restano nella pagina le chiusure di disegno (card, modali, pulsanti): spostarle in `Vista/` ha senso solo con prove di resa per ogni layout, quindi si ferma qui.
 
 ---
 
