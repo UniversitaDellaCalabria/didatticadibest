@@ -46,3 +46,11 @@ foreach (\App\Portale\Area\CatalogoRiquadri::sistema() as $chiave_ms => $r_ms) {
     }
 }
 prova($senza_file_ms === [], "area personale: ogni riquadro speciale ha il suo file in inc/area", implode(', ', $senza_file_ms));
+
+sezione("Database: contatore delle query");
+$db_ms = \App\Core\Database::per($conn);
+$n0_ms = \App\Core\Database::numeroQuery();
+$db_ms->valore('SELECT 1');
+$db_ms->righe('SELECT 1 UNION SELECT 2');
+$db_ms->comando('SELECT 1');
+prova(\App\Core\Database::numeroQuery() === $n0_ms + 3, "contatore: ogni query conta una volta (valore, righe, comando)");

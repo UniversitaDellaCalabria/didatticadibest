@@ -24,8 +24,17 @@ final class Database
     /** @var WeakMap<mysqli, Database>|null istanze per connessione (la stessa connessione → lo stesso oggetto) */
     private static ?WeakMap $istanze = null;
 
+    /** Query eseguite finora in questa richiesta (per misurare le pagine: vedi numeroQuery()). */
+    private static int $numeroQuery = 0;
+
     public function __construct(private mysqli $conn)
     {
+    }
+
+    /** Quante query sono partite dall'inizio della richiesta: serve a misurare le pagine (obiettivo dell'area personale: meno di 25). */
+    public static function numeroQuery(): int
+    {
+        return self::$numeroQuery;
     }
 
     /** L'oggetto Database di una connessione (usato dalle facciate procedurali che ricevono ancora $conn). */
@@ -53,6 +62,7 @@ final class Database
      */
     public function grezza(string $sql, array $parametri = []): mysqli_result|mysqli_stmt|false
     {
+        self::$numeroQuery++;
         $st = $this->conn->prepare($sql);
         if (!$st) {
             return false;
@@ -147,6 +157,8 @@ final class Database
      */
     public function comando(string $sql): mysqli_result|bool
     {
+        self::$numeroQuery++;
+
         return $this->conn->query($sql);
     }
 

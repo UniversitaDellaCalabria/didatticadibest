@@ -437,6 +437,7 @@ spiega dove trovare il compito.
 **5.2 Area personale: meno query per pagina** (M)
 - **Soluzione.** Misurare (contatore di query in modalità sviluppo nel wrapper `Database`); memorizzare per la durata della richiesta i risultati condivisi
   (profili, identità, prenotazioni usate da più tessere); i totali «Da fare» in sessione per 5 minuti (1.4). Obiettivo: area personale sotto 25 query.
+  *Stato 1/11/2026:* fatto il contatore `Database::numeroQuery()` (ogni query conta una volta). Manca la misura dell'area personale sul sito vero e, di conseguenza, la memorizzazione dei risultati condivisi: va decisa guardando i numeri.
 
 **5.3 Pagine con tante finestre già pronte** (S): `miei_eventi.php` crea due finestre modali per ogni prenotazione (chat e modifica, righe 361-446 e 579-593):
 caricarle alla prima apertura come fatto in `admin/utenti.php` (`?scheda=ID`).
