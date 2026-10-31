@@ -16,6 +16,19 @@ final class InsegnamentoRepository
     {
     }
 
+    /**
+     * Condizione SQL sui moduli degli integrati: 'semplici' = insegnamenti e moduli, senza le righe degli integrati (come prima);
+     * 'scelta' = insegnamenti singoli e integrati, senza i loro moduli (si sceglie l'integrato); 'tutti' = tutto.
+     */
+    private static function filtroLivello(string $livello): string
+    {
+        return match ($livello) {
+            'scelta' => ' AND (e_integrato = 1 OR padre_id IS NULL)',
+            'tutti' => '',
+            default => ' AND e_integrato = 0',
+        };
+    }
+
     /** Codice del proprio dipartimento (la prima struttura dell'anagrafe), null se l'anagrafe è vuota: per gli elenchi che non devono mostrare tutto l'Ateneo */
     public function dipartimentoProprio(): ?string
     {
@@ -54,17 +67,39 @@ final class InsegnamentoRepository
         $this->db->esegui('DELETE FROM insegnamenti WHERE anno_accademico < ?', [min($annoAccademico, self::PRIMO_ANNO_ARCHIVIO) - 1]);
     }
 
+    /**
+     * Riga dell'integrato (id del padre nelle API) con i dati ricavati dai suoi moduli.
+     *
+     * @param array<string, mixed> $i riga con le colonne di insegnamenti
+     */
+    public function salvaIntegrato(array $i): void
+    {
+        $this->db->esegui(
+            'INSERT INTO insegnamenti (id, codice, nome, cds_cod, cds_nome, anno_corso, anno_accademico, coorte, semestre, ssd_cod, ssd, lingua, docente, docente_id, partizione, padre_id, padre_nome, dipartimento_cod, dipartimento, link, e_integrato, presente, aggiornato_il)
+                              VALUES (?, \'\', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \'\', \'\', \'\', NULL, \'\', ?, ?, \'\', 1, 1, NOW())
+                              ON DUPLICATE KEY UPDATE nome=VALUES(nome), cds_cod=VALUES(cds_cod), cds_nome=VALUES(cds_nome), anno_corso=VALUES(anno_corso), anno_accademico=VALUES(anno_accademico), coorte=VALUES(coorte),
+                                semestre=VALUES(semestre), ssd_cod=VALUES(ssd_cod), ssd=VALUES(ssd), lingua=VALUES(lingua), dipartimento_cod=VALUES(dipartimento_cod), dipartimento=VALUES(dipartimento), e_integrato=1, presente=1, aggiornato_il=NOW()',
+            [$i['id'], $i['nome'], $i['cds_cod'], $i['cds_nome'], $i['anno_corso'], $i['anno_accademico'], $i['coorte'], $i['semestre'], $i['ssd_cod'], $i['ssd'], $i['lingua'], $i['dipartimento_cod'], $i['dipartimento']]
+        );
+    }
+
+    /** CFU degli integrati = somma dei CFU dei moduli (vuoti finché manca quello di un modulo) */
+    public function ricalcolaCfuIntegrati(): void
+    {
+        $this->db->esegui('UPDATE insegnamenti p SET p.cfu = (SELECT IF(COUNT(m.cfu) = COUNT(*), SUM(m.cfu), NULL) FROM (SELECT padre_id, cfu FROM insegnamenti WHERE padre_id IS NOT NULL AND presente = 1) m WHERE m.padre_id = p.id) WHERE p.e_integrato = 1');
+    }
+
     /** @return list<int> id degli insegnamenti i cui CFU non sono ancora stati scaricati dal dettaglio (o da più di 90 giorni) */
     public function daCompletare(int $max): array
     {
         return array_map(static fn (array $r): int => (int) $r['id'], $this->db->righe(
-            'SELECT id FROM insegnamenti WHERE presente = 1 AND (dettaglio_il IS NULL OR dettaglio_il < NOW() - INTERVAL 90 DAY) ORDER BY anno_accademico, id LIMIT ' . max(1, $max)
+            'SELECT id FROM insegnamenti WHERE presente = 1 AND e_integrato = 0 AND (dettaglio_il IS NULL OR dettaglio_il < NOW() - INTERVAL 90 DAY) ORDER BY anno_accademico, id LIMIT ' . max(1, $max)
         ));
     }
 
     public function quantiDaCompletare(): int
     {
-        return (int) ($this->db->valore('SELECT COUNT(*) n FROM insegnamenti WHERE presente = 1 AND (dettaglio_il IS NULL OR dettaglio_il < NOW() - INTERVAL 90 DAY)') ?? 0);
+        return (int) ($this->db->valore('SELECT COUNT(*) n FROM insegnamenti WHERE presente = 1 AND e_integrato = 0 AND (dettaglio_il IS NULL OR dettaglio_il < NOW() - INTERVAL 90 DAY)') ?? 0);
     }
 
     /** Segna scaricato il dettaglio di un insegnamento, con i CFU se indicati */
@@ -82,7 +117,7 @@ final class InsegnamentoRepository
     /** $dip: solo i corsi di quel dipartimento, null = tutto l'Ateneo */
     public function contaPresenti(int $anno, ?string $dip = null): int
     {
-        return (int) ($this->db->valore('SELECT COUNT(*) n FROM insegnamenti WHERE presente = 1 AND anno_accademico = ?' . ($dip !== null ? ' AND (dipartimento_cod = ? OR dipartimento_cod = \'\')' : ''), $dip !== null ? [$anno, $dip] : [$anno]) ?? 0);
+        return (int) ($this->db->valore('SELECT COUNT(*) n FROM insegnamenti WHERE presente = 1 AND e_integrato = 0 AND anno_accademico = ?' . ($dip !== null ? ' AND (dipartimento_cod = ? OR dipartimento_cod = \'\')' : ''), $dip !== null ? [$anno, $dip] : [$anno]) ?? 0);
     }
 
     public function annoPiuRecente(?string $dip = null): int
@@ -97,19 +132,19 @@ final class InsegnamentoRepository
     }
 
     /** @return list<array<string, mixed>> insegnamenti presenti di un anno, per corso ($dip: solo di un dipartimento, null = tutto l'Ateneo) */
-    public function dellAnno(int $anno, ?string $dip = null): array
+    public function dellAnno(int $anno, ?string $dip = null, string $livello = 'semplici'): array
     {
-        return $this->db->righe('SELECT * FROM insegnamenti WHERE presente = 1 AND anno_accademico = ?' . ($dip !== null ? ' AND (dipartimento_cod = ? OR dipartimento_cod = \'\')' : '') . ' ORDER BY cds_nome, anno_corso, nome, partizione', $dip !== null ? [$anno, $dip] : [$anno]);
+        return $this->db->righe('SELECT * FROM insegnamenti WHERE presente = 1 AND anno_accademico = ?' . ($dip !== null ? ' AND (dipartimento_cod = ? OR dipartimento_cod = \'\')' : '') . self::filtroLivello($livello) . ' ORDER BY cds_nome, anno_corso, nome, partizione', $dip !== null ? [$anno, $dip] : [$anno]);
     }
 
     /**
-     * Insegnamenti per il pannello (al massimo 600) con le attività collegate non archiviate. $dip: solo di un dipartimento, null = tutto l'Ateneo.
+     * Insegnamenti per il pannello (al massimo 3000) con le attività collegate non archiviate. $dip: solo di un dipartimento, null = tutto l'Ateneo.
      *
      * @return list<array<string, mixed>>
      */
-    public function elenco(int $anno, string $cds, int $annoCorso, string $semestre, string $cerca, ?string $dip = null): array
+    public function elenco(int $anno, string $cds, int $annoCorso, string $semestre, string $cerca, ?string $dip = null, string $livello = 'semplici'): array
     {
-        $where = ['presente = 1', 'anno_accademico = ?'];
+        $where = ['presente = 1', 'anno_accademico = ?', ltrim(self::filtroLivello($livello), ' AND') ?: '1 = 1'];
         $par = [$anno];
         if ($dip !== null) {
             $where[] = "(dipartimento_cod = ? OR dipartimento_cod = '')";
@@ -135,7 +170,7 @@ final class InsegnamentoRepository
 
         return $this->db->righe(
             'SELECT i.*, (SELECT COUNT(*) FROM progetti_dettagli d JOIN eventi e ON e.id = d.evento_id WHERE d.insegnamento_id = i.id AND e.archiviato = 0) AS n_att
-                            FROM insegnamenti i WHERE ' . implode(' AND ', $where) . ' ORDER BY cds_nome, anno_corso, nome, partizione LIMIT 600',
+                            FROM insegnamenti i WHERE ' . implode(' AND ', $where) . ' ORDER BY cds_nome, anno_corso, e_integrato DESC, padre_nome, nome, partizione LIMIT 3000',
             $par
         );
     }
@@ -161,6 +196,6 @@ final class InsegnamentoRepository
     /** @return list<array<string, mixed>> insegnamenti di un corso e di una coorte (ripiego del catalogo di Ateneo) */
     public function perCorsoECoorte(string $cds, int $coorte): array
     {
-        return $this->db->righe('SELECT id, nome, codice, cfu, ssd_cod, ssd, anno_corso, partizione, semestre, padre_id, padre_nome, link, docente FROM insegnamenti WHERE cds_cod = ? AND coorte = ? ORDER BY anno_corso, nome, partizione', [$cds, $coorte]);
+        return $this->db->righe('SELECT id, nome, codice, cfu, ssd_cod, ssd, anno_corso, partizione, semestre, padre_id, padre_nome, link, docente FROM insegnamenti WHERE cds_cod = ? AND coorte = ? AND e_integrato = 0 ORDER BY anno_corso, nome, partizione', [$cds, $coorte]);
     }
 }

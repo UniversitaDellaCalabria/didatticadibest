@@ -808,6 +808,8 @@ final class Definizioni
             'padre_nome'   => "ADD COLUMN padre_nome VARCHAR(255) DEFAULT ''",
             'link'         => "ADD COLUMN link VARCHAR(500) DEFAULT ''",
             'dettaglio_il' => "ADD COLUMN dettaglio_il DATETIME DEFAULT NULL",
+            // v119: riga dell'insegnamento integrato (id = quello del padre nelle API) di cui gli altri insegnamenti sono moduli (padre_id)
+            'e_integrato'  => "ADD COLUMN e_integrato TINYINT(1) NOT NULL DEFAULT 0",
         ],
         'ateneo_insegnamenti' => [
             // v118: come l'archivio, per scegliere l'integrato (padre_*), mostrare il link e sapere quando sono stati scaricati i CFU

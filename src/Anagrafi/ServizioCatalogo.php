@@ -176,6 +176,16 @@ final class ServizioCatalogo
     }
 
     /**
+     * Insegnamenti di un corso per la scelta nei moduli: singoli e integrati con i loro moduli (Testi::raggruppaIntegrati).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function insegnamentiPerScelta(string $cds, int $coorte, bool $scarica = true): array
+    {
+        return Testi::raggruppaIntegrati($this->insegnamenti($cds, $coorte, $scarica));
+    }
+
+    /**
      * Salva gli insegnamenti arrivati dalle API per un corso e un anno di offerta (solo quelli di quel corso).
      *
      * @param list<array<string, mixed>> $el
@@ -228,7 +238,7 @@ final class ServizioCatalogo
             $arrivati = 0;
             foreach ($percorsi as $id => $p) {
                 $d = $risp[$p] ?? null;
-                if (is_array($d) && is_array($d['results'] ?? null)) {
+                if (is_array($d)) {
                     $arrivati++;
                 }
             }
@@ -242,6 +252,7 @@ final class ServizioCatalogo
                 $this->catalogo->salvaDettaglio($id, $cfu);
                 $fatti++;
             }
+            $this->insegnamenti->ricalcolaCfuIntegrati();
         }
 
         return $fatti;

@@ -66,8 +66,10 @@ final class ClientApiAteneoHttp implements ClientApiAteneo, ClientApiAteneoMulti
         } while ($attivi && $stato === CURLM_OK);
         foreach ($manici as $p => $ch) {
             $corpo = curl_multi_getcontent($ch);
-            $j = curl_getinfo($ch, CURLINFO_HTTP_CODE) === 200 && is_string($corpo) && $corpo !== '' ? json_decode($corpo, true) : null;
-            $out[$p] = is_array($j) ? $j : null;
+            $codice = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $j = $codice === 200 && is_string($corpo) && $corpo !== '' ? json_decode($corpo, true) : null;
+            // 404 = la scheda non esiste (array vuoto), diverso da una rete che non risponde (null)
+            $out[$p] = is_array($j) ? $j : ($codice === 404 ? [] : null);
             curl_multi_remove_handle($multi, $ch);
             curl_close($ch);
         }

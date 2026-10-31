@@ -191,18 +191,26 @@ $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
     $aa_disp = $r_insegnamenti->anniPresenti();
     $f_aa = (int)($_GET['aa'] ?? 0); if (!in_array($f_aa, $aa_disp, true)) $f_aa = in_array(anno_accademico_corrente(), $aa_disp, true) ? anno_accademico_corrente() : (int)(end($aa_disp) ?: 0);
     $f_cds = (string)($_GET['cds'] ?? ''); $f_anno = (int)($_GET['anno'] ?? 0); $f_sem = (string)($_GET['sem'] ?? ''); $f_q = trim((string)($_GET['q'] ?? ''));
-    $ins = $r_insegnamenti->elenco($f_aa, $f_cds, $f_anno, $f_sem, $f_q);
-    $opz_cds = $r_insegnamenti->corsiDellAnno($f_aa);
+    // Di solito i corsi del proprio dipartimento; "ateneo" = l'archivio di tutto l'Ateneo (tutti i dipartimenti)
+    $dip_proprio = $r_insegnamenti->dipartimentoProprio();
+    $opz_dip = $r_insegnamenti->dipartimentiDellAnno($f_aa);
+    $f_dip = (string)($_GET['dip'] ?? ($dip_proprio ?? 'ateneo'));
+    if ($f_dip !== 'ateneo' && !in_array($f_dip, array_column($opz_dip, 'dipartimento_cod'), true)) $f_dip = $dip_proprio !== null && in_array($dip_proprio, array_column($opz_dip, 'dipartimento_cod'), true) ? $dip_proprio : 'ateneo';
+    $dip_sel = $f_dip === 'ateneo' ? null : $f_dip;
+    $ins = $r_insegnamenti->elenco($f_aa, $f_cds, $f_anno, $f_sem, $f_q, $dip_sel, 'tutti');
+    $opz_cds = $r_insegnamenti->corsiDellAnno($f_aa, $dip_sel);
     $opz_sem = $r_insegnamenti->semestri();
 ?>
 <section class="ana-sez">
     <h2><i class="fa fa-book-open me-1" aria-hidden="true"></i>Insegnamenti <?php echo $f_aa ? $f_aa . '/' . ($f_aa + 1) : ''; ?></h2>
-    <p class="small text-secondary">Insegnamenti tenuti nell'anno accademico, per tutti i corsi di studio del Dipartimento, con anno di corso, semestre, settore e docente titolare. Nelle aree <strong>Gruppi degli insegnamenti</strong> un'attività si crea partendo da qui: titolo, corso e docente arrivano da soli.</p>
+    <p class="small text-secondary">Archivio degli insegnamenti di Ateneo tenuti dall'anno accademico 2026/2027, di tutti i corsi di studio: codice, descrizione, S.S.D., CFU, semestre, corso di studio con il suo codice e link alla pagina dell'insegnamento sul portale di Ateneo. Un insegnamento <strong>integrato</strong> compare con i suoi <strong>moduli</strong> sotto. Nelle aree <strong>Gruppi degli insegnamenti</strong> un'attività si crea partendo da qui: si sceglie l'integrato, non i singoli moduli.</p>
     <?php if (!$aa_disp): ?>
         <p class="text-muted small mb-0">Nessun insegnamento: premi <strong>Aggiorna ora dal portale</strong>.</p>
     <?php else: ?>
     <form method="GET" class="row g-2 align-items-end mb-3">
         <input type="hidden" name="p_id" value="<?php echo (int)$filtro_p; ?>"><input type="hidden" name="vista" value="insegnamenti">
+        <div class="col-md-3"><label class="form-label small fw-bold mb-1" for="fiDip">Dipartimento</label>
+            <select name="dip" id="fiDip" class="form-select form-select-sm"><option value="ateneo" <?php echo $f_dip === 'ateneo' ? 'selected' : ''; ?>>Tutto l'Ateneo</option><?php foreach ($opz_dip as $o): ?><option value="<?php echo $h($o['dipartimento_cod']); ?>" <?php echo $o['dipartimento_cod'] === $f_dip ? 'selected' : ''; ?>><?php echo $h($o['dipartimento'] . ' (' . $o['n'] . ')'); ?></option><?php endforeach; ?></select></div>
         <div class="col-6 col-md-2"><label class="form-label small fw-bold mb-1" for="fiAa">Anno accademico</label>
             <select name="aa" id="fiAa" class="form-select form-select-sm"><?php foreach ($aa_disp as $a): ?><option value="<?php echo $a; ?>" <?php echo $a === $f_aa ? 'selected' : ''; ?>><?php echo $a . '/' . ($a + 1); ?></option><?php endforeach; ?></select></div>
         <div class="col-md-4"><label class="form-label small fw-bold mb-1" for="fiCds">Corso di studio</label>
@@ -211,25 +219,28 @@ $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
             <select name="anno" id="fiAnno" class="form-select form-select-sm"><option value="0">Tutti</option><?php for ($a = 1; $a <= 6; $a++): ?><option value="<?php echo $a; ?>" <?php echo $a === $f_anno ? 'selected' : ''; ?>><?php echo $a; ?>°</option><?php endfor; ?></select></div>
         <div class="col-6 col-md-2"><label class="form-label small fw-bold mb-1" for="fiSem">Semestre</label>
             <select name="sem" id="fiSem" class="form-select form-select-sm"><option value="">Tutti</option><?php foreach ($opz_sem as $o): ?><option value="<?php echo $h($o); ?>" <?php echo $o === $f_sem ? 'selected' : ''; ?>><?php echo $h($o); ?></option><?php endforeach; ?></select></div>
-        <div class="col-md-2"><label class="form-label small fw-bold mb-1" for="fiQ">Cerca</label><input type="search" name="q" id="fiQ" class="form-control form-control-sm" value="<?php echo $h($f_q); ?>" placeholder="Nome, docente, SSD"></div>
+        <div class="col-md-2"><label class="form-label small fw-bold mb-1" for="fiQ">Cerca</label><input type="search" name="q" id="fiQ" class="form-control form-control-sm" value="<?php echo $h($f_q); ?>" placeholder="Nome, codice, corso, SSD"></div>
         <div class="col-md-1 d-flex gap-1"><button class="btn btn-sm btn-primary fw-bold flex-grow-1" title="Filtra" aria-label="Filtra"><i class="fa fa-filter" aria-hidden="true"></i></button><a class="btn btn-sm btn-outline-secondary" href="<?php echo $h("$url_pagina&vista=insegnamenti"); ?>" title="Togli i filtri" aria-label="Togli i filtri"><i class="fa fa-xmark" aria-hidden="true"></i></a></div>
     </form>
     <div class="d-flex justify-content-between align-items-center mb-2 small">
-        <span class="text-secondary"><?php echo count($ins); ?> insegnamenti<?php echo count($ins) >= 600 ? ' (mostrati i primi 600: usa i filtri)' : ''; ?></span>
+        <span class="text-secondary"><?php echo count($ins); ?> insegnamenti<?php echo count($ins) >= 3000 ? ' (mostrati i primi 3000: usa i filtri)' : ''; ?></span>
         <?php echo pn_scarica_tabella('tabIns', 'Insegnamenti ' . $f_aa, 'insegnamenti_' . $f_aa); ?>
     </div>
     <div class="table-responsive">
         <table class="table table-sm align-middle small" id="tabIns">
-            <thead class="table-light"><tr><th>Insegnamento</th><th>Corso di studio</th><th class="text-center">Anno</th><th>Semestre</th><th>SSD</th><th>Docente</th><th class="text-center">Attività</th></tr></thead>
+            <thead class="table-light"><tr><th>Insegnamento</th><th>Codice</th><th>Corso di studio</th><?php if ($dip_sel === null): ?><th>Dipartimento</th><?php endif; ?><th class="text-center">Anno</th><th>Semestre</th><th>S.S.D.</th><th class="text-end">CFU</th><th>Link</th><th class="text-center">Attività</th></tr></thead>
             <tbody>
             <?php foreach ($ins as $i): ?>
                 <tr>
-                    <td><div class="fw-semibold"><?php echo $h($i['nome']); ?><?php if ($i['partizione'] !== ''): ?> <span class="badge bg-light text-dark border"><?php echo $h($i['partizione']); ?></span><?php endif; ?></div><div class="text-secondary font-monospace"><?php echo $h($i['codice']); ?></div></td>
-                    <td><?php echo $h($i['cds_nome']); ?></td>
+                    <td<?php echo $i['padre_id'] && !$i['e_integrato'] ? ' class="ps-4"' : ''; ?>><div class="fw-semibold"><?php echo $i['padre_id'] && !$i['e_integrato'] ? '↳ ' : ''; ?><?php echo $h($i['nome']); ?><?php if ($i['partizione'] !== ''): ?> <span class="badge bg-light text-dark border"><?php echo $h($i['partizione']); ?></span><?php endif; ?><?php if ($i['e_integrato']): ?> <span class="badge bg-info text-dark">integrato</span><?php elseif ($i['padre_id']): ?> <span class="badge bg-light text-dark border">modulo di <?php echo $h($i['padre_nome']); ?></span><?php endif; ?></div></td>
+                    <td class="font-monospace"><?php echo $h($i['codice'] ?: '—'); ?></td>
+                    <td><?php echo $h($i['cds_nome']); ?><?php if ($i['cds_cod'] !== ''): ?> <span class="text-secondary font-monospace">(<?php echo $h($i['cds_cod']); ?>)</span><?php endif; ?></td>
+                    <?php if ($dip_sel === null): ?><td class="small"><?php echo $h($i['dipartimento'] ?: '—'); ?></td><?php endif; ?>
                     <td class="text-center"><?php echo $i['anno_corso'] ? (int)$i['anno_corso'] . '°' : '—'; ?></td>
-                    <td><?php echo $h($i['semestre']); ?></td>
-                    <td><?php echo $h($i['ssd_cod']); ?></td>
-                    <td><?php echo $h($i['docente'] ?: '—'); ?></td>
+                    <td><?php echo $h($i['semestre'] ?: '—'); ?></td>
+                    <td><?php echo $h($i['ssd_cod'] ?: '—'); ?><?php if ($i['ssd'] !== '' && !$i['e_integrato']): ?><div class="text-secondary"><?php echo $h($i['ssd']); ?></div><?php endif; ?></td>
+                    <td class="text-end"><?php echo $i['cfu'] !== null ? $h(rtrim(rtrim(number_format((float)$i['cfu'], 1, ',', ''), '0'), ',')) : '—'; ?></td>
+                    <td><?php if ($i['link'] !== '' && !$i['e_integrato']): ?><a href="<?php echo $h($i['link']); ?>" target="_blank" rel="noopener noreferrer">Apri<span class="visually-hidden"> la pagina di <?php echo $h($i['nome']); ?></span></a><?php else: ?>—<?php endif; ?></td>
                     <td class="text-center"><?php echo (int)$i['n_att'] ?: '—'; ?></td>
                 </tr>
             <?php endforeach; ?>

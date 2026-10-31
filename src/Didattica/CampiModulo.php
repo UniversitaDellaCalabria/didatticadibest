@@ -128,6 +128,18 @@ final class CampiModulo
         if (preg_match('/^denominazion/u', $n)) {
             return 'denominazione';
         }
+        if (preg_match('/^semestre|^periodo/u', $n)) {
+            return 'semestre';
+        }
+        if (preg_match('/^codice\s+(del\s+)?(corso|cds|cdl)/u', $n)) {
+            return 'codice_corso';
+        }
+        if (preg_match('/^(corso|cds|cdl)\b/u', $n)) {
+            return 'corso';
+        }
+        if (preg_match('/^link|^pagina web/u', $n)) {
+            return 'link';
+        }
         if (preg_match('/^codice/u', $n)) {
             return 'codice';
         }

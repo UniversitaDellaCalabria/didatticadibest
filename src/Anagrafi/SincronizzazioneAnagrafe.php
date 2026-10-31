@@ -159,6 +159,7 @@ final class SincronizzazioneAnagrafe
             $elenchi[$coorte] = $el;
         }
         $visti = [];
+        $integrati = [];
         foreach ($elenchi as $coorte => $el) {
             $perCorso = [];
             foreach ($el as $r) {
@@ -173,8 +174,18 @@ final class SincronizzazioneAnagrafe
                 if ($erog < $dal || $erog > $aa + 1) {
                     continue;
                 }
-                $this->insegnamenti->salva($x + ['anno_accademico' => $erog, 'coorte' => $coorte, 'dipartimento_cod' => $x['dipartimento_cod'] !== '' ? $x['dipartimento_cod'] : (string) $dip]);
+                $x = $x + ['anno_accademico' => $erog, 'coorte' => $coorte];
+                $x['dipartimento_cod'] = $x['dipartimento_cod'] !== '' ? $x['dipartimento_cod'] : (string) $dip;
+                $this->insegnamenti->salva($x);
                 $visti[] = $x['id'];
+                if ($x['padre_id'] !== null) {
+                    // Integrato di cui è modulo: una riga nell'archivio con i dati dei suoi moduli
+                    $g = $integrati[$x['padre_id']] ?? array_merge($x, ['id' => $x['padre_id'], 'nome' => $x['padre_nome'] !== '' ? $x['padre_nome'] : 'Insegnamento integrato', 'ssd_cod' => '', 'ssd' => '', 'semestre' => '']);
+                    $g['ssd_cod'] = implode(', ', array_values(array_unique(array_filter(array_merge(explode(', ', $g['ssd_cod']), [$x['ssd_cod']])))));
+                    $g['ssd'] = implode(', ', array_values(array_unique(array_filter(array_merge(explode(', ', $g['ssd']), [$x['ssd']])))));
+                    $g['semestre'] = implode(' / ', array_values(array_unique(array_filter(array_merge(explode(' / ', $g['semestre']), [$x['semestre']])))));
+                    $integrati[$x['padre_id']] = $g;
+                }
             }
             // Catalogo dei moduli: tutto il percorso della coorte, per corso, senza che gli studenti debbano aspettare le API
             if ($dip === null) {
@@ -183,7 +194,12 @@ final class SincronizzazioneAnagrafe
                 }
             }
         }
+        foreach ($integrati as $g) {
+            $this->insegnamenti->salvaIntegrato(array_merge($g, ['ssd_cod' => mb_substr($g['ssd_cod'], 0, 20), 'ssd' => mb_substr($g['ssd'], 0, 150), 'semestre' => mb_substr($g['semestre'], 0, 60)]));
+            $visti[] = (int) $g['id'];
+        }
         $this->insegnamenti->segnaNonPresentiEPulisci($dip, $aa, $visti);
+        $this->insegnamenti->ricalcolaCfuIntegrati();
 
         return count($visti);
     }

@@ -390,17 +390,17 @@ form:not(.ev-form-classe) .ev-t-riga2 { grid-template-columns: repeat(3, 1fr); }
                         $dati_opt = fn($i) => ' data-nome="' . h($i['nome'] . ($i['partizione'] !== '' ? ' (' . $i['partizione'] . ')' : '')) . '" data-corso="' . h($i['cds_cod']) . '" data-corso-nome="' . h($i['cds_nome']) . '"'; ?>
                     <div class="col-12">
                         <label for="evIns" class="form-label small fw-bold"><i class="fa fa-book-open me-1" aria-hidden="true"></i>Insegnamento <span class="fw-normal text-muted">(anagrafe di Ateneo)</span></label>
-                        <input type="search" id="evInsCerca" class="form-control form-control-sm mb-1" placeholder="Filtra per nome, corso o docente" aria-label="Filtra gli insegnamenti">
+                        <input type="search" id="evInsCerca" class="form-control form-control-sm mb-1" placeholder="Filtra per nome, codice, corso o S.S.D." aria-label="Filtra gli insegnamenti">
                         <select name="insegnamento_id" id="evIns" class="form-select form-select-sm">
                             <option value="0">— Nessun insegnamento —</option>
                             <?php if ($ins_cur && !$ins_in_lista): ?><option value="<?php echo (int)$ins_cur['id']; ?>" selected<?php echo $dati_opt($ins_cur); ?>><?php echo h(etichetta_insegnamento($ins_cur, true) . ' – ' . $ins_cur['anno_accademico'] . '/' . ($ins_cur['anno_accademico'] + 1)); ?></option><?php endif; ?>
                             <?php foreach ($ins_gruppi as $cds_g => $lista_g): ?>
                                 <optgroup label="<?php echo h($cds_g); ?>">
-                                    <?php foreach ($lista_g as $i_g): ?><option value="<?php echo (int)$i_g['id']; ?>" <?php echo (int)$i_g['id'] === $ins_sel ? 'selected' : ''; ?><?php echo $dati_opt($i_g); ?>><?php echo h(etichetta_insegnamento($i_g)); ?></option><?php endforeach; ?>
+                                    <?php foreach ($lista_g as $i_g): ?><option value="<?php echo (int)$i_g['id']; ?>" <?php echo (int)$i_g['id'] === $ins_sel ? 'selected' : ''; ?><?php echo $dati_opt($i_g); ?>><?php echo h(\App\Anagrafi\Testi::etichettaInsegnamentoCompleta($i_g)); ?></option><?php endforeach; ?>
                                 </optgroup>
                             <?php endforeach; ?>
                         </select>
-                        <div class="form-text"><?php echo $ins_gruppi ? "Insegnamenti dell'anno accademico in corso. Scegliendolo si compilano titolo e corso di studio (puoi modificarli); i gruppi sono i turni qui sotto." : "L'anagrafe degli insegnamenti è vuota: aggiornala da Anagrafi → Strutture e aggiornamento."; ?></div>
+                        <div class="form-text"><?php echo $ins_gruppi ? "Insegnamenti dell'anno accademico in corso; un insegnamento integrato si sceglie intero, con i suoi moduli. Scegliendolo si compilano titolo e corso di studio (puoi modificarli); i gruppi sono i turni qui sotto." : "L'anagrafe degli insegnamenti è vuota: aggiornala da Anagrafi → Strutture e aggiornamento."; ?></div>
                     </div>
                     <script>
                     (function () {

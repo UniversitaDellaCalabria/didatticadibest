@@ -145,6 +145,11 @@
     }
     function svuota(sel, testo) { sel.innerHTML = ''; opt(sel, '', testo); sel.disabled = true; }
     function aa(anno) { anno = parseInt(anno, 10); return anno + '/' + (anno + 1); }
+    // Riga di sintesi di un insegnamento nell'elenco: anno di corso (solo per gli insegnamenti), codice, CFU, S.S.D., semestre
+    function info(i, conAnno) {
+        return (conAnno && i.anno ? ' · ' + i.anno + '° anno' : '') + (i.codice ? ' · ' + i.codice : '') + (i.cfu !== null && i.cfu !== undefined ? ' · ' + cfuTesto(i.cfu) + ' CFU' : '')
+            + (i.ssd ? ' · ' + i.ssd : '') + (i.semestre ? ' · ' + i.semestre : '');
+    }
     function cfuTesto(c) { return c === null || c === undefined ? '' : String(c).replace('.', ',').replace(/,0$/, ''); }
     function creaDialog() {
         dlg = document.createElement('dialog');
@@ -159,14 +164,16 @@
             + '<div class="col-md-6"><label class="form-label small fw-bold mb-0" for="insAa">2. Anno accademico di offerta</label><select class="form-select form-select-sm" id="insAa"></select></div>'
             + '<div class="col-12"><label class="form-label small fw-bold mb-0" for="insCorso">3. Corso di studio</label><select class="form-select form-select-sm" id="insCorso"></select></div>'
             + '<div class="col-12"><label class="form-label small fw-bold mb-0" for="insCerca">4. Insegnamento</label><input type="search" class="form-control form-control-sm mb-1" id="insCerca" placeholder="Filtra per nome" disabled>'
-            + '<select class="form-select form-select-sm" id="insIns" size="8"></select><div class="small text-secondary mt-1" id="insStato" aria-live="polite"></div></div>'
+            + '<select class="form-select form-select-sm" id="insIns" size="8"></select><div class="small text-secondary mt-1" id="insStato" aria-live="polite"></div>'
+            + '<div class="small border rounded p-2 mt-2 bg-light" id="insScheda" aria-live="polite"></div></div>'
             + '</div><div class="d-flex gap-2 justify-content-end mt-3">'
             + '<button type="button" class="btn btn-sm btn-outline-secondary" id="insAnnulla">Annulla</button>'
             + '<button type="button" class="btn btn-sm btn-primary fw-bold" id="insUsa" disabled>Usa questo insegnamento</button></div></form>';
         document.body.appendChild(dlg);
         var tipo = dlg.querySelector('#insTipo'), corso = dlg.querySelector('#insCorso'), anno = dlg.querySelector('#insAa'),
-            ins = dlg.querySelector('#insIns'), cerca = dlg.querySelector('#insCerca'), stato = dlg.querySelector('#insStato'), usa = dlg.querySelector('#insUsa');
-        function azzeraIns(t) { svuota(ins, t || '—'); cerca.disabled = true; cerca.value = ''; usa.disabled = true; stato.textContent = ''; }
+            ins = dlg.querySelector('#insIns'), cerca = dlg.querySelector('#insCerca'), stato = dlg.querySelector('#insStato'), usa = dlg.querySelector('#insUsa'),
+            scheda = dlg.querySelector('#insScheda'), voci = {};
+        function azzeraIns(t) { svuota(ins, t || '—'); cerca.disabled = true; cerca.value = ''; usa.disabled = true; stato.textContent = ''; scheda.innerHTML = ''; voci = {}; }
         dlg.querySelector('#insAnnulla').addEventListener('click', function () { dlg.close(); });
         // Ordine: tipo → anno di offerta → corsi offerti quell'anno (uno per nome) → insegnamenti
         tipo.addEventListener('change', function () {
@@ -191,22 +198,43 @@
             json('azione=insegnamenti&cds=' + encodeURIComponent(corso.value) + '&aa=' + encodeURIComponent(anno.value)).then(function (el) {
                 ins.innerHTML = ''; ins.disabled = !el.length; cerca.disabled = !el.length; cerca.value = '';
                 stato.textContent = el.length ? el.length + ' insegnamenti' : 'Nessun insegnamento per questo anno: prova un altro anno o scrivilo a mano.';
+                voci = {};
                 el.forEach(function (i) {
-                    opt(ins, i.id, i.nome + (i.anno ? ' · ' + i.anno + '° anno' : '') + (i.cfu !== null ? ' · ' + cfuTesto(i.cfu) + ' CFU' : '') + (i.ssd ? ' · ' + i.ssd : ''),
-                        { nome: i.nome, cfu: i.cfu === null ? '' : i.cfu, ssd: i.ssd || '' });
+                    var o = opt(ins, i.id, (i.integrato ? 'Integrato: ' : '') + i.nome + info(i, true), { chiave: (i.nome + ' ' + (i.codice || '') + ' ' + (i.moduli || []).map(function (m) { return m.nome; }).join(' ')).toLowerCase() });
+                    voci[i.id] = i;
+                    // I moduli di un integrato si vedono sotto di lui ma non si scelgono da soli: si sceglie l'integrato
+                    (i.moduli || []).forEach(function (m) {
+                        var om = opt(ins, '', '      ↳ modulo ' + m.nome + info(m, false)); om.disabled = true; om.dataset.padre = i.id;
+                    });
                 });
             }).catch(function () { svuota(ins, 'Catalogo non disponibile'); });
         });
         cerca.addEventListener('input', function () {
-            var q = cerca.value.toLowerCase();
-            Array.prototype.forEach.call(ins.options, function (o) { o.hidden = q && o.textContent.toLowerCase().indexOf(q) === -1; });
+            var q = cerca.value.toLowerCase(), nascosti = {};
+            Array.prototype.forEach.call(ins.options, function (o) {
+                if (o.dataset.padre) return;
+                o.hidden = !!q && (o.dataset.chiave || o.textContent.toLowerCase()).indexOf(q) === -1; nascosti[o.value] = o.hidden;
+            });
+            Array.prototype.forEach.call(ins.options, function (o) { if (o.dataset.padre) o.hidden = !!nascosti[o.dataset.padre]; });
         });
-        ins.addEventListener('change', function () { usa.disabled = !ins.value; });
+        ins.addEventListener('change', function () {
+            usa.disabled = !ins.value;
+            var v = voci[ins.value];
+            scheda.innerHTML = '';
+            if (!v) return;
+            // Tutte le informazioni dell'insegnamento scelto (il docente non c'è): codice, SSD, CFU, semestre, corso e codice del corso, link
+            var righe = ['Codice: ' + (v.codice || '—'), 'CFU: ' + (cfuTesto(v.cfu) || '—'), 'S.S.D.: ' + (v.ssd ? v.ssd + (v.ssd_nome ? ' (' + v.ssd_nome + ')' : '') : '—'),
+                'Semestre: ' + (v.semestre || '—'), 'Corso di studio: ' + (corso.selectedOptions[0] ? corso.selectedOptions[0].dataset.nome : '') + ' (' + corso.value + ')'];
+            righe.forEach(function (t) { var d = document.createElement('div'); d.textContent = t; scheda.appendChild(d); });
+            if (v.link) { var d = document.createElement('div'), a = document.createElement('a'); a.href = v.link; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = 'Pagina dell\'insegnamento sul portale di Ateneo'; d.appendChild(a); scheda.appendChild(d); }
+            if (v.integrato) { var d2 = document.createElement('div'); d2.className = 'fw-semibold'; d2.textContent = 'Scegliendo l\'integrato si scelgono anche i suoi ' + v.moduli.length + ' moduli.'; scheda.appendChild(d2); }
+        });
         ins.addEventListener('dblclick', function () { if (ins.value) usa.click(); });
         usa.addEventListener('click', function () {
-            var o = ins.selectedOptions[0]; if (!o) return;
-            var co = corso.selectedOptions[0], dati = { id: parseInt(o.value, 10), nome: o.dataset.nome, corso: co ? co.dataset.nome : '', aa: anno.value ? aa(anno.value) : '',
-                cfu: o.dataset.cfu === '' ? null : parseFloat(o.dataset.cfu), ssd: o.dataset.ssd };
+            var v = voci[ins.value]; if (!v) return;
+            var co = corso.selectedOptions[0], dati = { id: v.id, nome: v.nome, corso: co ? co.dataset.nome : '', cds: corso.value, aa: anno.value ? aa(anno.value) : '',
+                cfu: v.cfu, ssd: v.ssd || '', ssd_nome: v.ssd_nome || '', codice: v.codice || '', semestre: v.semestre || '', link: v.link || '',
+                integrato: !!v.integrato, moduli: (v.moduli || []).map(function (m) { return { nome: m.nome, codice: m.codice, cfu: m.cfu, ssd: m.ssd, semestre: m.semestre, link: m.link }; }) };
             applica(dati); dlg.close();
         });
         json('azione=tipi').then(function (el) {
@@ -216,19 +244,32 @@
         svuota(anno, '—'); svuota(corso, '—'); svuota(ins, '—');
     }
     function scrivi(el, v) { if (el) { el.value = v; el.dispatchEvent(new Event('change', { bubbles: true })); } }
+    // Testo completo dell'insegnamento scelto, che finisce nelle risposte, nei verbali e nei PDF: nome, corso (codice), a.a., codice, CFU, S.S.D., semestre, link
+    // e, per un integrato, i suoi moduli
+    function testoCompleto(d) {
+        var t = (d.integrato ? d.nome + ' (integrato)' : d.nome) + (d.corso ? ' – ' + d.corso + (d.cds ? ' (' + d.cds + ')' : '') : '') + (d.aa ? ' (a.a. ' + d.aa + ')' : '')
+            + (d.codice ? ' · cod. ' + d.codice : '') + (d.cfu !== null && d.cfu !== undefined ? ' · ' + cfuTesto(d.cfu) + ' CFU' : '') + (d.ssd ? ' · ' + d.ssd : '') + (d.semestre ? ' · ' + d.semestre : '');
+        if (d.integrato && d.moduli.length) {
+            t += ' · moduli: ' + d.moduli.map(function (m) { return m.nome + (m.cfu !== null && m.cfu !== undefined ? ' (' + cfuTesto(m.cfu) + ' CFU' + (m.ssd ? ', ' + m.ssd : '') + ')' : (m.ssd ? ' (' + m.ssd + ')' : '')); }).join('; ');
+        }
+        return t + (d.link ? ' · ' + d.link : '');
+    }
     function applica(d) {
         if (!bersaglio) return;
         if (bersaglio.dataset.ritorno === 'piano') { var t = document.getElementById('pianoTesto'); if (t) t.value = d.nome + (d.corso ? ' – ' + d.corso : ''); return; }
         var tr = bersaglio.closest('tr');
         if (tr) {
-            // Riga di una tabella: nome nella cella dell'insegnamento, CFU e S.S.D. nelle colonne di quel tipo
-            scrivi(bersaglio.closest('td').querySelector('input[type=text]'), d.nome + (d.corso ? ' – ' + d.corso : ''));
-            if (d.cfu !== null) tr.querySelectorAll('[data-col="cfu"]').forEach(function (i) { if (!i.value) scrivi(i, d.cfu); });
-            if (d.ssd) tr.querySelectorAll('[data-col="ssd"]').forEach(function (i) { if (!i.value) scrivi(i, d.ssd); });
+            // Riga di una tabella: nome nella cella dell'insegnamento, il resto nelle colonne di quel tipo (se vuote)
+            scrivi(bersaglio.closest('td').querySelector('input[type=text]'), (d.integrato ? d.nome + ' (integrato: ' + d.moduli.map(function (m) { return m.nome; }).join(', ') + ')' : d.nome) + (d.corso ? ' – ' + d.corso : ''));
+            var campi = { cfu: d.cfu, ssd: d.ssd, codice: d.codice, semestre: d.semestre, corso: d.corso, codice_corso: d.cds, link: d.link };
+            Object.keys(campi).forEach(function (k) {
+                var v = campi[k]; if (v === null || v === undefined || v === '') return;
+                tr.querySelectorAll('[data-col="' + k + '"]').forEach(function (i) { if (!i.value) scrivi(i, v); });
+            });
             return;
         }
         var box = bersaglio.closest('.campo-pratica') || bersaglio.parentNode;
-        scrivi(box.querySelector('.ins-testo'), d.nome + (d.corso ? ' – ' + d.corso : '') + (d.aa ? ' (a.a. ' + d.aa + ')' : '') + (d.cfu !== null ? ' · ' + cfuTesto(d.cfu) + ' CFU' : '') + (d.ssd ? ' · ' + d.ssd : ''));
+        scrivi(box.querySelector('.ins-testo'), testoCompleto(d));
         var m = box.querySelector('.ins-meta'); if (m) m.value = JSON.stringify(d);
     }
     document.addEventListener('click', function (e) {

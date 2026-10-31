@@ -150,6 +150,23 @@ final class Testi
     }
 
     /**
+     * Insegnamento nei pannelli con tutte le informazioni dell'archivio tranne il docente: nome (integrato), codice, CFU, S.S.D., semestre, anno di corso,
+     * corso di studio con il suo codice.
+     *
+     * @param array<string, mixed> $i riga della tabella insegnamenti
+     */
+    public static function etichettaInsegnamentoCompleta(array $i): string
+    {
+        $cfu = ($i['cfu'] ?? null) !== null ? rtrim(rtrim(number_format((float) $i['cfu'], 1, ',', ''), '0'), ',') . ' CFU' : '';
+        $corso = trim((string) ($i['cds_nome'] ?? '')) . (($i['cds_cod'] ?? '') !== '' ? ' (' . $i['cds_cod'] . ')' : '');
+
+        return implode(' · ', array_filter([
+            $i['nome'] . (($i['partizione'] ?? '') !== '' ? ' (' . $i['partizione'] . ')' : '') . (!empty($i['e_integrato']) ? ' [integrato]' : (!empty($i['padre_id']) ? ' [modulo]' : '')),
+            $i['codice'] ?? '', $cfu, $i['ssd_cod'] ?? '', $i['semestre'] ?? '', !empty($i['anno_corso']) ? (int) $i['anno_corso'] . '° anno' : '', trim($corso),
+        ]));
+    }
+
+    /**
      * Insegnamento nelle decisioni in seduta: "Nome – Corso · 6 CFU · BIO/01"
      *
      * @param array{nome: string, corso: string, cfu: ?float, ssd: string} $i
@@ -205,5 +222,48 @@ final class Testi
         }
 
         return null;
+    }
+
+    /**
+     * Insegnamenti di un corso come si scelgono nei moduli e nei pannelli: gli insegnamenti singoli e, al posto dei moduli,
+     * l'integrato di cui fanno parte (padre_id), che si sceglie intero con i suoi moduli. I CFU dell'integrato sono la somma
+     * dei moduli (se tutti li hanno); anno e semestre sono quelli del primo modulo.
+     *
+     * @param list<array<string, mixed>> $righe righe di insegnamenti/ateneo_insegnamenti (id, nome, codice, cfu, ssd_cod, ssd, anno_corso, partizione, semestre, padre_id, padre_nome, link)
+     * @return list<array<string, mixed>> voci con 'integrato' false (insegnamento) o true (con 'moduli')
+     */
+    public static function raggruppaIntegrati(array $righe): array
+    {
+        $voce = static fn (array $i): array => [
+            'id' => (int) $i['id'], 'nome' => (string) $i['nome'] . (($i['partizione'] ?? '') !== '' ? ' (' . $i['partizione'] . ')' : ''), 'codice' => (string) ($i['codice'] ?? ''),
+            'cfu' => $i['cfu'] !== null ? (float) $i['cfu'] : null, 'ssd' => (string) ($i['ssd_cod'] ?? ''), 'ssd_nome' => (string) ($i['ssd'] ?? ''),
+            'anno' => (int) ($i['anno_corso'] ?? 0), 'semestre' => (string) ($i['semestre'] ?? ''), 'link' => (string) ($i['link'] ?? ''),
+        ];
+        $out = [];
+        $integrati = [];
+        foreach ($righe as $i) {
+            $padre = (int) ($i['padre_id'] ?? 0);
+            if ($padre <= 0) {
+                $out[] = ['integrato' => false] + $voce($i);
+                continue;
+            }
+            if (!isset($integrati[$padre])) {
+                $integrati[$padre] = count($out);
+                $out[] = ['integrato' => true, 'id' => $padre, 'nome' => (string) (($i['padre_nome'] ?? '') !== '' ? $i['padre_nome'] : 'Insegnamento integrato'), 'codice' => '', 'cfu' => 0.0, 'ssd' => '', 'ssd_nome' => '',
+                    'anno' => (int) ($i['anno_corso'] ?? 0), 'semestre' => (string) ($i['semestre'] ?? ''), 'link' => '', 'moduli' => []];
+            }
+            $k = $integrati[$padre];
+            $m = $voce($i);
+            $out[$k]['moduli'][] = $m;
+            $out[$k]['cfu'] = $out[$k]['cfu'] === null || $m['cfu'] === null ? null : $out[$k]['cfu'] + $m['cfu'];
+            $ssd = array_values(array_unique(array_filter(array_column($out[$k]['moduli'], 'ssd'))));
+            $out[$k]['ssd'] = implode(', ', $ssd);
+            $out[$k]['ssd_nome'] = implode(', ', array_values(array_unique(array_filter(array_column($out[$k]['moduli'], 'ssd_nome')))));
+            if ($out[$k]['semestre'] !== $m['semestre']) {
+                $out[$k]['semestre'] = implode(' / ', array_values(array_unique(array_filter(array_column($out[$k]['moduli'], 'semestre')))));
+            }
+        }
+
+        return $out;
     }
 }

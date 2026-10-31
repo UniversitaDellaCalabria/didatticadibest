@@ -153,7 +153,7 @@ final class ServizioCorsi
             return [];
         }
         $out = [];
-        foreach ($this->insegnamenti->dellAnno($anno, $dip) as $x) {
+        foreach ($this->insegnamenti->dellAnno($anno, $dip, 'scelta') as $x) {
             $out[$x['cds_nome'] ?: 'Altri insegnamenti'][] = $x;
         }
 

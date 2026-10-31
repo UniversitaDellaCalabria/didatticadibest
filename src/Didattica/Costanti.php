@@ -42,6 +42,7 @@ final class Costanti
         'testo' => 'Testo', 'insegnamento' => 'Insegnamento (catalogo di Ateneo)', 'insegnamento_dip' => 'Insegnamento del Dipartimento', 'cfu' => 'CFU',
         'voto' => 'Voto', 'ssd' => 'S.S.D.', 'data' => 'Data', 'ora' => 'Ora', 'numero' => 'Numero', 'docente' => 'Docente (anagrafe)', 'anno_accademico' => 'Anno accademico', 'scelta' => 'Tendina',
         'codice' => 'Codice insegnamento', 'denominazione' => 'Insegnamento scritto a mano (altro Ateneo)',
+        'semestre' => 'Semestre', 'corso' => 'Corso di studio', 'codice_corso' => 'Codice del corso di studio', 'link' => 'Link alla pagina dell\'insegnamento',
         'piano' => 'Piano di studi: da inserire come a scelta (con l\'eventuale insegnamento da eliminare)',
     ];
 

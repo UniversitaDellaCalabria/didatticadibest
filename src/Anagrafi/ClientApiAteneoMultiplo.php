@@ -8,7 +8,7 @@ namespace App\Anagrafi;
 interface ClientApiAteneoMultiplo
 {
     /**
-     * Più chiamate GET in parallelo: percorso => risposta (null se quella chiamata non va).
+     * Più chiamate GET in parallelo: percorso => risposta (array vuoto se la risorsa non esiste, null se la chiamata non va).
      *
      * @param list<string> $percorsi percorsi relativi alle API, es. "activities/123/"
      * @return array<string, array<mixed>|null>

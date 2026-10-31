@@ -336,6 +336,47 @@ final class HtmlCampi
         if (($r['tipo'] ?? '') === 'date' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $txt)) {
             $txt = date('d/m/Y', strtotime($txt));
         }
-        return nl2br($h($txt)) . (!empty($r['meta']['corso']) ? '<div class="text-secondary small">' . $h($r['meta']['corso'] . ($r['meta']['aa'] !== '' ? ' · a.a. di offerta ' . $r['meta']['aa'] : '')) . '</div>' : '');
+        return nl2br($h($txt)) . (!empty($r['meta']['corso']) ? $this->schedaInsegnamento($r['meta']) : '');
+    }
+
+    /**
+     * Scheda dell'insegnamento scelto dal catalogo (sotto la risposta): corso e codice, a.a. di offerta, codice, CFU, S.S.D., semestre,
+     * link alla pagina sul portale di Ateneo e, per un integrato, i suoi moduli. Il docente non si riporta.
+     *
+     * @param array<string, mixed> $m
+     */
+    private function schedaInsegnamento(array $m): string
+    {
+        $h = fn ($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
+        $cfu = fn ($c) => rtrim(rtrim(number_format((float) $c, 1, ',', ''), '0'), ',');
+        $info = static function (array $x) use ($h, $cfu): string {
+            $p = [];
+            if (($x['codice'] ?? '') !== '') {
+                $p[] = 'cod. ' . $h($x['codice']);
+            }
+            if (isset($x['cfu']) && $x['cfu'] !== null) {
+                $p[] = $cfu($x['cfu']) . ' CFU';
+            }
+            if (($x['ssd'] ?? '') !== '') {
+                $p[] = 'S.S.D. ' . $h($x['ssd'] . (($x['ssd_nome'] ?? '') !== '' ? ' (' . $x['ssd_nome'] . ')' : ''));
+            }
+            if (($x['semestre'] ?? '') !== '') {
+                $p[] = $h($x['semestre']);
+            }
+            if (($x['link'] ?? '') !== '') {
+                $p[] = '<a href="' . $h($x['link']) . '" target="_blank" rel="noopener noreferrer">pagina dell\'insegnamento</a>';
+            }
+
+            return implode(' · ', $p);
+        };
+        $o = '<div class="text-secondary small">' . $h($m['corso'] . (($m['cds'] ?? '') !== '' ? ' (' . $m['cds'] . ')' : '') . (($m['aa'] ?? '') !== '' ? ' · a.a. di offerta ' . $m['aa'] : '')) . '</div>';
+        if (($d = $info($m)) !== '') {
+            $o .= '<div class="text-secondary small">' . ($m['integrato'] ?? false ? 'Integrato: ' : '') . $d . '</div>';
+        }
+        foreach ((array) ($m['moduli'] ?? []) as $x) {
+            $o .= '<div class="text-secondary small ps-3">Modulo ' . $h($x['nome']) . ($info($x) !== '' ? ' · ' . $info($x) : '') . '</div>';
+        }
+
+        return $o;
     }
 }

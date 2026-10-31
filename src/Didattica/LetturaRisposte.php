@@ -127,7 +127,10 @@ final class LetturaRisposte
                     $meta = json_decode((string) ($post[$k . '_meta'] ?? ''), true);
                     if (is_array($meta) && trim((string) ($meta['nome'] ?? '')) !== '') {
                         $r['meta'] = ['id' => (int) ($meta['id'] ?? 0), 'nome' => mb_substr((string) $meta['nome'], 0, 255), 'corso' => mb_substr((string) ($meta['corso'] ?? ''), 0, 255),
-                                      'aa' => mb_substr((string) ($meta['aa'] ?? ''), 0, 20), 'cfu' => is_numeric($meta['cfu'] ?? null) ? (float) $meta['cfu'] : null, 'ssd' => mb_substr((string) ($meta['ssd'] ?? ''), 0, 20)];
+                                      'aa' => mb_substr((string) ($meta['aa'] ?? ''), 0, 20), 'cfu' => is_numeric($meta['cfu'] ?? null) ? (float) $meta['cfu'] : null, 'ssd' => mb_substr((string) ($meta['ssd'] ?? ''), 0, 20),
+                                      'ssd_nome' => mb_substr((string) ($meta['ssd_nome'] ?? ''), 0, 150), 'codice' => mb_substr((string) ($meta['codice'] ?? ''), 0, 30), 'cds' => mb_substr((string) ($meta['cds'] ?? ''), 0, 20),
+                                      'semestre' => mb_substr((string) ($meta['semestre'] ?? ''), 0, 60), 'link' => self::linkAteneo((string) ($meta['link'] ?? '')), 'integrato' => !empty($meta['integrato']),
+                                      'moduli' => self::moduliScelti($meta['moduli'] ?? [])];
                     }
                 }
                 $r['valore'] = $v;
@@ -139,6 +142,31 @@ final class LetturaRisposte
         }
 
         return [$risposte, $errori];
+    }
+
+    /** Il link all'insegnamento si accetta solo se è la pagina dell'insegnamento sul portale di Ateneo (arriva dal browser) */
+    private static function linkAteneo(string $url): string
+    {
+        return preg_match('#^https://www\.unical\.it/storage/activities/\d{1,12}/$#', $url) ? $url : '';
+    }
+
+    /**
+     * Moduli di un insegnamento integrato scelto dal catalogo (dal browser): nome, codice, CFU, S.S.D., semestre e link di ciascuno.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function moduliScelti(mixed $moduli): array
+    {
+        $out = [];
+        foreach (is_array($moduli) ? array_slice($moduli, 0, 30) : [] as $m) {
+            if (!is_array($m) || trim((string) ($m['nome'] ?? '')) === '') {
+                continue;
+            }
+            $out[] = ['nome' => mb_substr((string) $m['nome'], 0, 255), 'codice' => mb_substr((string) ($m['codice'] ?? ''), 0, 30), 'cfu' => is_numeric($m['cfu'] ?? null) ? (float) $m['cfu'] : null,
+                      'ssd' => mb_substr((string) ($m['ssd'] ?? ''), 0, 20), 'semestre' => mb_substr((string) ($m['semestre'] ?? ''), 0, 60), 'link' => self::linkAteneo((string) ($m['link'] ?? ''))];
+        }
+
+        return $out;
     }
 
     /**

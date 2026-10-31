@@ -3,7 +3,8 @@
 //   ?azione=tipi                         tipi di corso (triennale, magistrale, ciclo unico…)
 //   ?azione=anni&tipo=L                  anni accademici di offerta dei corsi di quel tipo
 //   ?azione=corsi&tipo=L&aa=2025         corsi di studio di quel tipo offerti in quell'anno (senza aa: tutti, con gli anni)
-//   ?azione=insegnamenti&cds=X&aa=2024   insegnamenti del corso per l'anno di offerta (scaricati dalle API la prima volta)
+//   ?azione=insegnamenti&cds=X&aa=2024   insegnamenti del corso per l'anno di offerta (scaricati dalle API la prima volta): per ognuno codice, nome, CFU, SSD,
+//                                        semestre, anno di corso e link; gli integrati hanno integrato=true e l'elenco dei moduli
 // Usato da assets/js/campi-pratica.js (finestra di scelta dell'insegnamento).
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/functions.php';
@@ -27,10 +28,8 @@ if ($azione === 'tipi') {
 } elseif ($azione === 'insegnamenti') {
     $cds = preg_replace('/[^A-Za-z0-9_-]/', '', (string)($_GET['cds'] ?? ''));
     $aa = (int)($_GET['aa'] ?? 0);
-    foreach (catalogo_insegnamenti($conn, $cds, $aa) as $i) {
-        $out[] = ['id' => (int)$i['id'], 'nome' => $i['nome'] . ($i['partizione'] !== '' ? ' (' . $i['partizione'] . ')' : ''), 'cfu' => $i['cfu'] !== null ? (float)$i['cfu'] : null,
-                  'ssd' => (string)$i['ssd_cod'], 'ssd_nome' => (string)$i['ssd'], 'anno' => (int)$i['anno_corso'], 'semestre' => (string)$i['semestre']];
-    }
+    // Insegnamenti singoli e integrati (con 'moduli'): chi sceglie un integrato sceglie anche tutti i suoi moduli
+    $out = \App\Core\App::per($conn)->get(\App\Anagrafi\ServizioCatalogo::class)->insegnamentiPerScelta($cds, $aa);
 } else {
     http_response_code(400);
     $out = ['errore' => 'Azione non valida'];
