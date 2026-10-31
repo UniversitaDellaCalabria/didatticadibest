@@ -406,6 +406,8 @@ con un helper unico `ui_stato(string $tipo, string $testo)`.
 pagina (il `middleware.php:12` lo fa; controllare le pagine con `PAGINA_SENZA_SSO`); se il token è scaduto o già usato, il messaggio porta all'area personale e
 spiega dove trovare il compito.
 
+> **Stato 1/11/2026: FATTO in locale.** Verificato: le pagine con token protette da `middleware.php` mandano al login con `redirect` e tornano alla stessa pagina; quelle senza accesso (`convenzione_online.php`, `convenzione_tesi.php`) hanno il token come chiave e non hanno bisogno del login. Aggiunto `ui_link_non_valido()` (`inc/ui.php`): nelle pagine di firma e conferma (`firma_pratica`, `firma_incarico`, `firma_verbale`, `firma_convenzione`, `firma_convenzione_tesi`, `conferma_attestato`) un link scaduto o già usato spiega il motivo e porta a «Da fare per te». Restano con il loro testo `incarico.php` e `dichiarazione_tutorato.php`, che già indicano il link giusto. Prova: `prossima_cosa.php`.
+
 ---
 
 ## FASE 5 — Prestazioni

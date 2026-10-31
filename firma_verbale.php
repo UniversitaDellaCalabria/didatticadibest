@@ -41,7 +41,7 @@ require_once 'header.php';
 <div class="container my-4" style="max-width: 1000px;">
     <?php echo flash_html() . ui_prossima_cosa(); ?>
     <?php if (!$s): ?>
-        <h1 class="fw-bold h3">Verbale non disponibile</h1><p>Il link non è valido oppure il verbale è già stato firmato (in quel caso hai ricevuto l'email con il PDF).</p>
+        <?php echo ui_link_non_valido('Verbale non disponibile', "Il link non è valido oppure il verbale è già stato firmato (in quel caso hai ricevuto l'email con il PDF)."); ?>
     <?php elseif (!$io): ?>
         <h1 class="fw-bold h3">Firma del verbale</h1>
         <div class="alert alert-warning">Questa pagina è per il <strong><?php echo $h($chi); ?></strong> (<?php echo $h($s['verbale_stato'] === 'segretario' ? $s['segretario_email'] : $s['coordinatore_email']); ?>): accedi con le sue credenziali (Unical ID, SPID o CIE).</div>

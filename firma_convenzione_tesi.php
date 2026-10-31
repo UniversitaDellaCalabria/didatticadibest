@@ -45,7 +45,7 @@ require_once 'header.php';
 <div class="container my-4" style="max-width: 1000px;">
     <?php echo flash_html() . ui_prossima_cosa(); ?>
     <?php if (!$c || ($c['stato'] ?? '') === $S::RIFIUTATA): ?>
-        <div class="alert alert-warning">Il link non è valido o la convenzione non è più in attesa della firma.</div>
+        <?php echo ui_link_non_valido('Documento non disponibile', 'Il link non è valido o la convenzione non è più in attesa della firma.'); ?>
     <?php elseif (!$io): $d = $svc->chiFirma(); ?>
         <h1 class="fw-bold h3">Firma della convenzione di tesi</h1>
         <div class="alert alert-warning">Questa pagina è per <strong><?php echo $h($d['nome'] ?: 'il Direttore del Dipartimento'); ?></strong>: accedi con le sue credenziali (Unical ID, SPID o CIE).</div>

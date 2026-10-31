@@ -44,7 +44,7 @@ $altre = $user_info ? array_values(array_filter($svc->inAttesaPerEmail((string)(
 <div class="container my-4" style="max-width: 900px;">
     <?php echo flash_html() . ui_prossima_cosa(); ?>
     <?php if (!$c || !$p): ?>
-        <h1 class="fw-bold h3">Richiesta non disponibile</h1><p>Il link non è valido o la richiesta è stata annullata.</p>
+        <?php echo ui_link_non_valido('Richiesta non disponibile', 'Il link non è valido o la richiesta è stata annullata.'); ?>
     <?php elseif (!$io): ?>
         <h1 class="fw-bold h3">Conferma della richiesta</h1>
         <div class="alert alert-warning">Questa pagina è per <strong><?php echo $h($svc->nomeVisibile((string)$c['nome'])); ?></strong>: accedi con le sue credenziali (Unical ID, SPID o CIE).</div>

@@ -21,6 +21,19 @@ if (!function_exists('ui_vuoto')) {
     }
 }
 
+if (!function_exists('ui_link_non_valido')) {
+    /**
+     * Pagina di un link personale (firma, conferma, lettera) che non vale più: dice perché e porta a ciò che aspetta la persona. Se ha già fatto l'operazione
+     * non serve altro; altrimenti il compito si ritrova in «Da fare per te» dell'area personale.
+     */
+    function ui_link_non_valido(string $titolo, string $motivo): string {
+        $h = static fn (string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+        return '<h1 class="fw-bold h3">' . $h($titolo) . '</h1><p>' . $h($motivo) . '</p>'
+            . '<p class="text-secondary">Se hai già fatto quello che ti era richiesto non serve altro. Se invece ti aspetta ancora qualcosa, la trovi in «Da fare per te» nella tua area personale.</p>'
+            . '<a class="btn btn-primary fw-bold" href="area_personale.php#da-fare"><i class="fa fa-list-check me-1" aria-hidden="true"></i>Vai a «Da fare per te»</a>';
+    }
+}
+
 if (!function_exists('ui_prossima_cosa')) {
     /**
      * «Prossima cosa da fare»: va messa subito dopo flash_html(). Compare solo se il messaggio appena mostrato era un successo (compito chiuso) e alla persona

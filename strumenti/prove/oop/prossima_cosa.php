@@ -27,3 +27,11 @@ unset($GLOBALS['_flash_mostrato']);
 foreach (['firma_pratica', 'firma_incarico', 'firma_verbale', 'firma_convenzione', 'firma_convenzione_tesi', 'conferma_attestato', 'registro_tutorato'] as $pg) {
     prova(str_contains((string) file_get_contents(__DIR__ . "/../../../$pg.php"), 'ui_prossima_cosa()'), "la pagina $pg propone la prossima cosa da fare");
 }
+
+// 4.5 Link che non valgono più: la pagina spiega e porta a «Da fare per te»
+$lnv = ui_link_non_valido('Documento <non> disponibile', 'Il link non è valido.');
+prova(str_contains($lnv, 'Documento &lt;non&gt; disponibile') && str_contains($lnv, 'href="area_personale.php#da-fare"') && str_contains($lnv, 'Da fare per te'), "ui_link_non_valido(): spiega, protegge il testo e porta a «Da fare per te»");
+foreach (['firma_pratica', 'firma_incarico', 'firma_verbale', 'firma_convenzione', 'firma_convenzione_tesi', 'conferma_attestato'] as $pg) {
+    prova(str_contains((string) file_get_contents(__DIR__ . "/../../../$pg.php"), 'ui_link_non_valido('), "la pagina $pg, con un link non valido, porta all'area personale");
+}
+prova(str_contains((string) file_get_contents(__DIR__ . '/../../../middleware.php'), 'saml_login.php?redirect=" . urlencode($_SERVER[\'REQUEST_URI\'])'), "i link con il token chiedono l'accesso e poi tornano alla stessa pagina (middleware)");

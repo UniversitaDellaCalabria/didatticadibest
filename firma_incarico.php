@@ -60,7 +60,7 @@ require_once 'header.php';
 <div class="container my-4" style="max-width: 1000px;">
     <?php echo flash_html() . ui_prossima_cosa(); ?>
     <?php if (!$i || $i['stato'] === 'annullata'): ?>
-        <h1 class="fw-bold h3">Documento non disponibile</h1><p>Il link non è valido o la lettera è stata annullata.</p>
+        <?php echo ui_link_non_valido('Documento non disponibile', 'Il link non è valido o la lettera è stata annullata.'); ?>
     <?php elseif (!$io): ?>
         <h1 class="fw-bold h3"><?php echo $fine ? 'Firma della dichiarazione di fine attività' : 'Firma della lettera di incarico'; ?></h1>
         <div class="alert alert-warning">Questa pagina è per <strong><?php echo $h($chi); ?></strong>: accedi con le sue credenziali (Unical ID, SPID o CIE).</div>
