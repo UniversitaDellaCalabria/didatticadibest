@@ -47,9 +47,10 @@ final class DocumentiClasseRepository
      * Prenotazioni FSL di classe, attive e con l'attività non ancora iniziata, a cui manca l'elenco o l'autorizzazione.
      * Il calendario degli avvisi lo decide DocumentiClasse::prossimoAvviso().
      *
+     * @param string|null $email solo le prenotazioni fatte con questa email (per «Da fare» della scuola)
      * @return list<array<string, string|null>>
      */
-    public function incomplete(): array
+    public function incomplete(?string $email = null): array
     {
         $stati = "'" . implode("','", DocumentiClasse::STATI_ATTIVI) . "'";
 
@@ -66,8 +67,10 @@ final class DocumentiClasseRepository
                AND IFNULL(pr.stato, 'confermata') IN ($stati)
                AND COALESCE(t.data_turno, pd.data_inizio) >= CURDATE()
                AND (pr.autorizzazione_file IS NULL OR pr.autorizzazione_file = ''
-                    OR NOT EXISTS (SELECT 1 FROM partecipanti_prenotazione pp2 WHERE pp2.prenotazione_id = pr.id))
-             ORDER BY COALESCE(t.data_turno, pd.data_inizio), pr.id"
+                    OR NOT EXISTS (SELECT 1 FROM partecipanti_prenotazione pp2 WHERE pp2.prenotazione_id = pr.id))"
+             . ($email !== null ? ' AND LOWER(pr.email) = ?' : '') . "
+             ORDER BY COALESCE(t.data_turno, pd.data_inizio), pr.id",
+            $email !== null ? [strtolower($email)] : []
         ));
     }
 

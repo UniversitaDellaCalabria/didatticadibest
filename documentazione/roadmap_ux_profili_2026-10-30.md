@@ -122,7 +122,8 @@ lato docente; bozze delle pratiche; percorsi a passi per convenzione FSL e conve
 > **Fatte anche (1/11/2026):** pratiche con integrazione e posto liberato da confermare per lo studente (gruppi `pratiche_integrazione` e `posto_liberato`, inclusi nei candidati del riepilogo settimanale; prova `da_fare_studente.php`).
 > **Fatta anche:** convenzioni FSL da firmare nel «Da fare» di chi firma (gruppo `fsl_firma`, link diretto a `firma_convenzione.php`; lo stesso link nel Cruscotto); prova `da_fare_fsl_direttore.php`.
 > **Fatta anche:** azienda con convenzione di tesi da completare (gruppo `convenzioni_azienda`, riusa `PercorsoAzienda`); prova `da_fare_azienda.php`.
-> Restano: registro fermo/fine attività, sondaggi, scuola (autorizzazione). Il registro delle fonti (`FonteDaFare`) non è ancora stato fatto.
+> **Fatta anche:** scuola con elenco studenti e autorizzazione da consegnare prima dell'attività FSL (gruppo `documenti_classe`, con la scadenza; `DocumentiClasseRepository::incomplete()` accetta l'email); prova `da_fare_scuola_documenti.php`. Nota: nei 3 giorni prima dell'attività può comparire anche «Elenchi degli studenti da inserire» per la stessa prenotazione.
+> Restano: registro fermo/fine attività, sondaggi. Il registro delle fonti (`FonteDaFare`) non è ancora stato fatto.
 - **Problema.** Le 12 fonti di `DaFarePersona` (riga 41) coprono soprattutto chi **firma**; mancano i compiti di chi **fa la richiesta** e alcuni del Direttore.
   Mancanti verificati nel codice:
 
