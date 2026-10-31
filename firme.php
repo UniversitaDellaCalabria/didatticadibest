@@ -64,6 +64,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['azione'] ?? '') ==
     }
 }
 
+// Le firme e le conferme già date negli ultimi 12 mesi
+$fatte_fi = [];
+try { $fatte_fi = \App\Core\App::per($conn)->get(\App\Firme\StoricoFirme::class)->fatte($user_info ?? null); } catch (\Throwable $e_fa) { error_log('[Firme] storico non disponibile: ' . $e_fa->getMessage()); }
+
 // Filtri per tipo di documento, con il loro conteggio
 $etichette_fi = [];
 $conteggi_fi = [];
@@ -171,6 +175,18 @@ echo ui_tema_script();
             });
         })();
         </script>
+    <?php endif; ?>
+    <?php if ($fatte_fi): ?>
+        <details class="card border-0 shadow-sm mt-4 d-print-none" style="border-radius: 12px;" id="fi-fatte"<?php echo !$documenti_fi ? ' open' : ''; ?>><summary class="card-body fw-bold" style="cursor:pointer;"><i class="fa fa-clock-rotate-left me-1" aria-hidden="true"></i>Fatte negli ultimi <?php echo \App\Firme\StoricoFirme::MESI; ?> mesi <span class="badge text-bg-secondary"><?php echo count($fatte_fi); ?></span></summary>
+            <div class="card-body pt-0">
+                <?php foreach ($fatte_fi as $f_fa): ?>
+                    <div class="fi-riga d-flex flex-wrap justify-content-between gap-2">
+                        <div><span class="fw-semibold"><?php echo $h($f_fa['titolo']); ?></span><span class="d-block small text-secondary"><?php echo $h($f_fa['dettaglio']); ?></span></div>
+                        <span class="small text-secondary text-nowrap"><?php echo $h(date('d/m/Y H:i', (int) strtotime($f_fa['quando']))); ?></span>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </details>
     <?php endif; ?>
 </div>
 

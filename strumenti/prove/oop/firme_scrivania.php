@@ -135,3 +135,35 @@ prova($blocco_fi->inAttesa($marco_fi) === [] && $blocco_fi->conferma($marco_fi, 
 $mc_fi = (string) file_get_contents($radice . '/mie_conferme.php');
 prova(str_contains($mc_fi, 'csrf_verify') && str_contains($mc_fi, "empty(\$_POST['dichiaro'])") && str_contains($mc_fi, 'ConfermeInBlocco') && str_contains((string) file_get_contents($radice . '/conferma_attestato.php'), 'mie_conferme.php'), "mie_conferme.php: CSRF e dichiarazione obbligatoria; la pagina della singola conferma rimanda qui");
 foreach (["DELETE FROM pratiche_conferme WHERE pratica_id IN (98971, 98972)", "DELETE FROM pratiche WHERE id IN (98971, 98972)", "DELETE FROM didattica_moduli WHERE id = 98970"] as $sql) $q($sql);
+
+// ---- Storico «Fatte» ----
+sezione("Scrivania delle firme — fatte negli ultimi 12 mesi");
+$pulisci_st = ["DELETE FROM tutorato_incarichi WHERE bando_id = 9898", "DELETE FROM tutorato_bandi WHERE id = 9898", "DELETE FROM didattica_sedute WHERE id IN (98981, 98982)",
+    "DELETE FROM pratiche_firme WHERE pratica_id = 98981", "DELETE FROM pratiche_conferme WHERE pratica_id = 98981", "DELETE FROM pratiche WHERE id = 98981", "DELETE FROM didattica_moduli WHERE id = 98980"];
+foreach ($pulisci_st as $sql) $q($sql);
+$q("INSERT INTO tutorato_bandi (id, titolo, direttore_nome, direttore_email) VALUES (9898, 'Bando storico 9898', 'Dir Prova', 'dir9898@example.org')");
+$q("INSERT INTO tutorato_incarichi (bando_id, codice, cognome, nome, codice_fiscale, email, docente_email, attivita, stato, firmata_docente_il, firmata_direttore_il, fine_firmata_il) VALUES
+    (9898, 'TU-ST1', 'Rossi', 'Mara', 'RSSMRA00A41D086X', 'mara9898@example.org', 'doc9898@example.org', 'Aiuto', 'firmata', NOW() - INTERVAL 20 DAY, NOW() - INTERVAL 10 DAY, NULL),
+    (9898, 'TU-ST2', 'Verdi', 'Luca', 'VRDLCU00A01D086X', 'luca9898@example.org', 'doc9898@example.org', 'Lab', 'firmata', NOW() - INTERVAL 15 MONTH, NOW() - INTERVAL 14 MONTH, NULL)");
+$q("INSERT INTO didattica_moduli (id, titolo) VALUES (98980, 'Certificato 98980')");
+$q("INSERT INTO pratiche (id, modulo_id, utente_id, codice, stato, nome, cognome) VALUES (98981, 98980, 1, 'P-9898-1', 'inviata', 'Anna', 'Rossi')");
+$q("INSERT INTO pratiche_firme (pratica_id, passo, tipo, nome, email, token, stato, firmata_il) VALUES (98981, 1, 'persona', 'Doc Nove', 'doc9898@example.org', 'tokst9898a', 'firmata', NOW() - INTERVAL 3 DAY)");
+$q("INSERT INTO pratiche_conferme (pratica_id, passo, nome, email, token, stato, esito_il) VALUES (98981, 1, 'Doc Nove', 'doc9898@example.org', 'tokst9898b', 'confermata', NOW() - INTERVAL 1 DAY)");
+$q("INSERT INTO didattica_sedute (id, organo, data, segretario_email, coordinatore_email, verbale_stato, verbale_inviato_il, verbale_firmato_il) VALUES
+    (98981, 'Consiglio storico 9898', '2026-10-01', 'doc9898@example.org', 'coo9898@example.org', 'firmato', NOW() - INTERVAL 6 DAY, NOW() - INTERVAL 2 DAY),
+    (98982, 'Consiglio vecchio 9898', '2024-01-10', 'doc9898@example.org', 'coo9898@example.org', 'firmato', NOW() - INTERVAL 20 MONTH, NOW() - INTERVAL 19 MONTH)");
+$storico_fi = \App\Core\App::per($conn)->get(\App\Firme\StoricoFirme::class);
+$doc_st = $storico_fi->fatte(['id' => 1, 'email' => 'Doc9898@example.org', 'codice_fiscale' => '']);
+$tit_st = array_map(fn($x) => $x['tipo'] . ' | ' . $x['dettaglio'], $doc_st);
+prova(count($doc_st) === 4, "fatte: il docente ritrova firme, conferma, lettera, verbale da segretario (non le cose di oltre 12 mesi fa)", json_encode($tit_st));
+$quando_st = array_column($doc_st, 'quando');
+$ord_st = $quando_st; rsort($ord_st);
+prova($quando_st === $ord_st && $doc_st[0]['tipo'] === 'conferma', "fatte: dalla più recente", json_encode($quando_st));
+prova(!array_filter($doc_st, fn($x) => str_contains($x['dettaglio'], 'Direttore') || str_contains($x['dettaglio'], 'coordinatore')), "fatte: la firma del Direttore e quella del coordinatore non sono del docente");
+$dir_st = $storico_fi->fatte(['id' => 2, 'email' => 'dir9898@example.org', 'codice_fiscale' => '']);
+prova(count(array_filter($dir_st, fn($x) => $x['tipo'] === 'tutorato' && str_contains($x['dettaglio'], 'Direttore'))) === 1, "fatte: il Direttore del bando ritrova la sua firma sulla lettera", json_encode($dir_st));
+$coo_st = $storico_fi->fatte(['id' => 3, 'email' => 'coo9898@example.org', 'codice_fiscale' => '']);
+prova(count($coo_st) === 1 && str_contains($coo_st[0]['dettaglio'], 'coordinatore'), "fatte: il coordinatore ritrova il verbale firmato", json_encode($coo_st));
+prova($storico_fi->fatte(['id' => 4, 'email' => 'estraneo9898@example.org']) === [] && $storico_fi->fatte(null) === [], "fatte: un estraneo o nessun utente non vede niente");
+prova(str_contains((string) file_get_contents($radice . '/firme.php'), 'StoricoFirme'), "firme.php: mostra le firme già fatte");
+foreach ($pulisci_st as $sql) $q($sql);
