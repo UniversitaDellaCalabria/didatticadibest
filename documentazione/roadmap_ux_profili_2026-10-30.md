@@ -148,12 +148,16 @@ lato docente; bozze delle pratiche; percorsi a passi per convenzione FSL e conve
 - **Peso.** L (si può spezzare: prima le due del Direttore e quelle del tutor, poi il resto).
 
 ### 1.3 «Da fare» mostra 4 righe per gruppo e poi «… e altre N» senza link
+
+> **Stato 31/10/2026: FATTO in locale.** Pagina `da_fare.php` (filtro per gruppo con `?g=`, fino a 200 righe per gruppo, prima ciò che aspetta da più giorni); in area personale «… e altre N: vedi tutte» e «Vedi tutto l'elenco». Manca l'ordinamento per scadenza (arriva con 1.5).
 - **Problema.** `inc/area/da_fare.php:22` (`array_slice(..., 0, 4)`) e riga 27: il resto non è raggiungibile.
 - **Soluzione.** Pagina `da_fare.php` con l'elenco completo: filtri per gruppo, ordinamento per scadenza poi per giorni di attesa, pulsante d'azione su ogni riga.
   Nell'area personale «… e altre N» diventa un link a `da_fare.php#<gruppo>`.
 - **Requisiti.** Pagina sottile su `DaFarePersona`; stile `portale-ui.css`; esportazione non necessaria. **Peso.** S.
 
 ### 1.4 Numero dei compiti visibile in ogni pagina
+
+> **Stato 31/10/2026: FATTO in locale.** Pulsante «Da fare N» accanto al nome nella barra (e voce nel menu mobile) solo quando N > 0; `ContatoreDaFare` lo tiene 5 minuti in sessione per persona; ogni POST in una pagina protetta (`middleware.php`) lo azzera. Non toccato l'aspetto della testata. Il pulsante «Area personale» resta nel menu utente.
 - **Problema.** La testata (`header.php:368-381`) non mostra nulla; «Area Personale» è dentro il menu a tendina dell'utente.
 - **Soluzione.** Pulsante «Area personale» sempre visibile nella barra in alto con un **numero rosso** = totale «Da fare»; su telefono nella barra mobile.
   Il numero si calcola una volta per sessione e si aggiorna ogni 5 minuti o dopo un'azione (valore in sessione con orario).
@@ -349,6 +353,8 @@ con lo stato; utile per sapere se un tesista ha inviato la richiesta.
 ## FASE 4 — Navigazione: arrivare subito dove serve
 
 **4.1 Dopo l'accesso, all'area personale** (S)
+
+> **Stato 31/10/2026: FATTO in locale, tranne il Cruscotto del Direttore** (non c'è ancora la scelta nel profilo). «Accedi» passa la pagina corrente (solo da richieste GET); senza `redirect` si va in `area_personale.php`. Decisione 6 presa come proposta: area personale per tutti.
 - **Problema.** `saml_login.php:32`: senza `redirect` si torna a `index.php`; il pulsante «Accedi» della barra (`header.php:384`) non passa la pagina corrente.
 - **Soluzione.** «Accedi» passa la pagina corrente come `redirect`; senza `redirect` si va in `area_personale.php` (il Direttore al Cruscotto, se l'utente lo sceglie
   nel profilo). Mantenere il controllo anti open-redirect già presente (righe 23-30).

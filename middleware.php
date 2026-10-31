@@ -25,6 +25,11 @@ $is_gestore = ($u_ruolo === 2 || in_array('2', $sec_roles));
 $user_info = \App\Core\App::get(\App\Auth\UtenteRepository::class)->perId($u_id);
 $u_email_sql = strtolower($user_info['email'] ?? '');
 
+// Un invio di modulo (firma, conferma, caricamento…) può chiudere un compito: il numero «Da fare» della barra si ricalcola
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
+    da_fare_aggiorna();
+}
+
 // 5. Helper: Protezione Aree Riservate a Gestori e Admin
 if (!function_exists('require_admin_or_gestore')) {
     function require_admin_or_gestore() {

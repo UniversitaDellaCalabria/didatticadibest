@@ -8,6 +8,7 @@
                 <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
                     <h2 class="h5 fw-bold mb-0"><i class="fa fa-list-check me-2" style="color:#b45309;" aria-hidden="true"></i>Da fare per te</h2>
                     <span class="badge rounded-pill text-bg-warning fs-6"><?php echo $da_fare_n; ?></span>
+                    <a href="da_fare.php" class="btn btn-sm btn-outline-secondary ms-auto">Vedi tutto l'elenco</a>
                 </div>
                 <p class="small text-secondary mb-3">Le cose che aspettano te nel portale, con il link per farle. Una volta a settimana ti arriva anche per email.</p>
                 <div class="d-flex flex-wrap gap-2 mb-3" aria-label="Vai al gruppo">
@@ -24,7 +25,7 @@
                                 <span class="small fw-semibold"><?php echo htmlspecialchars($r_df['testo']); ?></span><?php if ($r_df['giorni'] >= \App\Portale\DaFarePersona::GIORNI_FERMA): ?> <span class="badge text-bg-danger"><?php echo (int)$r_df['giorni']; ?> giorni</span><?php endif; ?>
                                 <span class="d-block small text-secondary"><?php echo htmlspecialchars($r_df['dettaglio']); ?></span>
                             </a>
-                        <?php endforeach; if ((int)$g_df['n'] > 4): ?><div class="small text-secondary pt-1 border-top">… e altre <?php echo (int)$g_df['n'] - 4; ?>.</div><?php endif; ?>
+                        <?php endforeach; if ((int)$g_df['n'] > 4): ?><a class="d-block small fw-semibold pt-1 border-top" href="da_fare.php?g=<?php echo urlencode((string)$g_df['chiave']); ?>">… e altre <?php echo (int)$g_df['n'] - 4; ?>: vedi tutte</a><?php endif; ?>
                     </div></div>
                 <?php endforeach; ?>
                 </div>

@@ -21,6 +21,11 @@ final class DaFarePersona
     /** Giorni dopo i quali una cosa che aspetta si segnala come ferma. */
     public const GIORNI_FERMA = 7;
 
+    /** Quante righe per gruppo si leggono in area personale (la pagina «Da fare» ne chiede di più). */
+    public const RIGHE_BREVI = 15;
+
+    private int $limite = self::RIGHE_BREVI;
+
     public function __construct(private Database $db, private Direzione $direzione, private SostituzioniInCorso $sostituzioni)
     {
     }
@@ -29,10 +34,12 @@ final class DaFarePersona
      * I gruppi con almeno una cosa da fare per questa persona, nell'ordine in cui compaiono.
      *
      * @param array<string, mixed>|null $utente
+     * @param int $limite quante righe leggere al massimo per gruppo (il numero `n` è sempre il totale)
      * @return list<array{chiave: string, titolo: string, icona: string, colore: string, n: int, righe: list<array{testo: string, dettaglio: string, link: string, giorni: int}>}>
      */
-    public function gruppi(?array $utente): array
+    public function gruppi(?array $utente, int $limite = self::RIGHE_BREVI): array
     {
+        $this->limite = max(1, min($limite, 500));
         $email = mb_strtolower(trim((string) ($utente['email'] ?? '')));
         $cf = strtoupper(trim((string) ($utente['codice_fiscale'] ?? '')));
         if ($email === '' && $cf === '') {
@@ -127,7 +134,7 @@ final class DaFarePersona
         $da = "FROM convenzioni_compilate cc JOIN prenotazioni pr ON pr.id = cc.prenotazione_id JOIN turni t ON t.id = pr.turno_id JOIN eventi e ON e.id = t.evento_id";
         $n = (int) $this->db->valore("SELECT COUNT(DISTINCT cc.id) $da WHERE $dove", [$email]);
         $r = $this->db->righe("SELECT cc.token, cc.stato_iter, cc.nota_ufficio, cc.dati_json, MIN(e.titolo) AS titolo, DATEDIFF(NOW(), COALESCE(cc.aggiornata_il, cc.creata_il)) AS gg
-            $da WHERE $dove GROUP BY cc.id ORDER BY cc.creata_il LIMIT 15", [$email]);
+            $da WHERE $dove GROUP BY cc.id ORDER BY cc.creata_il LIMIT " . $this->limite, [$email]);
 
         return $this->gruppo('convenzioni_fsl', 'Convenzione della scuola da caricare', 'fa-file-signature', '#B30000', $n, $r, function (array $x): array {
             $dati = json_decode((string) ($x['dati_json'] ?? ''), true) ?: [];
@@ -148,7 +155,7 @@ final class DaFarePersona
         $dove = "c.stato = 'attesa' AND p.stato IN ('inviata', 'in_lavorazione') AND LOWER(c.email) = ?";
         $n = (int) $this->db->valore("SELECT COUNT(*) FROM pratiche_conferme c JOIN pratiche p ON p.id = c.pratica_id WHERE $dove", [$email]);
         $r = $this->db->righe("SELECT c.token, DATEDIFF(NOW(), c.richiesta_il) AS gg, p.codice, p.nome, p.cognome, m.titolo FROM pratiche_conferme c JOIN pratiche p ON p.id = c.pratica_id
-            JOIN didattica_moduli m ON m.id = p.modulo_id WHERE $dove ORDER BY c.richiesta_il LIMIT 15", [$email]);
+            JOIN didattica_moduli m ON m.id = p.modulo_id WHERE $dove ORDER BY c.richiesta_il LIMIT " . $this->limite, [$email]);
 
         return $this->gruppo('conferme', 'Attestati da confermare', 'fa-user-check', '#0369a1', $n, $r, fn (array $x): array => [
             'testo' => (string) $x['titolo'] . ' · ' . self::nome($x), 'dettaglio' => 'pratica ' . $x['codice'] . ': controlla le righe che ti riguardano e conferma',
@@ -162,7 +169,7 @@ final class DaFarePersona
         $dove = "f.stato = 'attesa' AND p.stato IN ('inviata', 'in_lavorazione') AND LOWER(f.email) = ?";
         $n = (int) $this->db->valore("SELECT COUNT(*) FROM pratiche_firme f JOIN pratiche p ON p.id = f.pratica_id WHERE $dove", [$email]);
         $r = $this->db->righe("SELECT f.token, DATEDIFF(NOW(), f.richiesta_il) AS gg, p.codice, p.nome, p.cognome, m.titolo FROM pratiche_firme f JOIN pratiche p ON p.id = f.pratica_id
-            JOIN didattica_moduli m ON m.id = p.modulo_id WHERE $dove ORDER BY f.richiesta_il LIMIT 15", [$email]);
+            JOIN didattica_moduli m ON m.id = p.modulo_id WHERE $dove ORDER BY f.richiesta_il LIMIT " . $this->limite, [$email]);
 
         return $this->gruppo('firme', 'Documenti da firmare', 'fa-signature', '#7c3aed', $n, $r, fn (array $x): array => [
             'testo' => (string) $x['titolo'] . ' · ' . self::nome($x), 'dettaglio' => 'pratica ' . $x['codice'] . ': firma digitale PAdES',
@@ -175,7 +182,7 @@ final class DaFarePersona
     {
         $chi = mb_strtolower(trim($this->direzione->chiFirma()['email']));
         $r = $chi !== '' && $chi === $email
-            ? $this->db->righe("SELECT token_direttore, azienda, DATEDIFF(NOW(), da_firmare_il) AS gg FROM convenzioni_tesi WHERE stato = 'da_firmare' AND token_direttore IS NOT NULL ORDER BY da_firmare_il LIMIT 15") : [];
+            ? $this->db->righe("SELECT token_direttore, azienda, DATEDIFF(NOW(), da_firmare_il) AS gg FROM convenzioni_tesi WHERE stato = 'da_firmare' AND token_direttore IS NOT NULL ORDER BY da_firmare_il LIMIT " . $this->limite) : [];
 
         return $this->gruppo('tesi_firma', 'Convenzioni di tesi da firmare', 'fa-file-signature', '#0f766e', count($r), $r, static fn (array $x): array => [
             'testo' => (string) $x['azienda'], 'dettaglio' => 'convenzione per la tesi: firma digitale PAdES', 'link' => 'firma_convenzione_tesi.php?t=' . urlencode((string) $x['token_direttore']), 'giorni' => max(0, (int) $x['gg']),
@@ -187,7 +194,7 @@ final class DaFarePersona
     {
         $membro = (int) $this->db->valore("SELECT COUNT(*) FROM uffici_persone p JOIN uffici u ON u.id = p.ufficio_id WHERE u.chiave = 'convenzioni_tesi' AND LOWER(p.email) = ?", [$email]) > 0;
         $stati = "'" . implode("','", CostantiTesi::DA_FARE_UFFICIO) . "'";
-        $r = $membro ? $this->db->righe("SELECT azienda, email, stato, DATEDIFF(NOW(), COALESCE(aggiornata_il, creata_il)) AS gg FROM convenzioni_tesi WHERE stato IN ($stati) ORDER BY COALESCE(aggiornata_il, creata_il) LIMIT 15") : [];
+        $r = $membro ? $this->db->righe("SELECT azienda, email, stato, DATEDIFF(NOW(), COALESCE(aggiornata_il, creata_il)) AS gg FROM convenzioni_tesi WHERE stato IN ($stati) ORDER BY COALESCE(aggiornata_il, creata_il) LIMIT " . $this->limite) : [];
         $cosa = [CostantiTesi::MODIFICHE => 'modifiche agli articoli da valutare', CostantiTesi::CARICATA => 'firmata dall\'azienda: da protocollare in entrata', CostantiTesi::IN_CARICO => 'da mandare al Direttore', CostantiTesi::FIRMATA => 'firmata dal Direttore: da protocollare in uscita'];
 
         return $this->gruppo('tesi_ufficio', 'Convenzioni di tesi da seguire', 'fa-handshake', '#047857', count($r), $r, static fn (array $x): array => [
@@ -202,7 +209,7 @@ final class DaFarePersona
             AND s.verbale_token IS NOT NULL AND s.verbale_token <> ''";
         $n = (int) $this->db->valore("SELECT COUNT(DISTINCT s.id) FROM didattica_sedute s JOIN didattica_consigli_persone p ON p.consiglio_id = s.consiglio_id WHERE $dove", [$email]);
         $r = $this->db->righe("SELECT DISTINCT s.id, s.organo, s.data, s.verbale_token, DATEDIFF(NOW(), COALESCE(s.verbale_inviato_il, s.data, s.creata_il)) AS gg
-            FROM didattica_sedute s JOIN didattica_consigli_persone p ON p.consiglio_id = s.consiglio_id WHERE $dove ORDER BY s.data LIMIT 15", [$email]);
+            FROM didattica_sedute s JOIN didattica_consigli_persone p ON p.consiglio_id = s.consiglio_id WHERE $dove ORDER BY s.data LIMIT " . $this->limite, [$email]);
 
         return $this->gruppo('verbali', 'Verbali da firmare', 'fa-gavel', '#475569', $n, $r, fn (array $x): array => [
             'testo' => (string) $x['organo'], 'dettaglio' => 'seduta del ' . ($x['data'] ? date('d/m/Y', (int) strtotime((string) $x['data'])) : '—'),
@@ -215,7 +222,7 @@ final class DaFarePersona
     {
         $dove = "stato = 'confermata' AND LOWER(docente_email) = ? AND token_docente IS NOT NULL AND token_docente <> ''";
         $n = (int) $this->db->valore("SELECT COUNT(*) FROM tutorato_incarichi WHERE $dove", [$email]);
-        $r = $this->db->righe("SELECT codice, nome, cognome, attivita, token_docente, DATEDIFF(NOW(), COALESCE(confermata_il, aggiornata_il, creata_il)) AS gg FROM tutorato_incarichi WHERE $dove ORDER BY confermata_il LIMIT 15", [$email]);
+        $r = $this->db->righe("SELECT codice, nome, cognome, attivita, token_docente, DATEDIFF(NOW(), COALESCE(confermata_il, aggiornata_il, creata_il)) AS gg FROM tutorato_incarichi WHERE $dove ORDER BY confermata_il LIMIT " . $this->limite, [$email]);
 
         return $this->gruppo('tutorato_lettere', 'Lettere di incarico da firmare (tutorato)', 'fa-user-graduate', '#b45309', $n, $r, fn (array $x): array => [
             'testo' => 'Tutor ' . self::nome($x), 'dettaglio' => 'incarico ' . $x['codice'] . ($x['attivita'] ? ': ' . mb_substr((string) $x['attivita'], 0, 80) : ''),
@@ -230,7 +237,7 @@ final class DaFarePersona
         $da = 'FROM tutorato_incarichi i JOIN tutorato_bandi b ON b.id = i.bando_id';
         $n = (int) $this->db->valore("SELECT COUNT(*) $da WHERE $dove", [$email]);
         $r = $this->db->righe("SELECT i.codice, i.nome, i.cognome, i.attivita, i.token_direttore, DATEDIFF(NOW(), COALESCE(i.firmata_docente_il, i.aggiornata_il, i.creata_il)) AS gg
-            $da WHERE $dove ORDER BY i.firmata_docente_il LIMIT 15", [$email]);
+            $da WHERE $dove ORDER BY i.firmata_docente_il LIMIT " . $this->limite, [$email]);
 
         return $this->gruppo('tutorato_lettere_direttore', 'Lettere di incarico da firmare (tutorato, Direttore)', 'fa-file-signature', '#b45309', $n, $r, fn (array $x): array => [
             'testo' => 'Tutor ' . self::nome($x), 'dettaglio' => 'incarico ' . $x['codice'] . ': firmata dal docente responsabile, aspetta la tua firma',
@@ -243,7 +250,7 @@ final class DaFarePersona
     {
         $dove = "stato = 'inviata' AND UPPER(codice_fiscale) = ? AND token_studente IS NOT NULL AND token_studente <> '' AND anonimizzata = 0";
         $n = (int) $this->db->valore("SELECT COUNT(*) FROM tutorato_incarichi WHERE $dove", [$cf]);
-        $r = $this->db->righe("SELECT codice, nome, cognome, attivita, token_studente, DATEDIFF(NOW(), COALESCE(inviata_il, aggiornata_il, creata_il)) AS gg FROM tutorato_incarichi WHERE $dove ORDER BY inviata_il LIMIT 15", [$cf]);
+        $r = $this->db->righe("SELECT codice, nome, cognome, attivita, token_studente, DATEDIFF(NOW(), COALESCE(inviata_il, aggiornata_il, creata_il)) AS gg FROM tutorato_incarichi WHERE $dove ORDER BY inviata_il LIMIT " . $this->limite, [$cf]);
 
         return $this->gruppo('tutorato_accettazione', 'Incarico di tutorato da accettare', 'fa-user-graduate', '#b45309', $n, $r, fn (array $x): array => [
             'testo' => 'Incarico ' . $x['codice'] . ($x['attivita'] ? ': ' . mb_substr((string) $x['attivita'], 0, 80) : ''), 'dettaglio' => 'controlla i dati della lettera e accetta con SPID o CIE',
@@ -259,7 +266,7 @@ final class DaFarePersona
         $r = $this->db->righe("SELECT i.id, i.codice, i.nome, i.cognome, i.fine_stato,
                 (SELECT COUNT(*) FROM tutorato_registro r WHERE r.incarico_id = i.id AND r.stato = 'inviata') AS da_approvare,
                 COALESCE((SELECT DATEDIFF(NOW(), MIN(r.creata_il)) FROM tutorato_registro r WHERE r.incarico_id = i.id AND r.stato = 'inviata'), 0) AS gg
-            FROM tutorato_incarichi i WHERE $dove ORDER BY i.id LIMIT 15", [$email]);
+            FROM tutorato_incarichi i WHERE $dove ORDER BY i.id LIMIT " . $this->limite, [$email]);
 
         return $this->gruppo('tutorato_registri', 'Registri del tutorato da approvare', 'fa-book', '#b45309', $n, $r, function (array $x): array {
             $cose = [];
@@ -283,7 +290,7 @@ final class DaFarePersona
             AND pr.valutazione_token IS NOT NULL AND pr.valutazione_token <> '' AND LOWER(pr.email) = ?";
         $n = (int) $this->db->valore("SELECT COUNT(*) FROM prenotazioni pr LEFT JOIN valutazioni_fsl v ON v.prenotazione_id = pr.id WHERE $dove", [$email]);
         $r = $this->db->righe("SELECT pr.valutazione_token, e.titolo, DATEDIFF(NOW(), pr.valutazione_inviata) AS gg FROM prenotazioni pr JOIN turni t ON t.id = pr.turno_id JOIN eventi e ON e.id = t.evento_id
-            LEFT JOIN valutazioni_fsl v ON v.prenotazione_id = pr.id WHERE $dove ORDER BY pr.valutazione_inviata LIMIT 15", [$email]);
+            LEFT JOIN valutazioni_fsl v ON v.prenotazione_id = pr.id WHERE $dove ORDER BY pr.valutazione_inviata LIMIT " . $this->limite, [$email]);
 
         return $this->gruppo('valutazioni', 'Schede di valutazione FSL da compilare', 'fa-star', '#0f766e', $n, $r, fn (array $x): array => [
             'testo' => (string) $x['titolo'], 'dettaglio' => 'scheda di valutazione della struttura ospitante (Formazione Scuola Lavoro)',
@@ -301,7 +308,7 @@ final class DaFarePersona
         $da = "FROM prenotazioni pr JOIN turni t ON t.id = pr.turno_id JOIN eventi e ON e.id = t.evento_id JOIN progetti_dettagli pd ON pd.evento_id = e.id";
         $n = (int) $this->db->valore("SELECT COUNT(*) $da WHERE $dove", [$email]);
         $r = $this->db->righe("SELECT pr.codice_prenotazione, e.titolo, e.tipo, pd.data_fine, t.data_turno, DATEDIFF(NOW(), COALESCE(IF(e.tipo = 'progetto', pd.data_fine, t.data_turno), t.data_turno)) AS gg
-            $da WHERE $dove ORDER BY t.data_turno LIMIT 15", [$email]);
+            $da WHERE $dove ORDER BY t.data_turno LIMIT " . $this->limite, [$email]);
 
         return $this->gruppo('elenchi', 'Elenchi degli studenti da inserire', 'fa-list-check', '#047857', $n, $r, fn (array $x): array => [
             'testo' => (string) $x['titolo'], 'dettaglio' => 'senza l\'elenco i tuoi studenti non ricevono gli attestati di partecipazione',
@@ -315,7 +322,7 @@ final class DaFarePersona
         $dove = "pr.stato = 'da_approvare' AND pr.fine >= NOW() AND LOWER(rr.email) = ? AND rr.puo_approvare = 1";
         $da = "FROM prenotazioni_risorse pr JOIN risorse r ON r.id = pr.risorsa_id JOIN risorse_responsabili rr ON rr.risorsa_id = r.id";
         $n = (int) $this->db->valore("SELECT COUNT(DISTINCT pr.id) $da WHERE $dove", [$email]);
-        $r = $this->db->righe("SELECT DISTINCT pr.id, pr.inizio, pr.nome, pr.cognome, r.nome AS risorsa, DATEDIFF(NOW(), pr.creata_il) AS gg $da WHERE $dove ORDER BY pr.inizio LIMIT 15", [$email]);
+        $r = $this->db->righe("SELECT DISTINCT pr.id, pr.inizio, pr.nome, pr.cognome, r.nome AS risorsa, DATEDIFF(NOW(), pr.creata_il) AS gg $da WHERE $dove ORDER BY pr.inizio LIMIT " . $this->limite, [$email]);
 
         return $this->gruppo('risorse', 'Prenotazioni di risorse da approvare', 'fa-door-open', '#0f766e', $n, $r, fn (array $x): array => [
             'testo' => (string) $x['risorsa'] . ' · ' . self::nome($x), 'dettaglio' => 'per il ' . date('d/m/Y H:i', (int) strtotime((string) $x['inizio'])),
@@ -338,7 +345,7 @@ final class DaFarePersona
             AND (p.assegnata_a = " . (int) $op['id'] . $inPiu . ($op['ufficio_id'] ? ' OR (p.assegnata_a IS NULL AND p.ufficio_id = ' . (int) $op['ufficio_id'] . ')' : '') . ')';
         $n = (int) $this->db->valore("SELECT COUNT(*) FROM pratiche p WHERE $dove");
         $r = $this->db->righe("SELECT p.id, p.codice, p.nome, p.cognome, p.assegnata_a, m.titolo, DATEDIFF(NOW(), COALESCE(p.aggiornata_il, p.creata_il)) AS gg
-            FROM pratiche p JOIN didattica_moduli m ON m.id = p.modulo_id WHERE $dove ORDER BY COALESCE(p.aggiornata_il, p.creata_il) LIMIT 15");
+            FROM pratiche p JOIN didattica_moduli m ON m.id = p.modulo_id WHERE $dove ORDER BY COALESCE(p.aggiornata_il, p.creata_il) LIMIT " . $this->limite);
 
         return $this->gruppo('pratiche', 'Pratiche da lavorare', 'fa-inbox', '#047857', $n, $r, fn (array $x): array => [
             'testo' => (string) $x['titolo'] . ' · ' . self::nome($x), 'dettaglio' => 'pratica ' . $x['codice'] . ($x['assegnata_a'] ? ((int) $x['assegnata_a'] === (int) $op['id'] ? ': in carico a te' : ': in carico a un collega che stai sostituendo') : ': del tuo ufficio, da prendere in carico'),

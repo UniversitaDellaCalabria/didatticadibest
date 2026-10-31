@@ -42,6 +42,16 @@ $u_logged_header = !empty($_SESSION['utente_id']);
 // Programma FSL della scuola: icona con il numero di attività scelte (compare solo quando ce n'è almeno una)
 $n_programma_fsl = 0;
 try { $n_programma_fsl = \App\Core\App::get(\App\Fsl\ProgrammaFsl::class)->conta(); } catch (\Throwable $e_prog) { $n_programma_fsl = 0; }
+// Numero di cose «Da fare» per la persona (calcolato ogni pochi minuti per sessione): pulsante con il numero rosso accanto al nome
+$n_da_fare = 0;
+// «Accedi» riporta alla pagina da cui si parte (solo da una richiesta normale di lettura, e mai dalla pagina dell'accesso stesso)
+$accedi_href = 'saml_login.php';
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && str_starts_with((string)($_SERVER['REQUEST_URI'] ?? ''), '/') && !str_starts_with((string)$_SERVER['REQUEST_URI'], '//') && !str_contains((string)$_SERVER['REQUEST_URI'], 'saml_login') && !str_contains((string)$_SERVER['REQUEST_URI'], 'esci.php')) {
+    $accedi_href .= '?redirect=' . urlencode((string)$_SERVER['REQUEST_URI']);
+}
+if ($u_logged_header) {
+    try { $n_da_fare = \App\Core\App::get(\App\Portale\ContatoreDaFare::class)->numero((int)$_SESSION['utente_id'], time()); } catch (\Throwable $e_df) { $n_da_fare = 0; }
+}
 $u_ruolo_header = isset($_SESSION['utente_ruolo_id']) ? (int)$_SESSION['utente_ruolo_id'] : 5;
 $u_sec_roles_header = !empty($_SESSION['utente_ruoli_secondari']) ? explode(',', $_SESSION['utente_ruoli_secondari']) : [];
 $is_admin_header = ($u_ruolo_header === 1 || $u_ruolo_header === 2 || in_array('1', $u_sec_roles_header) || in_array('2', $u_sec_roles_header));
@@ -364,6 +374,9 @@ if ($u_logged_header) {
                 <?php if ($n_programma_fsl > 0): ?>
                     <a href="programma_fsl.php" class="top-bar-btn programma-fsl-btn me-2" title="Il programma FSL della scuola" aria-label="Programma FSL: <?php echo (int)$n_programma_fsl; ?> attività. Apri il programma"><i class="fa fa-clipboard-list" aria-hidden="true"></i><span class="programma-fsl-n" aria-hidden="true"><?php echo (int)$n_programma_fsl; ?></span></a>
                 <?php endif; ?>
+                <?php if ($u_logged_header && $n_da_fare > 0): ?>
+                    <a href="da_fare.php" class="top-bar-btn me-2" aria-label="Da fare per te: <?php echo (int)$n_da_fare; ?>. Apri l'elenco"><i class="fa fa-list-check me-1" aria-hidden="true"></i>Da fare <span class="ui-badge-rosso ms-1" style="background:#B30000;color:#fff;"><?php echo (int)$n_da_fare; ?></span></a>
+                <?php endif; ?>
                 <?php if ($u_logged_header): ?>
                     <div class="dropdown">
                         <button class="top-bar-btn dropdown-toggle d-flex align-items-center" type="button" id="userTopDropdown" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Menu utente">
@@ -383,7 +396,7 @@ if ($u_logged_header) {
                         </div>
                     </div>
                 <?php else: ?>
-                    <a href="saml_login.php" class="top-bar-btn">
+                    <a href="<?php echo htmlspecialchars($accedi_href); ?>" class="top-bar-btn">
                         <i class="fa fa-sign-in-alt me-1" aria-hidden="true"></i> Accedi
                     </a>
                 <?php endif; ?>
@@ -504,13 +517,14 @@ if ($u_logged_header) {
         <?php if ($u_logged_header): ?>
             <div class="mob-nav-user"><i class="fa fa-user-circle me-2" aria-hidden="true"></i><?php echo htmlspecialchars($nome_visualizzato); ?></div>
             <a href="area_personale.php" class="mob-nav-link"><i class="fa fa-id-card me-2" style="color:#60a5fa;" aria-hidden="true"></i> Area Personale</a>
+            <?php if ($n_da_fare > 0): ?><a href="da_fare.php" class="mob-nav-link" style="font-weight:bold;"><i class="fa fa-list-check me-2" style="color:#fbbf24;" aria-hidden="true"></i> Da fare per te (<?php echo (int)$n_da_fare; ?>)</a><?php endif; ?>
             <?php if ($is_admin_header): ?>
                 <a href="admin/index.php" class="mob-nav-link"><i class="fa fa-cogs me-2" style="color:#f59e0b;" aria-hidden="true"></i> Pannello Gestori</a>
                 <a href="admin/scanner.php" class="mob-nav-link"><i class="fa fa-qrcode me-2" style="color:#34d399;" aria-hidden="true"></i> Scanner Check-in</a>
             <?php endif; ?>
             <a href="esci.php" class="mob-nav-link" style="color:#f87171;font-weight:bold;"><i class="fa fa-sign-out-alt me-2" aria-hidden="true"></i> Esci</a>
         <?php else: ?>
-            <a href="saml_login.php" class="mob-nav-link" style="font-weight:bold;"><i class="fa fa-sign-in-alt me-2" style="color:#34d399;" aria-hidden="true"></i> Accedi con SSO</a>
+            <a href="<?php echo htmlspecialchars($accedi_href); ?>" class="mob-nav-link" style="font-weight:bold;"><i class="fa fa-sign-in-alt me-2" style="color:#34d399;" aria-hidden="true"></i> Accedi con SSO</a>
         <?php endif; ?>
     </div>
 </div>

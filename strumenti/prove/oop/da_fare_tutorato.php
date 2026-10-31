@@ -29,4 +29,35 @@ prova(count($gc) === 1 && $gc[0]['n'] >= 1 && in_array('Tutor Verdi Luca', array
 $q("UPDATE tutorato_incarichi SET stato = 'firmata', token_direttore = NULL WHERE bando_id = 9895 AND codice = 'TU-DF2'");
 prova($per(['email' => 'dir9895@example.org'], 'tutorato_lettere_direttore') === [], "da fare: lettera firmata dal Direttore, non compare più");
 
+
+// Numero «Da fare» della barra: calcolato una volta, tenuto 5 minuti in sessione, azzerato alla chiusura di un compito, separato per persona
+$q("DELETE FROM utenti WHERE id IN (98951, 98952)");
+$q("INSERT INTO utenti (id, nome, cognome, email, codice_fiscale, ruolo_id, ruoli_secondari) VALUES (98951, 'Anna', 'Bianchi', 'anna9895@example.org', 'BNCNNA00A41D086X', 5, ''), (98952, 'Altro', 'Utente', 'altro9895@example.org', 'ZZZZZZ00A00A000A', 5, '')");
+$sess_df = new class implements \App\Auth\Sessione {
+    /** @var array<string, mixed> */
+    public array $d = [];
+    public function leggi(string $chiave): mixed { return $this->d[$chiave] ?? null; }
+    public function scrivi(string $chiave, mixed $valore): void { $this->d[$chiave] = $valore; }
+    public function togli(string $chiave): void { unset($this->d[$chiave]); }
+    public function rigenera(): void {}
+};
+$cont_df = new \App\Portale\ContatoreDaFare($sess_df, \App\Core\App::per($conn)->get(\App\Auth\UtenteRepository::class), $daFare);
+prova($cont_df->numero(98951, 1000) === 1, "contatore: il tutor con un incarico da accettare ha 1 cosa da fare");
+$q("UPDATE tutorato_incarichi SET stato = 'confermata' WHERE bando_id = 9895 AND codice = 'TU-DF1'");
+prova($cont_df->numero(98951, 1100) === 1, "contatore: entro i 5 minuti resta il valore in sessione (nessun nuovo calcolo)");
+$cont_df->azzera();
+prova($cont_df->numero(98951, 1100) === 0, "contatore: dopo l'azzeramento (compito chiuso) si ricalcola subito");
+$q("UPDATE tutorato_incarichi SET stato = 'inviata' WHERE bando_id = 9895 AND codice = 'TU-DF1'");
+prova($cont_df->numero(98951, 1100 + \App\Portale\ContatoreDaFare::DURATA + 1) === 1, "contatore: scaduti i 5 minuti si ricalcola da solo");
+prova($cont_df->numero(98952, 1100 + \App\Portale\ContatoreDaFare::DURATA + 2) === 0 && $cont_df->numero(0, 5000) === 0, "contatore: un'altra persona (o nessuno) non eredita il numero della sessione");
+
+// Pagina dell'elenco completo e accesso diretto
+$grandi_df = $daFare->gruppi(['email' => '', 'codice_fiscale' => 'BNCNNA00A41D086X'], 200);
+prova(count($grandi_df) === 1 && $grandi_df[0]['n'] === 1, "da fare: il limite di righe per gruppo è un parametro (la pagina elenco ne chiede di più)");
+$p_df = (string) file_get_contents(__DIR__ . '/../../../da_fare.php');
+$ar_df = (string) file_get_contents(__DIR__ . '/../../../inc/area/da_fare.php');
+$sl_df = (string) file_get_contents(__DIR__ . '/../../../saml_login.php');
+prova(str_contains($p_df, 'middleware.php') && str_contains($p_df, 'gruppi($user_info ?? null, 200)') && str_contains($ar_df, 'da_fare.php?g='), "pagina «Da fare»: richiede l'accesso, legge fino a 200 righe e l'area personale rimanda lì per le altre");
+prova(str_contains($sl_df, "\$redirect = 'area_personale.php'") && str_contains($sl_df, "strpos(\$redirect_raw, '//') !== 0"), "accesso: senza pagina di partenza si va all'area personale e il controllo anti open-redirect resta");
+$q("DELETE FROM utenti WHERE id IN (98951, 98952)");
 foreach (["DELETE FROM tutorato_incarichi WHERE bando_id = 9895", "DELETE FROM tutorato_bandi WHERE id = 9895"] as $sql) $q($sql);

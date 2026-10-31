@@ -19,6 +19,10 @@ if (!function_exists('flash_set')) {
     function flash_get() {
         return (new \App\Auth\Flash(new \App\Auth\SessioneNativa()))->prendi();
     }
+    /** Una persona ha chiuso un compito: il numero «Da fare» della barra si ricalcola alla prossima pagina. */
+    function da_fare_aggiorna(): void {
+        try { \App\Core\App::get(\App\Portale\ContatoreDaFare::class)->azzera(); } catch (\Throwable $e) { error_log('da_fare_aggiorna: ' . $e->getMessage()); }
+    }
     function flash_html() {
         return (new \App\Auth\Flash(new \App\Auth\SessioneNativa()))->html();
     }
