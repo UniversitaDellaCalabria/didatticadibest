@@ -54,13 +54,43 @@ final class IncaricoRepository
     }
 
     /**
-     * Id delle lettere firmate o protocollate, dalla più recente (le visibili nel registro).
+     * Le lettere firmate o protocollate che riguardano una persona (come tutor: codice fiscale; come docente responsabile: email, codice fiscale o scheda
+     * dell'anagrafe), con i dati del bando, dalla più recente. Una sola lettura, qualunque sia il numero di lettere dell'archivio.
      *
-     * @return list<int>
+     * @return list<array<string, string|null>>
      */
-    public function idFirmate(): array
+    public function firmateDi(string $codiceFiscale, string $email, string $personaId): array
     {
-        return array_map(static fn (array $r): int => (int) $r['id'], $this->db->righe("SELECT id FROM tutorato_incarichi WHERE stato IN ('firmata', 'protocollata') ORDER BY creata_il DESC"));
+        $cf = strtoupper(trim($codiceFiscale));
+        $email = strtolower(trim($email));
+        $condizioni = [];
+        $par = [];
+        if ($cf !== '') {
+            $condizioni[] = 'UPPER(i.codice_fiscale) = ?';
+            $condizioni[] = 'UPPER(i.docente_cf) = ?';
+            array_push($par, $cf, $cf);
+        }
+        if ($email !== '') {
+            $condizioni[] = 'LOWER(i.docente_email) = ?';
+            $par[] = $email;
+        }
+        if ($personaId !== '') {
+            $condizioni[] = 'i.docente_persona_id = ?';
+            $par[] = $personaId;
+        }
+        if (!$condizioni) {
+            return [];
+        }
+
+        $righe = $this->db->righe(
+            "SELECT i.*, " . self::DATI_BANDO . "
+             FROM tutorato_incarichi i JOIN tutorato_bandi b ON b.id = i.bando_id
+             WHERE i.stato IN ('firmata', 'protocollata') AND (" . implode(' OR ', $condizioni) . ')
+             ORDER BY i.creata_il DESC',
+            $par
+        );
+
+        return array_map(static fn (array $r): array => (array) Righe::riga($r), $righe);
     }
 
     /**

@@ -46,6 +46,21 @@ prova(registro_aperto(incarico_tutorato($conn, $i70)) === true && aggiungi_regis
 $righe70 = registro_incarico($conn, $i70);
 prova(count($righe70) === 2 && $righe70 == $s_reg->righe($i70) && ore_registro($righe70)['inviata'] === 5.5 && decidi_registro($conn, $i70, 'approvata') === 2 && togli_registro($conn, $i70, (int)$righe70[0]['id']) !== null, "registro: ore, approvazione e righe già decise non rimovibili");
 
+// Registro: con tante lettere firmate le query restano poche (una lettura filtrata, non una per lettera) e si vedono solo le proprie
+$q("UPDATE tutorato_incarichi SET stato = 'firmata' WHERE id = $i70");
+for ($k_ = 1; $k_ <= 40; $k_++) {
+    $q("INSERT INTO tutorato_incarichi (bando_id, codice, cognome, nome, codice_fiscale, email, docente_email, stato) VALUES ($b70, 'TU-MASSA$k_', 'Massa', 'Prova $k_', 'MSSPRV00A01D086Z', 'massa$k_@example.org', 'altro-doc@example.org', 'firmata')");
+}
+$dom_ = static fn (): int => (int) $conn->query("SHOW SESSION STATUS LIKE 'Questions'")->fetch_row()[1];
+$prima_ = $dom_();
+$tutor_ = $s_reg->incarichiRegistro(['id' => 7, 'codice_fiscale' => 'prvstt00a71d086x', 'email' => '']);
+$doc_ = $s_reg->incarichiRegistro(['id' => 8, 'codice_fiscale' => '', 'email' => 'DOC70@example.org']);
+$estraneo_ = $s_reg->incarichiRegistro(['id' => 9, 'codice_fiscale' => '', 'email' => 'nessuno@example.org']);
+$query_ = $dom_() - $prima_ - 1; // meno la lettura del contatore stessa
+prova(count($tutor_) === 1 && $tutor_[0]['_ruolo'] === 'tutor' && count($doc_) === 1 && $doc_[0]['_ruolo'] === 'docente' && $estraneo_ === [], "Registro: ognuno vede solo le proprie lettere firmate");
+prova($query_ === 3, "Registro: con 41 lettere firmate bastano $query_ query per tre persone (una ciascuna, non una per lettera)");
+$q("DELETE FROM tutorato_incarichi WHERE bando_id = $b70 AND cognome = 'Massa'");
+
 // Cartelle protette: ci sono e non si leggono via web
 $rel = $c_tut->get(\App\Tutorato\ArchivioIncarichi::class)->scrivi('TU-PROVA70', 'x', "%PDF-1.4\nprova");
 $cart = RADICE_SITO . '/' . dirname((string)$rel);

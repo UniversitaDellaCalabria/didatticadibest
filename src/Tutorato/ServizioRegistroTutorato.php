@@ -79,11 +79,8 @@ final class ServizioRegistroTutorato
         }
         $out = [];
         $cf = strtoupper(trim((string)($u['codice_fiscale'] ?? '')));
-        foreach ($this->incarichi->idFirmate() as $idLettera) {
-            $i = $this->incarichi->perId($idLettera);
-            if (!$i) {
-                continue;
-            }
+        $candidate = $this->incarichi->firmateDi($cf, (string) ($u['email'] ?? ''), (string) ($u['persona_id'] ?? ''));
+        foreach ($candidate as $i) {
             if ($cf !== '' && $cf === strtoupper((string) $i['codice_fiscale'])) {
                 $out[] = $i + ['_ruolo' => 'tutor'];
             } elseif ($this->lettere->firmatario($i, 'docente', $u)) {

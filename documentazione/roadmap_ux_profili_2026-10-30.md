@@ -366,6 +366,9 @@ spiega dove trovare il compito.
 ## FASE 5 — Prestazioni
 
 **5.1 Registro del tutorato: una query per ogni lettera mai firmata** (S, alta priorità)
+
+> **Stato 31/10/2026: FATTO in locale, da caricare (nessuna modifica allo schema).** `IncaricoRepository::firmateDi()` legge in una sola query le lettere firmate della persona
+> (tutor per codice fiscale; docente per email, codice fiscale o scheda); `idFirmate()` tolta. Prova in `strumenti/prove/oop/tutorato.php`: 41 lettere, 1 query per persona.
 - **Problema.** `ServizioRegistroTutorato::incarichiRegistro()` (`src/Tutorato/ServizioRegistroTutorato.php:82-92`) legge **tutte** le lettere firmate o protocollate
   di sempre (`IncaricoRepository::idFirmate()`, riga 61) e per ognuna fa `perId()`. Si esegue per ogni utente a ogni apertura dell'area personale (tessera
   `tutorato_registro`) e di `registro_tutorato.php`: cresce ogni anno.
