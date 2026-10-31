@@ -37,6 +37,8 @@ $prc = function (int $id, int $turno, string $stato, string $scad = 'NULL') use 
 $prc(996110, 996101, 'confermata');
 $prc(996111, 996102, 'in_attesa');
 $prc(996112, 996103, 'richiesta_conferma', $gg('+1 day') . ' 18:00:00');
+// L'offerta di un posto ora è anche un compito di «Da fare» (per email): qui serve una persona con la sola agenda, quindi l'email della prenotazione è un'altra
+$q("UPDATE prenotazioni SET email = 'altra99@prova.it' WHERE id = 996112");
 $prc(996113, 996104, 'confermata');
 $q("INSERT INTO risorse (id, pagina_id, nome, tipo, luogo, durata_slot, max_slot, attiva, persona_id) VALUES (99610, $area_cal, 'Laboratorio Cal 99', 'laboratorio', 'Cubo 4B', 60, 2, 1, NULL), (99611, $area_cal, 'Ricevimento Doc 99', 'sportello', 'Studio 12', 30, 1, 1, NULL)");
 $q("INSERT INTO prenotazioni_risorse (risorsa_id, utente_id, nome, cognome, email, inizio, fine, motivo, stato, codice) VALUES

@@ -53,7 +53,8 @@ final class DaFarePersona
             $fonti['tutoratoAccettazione'] = $cf;
         }
         if ($email !== '') {
-            $fonti += ['tutoratoRegistri' => $email, 'valutazioni' => $email, 'elenchi' => $email, 'risorse' => $email, 'pratiche' => $email];
+            $fonti += ['tutoratoRegistri' => $email, 'valutazioni' => $email, 'elenchi' => $email, 'risorse' => $email, 'pratiche' => $email,
+                'praticheIntegrazione' => $email, 'postoLiberato' => $email];
         }
         foreach ($fonti as $metodo => $chi) {
             try {
@@ -93,6 +94,8 @@ final class DaFarePersona
             "SELECT email FROM risorse_responsabili WHERE puo_approvare = 1",
             "SELECT email FROM didattica_consigli_persone WHERE ruolo IN ('segretario', 'coordinatore')",
             "SELECT email FROM uffici_persone",
+            "SELECT email FROM pratiche WHERE stato = 'integrazione' AND email <> ''",
+            "SELECT email FROM prenotazioni WHERE stato = 'richiesta_conferma' AND email <> ''",
         ];
         $emails = [];
         foreach ($fonti as $q) {
@@ -327,6 +330,34 @@ final class DaFarePersona
         return $this->gruppo('risorse', 'Prenotazioni di risorse da approvare', 'fa-door-open', '#0f766e', $n, $r, fn (array $x): array => [
             'testo' => (string) $x['risorsa'] . ' · ' . self::nome($x), 'dettaglio' => 'per il ' . date('d/m/Y H:i', (int) strtotime((string) $x['inizio'])),
             'link' => 'risorse_responsabile.php', 'giorni' => max(0, (int) $x['gg']),
+        ]);
+    }
+
+    /** Le tue pratiche (moduli online) per cui l'ufficio ha chiesto un'integrazione: lo studente deve rispondere. */
+    private function praticheIntegrazione(string $email): array
+    {
+        $dove = "p.stato = 'integrazione' AND LOWER(p.email) = ?";
+        $n = (int) $this->db->valore("SELECT COUNT(*) FROM pratiche p WHERE $dove", [$email]);
+        $r = $this->db->righe("SELECT p.id, p.codice, DATEDIFF(NOW(), COALESCE(p.aggiornata_il, p.creata_il)) AS gg, m.titolo FROM pratiche p JOIN didattica_moduli m ON m.id = p.modulo_id
+            WHERE $dove ORDER BY COALESCE(p.aggiornata_il, p.creata_il) LIMIT " . $this->limite, [$email]);
+
+        return $this->gruppo('pratiche_integrazione', 'Pratiche da integrare', 'fa-folder-open', '#b45309', $n, $r, fn (array $x): array => [
+            'testo' => (string) $x['titolo'], 'dettaglio' => 'pratica ' . $x['codice'] . ': l\'ufficio ha chiesto un\'integrazione, rispondi dalla pratica',
+            'link' => 'pratiche.php?id=' . (int) $x['id'], 'giorni' => max(0, (int) $x['gg']),
+        ]);
+    }
+
+    /** Posti liberati in una lista d'attesa e offerti a te: vanno confermati entro la scadenza, poi passano al prossimo. */
+    private function postoLiberato(string $email): array
+    {
+        $dove = "pr.stato = 'richiesta_conferma' AND (pr.scadenza_conferma IS NULL OR pr.scadenza_conferma >= NOW()) AND LOWER(pr.email) = ? AND e.archiviato = 0";
+        $da = 'FROM prenotazioni pr JOIN turni t ON t.id = pr.turno_id JOIN eventi e ON e.id = t.evento_id';
+        $n = (int) $this->db->valore("SELECT COUNT(*) $da WHERE $dove", [$email]);
+        $r = $this->db->righe("SELECT pr.id, pr.scadenza_conferma, e.titolo $da WHERE $dove ORDER BY pr.scadenza_conferma LIMIT " . $this->limite, [$email]);
+
+        return $this->gruppo('posto_liberato', 'Posti liberati da confermare', 'fa-hourglass-half', '#B30000', $n, $r, fn (array $x): array => [
+            'testo' => (string) $x['titolo'], 'dettaglio' => 'si è liberato un posto per te' . ($x['scadenza_conferma'] ? ': conferma entro il ' . date('d/m/Y \a\l\l\e H:i', (int) strtotime((string) $x['scadenza_conferma'])) : ''),
+            'link' => 'miei_eventi.php?conferma_posto=' . (int) $x['id'], 'giorni' => 0,
         ]);
     }
 
