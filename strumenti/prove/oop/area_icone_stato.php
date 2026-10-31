@@ -11,3 +11,7 @@ prova(str_contains($html, '<span class="ui-icona-stato">Posto da confermare</spa
 prova(!str_contains($ic('fa-user', '#000', 'Profilo', 'profilo.php'), 'ui-icona-stato'), "area_icona: senza stato (come prima) non c'è nessuna riga");
 prova(str_contains($ic('fa-user', '#000', 'X', 'x.php', 1, '', '<b>2</b> & altro'), '&lt;b&gt;2&lt;/b&gt; &amp; altro'), "area_icona: la riga di stato è ripulita");
 prova(strpos($html, 'ui-icona-testo') < strpos($html, 'ui-icona-stato') && strpos($html, 'ui-icona-stato') < strpos($html, 'ui-badge-rosso'), "area_icona: ordine nome, stato, numero in rosso");
+
+// 3.S1 Il numero dell'icona «Eventi e attestati» conta anche le attività FSL da completare
+$ev_src = (string) file_get_contents(__DIR__ . '/../../../inc/area/eventi.php');
+prova(str_contains($ev_src, 'ServizioPercorsiScuola') && str_contains($ev_src, '$ev_totale = $ev_offerte + $ev_fsl;') && str_contains($ev_src, "'miei_eventi.php', \$ev_totale"), "icona Eventi: il numero somma posti da confermare e attività FSL da completare");
