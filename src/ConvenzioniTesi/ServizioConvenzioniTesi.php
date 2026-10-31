@@ -7,6 +7,7 @@ namespace App\ConvenzioniTesi;
 use App\Core\Database;
 use App\Core\Orologio;
 use App\Core\Sito;
+use App\Infrastructure\Pdf\MessaggiFirma;
 use App\Infrastructure\Pdf\VerificaFirme;
 use App\Infrastructure\Storage\Upload;
 use App\Tutorato\FirmaRemota;
@@ -534,22 +535,22 @@ final class ServizioConvenzioniTesi
             return 'Prima di firmare vanno decise le modifiche agli articoli.';
         }
         if ($pdf === '' || strlen($pdf) > Costanti::MAX_FILE) {
-            return $pdf === '' ? 'Il file è vuoto.' : 'Il file è troppo grande: il limite è ' . (Costanti::MAX_FILE / 1048576) . ' MB.';
+            return MessaggiFirma::per($pdf === '' ? MessaggiFirma::VUOTO : MessaggiFirma::GRANDE, (int) (Costanti::MAX_FILE / 1048576));
         }
         if (strncmp($pdf, '%PDF-', 5) !== 0) {
-            return 'Il file non è un PDF. Carica il PDF firmato digitalmente in formato PAdES (non il file .p7m).';
+            return MessaggiFirma::nonPdf($pdf);
         }
         $firme = $this->firme->firmePades($pdf);
         if (!$firme) {
-            return 'Nel PDF non trovo una firma digitale PAdES. Il legale rappresentante deve firmare il PDF in formato PAdES: i file .p7m non sono accettati.';
+            return MessaggiFirma::per(MessaggiFirma::SENZA_FIRMA);
         }
         foreach ($firme as $f) {
             if (empty($f['valida_struttura'])) {
-                return 'La firma digitale del PDF non è integra: ripeti la firma e carica di nuovo il file.';
+                return MessaggiFirma::per(MessaggiFirma::NON_INTEGRA);
             }
         }
         if (empty($firme[array_key_last($firme)]['copre_tutto'])) {
-            return 'Il PDF è stato modificato dopo la firma: carica il file così come è uscito dalla firma, senza salvarlo di nuovo.';
+            return MessaggiFirma::per(MessaggiFirma::MODIFICATA);
         }
         $cartella = $this->sito->radice() . '/' . Costanti::DIR_FIRMATE;
         $this->upload->cartellaProtetta($cartella, 'Convenzioni di tesi firmate dalle aziende: si scaricano solo dal pannello e dalla pagina con il link personale');

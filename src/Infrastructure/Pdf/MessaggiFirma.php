@@ -25,7 +25,7 @@ final class MessaggiFirma
         self::GRANDE => 'Il file è troppo grande: il limite è %d MB. Cosa fare: riduci le immagini del documento prima della firma, poi firma e carica di nuovo.',
         self::NON_PDF => 'Il file non è un PDF. Cosa fare: carica il PDF firmato (il file termina con .pdf), non un documento Word o un\'immagine.',
         self::P7M => 'Il file non è un PDF: è una firma in formato CAdES (.p7m), che il portale non accetta. Cosa fare: firma di nuovo il PDF scegliendo il formato PAdES (nel programma di firma l\'opzione «PDF firmato») e carica il file .pdf che ne esce.',
-        self::SENZA_FIRMA => 'Nel PDF non trovo una firma digitale PAdES: il file non risulta firmato. Cosa fare: fai firmare il PDF dal Dirigente in formato PAdES e carica il file così come esce dalla firma.',
+        self::SENZA_FIRMA => 'Nel PDF non trovo una firma digitale PAdES: il file non risulta firmato. Cosa fare: fai firmare il PDF dal legale rappresentante (il Dirigente della scuola, il rappresentante dell\'azienda) in formato PAdES e carica il file così come esce dalla firma.',
         self::NON_INTEGRA => 'La firma digitale del PDF non è integra: il file è danneggiato o la firma si è interrotta. Cosa fare: ripeti la firma sul PDF originale e carica di nuovo il file.',
         self::MODIFICATA => 'Il PDF è stato modificato dopo la firma (salvato di nuovo, stampato in PDF o ritoccato), quindi la firma non copre più tutto il file. Cosa fare: ripeti la firma e carica il file così come è uscito dalla firma, senza riaprirlo.',
     ];
