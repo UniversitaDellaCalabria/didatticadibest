@@ -266,6 +266,8 @@ lato docente; bozze delle pratiche; percorsi a passi per convenzione FSL e conve
   `html_campo_scuola()`) e imposta `utenti.scuola_codice`, così il profilo diventa Scuola subito.
 
 **3.S4 Tessere inutili per le scuole** (S)
+
+> **Stato 31/10/2026: FATTO in locale (schema v110).** La scheda «Tirocini» non ha più il profilo Scuola; la migrazione lo toglie solo se i profili sono ancora quelli di partenza (confronto senza badare all'ordine).
 - **Problema.** La scheda «Tirocini» (TSP 2.0, tirocini universitari) è assegnata anche a Scuola ed Esterno (`CatalogoRiquadri.php:47-48`).
 - **Soluzione.** Togliere Scuola dai profili di partenza; per le installazioni esistenti una migrazione che toglie il profilo solo se l'amministratore non l'ha cambiato.
 

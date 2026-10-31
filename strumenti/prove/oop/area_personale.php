@@ -166,7 +166,17 @@ prova($rs_ap(99511) === '7', "gruppo Scuole: tolta la scuola, il gruppo va via e
 $cont_ap->get(\App\Iscrizioni\PrenotazioneRepository::class)->impostaScuolaUtente(99511, 'CSTF00003C');
 prova($rs_ap(99511) === '7,' . $id_gs, "gruppo Scuole: quando il docente sceglie la scuola il gruppo arriva da solo", $rs_ap(99511));
 $riq_sc = array_column($rep_ap->perProfili(['scuola']), 'chiave');
-prova(in_array('da_fare', $riq_sc, true) && in_array('assistenza', $riq_sc, true) && in_array('tirocini', $riq_sc, true), "profilo Scuola: vede i riquadri di tutti (da fare, assistenza) e i tirocini", implode(',', $riq_sc));
+prova(in_array('da_fare', $riq_sc, true) && in_array('assistenza', $riq_sc, true) && !in_array('tirocini', $riq_sc, true), "profilo Scuola: vede i riquadri di tutti (da fare, assistenza) ma non i tirocini universitari (TSP 2.0)", implode(',', $riq_sc));
+// Migrazione v110: la scheda Tirocini perde la Scuola solo se i profili sono ancora quelli di partenza
+$mig_s4 = new \App\Core\Schema\Migrazioni(\App\Core\App::per($conn)->get(\App\Core\Database::class), sys_get_temp_dir());
+$q("UPDATE area_riquadri SET profili = 'studente,docente,esterno,amministratore,scuola,azienda' WHERE chiave = 'tirocini'"); // come sui siti già in uso: scuola e azienda aggiunte in coda dalla v104
+(new ReflectionMethod($mig_s4, 'datiDiPartenza'))->invoke($mig_s4);
+$pr_s4 = fn() => array_column($rep_ap->tutti(), 'profili', 'chiave')['tirocini'];
+prova(!in_array('scuola', $pr_s4(), true) && in_array('esterno', $pr_s4(), true) && in_array('azienda', $pr_s4(), true), "migrazione v110: tirocini perde la Scuola e resta a studenti, docenti, aziende, esterni e amministratori");
+$q("UPDATE area_riquadri SET profili = 'scuola,studente' WHERE chiave = 'tirocini'");
+(new ReflectionMethod($mig_s4, 'datiDiPartenza'))->invoke($mig_s4);
+prova($pr_s4() === ['scuola', 'studente'] || $pr_s4() === ['studente', 'scuola'], "migrazione v110: se l'amministratore aveva scelto i profili, non si toccano");
+$q("UPDATE area_riquadri SET profili = '" . \App\Portale\Area\Profili::inCsv(array_map('strval', $cat_ap['tirocini']['profili'])) . "' WHERE chiave = 'tirocini'");
 // Il gruppo «Aziende» e il profilo «Azienda»: dall'email di una convenzione di tesi o dal gruppo dato a mano
 $ga_ap = new \App\Auth\GruppoAziende($db_oop);
 $id_ga = $ga_ap->id();

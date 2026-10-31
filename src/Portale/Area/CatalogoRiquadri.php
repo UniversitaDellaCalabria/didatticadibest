@@ -45,7 +45,7 @@ final class CatalogoRiquadri
             'messaggi' => ['tipo' => self::SPECIALE, 'forma' => self::ICONA, 'titolo' => 'Messaggi', 'descrizione' => 'La casella unica di chi gestisce (aree, convenzioni FSL, assistenza) con i messaggi da leggere; compare solo a chi ha una di queste postazioni', 'icona' => 'fa-envelope', 'colore' => '#1d4ed8',
                 'profili' => [Profili::DOCENTE, Profili::DIRETTORE, Profili::PERSONALE, Profili::GESTORE, Profili::AMMINISTRATORE], 'ordine' => 52],
             'tirocini' => ['tipo' => self::SCHEDA, 'titolo' => 'Tirocini', 'descrizione' => 'Guida sui tirocini e collegamento alla piattaforma esterna TSP 2.0 (i tirocini non si gestiscono nel portale)', 'icona' => 'fa-briefcase', 'colore' => '#0e7490',
-                'profili' => [Profili::STUDENTE, Profili::DOCENTE, Profili::SCUOLA, Profili::AZIENDA, Profili::ESTERNO, Profili::AMMINISTRATORE], 'ordine' => 60,
+                'profili' => [Profili::STUDENTE, Profili::DOCENTE, Profili::AZIENDA, Profili::ESTERNO, Profili::AMMINISTRATORE], 'ordine' => 60,
                 'testo' => 'I tirocini si gestiscono sulla piattaforma TSP 2.0 di Ateneo, non in questo portale. La guida spiega i passi, dalla proposta alla relazione finale.',
                 'link' => 'percorso_tirocini.php', 'etichetta_link' => 'La guida sui tirocini', 'link2' => 'https://unical.tsp.esse3.cineca.it', 'etichetta_link2' => 'Vai alla piattaforma TSP 2.0'],
             'tutorato_mio' => ['tipo' => self::SPECIALE, 'titolo' => 'Il mio tutorato', 'descrizione' => 'Per chi ha un incarico di tutorato (anche dottorandi e personale): a che punto è e i suoi documenti; compare solo a chi ha un incarico', 'icona' => 'fa-user-graduate', 'colore' => '#0f766e',
