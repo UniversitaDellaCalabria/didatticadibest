@@ -179,6 +179,7 @@ lato docente; bozze delle pratiche; percorsi a passi per convenzione FSL e conve
 ## FASE 2 — Firme del Direttore e approvazioni dei docenti
 
 ### 2.1 Una sola «scrivania delle firme»
+- **Stato (31/10/2026): passo 1 fatto** — `src/Firme/`: cinque adattatori (`FirmePratiche`, `FirmeConvenzioniFsl`, `FirmeConvenzioniTesi`, `FirmeTutorato`, `FirmeVerbali`) dietro l'interfaccia `FonteFirme` e `ScrivaniaFirme` che li unisce; riusano le regole di ogni modulo su chi può firmare; prova `firme_scrivania.php`. Restano: pagina `firme.php` e riquadro «Da firmare», scarico ZIP, ricarica dei firmati, conferme in blocco (2.5), storico (2.6).
 - **Problema.** Cinque pagine di firma con codice simile ma separato: `firma_pratica.php`, `firma_convenzione.php`, `firma_convenzione_tesi.php`, `firma_incarico.php`
   (lettera e fine attività), `firma_verbale.php`. Si arriva a ognuna da un link diverso; il Cruscotto (`cruscotto_direttore.php`) è «solo lettura».
 - **Soluzione logica.** Pagina `firme.php` («Da firmare») per chiunque firmi (Direttore, vice, relatori, docenti del tutorato, segretari e coordinatori):

@@ -94,6 +94,20 @@ final class IncaricoRepository
     }
 
     /**
+     * Le lettere che aspettano una firma (docente, Direttore o fine attività), con i giorni di attesa: chi può firmare lo decide ServizioIncarichi.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function inFirma(): array
+    {
+        return $this->db->righe(
+            "SELECT i.*, " . self::DATI_BANDO . ", DATEDIFF(NOW(), COALESCE(i.aggiornata_il, i.creata_il)) AS gg
+             FROM tutorato_incarichi i JOIN tutorato_bandi b ON b.id = i.bando_id
+             WHERE i.anonimizzata = 0 AND (i.stato IN ('confermata', 'firmata_docente') OR i.fine_stato = 'da_firmare') ORDER BY COALESCE(i.aggiornata_il, i.creata_il)"
+        );
+    }
+
+    /**
      * Id delle lettere da seguire con i promemoria e i solleciti (non ancora anonimizzate).
      *
      * @return list<int>
