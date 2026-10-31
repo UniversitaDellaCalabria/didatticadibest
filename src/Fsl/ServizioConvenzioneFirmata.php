@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Fsl;
 
 use App\Core\Sito;
+use App\Infrastructure\Pdf\MessaggiFirma;
 use App\Infrastructure\Pdf\VerificaFirme;
 use App\Infrastructure\Storage\Upload;
 
@@ -68,7 +69,7 @@ final class ServizioConvenzioneFirmata
             return [$mancante, null];
         }
         if ($errore === UPLOAD_ERR_INI_SIZE || $errore === UPLOAD_ERR_FORM_SIZE || (int) ($file['size'] ?? 0) > Costanti::MAX_FIRMATA) {
-            return ['Il file è troppo grande: il limite è ' . (Costanti::MAX_FIRMATA / 1048576) . ' MB.', null];
+            return [MessaggiFirma::per(MessaggiFirma::GRANDE, (int) (Costanti::MAX_FIRMATA / 1048576)), null];
         }
         $tmp = (string) ($file['tmp_name'] ?? '');
         if ($errore !== UPLOAD_ERR_OK || !is_uploaded_file($tmp)) {
@@ -91,22 +92,22 @@ final class ServizioConvenzioneFirmata
             return "La convenzione è già stata presa in carico dal Dipartimento: non si può più sostituire. Se serve una correzione, scrivi all'ufficio.";
         }
         if ($pdf === '' || strlen($pdf) > Costanti::MAX_FIRMATA) {
-            return $pdf === '' ? 'Il file è vuoto.' : 'Il file è troppo grande: il limite è ' . (Costanti::MAX_FIRMATA / 1048576) . ' MB.';
+            return MessaggiFirma::per($pdf === '' ? MessaggiFirma::VUOTO : MessaggiFirma::GRANDE, (int) (Costanti::MAX_FIRMATA / 1048576));
         }
         if (strncmp($pdf, '%PDF-', 5) !== 0) {
-            return 'Il file non è un PDF. Carica il PDF firmato digitalmente in formato PAdES (non il file .p7m).';
+            return MessaggiFirma::nonPdf($pdf);
         }
         $firme = $this->firme->firmePades($pdf);
         if (!$firme) {
-            return 'Nel PDF non trovo una firma digitale PAdES. Il Dirigente Scolastico deve firmare il PDF in formato PAdES: i file .p7m non sono accettati.';
+            return MessaggiFirma::per(MessaggiFirma::SENZA_FIRMA);
         }
         foreach ($firme as $f) {
             if (empty($f['valida_struttura'])) {
-                return 'La firma digitale del PDF non è integra: ripeti la firma e carica di nuovo il file.';
+                return MessaggiFirma::per(MessaggiFirma::NON_INTEGRA);
             }
         }
         if (empty($firme[array_key_last($firme)]['copre_tutto'])) {
-            return 'Il PDF è stato modificato dopo la firma: carica il file così come è uscito dalla firma, senza salvarlo di nuovo.';
+            return MessaggiFirma::per(MessaggiFirma::MODIFICATA);
         }
         if ($allegato === '' && empty($cc['file_allegato_scuola'])) {
             return 'Carica anche l\'Allegato A (PDF): la convenzione e l\'Allegato A si inviano insieme.';

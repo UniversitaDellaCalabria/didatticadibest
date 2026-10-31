@@ -275,6 +275,8 @@ lato docente; bozze delle pratiche; percorsi a passi per convenzione FSL e conve
 - **Soluzione.** Togliere Scuola dai profili di partenza; per le installazioni esistenti una migrazione che toglie il profilo solo se l'amministratore non l'ha cambiato.
 
 **3.S5 Caricamento della convenzione firmata più chiaro** (S)
+
+> **Stato 31/10/2026: passo 1 fatto.** `src/Infrastructure/Pdf/MessaggiFirma.php`: una sola fonte dei messaggi di rifiuto (vuoto, troppo grande, non PDF, firma .p7m riconosciuta, senza firma, non integra, modificata dopo la firma), ognuno con «Cosa fare:»; usata dal caricamento della convenzione FSL firmata. Restano: controllo nel browser prima dell'invio, stesso trattamento per `convenzione_tesi.php` e per le pagine di firma, link alla guida.
 - **Soluzione.** Prima dell'invio, controllo nel browser dell'estensione (`.pdf`, non `.p7m`) e della dimensione; dopo un rifiuto della verifica PAdES, messaggio
   in italiano semplice con la causa (file modificato, firma assente, firma CAdES) e cosa fare, più il link alla guida `Guida_Scuole_convenzione_FSL.pdf`.
   Stesso trattamento per `convenzione_tesi.php` e per le pagine di firma.
