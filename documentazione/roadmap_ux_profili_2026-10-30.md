@@ -399,6 +399,7 @@ con lo stato; utile per sapere se un tesista ha inviato la richiesta.
 **4.1 Dopo l'accesso, all'area personale** (S)
 
 > **Stato 31/10/2026: FATTO in locale, tranne il Cruscotto del Direttore** (non c'è ancora la scelta nel profilo). «Accedi» passa la pagina corrente (solo da richieste GET); senza `redirect` si va in `area_personale.php`. Decisione 6 presa come proposta: area personale per tutti.
+> **Stato 1/11/2026: completato (schema v116).** `utenti.pagina_iniziale`, `src/Portale/PaginaIniziale.php`; in `profilo.php` il Direttore e il vice trovano «Dopo l'accesso» con la casella «Portami subito al Cruscotto»; `saml_login.php` la usa solo senza `redirect`. Prova `pagina_iniziale.php`.
 - **Problema.** `saml_login.php:32`: senza `redirect` si torna a `index.php`; il pulsante «Accedi» della barra (`header.php:384`) non passa la pagina corrente.
 - **Soluzione.** «Accedi» passa la pagina corrente come `redirect`; senza `redirect` si va in `area_personale.php` (il Direttore al Cruscotto, se l'utente lo sceglie
   nel profilo). Mantenere il controllo anti open-redirect già presente (righe 23-30).

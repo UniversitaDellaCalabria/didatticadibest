@@ -1073,6 +1073,8 @@ final class Definizioni
             'ultimo_accesso'       => "ADD COLUMN ultimo_accesso DATETIME DEFAULT NULL",
             'ruoli_secondari'      => "ADD COLUMN ruoli_secondari VARCHAR(255) DEFAULT ''",
             'email_personalizzata' => "ADD COLUMN email_personalizzata TINYINT(1) NOT NULL DEFAULT 0",
+            // v116: pagina dove portare la persona dopo l'accesso (oggi solo «cruscotto» per il Direttore e il vice; vuoto = area personale)
+            'pagina_iniziale'      => "ADD COLUMN pagina_iniziale VARCHAR(20) NOT NULL DEFAULT ''",
             // v22: ultima scuola indicata dal docente, proposta già compilata alle iscrizioni successive
             'scuola_codice'        => "ADD COLUMN scuola_codice VARCHAR(10) DEFAULT NULL",
             // v23: persona dell'anagrafe di Ateneo collegata al login (per email)

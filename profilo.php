@@ -39,6 +39,13 @@ $ve_in_corso = $verifica_email->inCorso((int)$u_id);
 // =======================================================================
 // AZIONE: SCHEDA DI ATENEO (dati dalle API del portale, modificabili dalla persona)
 // =======================================================================
+$pagina_iniziale = \App\Core\App::per($conn)->get(\App\Portale\PaginaIniziale::class);
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['pagina_iniziale']) && $pagina_iniziale->puoScegliere($user_info)) {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    $pagina_iniziale->imposta((int)$u_id, !empty($_POST['al_cruscotto']));
+    $_SESSION['msg_area_pers'] = "<div class='alert alert-success fw-bold text-center my-3 shadow-sm'><i class='fa fa-check-circle me-1'></i> Preferenza salvata: " . (!empty($_POST['al_cruscotto']) ? 'dopo l\'accesso vai al Cruscotto del Direttore.' : 'dopo l\'accesso vai alla tua area personale.') . "</div>";
+    header('Location: profilo.php'); exit;
+}
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['aggiorna_scheda_ateneo'])) {
     csrf_verify($_POST['csrf_token'] ?? '');
     $pers_sv = !empty($user_info['persona_id']) ? persona_ateneo($conn, $user_info['persona_id']) : null;
@@ -166,6 +173,22 @@ echo ui_tema_script();
                             <button type="submit" class="btn btn-primary btn-sm fw-bold"><i class="fa fa-save me-1" aria-hidden="true"></i>Salva la scheda</button>
                             <?php if ($sc['modificati']): ?><button type="submit" name="ripristina" value="1" class="btn btn-outline-secondary btn-sm fw-bold" data-confirm="Tornare ai dati del portale di Ateneo per tutti i campi?"><i class="fa fa-rotate-left me-1" aria-hidden="true"></i>Ripristina i dati del portale</button><?php endif; ?>
                         </div>
+                    </form>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <?php if ($pagina_iniziale->puoScegliere($user_info)): ?>
+            <!-- Pagina dopo l'accesso (Direttore e vice) -->
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header fw-bold"><i class="fa fa-door-open me-2 text-secondary" aria-hidden="true"></i>Dopo l'accesso</div>
+                <div class="card-body">
+                    <form method="POST">
+                        <?php csrf_field(); ?>
+                        <input type="hidden" name="pagina_iniziale" value="1">
+                        <div class="form-check mb-2"><input class="form-check-input" type="checkbox" name="al_cruscotto" value="1" id="alCruscotto"<?php echo $pagina_iniziale->sceltaCruscotto((int)$u_id) ? ' checked' : ''; ?>>
+                            <label class="form-check-label" for="alCruscotto">Portami subito al Cruscotto del Direttore (invece che alla mia area personale)</label></div>
+                        <button type="submit" class="btn btn-outline-primary btn-sm fw-bold">Salva</button>
                     </form>
                 </div>
             </div>
