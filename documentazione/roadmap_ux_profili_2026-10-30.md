@@ -224,6 +224,8 @@ lato docente; bozze delle pratiche; percorsi a passi per convenzione FSL e conve
 - **Requisiti.** `ZipArchive` (già usato); limite di dimensione per file come oggi (20 MB); risposta con l'esito file per file. **Peso.** M.
 
 ### 2.4 Cruscotto del Direttore operativo
+
+> **Stato 1/11/2026: FATTO in locale.** Il pulsante «Firma ora (N)» in testa e il gruppo delle lettere di tutorato c'erano già (1.2); ora il gruppo «Pagamenti del tutorato fermi» compare solo con l'ufficio pagamenti acceso (`tutorato_pagamenti` attivo), le convenzioni FSL da firmare portano al link diretto e la pagina non si dichiara più «solo lettura». Resta il punto «dopo l'accesso il Direttore arriva sul Cruscotto» (4.1: serve la scelta nel profilo). Prove in `didattica.php`.
 - **Problema.** `cruscotto_direttore.php` è dichiaratamente «solo lettura» (riga 2), non ha le lettere del tutorato (vedi 1.2) e mostra «Pagamenti del tutorato fermi»
   anche quando i pagamenti sono spenti dal pannello.
 - **Soluzione.** In testa il pulsante «Firma ora (N)» → `firme.php`; gruppo lettere del tutorato; nascondere il gruppo pagamenti se il riquadro

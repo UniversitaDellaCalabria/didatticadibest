@@ -1,6 +1,6 @@
 <?php
 // cruscotto_direttore.php - Il cruscotto del Direttore (Area personale): in una pagina le cose che aspettano la sua firma e quelle che si sono fermate
-// (pratiche degli studenti, conferme dei docenti, verbali, convenzioni, tutorato, risorse). Solo lettura. Logica in src/Portale/CruscottoDirettore.php.
+// (pratiche degli studenti, conferme dei docenti, verbali, convenzioni, tutorato, risorse). In testa «Firma ora» per i documenti da firmare; ogni riga porta all'azione. Il gruppo dei pagamenti del tutorato compare solo con l'ufficio pagamenti acceso. Logica in src/Portale/CruscottoDirettore.php.
 require_once __DIR__ . '/middleware.php';
 
 $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');

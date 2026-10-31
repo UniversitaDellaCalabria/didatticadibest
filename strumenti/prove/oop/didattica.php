@@ -266,8 +266,12 @@ $conn->query("INSERT INTO uffici_persone (ufficio_id, email, nominativo, ruolo) 
 prova($cru_dir_->puoVedere(['ruolo_id' => 1, 'email' => 'a@b.it']) && $cru_dir_->puoVedere(['ruolo_id' => 4, 'email' => 'direttore@unical.it']) && !$cru_dir_->puoVedere(['ruolo_id' => 4, 'email' => 'altro@unical.it']) && !$cru_dir_->puoVedere(null),
     "Cruscotto del Direttore: lo vedono gli amministratori e il Direttore indicato nelle impostazioni");
 $gr_dir_ = $cru_dir_->gruppi();
-prova(array_column($gr_dir_, 'chiave') === ['firme', 'convenzioni_firma', 'tesi_firma', 'tutorato_firma', 'pratiche', 'conferme', 'verbali', 'convenzioni', 'tutorato', 'risorse', 'prenotazioni'] && $cru_dir_->riepilogo()['totale'] >= 0,
-    "Cruscotto del Direttore: undici gruppi, tutti leggibili");
+prova(array_column($gr_dir_, 'chiave') === ['firme', 'convenzioni_firma', 'tesi_firma', 'tutorato_firma', 'pratiche', 'conferme', 'verbali', 'convenzioni', 'risorse', 'prenotazioni'] && $cru_dir_->riepilogo()['totale'] >= 0,
+    "Cruscotto del Direttore: dieci gruppi, tutti leggibili; i pagamenti del tutorato non compaiono finché l'ufficio pagamenti è spento");
+$att_pag_ = $conn->query("SELECT attivo FROM area_riquadri WHERE chiave = 'tutorato_pagamenti'")->fetch_row()[0] ?? null;
+$conn->query("UPDATE area_riquadri SET attivo = 1 WHERE chiave = 'tutorato_pagamenti'");
+prova(in_array('tutorato', array_column($cru_dir_->gruppi(), 'chiave'), true), "Cruscotto del Direttore: con l'ufficio pagamenti acceso compaiono i pagamenti del tutorato fermi");
+if ($att_pag_ !== null) $conn->query("UPDATE area_riquadri SET attivo = " . (int) $att_pag_ . " WHERE chiave = 'tutorato_pagamenti'");
 
 // Verifica dei backup: l'esportazione del database e lo ZIP dei file si rileggono per intero; un file troncato o senza config.php non passa
 $ver_bk_ = new \App\Sistema\Backup\VerificaBackup();

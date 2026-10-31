@@ -50,10 +50,15 @@ final class CruscottoDirettore
     public function gruppi(): array
     {
         $out = [];
+        $pagamenti = $this->pagamentiAcceso();
         foreach ([
             'firme' => 'firmeDelDirettore', 'convenzioni_firma' => 'convenzioniDaFirmare', 'tesi_firma' => 'convenzioniTesiDaFirmare', 'tutorato_firma' => 'lettereTutoratoDaFirmare', 'pratiche' => 'praticheFerme', 'conferme' => 'confermeFerme', 'verbali' => 'verbaliInFirma',
             'convenzioni' => 'convenzioniInScadenza', 'tutorato' => 'tutoratoFermo', 'risorse' => 'scadenzeRisorse', 'prenotazioni' => 'prenotazioniFerme',
-        ] as $metodo) {
+        ] as $chiave => $metodo) {
+            // I pagamenti del tutorato non compaiono finché l'ufficio pagamenti è spento dal pannello (riquadro «tutorato_pagamenti»)
+            if ($chiave === 'tutorato' && !$pagamenti) {
+                continue;
+            }
             try {
                 $out[] = $this->$metodo();
             } catch (\Throwable $e) {
@@ -62,6 +67,14 @@ final class CruscottoDirettore
         }
 
         return $out;
+    }
+
+    /** L'ufficio pagamenti del tutorato è acceso (riquadro «tutorato_pagamenti» attivo; se non è ancora nel database vale il valore di partenza). */
+    private function pagamentiAcceso(): bool
+    {
+        $r = $this->db->riga("SELECT attivo FROM area_riquadri WHERE chiave = 'tutorato_pagamenti'");
+
+        return $r ? (int) $r['attivo'] === 1 : (int) (\App\Portale\Area\CatalogoRiquadri::voce('tutorato_pagamenti')['attivo'] ?? 1) === 1;
     }
 
     /**
