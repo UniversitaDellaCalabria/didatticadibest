@@ -344,6 +344,8 @@ con lo stato; utile per sapere se un tesista ha inviato la richiesta.
 - **Soluzione.** Assegnarle a tutti i profili: compaiono comunque solo se ci sono dati. Migrazione come in 3.S4.
 
 **3.T3 Registro più rapido** (M)
+
+> **Stato 31/10/2026: FATTA SOLO la parte dei promemoria (nessuna modifica allo schema).** Promemoria automatico al tutor col registro fermo portato da 14 a 7 giorni (`ServizioRegistroTutorato::GIORNI_REGISTRO_FERMO`, testo della email aggiornato). I pulsanti per admin e gestore al singolo tutor **c'erano già** in `admin/tutorato.php`: «Invita a compilare il registro» (per lettera e in blocco per bando), «Invia di nuovo l'email» per la lettera non ancora accettata e, nell'iter Uniticket, «Presa di servizio verificata» + «Invia email allo studente per compilare e accettare». Restano da fare: modifica di una riga, «Ripeti l'ultima», più date in una volta, riepilogo mensile in PDF.
 - **Problema.** In `registro_tutorato.php` si inserisce una riga alla volta; una riga sbagliata si può solo togliere (righe 21 e 92-93); nessun promemoria automatico
   (esistono solo i pulsanti manuali dell'ufficio, `tests/Integration/Tutorato/PromemoriaManualiTest.php`).
 - **Soluzione.** Modifica di una riga ancora «da approvare»; «Ripeti l'ultima» (stessa attività e ore, data di oggi); inserimento di più date in una volta

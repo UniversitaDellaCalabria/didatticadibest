@@ -16,6 +16,9 @@ use App\Sistema\FileEnv;
  */
 final class ServizioRegistroTutorato
 {
+    /** Giorni senza attività nel registro (o dalla firma del Direttore) dopo i quali il tutor riceve il promemoria automatico. */
+    public const GIORNI_REGISTRO_FERMO = 7;
+
     public function __construct(
         private IncaricoRepository $incarichi,
         private RegistroRepository $registro,
@@ -397,7 +400,7 @@ final class ServizioRegistroTutorato
                 if ($i['data_fine'] && $oggi >= date('Y-m-d', (int) strtotime($i['data_fine'] . ' -7 days'))) {
                     $modello = 'tutorato_promemoria_registro_scadenza';
                     $dati['periodo'] = ($oggi > $i['data_fine'] ? 'è terminato il ' : 'termina il ') . date('d/m/Y', (int) strtotime($i['data_fine']));
-                } elseif ((!$i['data_inizio'] || $oggi >= $i['data_inizio']) && (!$ultima || $ultima < $this->orologio->adesso()->modify('-14 days')->format('Y-m-d')) && ($i['firmata_direttore_il'] !== null && strtotime($i['firmata_direttore_il']) < $ora - 14 * 86400)) {
+                } elseif ((!$i['data_inizio'] || $oggi >= $i['data_inizio']) && (!$ultima || $ultima < $this->orologio->adesso()->modify('-' . self::GIORNI_REGISTRO_FERMO . ' days')->format('Y-m-d')) && ($i['firmata_direttore_il'] !== null && strtotime($i['firmata_direttore_il']) < $ora - self::GIORNI_REGISTRO_FERMO * 86400)) {
                     $modello = 'tutorato_promemoria_registro_fermo';
                 }
                 if ($modello) {
