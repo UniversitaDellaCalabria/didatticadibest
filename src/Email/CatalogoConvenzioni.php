@@ -223,6 +223,12 @@ Se non sei stato tu a chiederlo, ignora questa email: nessun dato è stato modif
                 'Convenzione stipulata: {{azienda}}',
                 "Gentile **{{azienda}}**,\n\nla convenzione per la tesi è stata **stipulata** (protocollo {{protocollo}}) ed è valida dal {{dal}} al {{al}}.\n\nDa questa pagina puoi scaricare la convenzione firmata. Grazie per la collaborazione!",
                 'Scarica la convenzione firmata'),
+            'tesi_studente_stipulata' => $m('Convenzioni di tesi · Allo studente', 'Convenzione dell\'azienda stipulata', 'La convenzione che lo studente ha chiesto per la sua azienda è stipulata.', 'Lo studente', $az,
+                'Convenzione stipulata: {{azienda}}',
+                "Ciao,
+
+la convenzione con **{{azienda}}**, che hai chiesto dalla tua pratica di tesi, è stata **stipulata**: puoi proseguire con la tesi.",
+                'Apri la tua pratica'),
             'tesi_promemoria_invitata' => $promemoria('inserire i dati', "Il cron ricorda all'azienda invitata di inserire i dati.", "inserire i dati dell'azienda"),
             'tesi_promemoria_risposta' => $promemoria('leggere la risposta', "Il cron ricorda all'azienda di leggere la risposta alle modifiche.", 'leggere la risposta del Dipartimento alle modifiche proposte'),
             'tesi_promemoria_rifiutata' => $promemoria('ricaricare il file', "Il cron ricorda all'azienda di ricaricare il file rifiutato.", 'ricaricare la convenzione corretta'),

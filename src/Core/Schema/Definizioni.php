@@ -654,6 +654,8 @@ final class Definizioni
             'punto_id'     => "ADD COLUMN punto_id INT DEFAULT NULL",
             'delibera'     => "ADD COLUMN delibera TEXT DEFAULT NULL",
             'ufficio_json' => "ADD COLUMN ufficio_json MEDIUMTEXT DEFAULT NULL",
+            // v114: la convenzione di tesi che lo studente ha chiesto per l'azienda scelta nella pratica («Invita l'azienda»)
+            'convenzione_tesi_id' => "ADD COLUMN convenzione_tesi_id INT DEFAULT NULL",
             // v36: chi ha in carico la pratica, passo dell'iter, integrazione richiesta allo studente (documenti o autodichiarazione)
             'assegnata_a'   => "ADD COLUMN assegnata_a INT DEFAULT NULL, ADD INDEX idx_assegnata (assegnata_a)",
             'passo'         => "ADD COLUMN passo TINYINT NOT NULL DEFAULT 0",

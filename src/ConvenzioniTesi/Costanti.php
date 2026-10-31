@@ -36,6 +36,8 @@ final class Costanti
     public const ORIGINE_INVITO = 'invito';
     public const ORIGINE_PUBBLICA = 'pubblica';
     public const ORIGINE_ARCHIVIO = 'archivio';
+    /** Lo studente ha invitato l'azienda dalla sua pratica di tesi. */
+    public const ORIGINE_STUDENTE = 'studente';
 
     /** Come si presentano gli stati nel pannello: [etichetta, colore bootstrap]. */
     public const ETICHETTE = [

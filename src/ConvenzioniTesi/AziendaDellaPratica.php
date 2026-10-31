@@ -62,10 +62,21 @@ final class AziendaDellaPratica
      * @return array{esito: string, azienda: string, valida_al: string, protocollo: string, stato_in_corso: string}
      *   esito: valida | in_scadenza | scaduta | in_corso | da_chiedere | non_trovata
      */
-    public function stato(string $valore, string $nomeAltra = ''): array
+    public function stato(string $valore, string $nomeAltra = '', ?int $praticaId = null): array
     {
         $oggi = $this->orologio->adesso();
         $base = ['esito' => 'non_trovata', 'azienda' => $valore, 'valida_al' => '', 'protocollo' => '', 'stato_in_corso' => ''];
+        // La convenzione chiesta dallo studente dalla pratica («Invita l'azienda») vale più della ricerca per nome
+        $legata = $praticaId !== null ? $this->collegata($praticaId) : null;
+        if ($legata !== null) {
+            if ((string) $legata['stato'] !== Costanti::PROTOCOLLATA) {
+                return ['esito' => 'in_corso', 'azienda' => (string) $legata['azienda'], 'stato_in_corso' => (Costanti::ETICHETTE[(string) $legata['stato']][0] ?? (string) $legata['stato'])] + $base;
+            }
+            $al = (string) $legata['valida_al'];
+            $esito = $al < $oggi->format('Y-m-d') ? 'scaduta' : ($al <= $oggi->modify('+' . self::GIORNI_TESI . ' days')->format('Y-m-d') ? 'in_scadenza' : 'valida');
+
+            return ['esito' => $esito, 'azienda' => (string) $legata['azienda'], 'valida_al' => $al, 'protocollo' => (string) $legata['protocollo']] + $base;
+        }
         if ($valore === Costanti::ALTRA_AZIENDA) {
             $base['azienda'] = $nomeAltra;
             if ($nomeAltra !== '') {
@@ -93,18 +104,25 @@ final class AziendaDellaPratica
         return ['esito' => $esito, 'azienda' => (string) $trovata['azienda'], 'valida_al' => $al, 'protocollo' => (string) $trovata['protocollo']] + $base;
     }
 
+    /** @return array<string, mixed>|null la convenzione che lo studente ha chiesto per la pratica (pratiche.convenzione_tesi_id) */
+    public function collegata(int $praticaId): ?array
+    {
+        return $this->db->riga('SELECT c.* FROM pratiche p JOIN convenzioni_tesi c ON c.id = p.convenzione_tesi_id WHERE p.id = ?', [$praticaId]);
+    }
+
     /**
-     * Il riquadro da mostrare nella pratica (HTML pronto), vuoto se la pratica non ha un'azienda scelta.
+     * Il riquadro da mostrare nella pratica (HTML pronto), vuoto se la pratica non ha un'azienda scelta. Con $praticaId lo studente, se l'azienda non è
+     * convenzionata, trova il modulo «Invita l'azienda»; se l'ha già invitata ne vede l'avanzamento.
      *
      * @param list<array<string, mixed>> $risposte
      */
-    public function riquadro(array $risposte, bool $perUfficio): string
+    public function riquadro(array $risposte, bool $perUfficio, ?int $praticaId = null): string
     {
         $s = self::scelta($risposte);
         if ($s === null) {
             return '';
         }
-        $st = $this->stato($s['valore'], $s['nome_altra']);
+        $st = $this->stato($s['valore'], $s['nome_altra'], $praticaId);
         $h = static fn (string $t): string => htmlspecialchars($t, ENT_QUOTES, 'UTF-8');
         $d = static fn (string $x): string => date('d/m/Y', (int) strtotime($x));
         $richiesta = 'richiedi_convenzione_tesi.php';
@@ -120,7 +138,22 @@ final class AziendaDellaPratica
             default => ['#475569', 'fa-circle-info', 'Azienda non trovata tra le convenzionate', 'L\'azienda scelta (<strong>' . $h($st['azienda']) . '</strong>) non risulta più tra quelle convenzionate: ' . ($perUfficio ? 'controlla l\'archivio delle convenzioni di tesi.' : 'scrivi all\'ufficio.')],
         };
 
+        $invito = $st['esito'] === 'da_chiedere' && !$perUfficio && $praticaId !== null ? $this->moduloInvito($praticaId, $st['azienda']) : '';
+
         return '<div class="card border-0 shadow-sm mb-3" style="border-left:5px solid ' . $colore . ' !important;"><div class="card-body"><h2 class="h6 fw-bold mb-1"><i class="fa ' . $icona . ' me-1" style="color:' . $colore . ';" aria-hidden="true"></i>'
-            . $h($titolo) . '</h2><div class="small mb-0">' . $testo . '</div></div></div>';
+            . $h($titolo) . '</h2><div class="small mb-0">' . $testo . '</div>' . $invito . '</div></div>';
+    }
+
+    /** Il modulo «Invita l'azienda» per lo studente (nome e email del referente), con il token CSRF della sessione. */
+    private function moduloInvito(int $praticaId, string $nomeAzienda): string
+    {
+        $h = static fn (string $t): string => htmlspecialchars($t, ENT_QUOTES, 'UTF-8');
+        $csrf = function_exists('csrf_token') ? csrf_token() : '';
+
+        return '<form method="post" action="invita_azienda.php" class="mt-3 border-top pt-3"><input type="hidden" name="csrf_token" value="' . $h((string) $csrf) . '"><input type="hidden" name="pratica" value="' . $praticaId . '">'
+            . '<div class="fw-semibold mb-1">Invita l\'azienda</div><div class="text-secondary mb-2">Scrivi l\'email del referente: riceve il link per compilare la convenzione online, senza registrarsi, e tu ne vedi l\'avanzamento qui.</div>'
+            . '<div class="row g-2"><div class="col-md-5"><label class="form-label mb-0" for="inv-nome">Nome dell\'azienda</label><input class="form-control form-control-sm" id="inv-nome" name="nome" maxlength="200" required value="' . $h($nomeAzienda) . '"></div>'
+            . '<div class="col-md-5"><label class="form-label mb-0" for="inv-email">Email del referente</label><input type="email" class="form-control form-control-sm" id="inv-email" name="email" maxlength="190" required></div>'
+            . '<div class="col-md-2 d-flex align-items-end"><button type="submit" class="btn btn-sm btn-primary fw-bold w-100">Invita</button></div></div></form>';
     }
 }

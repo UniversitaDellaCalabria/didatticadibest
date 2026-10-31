@@ -32,7 +32,7 @@ final class TesiStudente
         $azienda = null;
         if ($pratica && $pratica['stato'] !== 'bozza') {
             $scelta = AziendaDellaPratica::scelta((array) (json_decode((string) $pratica['risposte_json'], true) ?: []));
-            $azienda = $scelta === null ? null : $this->azienda->stato($scelta['valore'], $scelta['nome_altra']);
+            $azienda = $scelta === null ? null : $this->azienda->stato($scelta['valore'], $scelta['nome_altra'], (int) $pratica['id']);
         }
         if ($pratica) {
             unset($pratica['risposte_json']);

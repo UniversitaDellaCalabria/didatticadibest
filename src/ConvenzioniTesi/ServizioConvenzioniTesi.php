@@ -767,7 +767,21 @@ final class ServizioConvenzioniTesi
         $this->conv->segnaProtocollata($id, $protocollo, $ok($dati['protocollo_data'] ?? null), $dal, $al, $percorso);
         $this->notifiche->attiva((string) $c['email'], (string) $c['azienda'], (string) $c['token'], $protocollo . ($ok($dati['protocollo_data'] ?? null) ? ' del ' . date('d/m/Y', (int) strtotime((string) $dati['protocollo_data'])) : ''), $dal, $al);
 
+        $this->avvisaStudenti($id, (string) $c['azienda']);
+
         return null;
+    }
+
+    /** Gli studenti che hanno invitato l'azienda dalla loro pratica (pratiche.convenzione_tesi_id) sanno che la convenzione è stipulata. */
+    private function avvisaStudenti(int $convenzioneId, string $azienda): void
+    {
+        try {
+            foreach ($this->db->righe('SELECT email FROM pratiche WHERE convenzione_tesi_id = ? AND email <> ?', [$convenzioneId, '']) as $p) {
+                $this->notifiche->stipulataAlloStudente((string) $p['email'], $azienda, $this->sito->urlBase() . '/pratiche.php');
+            }
+        } catch (\Throwable $e) {
+            error_log('Convenzione di tesi stipulata, avviso agli studenti: ' . $e->getMessage());
+        }
     }
 
     private function salvaDefinitivo(string $pdf): ?string

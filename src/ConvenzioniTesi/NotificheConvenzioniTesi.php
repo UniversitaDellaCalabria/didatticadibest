@@ -95,6 +95,12 @@ final class NotificheConvenzioniTesi
         return $this->scrivi($email, 'tesi_attiva', ['azienda' => $azienda, 'protocollo' => $protocollo, 'dal' => date('d/m/Y', (int) strtotime($dal)), 'al' => date('d/m/Y', (int) strtotime($al))], $this->linkAzienda($token));
     }
 
+    /** Allo studente che ha invitato l'azienda: la convenzione è stipulata, la tesi può cominciare. */
+    public function stipulataAlloStudente(string $email, string $azienda, string $linkPratica): bool
+    {
+        return $this->scrivi($email, 'tesi_studente_stipulata', ['azienda' => $this->nomeAzienda($azienda)], $linkPratica);
+    }
+
     public function promemoria(string $email, string $azienda, string $token, string $stato): bool
     {
         $chiave = match ($stato) {

@@ -319,6 +319,8 @@ lato docente; bozze delle pratiche; percorsi a passi per convenzione FSL e conve
   pratica di tesi e della convenzione dell'azienda (riquadro di `AziendaDellaPratica`), «Cerca un relatore» (`disponibilita_tesi.php`).
 
 **3.St2 «Invita l'azienda» dalla pratica di tesi** (M, dopo 0.1)
+
+> **Stato 1/11/2026: FATTO in locale (schema v114).** Colonna `pratiche.convenzione_tesi_id`, origine `ORIGINE_STUDENTE`; nel riquadro «Azienda non ancora convenzionata» di `pratiche.php` il modulo «Invita l'azienda» (nome e email del referente) manda a `invita_azienda.php` → `App\ConvenzioniTesi\InvitoAziendaDaPratica` (solo l'autore della pratica inviata, una convenzione aperta per pratica, al massimo 5 inviti per studente). `AziendaDellaPratica::stato()` usa prima il collegamento, poi il nome; lo studente vede l'avanzamento nello stesso riquadro e nella tessera «Tesi e laurea»; a convenzione stipulata riceve l'email `tesi_studente_stipulata`. Prova: `invita_azienda.php`.
 - **Problema.** Con «Altra azienda» la pratica dice solo che l'azienda può chiedere la convenzione da sola (`AziendaDellaPratica.php:118`); il legame tra pratica e
   convenzione è una ricerca per nome con `LIKE` (riga 72), fragile.
 - **Soluzione.** Nel riquadro «Azienda non ancora convenzionata» un modulo «Invita l'azienda» (nome, email del referente): avvia la convenzione con origine nuova
