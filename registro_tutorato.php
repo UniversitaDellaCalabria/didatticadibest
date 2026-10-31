@@ -92,7 +92,7 @@ require_once 'header.php';
         <form method="POST" class="card border-0 shadow-sm mb-3"><div class="card-body">
             <?php csrf_field(); ?>
             <h2 class="h6 fw-bold">Registro</h2>
-            <div class="table-responsive"><table class="table table-sm align-middle small mb-2">
+            <div class="table-responsive"><table class="table table-sm align-middle small mb-2 ui-tabella-schede">
                 <thead class="table-light"><tr><?php if (!$tutor && $aperto): ?><th style="width:28px;"><input type="checkbox" class="form-check-input" id="rTutte" aria-label="Seleziona tutte le righe da approvare"></th><?php endif; ?><th>Giorno</th><th class="text-center">Ore</th><th>Attività</th><th>Stato</th><?php if ($tutor && $aperto): ?><th></th><?php endif; ?></tr></thead><tbody>
                 <?php foreach ($reg as $r): [$sn, $sc] = STATI_REGISTRO[$r['stato']]; ?>
                     <tr><?php if (!$tutor && $aperto): ?><td><?php if ($r['stato'] === 'inviata'): ?><input type="checkbox" class="form-check-input r-sel" name="righe[]" value="<?php echo (int)$r['id']; ?>" aria-label="Seleziona il <?php echo date('d/m/Y', strtotime($r['data'])); ?>"><?php endif; ?></td><?php endif; ?>

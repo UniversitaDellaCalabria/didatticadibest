@@ -148,3 +148,13 @@ html[data-tema="scuro"] body.ui-scuro-ok [style*="background:#f8fafc"], html[dat
 .ui-tema-btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--ui-bordo); background: var(--ui-card); color: var(--ui-testo); border-radius: 999px; padding: 4px 12px; font-size: .82rem; font-weight: 600; cursor: pointer; }
 .ui-tema-btn:hover { border-color: var(--ui-rosso); }
 .ui-tema-btn[hidden] { display: none; }
+
+/* telefono: pulsanti e campi comodi al dito (almeno 44 px) e tabelle «a schede» (classe ui-tabella-schede: ogni riga diventa una scheda, l'intestazione si nasconde) */
+@media (max-width: 575.98px) {
+    body.ui-scuro-ok .btn { min-height: 44px; }
+    .ui-tabella-schede thead { display: none; }
+    .ui-tabella-schede, .ui-tabella-schede tbody, .ui-tabella-schede tr, .ui-tabella-schede td { display: block; width: 100%; }
+    .ui-tabella-schede tr { border: 1px solid var(--ui-bordo); border-radius: 10px; padding: 8px 12px; margin-bottom: 10px; background: var(--ui-card); }
+    .ui-tabella-schede td { border: 0; padding: 3px 0; }
+    .ui-tabella-schede td[colspan] { text-align: center; }
+}
