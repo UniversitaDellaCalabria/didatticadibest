@@ -435,6 +435,15 @@ lasciando nella pagina solo il disegno. Da fare dopo le fasi 0-3.
 | 6 | 3.T3, 3.T4, 3.D1, 3.D2, 4.3-4.5, 1.5, 1.6 | Rifiniture dei percorsi |
 | 7 | Fase 5 (resto), Fase 6, Fase 7 | Prestazioni, accessibilità, prove complessive |
 
+## Decisioni prese dall'utente (31/10/2026)
+
+- **Metodo:** piccoli passi, un commit dopo ciascuno; un solo archivio completo da caricare sul server alla fine.
+- **2.2 (una OTP per più documenti): per ora NON si usa.** Si resta sull'iter «scarica il file, firma in locale, ricarica» → si fa 2.3 (firma in blocco fuori dal portale) al posto di 2.2; 2.1 e 2.3 non dipendono da Aruba.
+- **3.D2: sì**, il docente può vedere le pratiche in cui è relatore (sola lettura).
+- **3.St3: per ora nessun modulo pubblicato**; li pubblica l'utente a mano al momento opportuno. La tessera «Nuova richiesta» si fa comunque, ma resta vuota finché non ci sono moduli.
+- **3.T3: promemoria dopo 7 giorni** (non 14). In più un **pulsante per amministratore e gestore** che manda il promemoria al singolo tutor. Caso Uniticket: il tutor compila il ticket, poi il gestore con un pulsante gli manda la notifica «compila la lettera di incarico».
+- Decisioni 1 (email solo per gli avvisi) e 6 (accesso → area personale per tutti): restano come proposte già applicate.
+
 ## Decisioni da chiedere all'utente prima di implementare
 
 1. **0.1:** l'email scelta dalla persona resta solo per gli avvisi (proposta) o deve contare anche per i permessi dopo la verifica?
