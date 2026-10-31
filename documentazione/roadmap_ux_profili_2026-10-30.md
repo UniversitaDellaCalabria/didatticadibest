@@ -339,6 +339,8 @@ separati e link a `firme.php` / `mie_conferme.php` / `registro_tutorato.php`.
 **3.D2 «I miei studenti»** (M, **chiedere prima all'utente per la privacy**): elenco in sola lettura delle pratiche in cui il docente è relatore o indicato,
 con lo stato; utile per sapere se un tesista ha inviato la richiesta.
 
+> **Stato 31/10/2026: FATTO in locale (schema v112).** Privacy decisa: il docente vede le pratiche in cui ha una richiesta di firma come relatore (per email o scheda dell'anagrafe), solo studente, tipo di richiesta, codice e stato, mai allegati o messaggi. `App\Didattica\StudentiDelDocente`, pagina `miei_studenti.php`, riquadro `miei_studenti` (Docente e Amministratore, ordine 17, compare solo con almeno una richiesta; numero rosso = firme che aspettano il docente). Prove: `studenti_del_docente.php`.
+
 ### Tutor
 
 **3.T1 Ogni passo con il suo pulsante** (S)
