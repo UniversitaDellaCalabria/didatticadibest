@@ -83,9 +83,16 @@ final class InsegnamentoRepository
         );
     }
 
-    /** CFU degli integrati = somma dei CFU dei moduli (vuoti finché manca quello di un modulo) */
+    /** Codice dell'integrato (dal dettaglio di un suo modulo): si scrive solo se l'integrato non ne ha già uno */
+    public function salvaCodiceIntegrato(int $moduloId, string $codice): void
+    {
+        $this->db->esegui('UPDATE insegnamenti i JOIN insegnamenti m ON m.padre_id = i.id SET i.codice = ? WHERE m.id = ? AND i.e_integrato = 1 AND i.codice = \'\'', [$codice, $moduloId]);
+    }
+
+    /** CFU degli integrati = somma dei CFU dei moduli (vuoti finché manca quello di un modulo); docenti = quelli dei moduli */
     public function ricalcolaCfuIntegrati(): void
     {
+        $this->db->esegui("UPDATE insegnamenti p SET p.docente = LEFT((SELECT GROUP_CONCAT(DISTINCT m.docente ORDER BY m.docente SEPARATOR ', ') FROM insegnamenti m WHERE m.padre_id = p.id AND m.presente = 1 AND m.docente <> ''), 150) WHERE p.e_integrato = 1");
         $this->db->esegui('UPDATE insegnamenti p SET p.cfu = (SELECT IF(COUNT(m.cfu) = COUNT(*), SUM(m.cfu), NULL) FROM (SELECT padre_id, cfu FROM insegnamenti WHERE padre_id IS NOT NULL AND presente = 1) m WHERE m.padre_id = p.id) WHERE p.e_integrato = 1');
     }
 

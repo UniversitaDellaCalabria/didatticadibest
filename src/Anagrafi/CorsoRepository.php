@@ -77,6 +77,52 @@ final class CorsoRepository
         return $this->db->righe('SELECT c.*, s.nome AS dipartimento FROM corsi_studio c LEFT JOIN anagrafe_strutture s ON s.codice = c.dipartimento_cod WHERE c.presente = 1 ORDER BY c.tipo_descrizione, c.nome, c.anno DESC');
     }
 
+    /** Tutti i corsi di studio di Ateneo (catalogo ateneo_cds) più quelli sincronizzati che il catalogo non ha, uno per codice */
+    private const CORSI_ATENEO = "SELECT c.codice, c.nome, c.tipo, c.tipo_descrizione, c.dipartimento_cod, c.dipartimento, y.anni, y.anno, cs.classe, cs.visibile, IF(cs.codice IS NULL, 0, 1) AS gestito
+             FROM ateneo_cds c JOIN (SELECT codice, MAX(anno) AS anno, GROUP_CONCAT(anno ORDER BY anno DESC) AS anni FROM ateneo_cds GROUP BY codice) y ON y.codice = c.codice AND y.anno = c.anno
+             LEFT JOIN corsi_studio cs ON cs.codice = c.codice AND cs.presente = 1
+             UNION ALL
+             SELECT cs.codice, cs.nome, cs.tipo, cs.tipo_descrizione, cs.dipartimento_cod, IFNULL(s.nome, ''), IFNULL(cs.anno, ''), cs.anno, cs.classe, cs.visibile, 1
+             FROM corsi_studio cs LEFT JOIN anagrafe_strutture s ON s.codice = cs.dipartimento_cod WHERE cs.presente = 1 AND NOT EXISTS (SELECT 1 FROM ateneo_cds a WHERE a.codice = cs.codice)";
+
+    /**
+     * Corsi di studio di tutto l'Ateneo con i filtri dell'elenco.
+     *
+     * @return list<array<string, mixed>> codice, nome, tipo, tipo_descrizione, dipartimento_cod, dipartimento, anni, classe, visibile, gestito
+     */
+    public function ateneo(string $dip = '', string $tipo = '', string $cerca = ''): array
+    {
+        $where = ['1 = 1'];
+        $par = [];
+        if ($dip !== '') {
+            $where[] = 'dipartimento_cod = ?';
+            $par[] = $dip;
+        }
+        if ($tipo !== '') {
+            $where[] = 'tipo = ?';
+            $par[] = $tipo;
+        }
+        if ($cerca !== '') {
+            $where[] = '(codice LIKE ? OR nome LIKE ? OR classe LIKE ?)';
+            $lk = '%' . addcslashes($cerca, '%_\\') . '%';
+            array_push($par, $lk, $lk, $lk);
+        }
+
+        return $this->db->righe('SELECT * FROM (' . self::CORSI_ATENEO . ') t WHERE ' . implode(' AND ', $where) . ' ORDER BY dipartimento, tipo_descrizione, nome, codice', $par);
+    }
+
+    /** @return list<array<string, mixed>> dipartimenti con corsi (dipartimento_cod, dipartimento) */
+    public function dipartimentiAteneo(): array
+    {
+        return $this->db->righe("SELECT DISTINCT dipartimento_cod, dipartimento FROM (" . self::CORSI_ATENEO . ") t WHERE dipartimento_cod <> '' AND dipartimento <> '' ORDER BY dipartimento");
+    }
+
+    /** @return list<array<string, mixed>> tipi di corso (tipo, tipo_descrizione) */
+    public function tipiAteneo(): array
+    {
+        return $this->db->righe("SELECT DISTINCT tipo, tipo_descrizione FROM (" . self::CORSI_ATENEO . ") t WHERE tipo <> '' ORDER BY tipo_descrizione");
+    }
+
     /** @return list<array<string, mixed>> codice, nome e anno dei corsi presenti di un tipo (ripiego del catalogo) */
     public function presentiDiTipo(string $tipo): array
     {

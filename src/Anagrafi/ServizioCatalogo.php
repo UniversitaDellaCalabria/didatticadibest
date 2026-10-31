@@ -250,6 +250,9 @@ final class ServizioCatalogo
                 $cfu = is_array($risp[$p]['results'] ?? null) ? AttivitaAteneo::cfuDaDettaglio($risp[$p]['results']) : null;
                 $this->insegnamenti->salvaDettaglio($id, $cfu);
                 $this->catalogo->salvaDettaglio($id, $cfu);
+                if (is_array($risp[$p]['results'] ?? null) && ($radice = AttivitaAteneo::codiceRadice($risp[$p]['results'])) !== null) {
+                    $this->insegnamenti->salvaCodiceIntegrato($id, $radice);
+                }
                 $fatti++;
             }
             $this->insegnamenti->ricalcolaCfuIntegrati();

@@ -228,17 +228,16 @@ $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
     </div>
     <div class="table-responsive">
         <table class="table table-sm align-middle small" id="tabIns">
-            <thead class="table-light"><tr><th>Insegnamento</th><th>Codice</th><th>Corso di studio</th><?php if ($dip_sel === null): ?><th>Dipartimento</th><?php endif; ?><th class="text-center">Anno</th><th>Semestre</th><th>S.S.D.</th><th class="text-end">CFU</th><th>Link</th><th class="text-center">Attività</th></tr></thead>
+            <thead class="table-light"><tr><th>Insegnamento</th><th>Codice</th><th>Corso di studio</th><th>Anno e semestre</th><th>S.S.D.</th><th>Docente</th><th class="text-end">CFU</th><th>Link</th><th class="text-center">Attività</th></tr></thead>
             <tbody>
             <?php foreach ($ins as $i): ?>
                 <tr>
-                    <td<?php echo $i['padre_id'] && !$i['e_integrato'] ? ' class="ps-4"' : ''; ?>><div class="fw-semibold"><?php echo $i['padre_id'] && !$i['e_integrato'] ? '↳ ' : ''; ?><?php echo $h($i['nome']); ?><?php if ($i['partizione'] !== ''): ?> <span class="badge bg-light text-dark border"><?php echo $h($i['partizione']); ?></span><?php endif; ?><?php if ($i['e_integrato']): ?> <span class="badge bg-info text-dark">integrato</span><?php elseif ($i['padre_id']): ?> <span class="badge bg-light text-dark border">modulo di <?php echo $h($i['padre_nome']); ?></span><?php endif; ?></div></td>
+                    <td<?php echo $i['padre_id'] && !$i['e_integrato'] ? ' class="ps-4"' : ''; ?>><div class="fw-semibold"><?php echo $i['padre_id'] && !$i['e_integrato'] ? '↳ ' : ''; ?><?php echo $h($i['nome']); ?><?php if ($i['partizione'] !== ''): ?> <span class="badge bg-light text-dark border"><?php echo $h($i['partizione']); ?></span><?php endif; ?></div><?php if ($i['e_integrato']): ?><span class="badge bg-info text-dark">integrato</span><?php elseif ($i['padre_id']): ?><div class="text-secondary" style="font-size:.78rem;">modulo di <?php echo $h($i['padre_nome']); ?></div><?php endif; ?></td>
                     <td class="font-monospace"><?php echo $h($i['codice'] ?: '—'); ?></td>
-                    <td><?php echo $h($i['cds_nome']); ?><?php if ($i['cds_cod'] !== ''): ?> <span class="text-secondary font-monospace">(<?php echo $h($i['cds_cod']); ?>)</span><?php endif; ?></td>
-                    <?php if ($dip_sel === null): ?><td class="small"><?php echo $h($i['dipartimento'] ?: '—'); ?></td><?php endif; ?>
-                    <td class="text-center"><?php echo $i['anno_corso'] ? (int)$i['anno_corso'] . '°' : '—'; ?></td>
-                    <td><?php echo $h($i['semestre'] ?: '—'); ?></td>
+                    <td style="min-width:11rem;"><?php echo $h($i['cds_nome']); ?><?php if ($i['cds_cod'] !== ''): ?> <span class="text-secondary font-monospace">(<?php echo $h($i['cds_cod']); ?>)</span><?php endif; ?><?php if ($dip_sel === null && $i['dipartimento'] !== ''): ?><div class="text-secondary" style="font-size:.78rem;"><?php echo $h($i['dipartimento']); ?></div><?php endif; ?></td>
+                    <td><?php echo $i['anno_corso'] ? (int)$i['anno_corso'] . '° anno' : '—'; ?><?php if ($i['semestre'] !== ''): ?><div class="text-secondary"><?php echo $h($i['semestre']); ?></div><?php endif; ?></td>
                     <td><?php echo $h($i['ssd_cod'] ?: '—'); ?><?php if ($i['ssd'] !== '' && !$i['e_integrato']): ?><div class="text-secondary"><?php echo $h($i['ssd']); ?></div><?php endif; ?></td>
+                    <td><?php echo $h($i['docente'] ?: '—'); ?></td>
                     <td class="text-end"><?php echo $i['cfu'] !== null ? $h(rtrim(rtrim(number_format((float)$i['cfu'], 1, ',', ''), '0'), ',')) : '—'; ?></td>
                     <td><?php if ($i['link'] !== '' && !$i['e_integrato']): ?><a href="<?php echo $h($i['link']); ?>" target="_blank" rel="noopener noreferrer">Apri<span class="visually-hidden"> la pagina di <?php echo $h($i['nome']); ?></span></a><?php else: ?>—<?php endif; ?></td>
                     <td class="text-center"><?php echo (int)$i['n_att'] ?: '—'; ?></td>
@@ -252,31 +251,47 @@ $h = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
 
 <?php elseif ($vista === 'corsi'):
     // ---------------------------------------------------------------- CORSI DI STUDIO
-    $corsi = $r_corsi->presentiConStruttura();
+    $f_dipc = (string)($_GET['dip'] ?? ''); $f_tipoc = (string)($_GET['tipo'] ?? ''); $f_qc = trim((string)($_GET['q'] ?? ''));
+    $corsi = $r_corsi->ateneo($f_dipc, $f_tipoc, $f_qc);
+    $opz_dipc = $r_corsi->dipartimentiAteneo();
+    $opz_tipic = $r_corsi->tipiAteneo();
 ?>
 <section class="ana-sez">
     <h2><i class="fa fa-graduation-cap me-1" aria-hidden="true"></i>Corsi di studio</h2>
     <p class="small text-secondary">Corsi dei dipartimenti dell'anagrafe. Quelli <strong>proposti</strong> compaiono nel campo <strong>"Corso di studio"</strong> che puoi aggiungere ai moduli dal Form Builder. All'arrivo sono proposti i corsi più recenti del proprio dipartimento (la prima struttura); restano nascosti quelli di anni vecchi, i doppi (stesso nome, regolamento precedente) e i corsi delle strutture aggiunte dopo: puoi cambiare la scelta qui.</p>
+    <form method="GET" class="row g-2 align-items-end mb-3">
+        <input type="hidden" name="p_id" value="<?php echo (int)$filtro_p; ?>"><input type="hidden" name="vista" value="corsi">
+        <div class="col-md-4"><label class="form-label small fw-bold mb-1" for="fcDip">Dipartimento</label>
+            <select name="dip" id="fcDip" class="form-select form-select-sm"><option value="">Tutti i dipartimenti</option><?php foreach ($opz_dipc as $o): ?><option value="<?php echo $h($o['dipartimento_cod']); ?>" <?php echo $o['dipartimento_cod'] === $f_dipc ? 'selected' : ''; ?>><?php echo $h($o['dipartimento']); ?></option><?php endforeach; ?></select></div>
+        <div class="col-md-3"><label class="form-label small fw-bold mb-1" for="fcTipo">Tipo di corso</label>
+            <select name="tipo" id="fcTipo" class="form-select form-select-sm"><option value="">Tutti i tipi</option><?php foreach ($opz_tipic as $o): ?><option value="<?php echo $h($o['tipo']); ?>" <?php echo $o['tipo'] === $f_tipoc ? 'selected' : ''; ?>><?php echo $h($o['tipo_descrizione'] ?: $o['tipo']); ?></option><?php endforeach; ?></select></div>
+        <div class="col-md-3"><label class="form-label small fw-bold mb-1" for="fcQ">Codice o nome</label><input type="search" name="q" id="fcQ" class="form-control form-control-sm" value="<?php echo $h($f_qc); ?>" placeholder="Es. 0865 o Biologia"></div>
+        <div class="col-md-2 d-flex gap-1"><button class="btn btn-sm btn-primary fw-bold flex-grow-1" title="Filtra" aria-label="Filtra"><i class="fa fa-filter" aria-hidden="true"></i></button><a class="btn btn-sm btn-outline-secondary" href="<?php echo $h("$url_pagina&vista=corsi"); ?>" title="Azzera i filtri" aria-label="Azzera i filtri"><i class="fa fa-xmark" aria-hidden="true"></i></a></div>
+    </form>
+    <div class="small text-secondary mb-2"><?php echo count($corsi); ?> corsi di studio</div>
     <?php if (!$corsi): ?>
-        <p class="text-muted small mb-0">Nessun corso: aggiorna l'anagrafe dal portale.</p>
+        <p class="text-muted small mb-0">Nessun corso con questi filtri (o anagrafe da aggiornare dal portale).</p>
     <?php else: ?>
     <div class="table-responsive">
         <table class="table table-sm align-middle">
-            <thead class="table-light small"><tr><th>Corso</th><th>Tipo</th><th class="text-center">Anno</th><th>Codice</th><th class="text-center">Nei moduli</th></tr></thead>
+            <thead class="table-light small"><tr><th>Corso</th><th>Dipartimento</th><th>Tipo</th><th class="text-center">Anno</th><th>Codice</th><th class="text-center">Nei moduli</th></tr></thead>
             <tbody>
             <?php foreach ($corsi as $c): ?>
                 <tr id="c<?php echo $h($c['codice']); ?>" class="<?php echo $c['visibile'] ? '' : 'text-muted'; ?>">
                     <td><div class="fw-semibold"><?php echo $h($c['nome']); ?></div><?php if ($c['classe'] !== '' && mb_strtolower($c['classe']) !== mb_strtolower($c['nome'])): ?><div class="small text-secondary"><?php echo $h($c['classe']); ?></div><?php endif; ?></td>
-                    <td class="small"><?php echo $h($c['tipo_descrizione']); ?></td>
+                    <td class="small"><?php echo $h($c['dipartimento'] ?: '—'); ?></td>
+                    <td class="small"><?php echo $h($c['tipo_descrizione'] ?: $c['tipo']); ?></td>
                     <td class="text-center small"><?php echo $c['anno'] ? $h($c['anno'] . '/' . substr((string)($c['anno'] + 1), 2)) : '—'; ?></td>
                     <td class="small font-monospace"><?php echo $h($c['codice']); ?></td>
                     <td class="text-center">
+                        <?php if (!(int)$c['gestito']): ?><span class="text-secondary small" title="Corso di un altro dipartimento: si propone nei moduli aggiungendo la sua struttura in «Strutture e aggiornamento»">—</span><?php else: ?>
                         <form method="POST" class="m-0">
                             <?php csrf_field(); ?>
                             <input type="hidden" name="corso_visibile" value="<?php echo $h($c['codice']); ?>">
                             <input type="hidden" name="visibile" value="<?php echo $c['visibile'] ? 0 : 1; ?>">
                             <div class="form-check form-switch d-inline-block m-0"><input class="form-check-input" type="checkbox" role="switch" id="cv<?php echo $h($c['codice']); ?>" <?php echo $c['visibile'] ? 'checked' : ''; ?> onchange="this.form.submit()" aria-label="Proponi <?php echo $h($c['nome']); ?> nei moduli"></div>
                         </form>
+                        <?php endif; ?>
                     </td>
                 </tr>
             <?php endforeach; ?>

@@ -87,7 +87,7 @@ $ap->elenchi['activities/|' . $aa_i . '|'] = [
     $riga_i(9952, 'CHIMICA', 'ZD1', 'ZC1', ['StudyActivityFathers' => $padre_i]),
     $riga_i(9953, 'ANATOMIA', 'ZD2', 'ZC2'),
 ];
-$ap->dettagli['activities/9951/'] = ['results' => ['StudyActivityID' => 9951, 'StudyActivityECTS' => 6.0]];
+$ap->dettagli['activities/9951/'] = ['results' => ['StudyActivityID' => 9951, 'StudyActivityECTS' => 6.0, 'StudyActivityRoot' => ['StudyActivityID' => null, 'StudyActivityName' => 'FISICA E CHIMICA', 'StudyActivityCod' => 'INT-77']]];
 $ap->dettagli['activities/9952/'] = ['results' => ['StudyActivityID' => 9952, 'StudyActivityECTS' => 3]];
 $ap->dettagli['activities/9953/'] = ['results' => ['StudyActivityID' => 9953, 'StudyActivityECTS' => null]];
 $q("DELETE FROM insegnamenti WHERE id IN (9950, 9951, 9952, 9953)"); $q("DELETE FROM ateneo_insegnamenti WHERE id IN (9951, 9952, 9953)");
@@ -110,12 +110,14 @@ prova($fatti_i >= 3 && (float)$i1['cfu'] === 6.0 && $i1['dettaglio_il'] !== null
 $sin_i->sincronizzaInsegnamenti();
 $pi_i = $conn->query("SELECT * FROM insegnamenti WHERE id = 9950")->fetch_assoc();
 prova($pi_i && (int)$pi_i['e_integrato'] === 1 && $pi_i['nome'] === 'Fisica e chimica (integrato)' && $pi_i['cds_cod'] === 'ZC1' && $pi_i['dipartimento_cod'] === 'ZD1' && (float)$pi_i['cfu'] === 9.0 && $pi_i['padre_id'] === null, "l'integrato è una riga dell'archivio, con i CFU dei suoi moduli", json_encode($pi_i, JSON_UNESCAPED_UNICODE));
+prova($pi_i['codice'] === 'INT-77' && \App\Anagrafi\AttivitaAteneo::codiceRadice(['StudyActivityRoot' => ['StudyActivityCod' => ' ']]) === null, "il codice dell'integrato arriva dal dettaglio di un suo modulo (StudyActivityRoot)", (string)$pi_i['codice']);
+prova(str_contains((string)$pi_i['docente'], (string)$conn->query("SELECT docente FROM insegnamenti WHERE id = 9951")->fetch_assoc()['docente']), "i docenti dell'integrato sono quelli dei moduli");
 $rep_i0 = $cont_i->get(\App\Anagrafi\InsegnamentoRepository::class);
 $sc_i = array_column($rep_i0->dellAnno($aa_i, 'ZD1', 'scelta'), 'id');
 prova(in_array(9950, array_map('intval', $sc_i), true) && !in_array(9951, array_map('intval', $sc_i), true) && !in_array(9950, array_map('intval', array_column($rep_i0->dellAnno($aa_i, 'ZD1'), 'id')), true) && count($rep_i0->dellAnno($aa_i, 'ZD1', 'tutti')) === 3, "le scelte propongono l'integrato e non i suoi moduli; l'elenco di prima non cambia");
 $gr_i = \App\Anagrafi\Testi::raggruppaIntegrati($cat_i->insegnamenti('ZC1', $aa_i, false));
 prova(count($gr_i) === 1 && $gr_i[0]['integrato'] === true && $gr_i[0]['id'] === 9950 && $gr_i[0]['cfu'] === 9.0 && count($gr_i[0]['moduli']) === 2 && $gr_i[0]['ssd'] === 'FIS-01/A' && $gr_i[0]['moduli'][0]['link'] === 'https://www.unical.it/storage/activities/' . $gr_i[0]['moduli'][0]['id'] . '/', "catalogo dei moduli: l'integrato si sceglie intero con i suoi moduli", json_encode($gr_i, JSON_UNESCAPED_UNICODE));
-prova(\App\Anagrafi\Testi::etichettaInsegnamentoCompleta($pi_i) === 'Fisica e chimica (integrato) [integrato] · 9 CFU · FIS-01/A · Primo Semestre · 1° anno · Corso zc1 (ZC1)' && !str_contains(\App\Anagrafi\Testi::etichettaInsegnamentoCompleta($i1), 'Rossi'), "etichetta dei pannelli: codice, CFU, SSD, semestre, corso con codice, senza docente", \App\Anagrafi\Testi::etichettaInsegnamentoCompleta($pi_i));
+prova(\App\Anagrafi\Testi::etichettaInsegnamentoCompleta($pi_i) === 'Fisica e chimica (integrato) [integrato] · INT-77 · 9 CFU · FIS-01/A · Primo Semestre · 1° anno · Corso zc1 (ZC1)' && !str_contains(\App\Anagrafi\Testi::etichettaInsegnamentoCompleta($i1), 'Rossi'), "etichetta dei pannelli: codice, CFU, SSD, semestre, corso con codice, senza docente", \App\Anagrafi\Testi::etichettaInsegnamentoCompleta($pi_i));
 prova(\App\Didattica\CampiModulo::tipoColonnaDaNome('Semestre') === 'semestre' && \App\Didattica\CampiModulo::tipoColonnaDaNome('Codice corso di laurea') === 'codice_corso' && \App\Didattica\CampiModulo::tipoColonnaDaNome('Corso di laurea') === 'corso' && \App\Didattica\CampiModulo::tipoColonnaDaNome('Link insegnamento') === 'link' && \App\Didattica\CampiModulo::tipoColonnaDaNome('Codice insegnamento') === 'codice', "colonne delle tabelle dei moduli: semestre, corso, codice del corso e link si riconoscono dal nome");
 prova((float)$conn->query("SELECT cfu FROM insegnamenti WHERE id = 9951")->fetch_assoc()['cfu'] === 6.0 && (float)$conn->query("SELECT cfu FROM ateneo_insegnamenti WHERE id = 9951")->fetch_assoc()['cfu'] === 6.0, "una nuova sincronizzazione non cancella i CFU già scaricati");
 $ap->elenchi['activities/|' . $aa_i . '|'] = [$riga_i(9951, 'FISICA', 'ZD1', 'ZC1')];

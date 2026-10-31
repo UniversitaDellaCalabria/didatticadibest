@@ -63,6 +63,14 @@ final class AttivitaAteneo
         ];
     }
 
+    /** Codice dell'insegnamento integrato di cui l'attività è modulo (StudyActivityRoot del dettaglio), null se non c'è */
+    public static function codiceRadice(array $d): ?string
+    {
+        $c = trim((string) (is_array($d['StudyActivityRoot'] ?? null) ? ($d['StudyActivityRoot']['StudyActivityCod'] ?? '') : ''));
+
+        return $c !== '' ? mb_substr($c, 0, 30) : null;
+    }
+
     /** CFU dal dettaglio dell'attività (StudyActivityECTS), null se non indicati */
     public static function cfuDaDettaglio(array $d): ?float
     {
