@@ -135,23 +135,25 @@ final class ServizioCorsi
 
     /**
      * Insegnamenti presenti di un anno accademico, raggruppati per corso di studio.
-     * Senza anno: quello in corso; se non ci sono ancora dati, il più recente disponibile.
+     * Senza anno: quello in corso; se non ci sono ancora dati, il più recente disponibile. Di solito sono i corsi del proprio
+     * dipartimento; con $ateneo anche quelli di tutto l'Ateneo (l'archivio li conserva dal 2026/2027).
      *
      * @return array<string, list<array<string, mixed>>>
      */
-    public function insegnamentiPerCorso(?int $anno = null): array
+    public function insegnamentiPerCorso(?int $anno = null, bool $ateneo = false): array
     {
+        $dip = $ateneo ? null : $this->insegnamenti->dipartimentoProprio();
         if ($anno === null) {
             $anno = $this->catalogo->annoCorrente();
-            if (!$this->insegnamenti->contaPresenti($anno)) {
-                $anno = $this->insegnamenti->annoPiuRecente();
+            if (!$this->insegnamenti->contaPresenti($anno, $dip)) {
+                $anno = $this->insegnamenti->annoPiuRecente($dip);
             }
         }
         if (!$anno) {
             return [];
         }
         $out = [];
-        foreach ($this->insegnamenti->dellAnno($anno) as $x) {
+        foreach ($this->insegnamenti->dellAnno($anno, $dip) as $x) {
             $out[$x['cds_nome'] ?: 'Altri insegnamenti'][] = $x;
         }
 

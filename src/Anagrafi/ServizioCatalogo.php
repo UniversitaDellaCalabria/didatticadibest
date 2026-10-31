@@ -184,30 +184,66 @@ final class ServizioCatalogo
     {
         $n = 0;
         foreach ($el as $r) {
-            $id = (int) ($r['StudyActivityID'] ?? 0);
-            $nome = trim((string) ($r['StudyActivityName'] ?? ''));
+            $x = AttivitaAteneo::daElenco($r);
             $cdsR = (string) ($r['StudyActivityCdSCod'] ?? $cds);
-            if ($id <= 0 || $nome === '' || ($cdsR !== '' && $cdsR !== $cds)) {
+            if ($x === null || ($cdsR !== '' && $cdsR !== $cds)) {
                 continue;
             }
-            $ok = $this->catalogo->salvaInsegnamento([
-                'id' => $id, 'cds_cod' => $cds, 'coorte' => $coorte,
-                'anno_corso' => (int) ($r['StudyActivityYear'] ?? 0) ?: null,
-                'codice' => mb_substr((string) ($r['StudyActivityCod'] ?? ''), 0, 30),
-                'nome' => mb_substr(Testi::maiuscoleCorso($nome), 0, 255),
-                'cfu' => Testi::cfuAttivitaApi($r),
-                'ssd_cod' => mb_substr((string) ($r['StudyActivitySSDCod'] ?? ''), 0, 20),
-                'ssd' => mb_substr(Testi::maiuscoleCorso((string) ($r['StudyActivitySSD'] ?? '')), 0, 150),
-                'partizione' => mb_substr(trim((string) ($r['StudyActivityPartitionDes'] ?? $r['StudyActivityExtendedPartitionDes'] ?? '')), 0, 150),
-                'semestre' => mb_substr((string) ($r['StudyActivitySemester'] ?? ''), 0, 60),
-                'docente' => mb_substr(Testi::maiuscoleNome((string) ($r['StudyActivityTeacherName'] ?? '')), 0, 150),
-            ]);
-            if ($ok) {
+            if ($this->catalogo->salvaInsegnamento(['cds_cod' => $cds, 'coorte' => $coorte] + $x)) {
                 $n++;
             }
         }
         $this->catalogo->segnaScaricato($cds, $coorte, $n);
 
         return $n;
+    }
+
+    /**
+     * Scarica il dettaglio degli insegnamenti (activities/<id>/) per i CFU, che l'elenco non dà: prima quelli dell'archivio
+     * (dal 2026/2027), poi il resto del catalogo. Si ferma allo scadere dei secondi o se le API non rispondono; il lavoro
+     * riprende alla chiamata dopo. Ritorna quanti ne ha completati.
+     */
+    public function completaDettagli(int $secondi = 120, int $parallele = 10): int
+    {
+        $fine = microtime(true) + $secondi;
+        $fatti = 0;
+        while (microtime(true) < $fine) {
+            $ids = array_values(array_unique(array_merge($this->insegnamenti->daCompletare($parallele), $this->catalogo->daCompletare($parallele))));
+            $ids = array_slice($ids, 0, $parallele);
+            if (!$ids) {
+                break;
+            }
+            $percorsi = [];
+            foreach ($ids as $id) {
+                $percorsi[$id] = "activities/$id/";
+            }
+            if ($this->api instanceof ClientApiAteneoMultiplo) {
+                $risp = $this->api->getMolti(array_values($percorsi));
+            } else {
+                $risp = [];
+                foreach ($percorsi as $p) {
+                    $risp[$p] = $this->api->get($p);
+                }
+            }
+            $arrivati = 0;
+            foreach ($percorsi as $id => $p) {
+                $d = $risp[$p] ?? null;
+                if (is_array($d) && is_array($d['results'] ?? null)) {
+                    $arrivati++;
+                }
+            }
+            if ($arrivati === 0) {
+                break; // API non raggiungibili (o tutte le schede mancano): si riprova alla prossima sincronizzazione
+            }
+            foreach ($percorsi as $id => $p) {
+                // Scheda mancante (l'Ateneo non la pubblica più): si segna comunque, senza CFU
+                $cfu = is_array($risp[$p]['results'] ?? null) ? AttivitaAteneo::cfuDaDettaglio($risp[$p]['results']) : null;
+                $this->insegnamenti->salvaDettaglio($id, $cfu);
+                $this->catalogo->salvaDettaglio($id, $cfu);
+                $fatti++;
+            }
+        }
+
+        return $fatti;
     }
 }

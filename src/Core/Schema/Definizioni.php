@@ -802,6 +802,19 @@ final class Definizioni
         'insegnamenti' => [
             // v38: crediti dell'insegnamento (proposti nelle convalide in seduta)
             'cfu' => "ADD COLUMN cfu DECIMAL(5,1) DEFAULT NULL",
+            // v118: archivio di tutto l'Ateneo: dipartimento del corso, integrato di cui l'insegnamento è modulo (padre_id esiste già),
+            // link (pagina web del docente/insegnamento) e quando sono stati scaricati CFU e link (dettaglio dell'attività)
+            'dipartimento' => "ADD COLUMN dipartimento VARCHAR(255) DEFAULT ''",
+            'padre_nome'   => "ADD COLUMN padre_nome VARCHAR(255) DEFAULT ''",
+            'link'         => "ADD COLUMN link VARCHAR(500) DEFAULT ''",
+            'dettaglio_il' => "ADD COLUMN dettaglio_il DATETIME DEFAULT NULL",
+        ],
+        'ateneo_insegnamenti' => [
+            // v118: come l'archivio, per scegliere l'integrato (padre_*), mostrare il link e sapere quando sono stati scaricati i CFU
+            'padre_id'   => "ADD COLUMN padre_id INT DEFAULT NULL",
+            'padre_nome' => "ADD COLUMN padre_nome VARCHAR(255) DEFAULT ''",
+            'link'       => "ADD COLUMN link VARCHAR(500) DEFAULT ''",
+            'dettaglio_il' => "ADD COLUMN dettaglio_il DATETIME DEFAULT NULL",
         ],
         'convenzioni_compilate' => [
             // v85: conversazione con la scuola archiviata dalla casella dei messaggi (torna da sola se la scuola riscrive)

@@ -35,7 +35,7 @@ final class SincronizzazioneAnagrafe
      */
     public function sincronizza(?string $soloStruttura = null): array
     {
-        @set_time_limit(300);
+        @set_time_limit(900);
         // Inizio dell'aggiornamento (ora del database): chi non viene aggiornato da qui in poi non compare più
         $inizio = $this->strutture->adesso() ?? date('Y-m-d H:i:s');
         $riepilogo = [];
@@ -114,11 +114,15 @@ final class SincronizzazioneAnagrafe
             $this->catalogo->sincronizzaCorsi();
         }
 
-        // Insegnamenti dei corsi del proprio dipartimento (la prima struttura dell'anagrafe)
+        // Insegnamenti di tutto l'Ateneo (a capo della prima struttura dell'anagrafe, il proprio dipartimento), poi i CFU dal dettaglio
         $prima = $this->strutture->prima();
         if ($prima !== '' && ($soloStruttura === null || $soloStruttura === $prima) && isset($riepilogo[$prima]) && $riepilogo[$prima]['ok']) {
-            $nIns = $this->sincronizzaInsegnamenti($prima);
-            $riepilogo[$prima]['esito'] .= $nIns !== null ? ", $nIns insegnamenti" : ', insegnamenti non disponibili';
+            $nIns = $this->sincronizzaInsegnamenti();
+            $riepilogo[$prima]['esito'] .= $nIns !== null ? ", $nIns insegnamenti di Ateneo" : ', insegnamenti non disponibili';
+            if ($nIns !== null) {
+                $nDet = $this->catalogo->completaDettagli(150);
+                $riepilogo[$prima]['esito'] .= $nDet > 0 ? " ($nDet schede con i CFU)" : '';
+            }
         }
 
         // Chi non compare più in nessuna struttura (solo se le API hanno risposto per tutte)
@@ -136,60 +140,48 @@ final class SincronizzazioneAnagrafe
     }
 
     /**
-     * Insegnamenti del dipartimento tenuti nell'anno accademico in corso e nel successivo. Nelle API "academic_year" è la coorte
-     * (anno di immatricolazione) e ogni coorte elenca tutto il suo percorso: l'insegnamento si tiene nell'anno coorte + anno di
-     * corso - 1. Si scaricano le coorti degli ultimi 6 anni. Ritorna quanti ne sono arrivati, null se le API non rispondono.
+     * Insegnamenti di tutto l'Ateneo (o di un solo dipartimento) tenuti dall'anno accademico 2026/2027 (o in corso, se precedente)
+     * fino al successivo a quello in corso. Nelle API "academic_year" è la coorte (anno di immatricolazione) e ogni coorte elenca
+     * tutto il suo percorso: l'insegnamento si tiene nell'anno coorte + anno di corso - 1. Si scaricano le coorti degli ultimi
+     * 6 anni; l'intero percorso di ogni coorte va anche nel catalogo dei moduli. I CFU (solo nel dettaglio) si completano a parte
+     * (ServizioCatalogo::completaDettagli). Ritorna quanti ne sono arrivati, null se le API non rispondono.
      */
-    public function sincronizzaInsegnamenti(string $dip): ?int
+    public function sincronizzaInsegnamenti(?string $dip = null): ?int
     {
         $aa = $this->catalogo->annoCorrente();
-        $tutti = [];
+        $dal = min($aa, InsegnamentoRepository::PRIMO_ANNO_ARCHIVIO);
+        $elenchi = [];
         for ($coorte = $aa - 5; $coorte <= $aa + 1; $coorte++) {
-            $el = $this->api->tutte('activities/', ['department' => $dip, 'academic_year' => $coorte]);
+            $el = $this->api->tutte('activities/', ($dip !== null ? ['department' => $dip] : []) + ['academic_year' => $coorte]);
             if ($el === null) {
                 return null;
             }
-            foreach ($el as $r) {
-                $annoC = max(1, (int) ($r['StudyActivityYear'] ?? 1));
-                $erog = $coorte + $annoC - 1;
-                if ($erog === $aa || $erog === $aa + 1) {
-                    $r['_coorte'] = $coorte;
-                    $r['_erog'] = $erog;
-                    $tutti[] = $r;
-                }
-            }
+            $elenchi[$coorte] = $el;
         }
         $visti = [];
-        foreach ($tutti as $r) {
-            $id = (int) ($r['StudyActivityID'] ?? 0);
-            $nome = trim((string) ($r['StudyActivityName'] ?? ''));
-            if ($id <= 0 || $nome === '') {
-                continue;
+        foreach ($elenchi as $coorte => $el) {
+            $perCorso = [];
+            foreach ($el as $r) {
+                $x = AttivitaAteneo::daElenco($r);
+                if ($x === null) {
+                    continue;
+                }
+                if ($x['cds_cod'] !== '') {
+                    $perCorso[$x['cds_cod']][] = $r;
+                }
+                $erog = $coorte + max(1, (int) ($r['StudyActivityYear'] ?? 1)) - 1;
+                if ($erog < $dal || $erog > $aa + 1) {
+                    continue;
+                }
+                $this->insegnamenti->salva($x + ['anno_accademico' => $erog, 'coorte' => $coorte, 'dipartimento_cod' => $x['dipartimento_cod'] !== '' ? $x['dipartimento_cod'] : (string) $dip]);
+                $visti[] = $x['id'];
             }
-            $padri = (array) ($r['StudyActivityFathers'] ?? []);
-            $padre = null;
-            if ($padri) {
-                $p0 = reset($padri);
-                $padre = (int) (is_array($p0) ? ($p0['StudyActivityID'] ?? $p0['id'] ?? 0) : $p0) ?: null;
+            // Catalogo dei moduli: tutto il percorso della coorte, per corso, senza che gli studenti debbano aspettare le API
+            if ($dip === null) {
+                foreach ($perCorso as $cds => $righe) {
+                    $this->catalogo->salvaInsegnamenti((string) $cds, $coorte, $righe);
+                }
             }
-            $this->insegnamenti->salva([
-                'id' => $id, 'codice' => mb_substr((string) ($r['StudyActivityCod'] ?? ''), 0, 30),
-                'nome' => mb_substr(Testi::maiuscoleCorso($nome), 0, 255),
-                'cds_cod' => mb_substr((string) ($r['StudyActivityCdSCod'] ?? ''), 0, 20),
-                'cds_nome' => mb_substr(Testi::maiuscoleCorso((string) ($r['StudyActivityCdSName'] ?? '')), 0, 255),
-                'anno_corso' => (int) ($r['StudyActivityYear'] ?? 0) ?: null,
-                'anno_accademico' => (int) $r['_erog'], 'coorte' => (int) $r['_coorte'],
-                'semestre' => mb_substr((string) ($r['StudyActivitySemester'] ?? ''), 0, 60),
-                'ssd_cod' => mb_substr((string) ($r['StudyActivitySSDCod'] ?? ''), 0, 20),
-                'ssd' => mb_substr(Testi::maiuscoleCorso((string) ($r['StudyActivitySSD'] ?? '')), 0, 150),
-                'lingua' => mb_substr((string) ($r['StudyActivityLanguage'] ?? ''), 0, 60),
-                'docente' => mb_substr(Testi::maiuscoleNome((string) ($r['StudyActivityTeacherName'] ?? '')), 0, 150),
-                'docente_id' => mb_substr((string) ($r['StudyActivityTeacherID'] ?? ''), 0, 30),
-                'partizione' => mb_substr(trim((string) ($r['StudyActivityPartitionDes'] ?? $r['StudyActivityExtendedPartitionDes'] ?? '')), 0, 150),
-                'padre_id' => $padre, 'dipartimento_cod' => mb_substr((string) ($r['DepartmentCod'] ?? $dip), 0, 20),
-                'cfu' => Testi::cfuAttivitaApi($r),
-            ]);
-            $visti[] = $id;
         }
         $this->insegnamenti->segnaNonPresentiEPulisci($dip, $aa, $visti);
 

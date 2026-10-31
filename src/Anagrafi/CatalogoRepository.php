@@ -67,18 +67,32 @@ final class CatalogoRepository
     /** @return list<array<string, mixed>> */
     public function insegnamenti(string $cds, int $coorte): array
     {
-        return $this->db->righe('SELECT id, nome, codice, cfu, ssd_cod, ssd, anno_corso, partizione, semestre FROM ateneo_insegnamenti WHERE cds_cod = ? AND coorte = ? ORDER BY anno_corso, nome, partizione', [$cds, $coorte]);
+        return $this->db->righe('SELECT id, nome, codice, cfu, ssd_cod, ssd, anno_corso, partizione, semestre, padre_id, padre_nome, link, docente FROM ateneo_insegnamenti WHERE cds_cod = ? AND coorte = ? ORDER BY anno_corso, nome, partizione', [$cds, $coorte]);
     }
 
-    /** @param array<string, mixed> $i id, cds_cod, coorte, anno_corso, codice, nome, cfu, ssd_cod, ssd, partizione, semestre, docente */
+    /** @param array<string, mixed> $i id, cds_cod, coorte, anno_corso, codice, nome, cfu, ssd_cod, ssd, partizione, semestre, docente, padre_id, padre_nome, link (i CFU già scaricati dal dettaglio non si perdono) */
     public function salvaInsegnamento(array $i): bool
     {
         return $this->db->esegui(
-            'INSERT INTO ateneo_insegnamenti (id, cds_cod, coorte, anno_corso, codice, nome, cfu, ssd_cod, ssd, partizione, semestre, docente) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                              ON DUPLICATE KEY UPDATE cds_cod = VALUES(cds_cod), coorte = VALUES(coorte), anno_corso = VALUES(anno_corso), codice = VALUES(codice), nome = VALUES(nome), cfu = VALUES(cfu),
-                                ssd_cod = VALUES(ssd_cod), ssd = VALUES(ssd), partizione = VALUES(partizione), semestre = VALUES(semestre), docente = VALUES(docente)',
-            [$i['id'], $i['cds_cod'], $i['coorte'], $i['anno_corso'], $i['codice'], $i['nome'], $i['cfu'], $i['ssd_cod'], $i['ssd'], $i['partizione'], $i['semestre'], $i['docente']]
+            'INSERT INTO ateneo_insegnamenti (id, cds_cod, coorte, anno_corso, codice, nome, cfu, ssd_cod, ssd, partizione, semestre, docente, padre_id, padre_nome, link) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                              ON DUPLICATE KEY UPDATE cds_cod = VALUES(cds_cod), coorte = VALUES(coorte), anno_corso = VALUES(anno_corso), codice = VALUES(codice), nome = VALUES(nome), cfu = COALESCE(VALUES(cfu), cfu),
+                                ssd_cod = VALUES(ssd_cod), ssd = VALUES(ssd), partizione = VALUES(partizione), semestre = VALUES(semestre), docente = VALUES(docente),
+                                padre_id = VALUES(padre_id), padre_nome = VALUES(padre_nome), link = VALUES(link)',
+            [$i['id'], $i['cds_cod'], $i['coorte'], $i['anno_corso'], $i['codice'], $i['nome'], $i['cfu'], $i['ssd_cod'], $i['ssd'], $i['partizione'], $i['semestre'], $i['docente'],
+             $i['padre_id'] ?? null, $i['padre_nome'] ?? '', $i['link'] ?? '']
         ) >= 0;
+    }
+
+    /** Segna scaricato il dettaglio di un insegnamento del catalogo, con i CFU se indicati */
+    public function salvaDettaglio(int $id, ?float $cfu): void
+    {
+        $this->db->esegui('UPDATE ateneo_insegnamenti SET cfu = COALESCE(?, cfu), dettaglio_il = NOW() WHERE id = ?', [$cfu, $id]);
+    }
+
+    /** @return list<int> id del catalogo senza il dettaglio (CFU) scaricato, prima le coorti più recenti */
+    public function daCompletare(int $max): array
+    {
+        return array_map(static fn (array $r): int => (int) $r['id'], $this->db->righe('SELECT id FROM ateneo_insegnamenti WHERE dettaglio_il IS NULL OR dettaglio_il < NOW() - INTERVAL 90 DAY ORDER BY coorte DESC, id LIMIT ' . max(1, $max)));
     }
 
     public function segnaScaricato(string $cds, int $coorte, int $n): void

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Anagrafi;
 
 /** Client HTTP delle API di Ateneo (cURL, o file_get_contents se cURL manca). Spostato da api_unical_get/api_unical_tutte. */
-final class ClientApiAteneoHttp implements ClientApiAteneo
+final class ClientApiAteneoHttp implements ClientApiAteneo, ClientApiAteneoMultiplo
 {
     private const AGENTE = 'DidatticaDiBEST/1.0';
 
@@ -36,6 +36,44 @@ final class ClientApiAteneoHttp implements ClientApiAteneo
         $j = json_decode($corpo, true);
 
         return is_array($j) ? $j : null;
+    }
+
+    public function getMolti(array $percorsi, int $timeout = 25): array
+    {
+        $out = [];
+        if (!function_exists('curl_multi_init')) {
+            foreach ($percorsi as $p) {
+                $out[$p] = $this->get($p, [], $timeout);
+            }
+
+            return $out;
+        }
+        $multi = curl_multi_init();
+        $manici = [];
+        foreach ($percorsi as $p) {
+            $ch = curl_init($this->base . ltrim($p, '/') . '?format=json');
+            curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => $timeout, CURLOPT_CONNECTTIMEOUT => 8,
+                                    CURLOPT_FOLLOWLOCATION => true, CURLOPT_MAXREDIRS => 3, CURLOPT_HTTPHEADER => ['Accept: application/json'],
+                                    CURLOPT_USERAGENT => self::AGENTE]);
+            curl_multi_add_handle($multi, $ch);
+            $manici[$p] = $ch;
+        }
+        do {
+            $stato = curl_multi_exec($multi, $attivi);
+            if ($attivi) {
+                curl_multi_select($multi, 1.0);
+            }
+        } while ($attivi && $stato === CURLM_OK);
+        foreach ($manici as $p => $ch) {
+            $corpo = curl_multi_getcontent($ch);
+            $j = curl_getinfo($ch, CURLINFO_HTTP_CODE) === 200 && is_string($corpo) && $corpo !== '' ? json_decode($corpo, true) : null;
+            $out[$p] = is_array($j) ? $j : null;
+            curl_multi_remove_handle($multi, $ch);
+            curl_close($ch);
+        }
+        curl_multi_close($multi);
+
+        return $out;
     }
 
     public function tutte(string $percorso, array $query = []): ?array

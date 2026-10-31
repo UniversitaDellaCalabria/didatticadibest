@@ -110,9 +110,10 @@ final class AbbinamentoInsegnamenti
     private function insegnamentiDell(int $anno): array
     {
         if (!isset($this->cache[$anno])) {
-            $el = $anno > 0 ? $this->insegnamenti->dellAnno($anno) : [];
-            if (!$el && ($recente = $this->insegnamenti->annoPiuRecente()) > 0) {
-                $el = $this->insegnamenti->dellAnno($recente);
+            $dip = $this->insegnamenti->dipartimentoProprio();
+            $el = $anno > 0 ? $this->insegnamenti->dellAnno($anno, $dip) : [];
+            if (!$el && ($recente = $this->insegnamenti->annoPiuRecente($dip)) > 0) {
+                $el = $this->insegnamenti->dellAnno($recente, $dip);
             }
             $this->cache[$anno] = $el;
         }

@@ -15,12 +15,13 @@ $corso = $codice !== '' ? $corsi_srv->corso($codice) : null;
 if ($corso && (int)($corso['visibile'] ?? 1) !== 1) { $corso = null; }
 $cerca = trim((string)($_GET['q'] ?? ''));
 
-$anno = $ins_rep->contaPresenti(\App\Anagrafi\Anagrafe::annoAccademico(new \DateTimeImmutable())) ? \App\Anagrafi\Anagrafe::annoAccademico(new \DateTimeImmutable()) : $ins_rep->annoPiuRecente();
+$dip_proprio = $ins_rep->dipartimentoProprio(); // la pagina mostra i corsi del Dipartimento, anche se l'archivio ha tutto l'Ateneo
+$anno = $ins_rep->contaPresenti(\App\Anagrafi\Anagrafe::annoAccademico(new \DateTimeImmutable()), $dip_proprio) ? \App\Anagrafi\Anagrafe::annoAccademico(new \DateTimeImmutable()) : $ins_rep->annoPiuRecente($dip_proprio);
 $insegnamenti = [];
 if ($corso) {
-    $insegnamenti = $anno ? $ins_rep->elenco($anno, (string)$corso['codice'], 0, '', $cerca) : [];
+    $insegnamenti = $anno ? $ins_rep->elenco($anno, (string)$corso['codice'], 0, '', $cerca, $dip_proprio) : [];
 } elseif ($cerca !== '' && $anno) {
-    $insegnamenti = $ins_rep->elenco($anno, '', 0, '', $cerca);
+    $insegnamenti = $ins_rep->elenco($anno, '', 0, '', $cerca, $dip_proprio);
 }
 if ($corso && empty($corso['regdid_id'])) { $corso = $corsi_srv->completaRegdid($corso); }
 $url_corso = $corso ? \App\Anagrafi\Testi::urlCorsoStudio($corso) : '';

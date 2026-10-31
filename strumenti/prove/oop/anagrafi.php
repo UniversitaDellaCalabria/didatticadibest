@@ -69,6 +69,55 @@ $n = salva_catalogo_insegnamenti($conn, 'ZZ001', 2025, [['StudyActivityID' => 99
 $ci = catalogo_insegnamenti($conn, 'ZZ001', 2025, false);
 prova($n === 1 && count($ci) === 1 && $ci[0]['nome'] === 'Materia prova' && (float)$ci[0]['cfu'] === 9.5 && catalogo_insegnamenti($conn, 'ZZ001', 1800, false) === [], "salva_catalogo_insegnamenti() e catalogo_insegnamenti()");
 
+// Insegnamenti di tutto l'Ateneo: tutti i campi dell'API, integrato con i suoi moduli, CFU dal dettaglio, link
+$ap = new class implements \App\Anagrafi\ClientApiAteneo {
+    public array $elenchi = [];
+    public array $dettagli = [];
+    public function get(string $percorso, array $query = [], int $timeout = 25): ?array { return $this->dettagli[$percorso] ?? null; }
+    public function tutte(string $percorso, array $query = []): ?array { $k = $percorso . '|' . ($query['academic_year'] ?? '') . '|' . ($query['department'] ?? ''); return array_key_exists($k, $this->elenchi) ? $this->elenchi[$k] : []; }
+    public function scarica(string $url, int $timeout = 10): ?string { return null; }
+};
+$aa_i = anno_accademico_corrente();
+$riga_i = fn (int $id, string $nome, string $dip, string $cds, array $extra = []): array => $extra + ['StudyActivityID' => $id, 'StudyActivityName' => $nome, 'StudyActivityCod' => "27$id", 'StudyActivityCdSCod' => $cds,
+    'StudyActivityCdSName' => 'CORSO ' . $cds, 'DepartmentCod' => $dip, 'DepartmentName' => 'Dipartimento ' . $dip, 'StudyActivityYear' => 1.0, 'StudyActivitySemester' => 'Primo Semestre',
+    'StudyActivitySSDCod' => 'FIS-01/A', 'StudyActivitySSD' => 'Fisica sperimentale', 'StudyActivityTeacherName' => 'ROSSI MARIO', 'StudyActivityTeacherID' => 'mario.rossi', 'StudyActivityFathers' => []];
+$padre_i = [['FatherID' => 9950, 'FatherName' => 'FISICA E CHIMICA (INTEGRATO)', 'RegdidId' => 1]];
+$ap->elenchi['activities/|' . $aa_i . '|'] = [
+    $riga_i(9951, 'FISICA', 'ZD1', 'ZC1', ['StudyActivityFathers' => $padre_i]),
+    $riga_i(9952, 'CHIMICA', 'ZD1', 'ZC1', ['StudyActivityFathers' => $padre_i]),
+    $riga_i(9953, 'ANATOMIA', 'ZD2', 'ZC2'),
+];
+$ap->dettagli['activities/9951/'] = ['results' => ['StudyActivityID' => 9951, 'StudyActivityECTS' => 6.0]];
+$ap->dettagli['activities/9952/'] = ['results' => ['StudyActivityID' => 9952, 'StudyActivityECTS' => 3]];
+$ap->dettagli['activities/9953/'] = ['results' => ['StudyActivityID' => 9953, 'StudyActivityECTS' => null]];
+$q("DELETE FROM insegnamenti WHERE id IN (9951, 9952, 9953)"); $q("DELETE FROM ateneo_insegnamenti WHERE id IN (9951, 9952, 9953)");
+$cont_i = \App\Core\App::per($conn);
+$db_i = \App\Core\Database::per($conn);
+$cat_i = new \App\Anagrafi\ServizioCatalogo($cont_i->get(\App\Anagrafi\CatalogoRepository::class), $cont_i->get(\App\Anagrafi\CorsoRepository::class), $cont_i->get(\App\Anagrafi\InsegnamentoRepository::class), $ap, $cont_i->get(\App\Core\Orologio::class));
+$sin_i = new \App\Anagrafi\SincronizzazioneAnagrafe($db_i, $ap, $cont_i->get(\App\Anagrafi\StruttureRepository::class), $cont_i->get(\App\Anagrafi\PersonaRepository::class), $cont_i->get(\App\Anagrafi\CorsoRepository::class),
+    $cont_i->get(\App\Anagrafi\InsegnamentoRepository::class), $cat_i, $cont_i->get(\App\Anagrafi\CollegamentoUtente::class), $cont_i->get(\App\Core\Sito::class));
+$n_i = $sin_i->sincronizzaInsegnamenti();
+$i1 = $conn->query("SELECT * FROM insegnamenti WHERE id = 9951")->fetch_assoc();
+prova($n_i >= 3 && (int)$conn->query("SELECT COUNT(*) c FROM insegnamenti WHERE id IN (9951, 9952, 9953) AND presente = 1")->fetch_assoc()['c'] === 3, "sincronizzazione: insegnamenti di tutto l'Ateneo, anche di dipartimenti diversi");
+prova($i1['codice'] === '279951' && $i1['nome'] === 'Fisica' && $i1['cds_cod'] === 'ZC1' && $i1['semestre'] === 'Primo Semestre' && $i1['ssd_cod'] === 'FIS-01/A' && $i1['ssd'] === 'Fisica sperimentale'
+    && $i1['docente'] === 'Rossi Mario' && $i1['dipartimento_cod'] === 'ZD1' && $i1['dipartimento'] === 'Dipartimento ZD1' && (int)$i1['anno_accademico'] === $aa_i, "sincronizzazione: codice, descrizione, SSD, semestre, docente, corso e dipartimento", json_encode($i1, JSON_UNESCAPED_UNICODE));
+prova((int)$i1['padre_id'] === 9950 && $i1['padre_nome'] === 'Fisica e chimica (integrato)' && $i1['link'] === 'https://www.unical.it/storage/activities/9951/', "sincronizzazione: integrato di cui è modulo e link alla pagina dell'insegnamento", json_encode($i1, JSON_UNESCAPED_UNICODE));
+prova((int)$conn->query("SELECT COUNT(*) c FROM ateneo_insegnamenti WHERE id IN (9951, 9952, 9953)")->fetch_assoc()['c'] === 3 && $conn->query("SELECT padre_nome FROM ateneo_insegnamenti WHERE id = 9952")->fetch_assoc()['padre_nome'] === 'Fisica e chimica (integrato)', "sincronizzazione: anche il catalogo dei moduli ha l'integrato");
+prova($i1['cfu'] === null && $i1['dettaglio_il'] === null, "i CFU non arrivano dall'elenco: restano da scaricare dal dettaglio");
+$fatti_i = $cat_i->completaDettagli(30, 3);
+$i1 = $conn->query("SELECT * FROM insegnamenti WHERE id = 9951")->fetch_assoc();
+prova($fatti_i >= 3 && (float)$i1['cfu'] === 6.0 && $i1['dettaglio_il'] !== null && (float)$conn->query("SELECT cfu FROM ateneo_insegnamenti WHERE id = 9952")->fetch_assoc()['cfu'] === 3.0 && $conn->query("SELECT cfu FROM insegnamenti WHERE id = 9953")->fetch_assoc()['cfu'] === null, "dettaglio: CFU scaricati dalla scheda dell'attività (senza CFU indicati restano vuoti)");
+$sin_i->sincronizzaInsegnamenti();
+prova((float)$conn->query("SELECT cfu FROM insegnamenti WHERE id = 9951")->fetch_assoc()['cfu'] === 6.0 && (float)$conn->query("SELECT cfu FROM ateneo_insegnamenti WHERE id = 9951")->fetch_assoc()['cfu'] === 6.0, "una nuova sincronizzazione non cancella i CFU già scaricati");
+$ap->elenchi['activities/|' . $aa_i . '|'] = [$riga_i(9951, 'FISICA', 'ZD1', 'ZC1')];
+$sin_i->sincronizzaInsegnamenti();
+prova($conn->query("SELECT presente FROM insegnamenti WHERE id = 9952")->fetch_assoc()['presente'] == 0 && (int)$conn->query("SELECT presente FROM insegnamenti WHERE id = 9951")->fetch_assoc()['presente'] === 1, "un insegnamento che l'Ateneo non pubblica più è segnato non presente");
+$rep_i = $cont_i->get(\App\Anagrafi\InsegnamentoRepository::class);
+prova(count($rep_i->elenco($aa_i, 'ZC1', 0, '', '', 'ZD2')) === 0 && count($rep_i->elenco($aa_i, '', 0, '', 'zc1', 'ZD1')) === 1 && in_array('ZD1', array_column($rep_i->dipartimentiDellAnno($aa_i), 'dipartimento_cod'), true), "elenco per dipartimento o per tutto l'Ateneo");
+$ap->elenchi['activities/|' . $aa_i . '|'] = null;
+prova($sin_i->sincronizzaInsegnamenti() === null && (int)$conn->query("SELECT presente FROM insegnamenti WHERE id = 9951")->fetch_assoc()['presente'] === 1, "API non raggiungibili: nessun insegnamento cancellato");
+$q("DELETE FROM insegnamenti WHERE id IN (9951, 9952, 9953)"); $q("DELETE FROM ateneo_insegnamenti WHERE id IN (9951, 9952, 9953)"); $q("DELETE FROM ateneo_insegnamenti_scaricati WHERE cds_cod IN ('ZC1', 'ZC2')");
+
 // Abilitazioni
 $q("INSERT INTO pagine_eventi (id, titolo, slug, permessi_gestori_json) VALUES (9980, 'Area anagrafi', 'area-anagrafi', '{}')");
 $q("INSERT INTO eventi (id, pagina_id, titolo, tipo) VALUES (9981, 9980, 'Evento A', 'evento')");
