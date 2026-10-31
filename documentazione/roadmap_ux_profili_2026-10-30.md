@@ -457,6 +457,7 @@ lasciando nella pagina solo il disegno. Da fare dopo le fasi 0-3.
 - **6.1** Passata con axe-core (come già fatto il 25/09) sulle pagine per profilo: `area_personale.php`, `da_fare.php`, `firme.php`, `miei_eventi.php`, `programma_fsl.php`,
   `convenzione_online.php`, `elenco_studenti.php`, `convenzione_tesi.php`, `modulo.php`, `pratiche.php`, `il_mio_tutorato.php`, `registro_tutorato.php`,
   `dichiarazione_tutorato.php`, `conferma_attestato.php`, `cruscotto_direttore.php`. Zero errori «serious/critical». (M)
+  *Stato 1/11/2026:* passata con axe-core 4.9.1 sull'ambiente locale (tema chiaro e scuro, anche a 375 px) su `area_personale`, `da_fare`, `miei_eventi`, `pratiche`, `profilo`, `programma_fsl`, `il_mio_tutorato`, `firme`, `dichiarazione_tutorato` e `registro_tutorato`: 0 errori serious/critical dopo aver corretto i contrasti del tema scuro (etichette, `btn-outline-primary`, `btn-link`) in `portale-ui.css`. Non passate: `convenzione_online`, `elenco_studenti`, `modulo`, `conferma_attestato`, `cruscotto_direttore` (servono i link personali o utenti con quei ruoli).
 - **6.2** Moduli lunghi (`convenzione_online.php`, `dichiarazione_tutorato.php`, `convenzione_tesi.php`): salvataggio automatico della bozza ogni 30 secondi e avviso se si
   lascia la pagina con modifiche non salvate. (M)
 - **6.3** Tema scuro e stile comune anche sulle pagine raggiunte dall'area personale che oggi non lo hanno (`registro_tutorato.php`, pagine di firma). (S)
