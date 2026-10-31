@@ -222,6 +222,7 @@ lato docente; bozze delle pratiche; percorsi a passi per convenzione FSL e conve
 - **Soluzione.** «Scarica i selezionati» produce uno ZIP con nomi file univoci (`<tipo>_<id>_<codice>.pdf`); chi firma con ArubaSign/Dike firma tutti i file insieme
   e ricarica i PDF firmati (più file o uno ZIP). Il portale abbina ogni file al documento dal nome e lo controlla con la verifica già esistente (stesso PDF + una firma).
 - **Requisiti.** `ZipArchive` (già usato); limite di dimensione per file come oggi (20 MB); risposta con l'esito file per file. **Peso.** M.
+- **Stato 1/11/2026.** Già presente in `firme.php` (`PacchettoFirme` per lo ZIP con nomi `<tipo>_<id>_<codice>.pdf`, `RicaricaFirmati` per il ricarico di più file o di uno ZIP, esito file per file) e coperto da `firme_scrivania.php`: nessuna modifica necessaria.
 
 ### 2.4 Cruscotto del Direttore operativo
 
