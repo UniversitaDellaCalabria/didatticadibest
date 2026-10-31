@@ -55,3 +55,22 @@ $pag_fi = (string) file_get_contents($radice . '/firme.php');
 prova(str_contains($pag_fi, 'ScrivaniaFirme') && str_contains($pag_fi, 'linkFirma') && str_contains($pag_fi, 'linkPdf()'), "firme.php: legge la scrivania e porta alla pagina di firma e all'anteprima");
 $cru_fi = (string) file_get_contents($radice . '/cruscotto_direttore.php');
 prova(str_contains($cru_fi, 'Firma ora (') && str_contains($cru_fi, 'firme.php'), "cruscotto del Direttore: pulsante «Firma ora (N)»");
+
+// ---- Scarico in ZIP ----
+sezione("Scrivania delle firme — ZIP dei selezionati");
+$f1_fi = tempnam(sys_get_temp_dir(), 'fz'); file_put_contents($f1_fi, "%PDF-1.4\nuno\n");
+$f2_fi = tempnam(sys_get_temp_dir(), 'fz'); file_put_contents($f2_fi, "%PDF-1.4\ndue\n");
+$mk_fi = fn(string $tipo, int $id, ?string $p) => new \App\Firme\DocumentoDaFirmare($tipo, $id, 'Doc ' . $id, '', 1, 'firma_x.php?t=a', $p, \App\Firme\DocumentoDaFirmare::nomeSicuro($tipo, $id, 'C' . $id));
+$disp_fi = [$mk_fi('verbale', 1, $f1_fi), $mk_fi('tutorato', 2, $f2_fi), $mk_fi('pratica', 3, null)];
+$sc_fi = \App\Firme\PacchettoFirme::scelti($disp_fi, ['verbale:1', 'tutorato:2', 'verbale:1', 'pratica:3', 'verbale:99', 'x; DROP', '../etc:1']);
+prova(count($sc_fi) === 3 && array_map(fn($d) => $d->id, $sc_fi) === [1, 2, 3], "zip: si prendono solo documenti dell'elenco della persona, senza doppioni né sigle inventate");
+$z_fi = \App\Firme\PacchettoFirme::crea($sc_fi);
+$za_fi = new \ZipArchive();
+$aperto_fi = $z_fi['percorso'] !== null && $za_fi->open($z_fi['percorso']) === true;
+prova($aperto_fi && $z_fi['inclusi'] === 2 && $za_fi->numFiles === 2 && $za_fi->locateName('verbale_1_C1.pdf') !== false && $za_fi->locateName('tutorato_2_C2.pdf') !== false && $za_fi->getFromName('verbale_1_C1.pdf') === "%PDF-1.4\nuno\n", "zip: un PDF per documento, con il nome per l'abbinamento");
+prova($z_fi['senza_pdf'] === ['Doc 3'], "zip: i documenti senza PDF sono segnalati e non rompono lo ZIP", json_encode($z_fi['senza_pdf']));
+if ($aperto_fi) { $za_fi->close(); @unlink($z_fi['percorso']); }
+prova(\App\Firme\PacchettoFirme::crea([$mk_fi('pratica', 3, null)])['percorso'] === null && \App\Firme\PacchettoFirme::crea([])['percorso'] === null, "zip: senza PDF non si crea nessun file");
+@unlink($f1_fi); @unlink($f2_fi);
+$pag2_fi = (string) file_get_contents($radice . '/firme.php');
+prova(str_contains($pag2_fi, "csrf_verify") && str_contains($pag2_fi, 'PacchettoFirme::scelti($documenti_fi'), "firme.php: lo ZIP vale solo per i documenti dell'elenco e con il controllo CSRF");
