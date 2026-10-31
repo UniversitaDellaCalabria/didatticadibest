@@ -58,7 +58,7 @@ $page_cfg['titolo'] = $fine ? 'Firma della dichiarazione di fine attività' : 'F
 require_once 'header.php';
 ?>
 <div class="container my-4" style="max-width: 1000px;">
-    <?php echo flash_html(); ?>
+    <?php echo flash_html() . ui_prossima_cosa(); ?>
     <?php if (!$i || $i['stato'] === 'annullata'): ?>
         <h1 class="fw-bold h3">Documento non disponibile</h1><p>Il link non è valido o la lettera è stata annullata.</p>
     <?php elseif (!$io): ?>

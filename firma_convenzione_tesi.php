@@ -43,7 +43,7 @@ $page_cfg['titolo'] = 'Firma della convenzione di tesi';
 require_once 'header.php';
 ?>
 <div class="container my-4" style="max-width: 1000px;">
-    <?php echo flash_html(); ?>
+    <?php echo flash_html() . ui_prossima_cosa(); ?>
     <?php if (!$c || ($c['stato'] ?? '') === $S::RIFIUTATA): ?>
         <div class="alert alert-warning">Il link non è valido o la convenzione non è più in attesa della firma.</div>
     <?php elseif (!$io): $d = $svc->chiFirma(); ?>

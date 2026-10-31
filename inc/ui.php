@@ -21,6 +21,31 @@ if (!function_exists('ui_vuoto')) {
     }
 }
 
+if (!function_exists('ui_prossima_cosa')) {
+    /**
+     * «Prossima cosa da fare»: va messa subito dopo flash_html(). Compare solo se il messaggio appena mostrato era un successo (compito chiuso) e alla persona
+     * resta qualcosa in «Da fare per te»; altrimenti non scrive niente.
+     */
+    function ui_prossima_cosa(): string {
+        global $conn, $user_info;
+        if (($GLOBALS['_flash_mostrato'] ?? '') !== 'success' || empty($user_info['id'])) {
+            return '';
+        }
+        try {
+            $p = \App\Core\App::per($conn)->get(\App\Portale\ProssimaCosa::class)->perUtente($user_info, (string) ($_SERVER['REQUEST_URI'] ?? ''));
+        } catch (\Throwable $e) {
+            return '';
+        }
+        if ($p === null) {
+            return '';
+        }
+        $h = static fn (string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+        return '<div class="alert alert-info border-0 border-start border-4 border-info d-flex flex-wrap align-items-center gap-2" role="status"><div class="flex-grow-1">'
+            . '<strong>Prossima cosa da fare:</strong> ' . $h($p['testo']) . '<span class="d-block small text-secondary">' . $h($p['dettaglio']) . ($p['altre'] > 0 ? ' · e altre ' . (int) $p['altre'] : '') . '</span></div>'
+            . '<a class="btn btn-sm btn-primary fw-bold" href="' . $h($p['link']) . '">Vai</a><a class="btn btn-sm btn-outline-secondary" href="area_personale.php">Area personale</a></div>';
+    }
+}
+
 if (!function_exists('ui_intestazione')) {
     /** Titolo di una pagina interna, con il «torna a…» sopra. */
     function ui_intestazione(string $titolo, string $indietro_href = 'area_personale.php', string $indietro_et = 'Area personale', string $sottotitolo = ''): string {

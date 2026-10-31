@@ -396,6 +396,8 @@ con lo stato; utile per sapere se un tesista ha inviato la richiesta.
 **4.3 Dopo un'azione, la prossima** (S): nelle pagine di firma/conferma/caricamento, dopo il successo, riquadro «Prossima cosa da fare: …» con il primo compito di
 `DaFarePersona` e il link «Torna all'area personale»; tutte queste pagine hanno il percorso «Area personale / …» come `registro_tutorato.php:41`.
 
+> **Stato 1/11/2026: FATTO in locale (nessuna modifica allo schema).** `App\Portale\ProssimaCosa` sceglie dal «Da fare» il compito con la scadenza più vicina (poi quello più vecchio), saltando la pagina in cui sei; `ui_prossima_cosa()` (`inc/ui.php`) lo mostra subito dopo il messaggio di successo (`flash_html()` ricorda il tipo del messaggio) in `firma_pratica`, `firma_incarico`, `firma_verbale`, `firma_convenzione`, `firma_convenzione_tesi`, `conferma_attestato`, `registro_tutorato`, con «Vai» e «Area personale». Non toccata `mie_conferme.php` (mostra già i suoi esiti). Prova: `prossima_cosa.php`.
+
 **4.4 Stati con le stesse parole e gli stessi colori** (M): `miei_eventi.php` usa ancora i badge Bootstrap con colori propri (righe 340-350); `registro_tutorato.php`,
 le pagine di firma e `convenzione_*.php` hanno stili in linea. Portarli ai cinque stati di `portale-ui.css` (fatto, in attesa, serve un'azione, informazione, chiuso)
 con un helper unico `ui_stato(string $tipo, string $testo)`.

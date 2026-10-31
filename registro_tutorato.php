@@ -36,7 +36,7 @@ require_once 'header.php';
 ?>
 <div class="container my-4" style="max-width: 1050px;">
     <nav aria-label="Percorso" class="mb-3 small"><a href="area_personale.php">Area personale</a> <span class="text-secondary mx-1">/</span> <span class="text-secondary">Registro delle attività di tutorato</span></nav>
-    <?php echo flash_html(); ?>
+    <?php echo flash_html() . ui_prossima_cosa(); ?>
     <?php if (!$miei): ?>
         <h1 class="fw-bold h3">Registro delle attività di tutorato</h1>
         <div class="alert alert-light border">Non ci sono incarichi di tutorato attivi per te. Il registro si apre quando la lettera di incarico ha tutte le firme.</div>

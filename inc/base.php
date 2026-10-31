@@ -24,7 +24,9 @@ if (!function_exists('flash_set')) {
         try { \App\Core\App::get(\App\Portale\ContatoreDaFare::class)->azzera(); } catch (\Throwable $e) { error_log('da_fare_aggiorna: ' . $e->getMessage()); }
     }
     function flash_html() {
-        return (new \App\Auth\Flash(new \App\Auth\SessioneNativa()))->html();
+        $f = flash_get();
+        $GLOBALS['_flash_mostrato'] = is_array($f) ? (string) ($f['type'] ?? '') : ''; // lo legge ui_prossima_cosa(): dopo un successo propone il compito seguente
+        return \App\Auth\Vista\FlashVista::html($f);
     }
 }
 
