@@ -174,9 +174,9 @@ require_once 'header.php';
             <?php foreach ($articoli as $n => $a):
                 $m = $mod[$n] ?? null;
                 $testo_campo = $errori && isset($_POST['art'][$n]) ? (string)$_POST['art'][$n] : ($m['testo'] ?? $a['testo']);
-                $badge = $m ? ['proposta' => ['warning text-dark', 'Modifica proposta: in attesa del Dipartimento'], 'accettata' => ['success', 'Modifica accettata'], 'rifiutata' => ['danger', 'Modifica rifiutata'], 'controproposta' => ['info text-dark', 'Il Dipartimento propone un altro testo']][$m['stato']] ?? null : null; ?>
+                $badge = $m ? ['proposta' => ['attesa', 'Modifica proposta: in attesa del Dipartimento'], 'accettata' => ['ok', 'Modifica accettata'], 'rifiutata' => ['azione', 'Modifica rifiutata'], 'controproposta' => ['info', 'Il Dipartimento propone un altro testo']][$m['stato']] ?? null : null; ?>
             <details class="ct-art<?php echo $m ? ' mod' : ''; ?>"<?php echo $m && $m['stato'] !== 'accettata' ? ' open' : ''; ?>>
-                <summary>Art. <?php echo (int)$n; ?> – <?php echo $h($a['titolo']); ?><?php echo $badge ? ' <span class="badge bg-' . $badge[0] . ' ms-1">' . $h($badge[1]) . '</span>' : ''; ?></summary>
+                <summary>Art. <?php echo (int)$n; ?> – <?php echo $h($a['titolo']); ?><?php echo $badge ? ' ' . ui_stato($badge[0], $badge[1]) : ''; ?></summary>
                 <div class="corpo">
                     <?php foreach (explode("\n\n", $a['testo']) as $par): ?><p class="text-secondary"><?php echo $h($par); ?></p><?php endforeach; ?>
                     <?php if ($m && $m['risposta'] !== ''): ?><div class="alert alert-light border small"><strong>Risposta del Dipartimento:</strong> <?php echo nl2br($h($m['risposta'])); ?></div><?php endif; ?>

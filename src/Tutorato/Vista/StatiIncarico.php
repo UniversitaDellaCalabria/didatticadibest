@@ -13,6 +13,10 @@ final class StatiIncarico
     {
         [$n, $col, $ico] = Costanti::STATI_INCARICO[$stato] ?? [$stato, '#64748b', 'fa-circle'];
 
+        if (function_exists('ui_stato_colore')) {
+            return ui_stato_colore($stato === 'annullata' ? '#64748b' : $col, $n, $ico);
+        }
+
         return '<span class="badge" style="background:' . $col . ';"><i class="fa ' . $ico . ' me-1" aria-hidden="true"></i>' . htmlspecialchars($n) . '</span>';
     }
 

@@ -11,6 +11,20 @@ if (!function_exists('ui_stato')) {
     }
 }
 
+if (!function_exists('ui_stato_colore')) {
+    /** Come ui_stato(), per gli stati che nel codice portano ancora un colore: verde = ok · ambra/viola = in attesa · rosso = serve un'azione · blu = informazione · altro = neutro. */
+    function ui_stato_colore(string $colore, string $testo, string $icona = ''): string {
+        $tipo = match (strtolower($colore)) {
+            '#15803d', '#198754', '#16a34a' => 'ok',
+            '#b45309', '#f59e0b', '#7c3aed' => 'attesa',
+            '#b91c1c', '#dc2626', '#b30000' => 'azione',
+            '#0056b3', '#0e7490', '#0284c7' => 'info',
+            default => 'neutro',
+        };
+        return ui_stato($tipo, $testo, $icona);
+    }
+}
+
 if (!function_exists('ui_vuoto')) {
     /** Stato vuoto: cerchio leggero con l'icona, titolo, testo e un pulsante utile (facoltativo). */
     function ui_vuoto(string $icona, string $titolo, string $testo = '', string $href = '', string $etichetta = '', string $colore = '#64748b'): string {

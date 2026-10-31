@@ -61,7 +61,7 @@ echo ui_tema_script();
         <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
             <div><h1 class="fw-bold h3 mb-0">Registro delle attività di tutorato</h1>
                 <div class="text-secondary"><?php echo $h($tutor ? $i['bando_titolo'] : 'Tutor: ' . trim($i['nome'] . ' ' . $i['cognome']) . ' · ' . $i['bando_titolo']); ?></div></div>
-            <span class="badge fs-6" style="background:<?php echo $fs_col; ?>;"><?php echo $h($fs_nome); ?></span>
+            <?php echo ui_stato_colore($fs_col, $fs_nome); ?>
         </div>
         <div class="row g-3 mb-3">
             <div class="col-md-8"><div class="card border-0 shadow-sm h-100"><div class="card-body">
@@ -99,7 +99,7 @@ echo ui_tema_script();
                     <tr><?php if (!$tutor && $aperto): ?><td><?php if ($r['stato'] === 'inviata'): ?><input type="checkbox" class="form-check-input r-sel" name="righe[]" value="<?php echo (int)$r['id']; ?>" aria-label="Seleziona il <?php echo date('d/m/Y', strtotime($r['data'])); ?>"><?php endif; ?></td><?php endif; ?>
                         <td class="text-nowrap"><?php echo date('d/m/Y', strtotime($r['data'])); ?></td><td class="text-center"><?php echo ore_testo($r['ore']); ?></td>
                         <td><?php echo $h($r['attivita']); ?><?php echo $r['nota_docente'] !== '' ? '<div class="text-secondary"><i class="fa fa-comment me-1" aria-hidden="true"></i>' . $h($r['nota_docente']) . '</div>' : ''; ?></td>
-                        <td><span class="badge" style="background:<?php echo $sc; ?>;"><?php echo $h($sn); ?></span></td>
+                        <td><?php echo ui_stato_colore($sc, $sn); ?></td>
                         <?php if ($tutor && $aperto): ?><td><?php if ($r['stato'] === 'inviata'): ?><button type="submit" name="togli" value="<?php echo (int)$r['id']; ?>" class="btn btn-sm btn-link text-danger p-0" data-confirm="Togliere questa riga?" aria-label="Togli la riga"><i class="fa fa-trash" aria-hidden="true"></i></button><?php endif; ?></td><?php endif; ?></tr>
                 <?php endforeach; ?>
                 <?php if (!$reg): ?><tr><td colspan="6" class="text-center text-muted py-3">Nessuna attività segnata.</td></tr><?php endif; ?>

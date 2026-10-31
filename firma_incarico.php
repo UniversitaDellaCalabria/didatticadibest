@@ -67,7 +67,7 @@ require_once 'header.php';
         <a class="btn btn-outline-secondary" href="esci.php">Esci</a>
     <?php else: $d = dati_lettera_incarico($i); ?>
         <h1 class="fw-bold h3 mb-1"><?php echo $fine ? 'Fine attività di tutorato di ' : 'Lettera di incarico di '; ?><?php echo $h($d['NOMINATIVO']); ?></h1>
-        <p class="text-secondary mb-3"><?php echo $h($i['bando_titolo']); ?> · <?php echo $fine ? '<span class="badge" style="background:' . STATI_FINE_ATTIVITA[$stato_ora][1] . ';">' . $h(STATI_FINE_ATTIVITA[$stato_ora][0]) . '</span>' : badge_stato_incarico($i['stato']); ?></p>
+        <p class="text-secondary mb-3"><?php echo $h($i['bando_titolo']); ?> · <?php echo $fine ? ui_stato_colore(STATI_FINE_ATTIVITA[$stato_ora][1], STATI_FINE_ATTIVITA[$stato_ora][0]) : badge_stato_incarico($i['stato']); ?></p>
         <div class="row g-3">
             <div class="col-lg-5">
                 <?php if ($stato_ora === $atteso): ?>

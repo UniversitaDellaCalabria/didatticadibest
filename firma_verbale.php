@@ -48,7 +48,7 @@ require_once 'header.php';
         <a class="btn btn-outline-secondary" href="esci.php">Esci</a>
     <?php else: ?>
         <h1 class="fw-bold h3 mb-1">Verbale della seduta<?php echo $s['data'] ? ' del ' . date('d/m/Y', strtotime($s['data'])) : ''; ?></h1>
-        <p class="text-secondary mb-3"><?php echo $h($s['organo']); ?> · <span class="badge" style="background:<?php echo STATI_VERBALE[$s['verbale_stato']][1]; ?>;"><?php echo $h(STATI_VERBALE[$s['verbale_stato']][0]); ?></span></p>
+        <p class="text-secondary mb-3"><?php echo $h($s['organo']); ?> · <?php echo ui_stato_colore(STATI_VERBALE[$s['verbale_stato']][1], STATI_VERBALE[$s['verbale_stato']][0]); ?></p>
         <div class="row g-3">
             <div class="col-lg-5">
                 <div class="alert alert-info small"><i class="fa fa-circle-info me-1" aria-hidden="true"></i>Firma richiesta: <strong><?php echo $h($chi); ?></strong>, in formato <strong>PAdES</strong> (firma dentro il PDF). Il formato CAdES (.p7m) non è accettato.</div>
