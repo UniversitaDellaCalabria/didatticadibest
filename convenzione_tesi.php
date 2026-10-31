@@ -47,6 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['salva_dati'])) {
         $errori = $svc->salvaDati($c, $_POST);
         if (!$errori) {
+            if ($bz = \App\Portale\BozzaModulo::chiave('tesi', $tok)) \App\Core\App::per($conn)->get(\App\Portale\BozzaModulo::class)->elimina($bz);
             $c = $svc->perToken($tok) ?: $c;
             flash_set($c['stato'] === $S::MODIFICHE ? "Dati salvati. Hai proposto modifiche agli articoli: il Dipartimento le valuta e ti scrive. Potrai firmare dopo la loro risposta."
                 : ($svc->pronta($c) ? "Dati salvati: scarica la convenzione, firmala digitalmente e ricaricala qui sotto." : "Dati salvati. Controlla le risposte del Dipartimento agli articoli modificati."));
@@ -203,6 +204,7 @@ require_once 'header.php';
         </div>
     </form>
     <?php echo ui_avviso_modifiche('formDati'); ?>
+    <?php if ($modificabile) echo ui_bozza_automatica('formDati', 'tesi', $tok, \App\Core\App::per($conn)->get(\App\Portale\BozzaModulo::class)->leggi((string)\App\Portale\BozzaModulo::chiave('tesi', $tok))); ?>
     <?php endif; ?>
 
     <?php if ($stato === $S::MODIFICHE): ?>

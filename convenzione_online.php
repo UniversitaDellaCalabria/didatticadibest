@@ -88,6 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['salva_convenzione']))
     $s = $esito['s'];
     $errori = $esito['errori'];
     if (!$errori) {
+        if ($bz_cc = \App\Portale\BozzaModulo::chiave('fsl', (string)$cc['token'])) \App\Core\App::per($conn)->get(\App\Portale\BozzaModulo::class)->elimina($bz_cc);
         flash_set("Dati salvati: scarica i documenti, falli firmare digitalmente al Dirigente e inviali via PEC.");
         header('Location: convenzione_online.php?t=' . $cc['token'] . '&r=' . time() . '#documenti'); exit;
     }
@@ -252,6 +253,7 @@ require_once 'header.php';
         <p class="small text-secondary">Preferisci i modelli vuoti? <a href="<?php echo $h($cfg['modello']); ?>">Convenzione</a> · <a href="<?php echo $h($cfg['allegato']); ?>">Allegato A</a></p>
     </form>
     <?php echo ui_avviso_modifiche('formConvenzione'); ?>
+    <?php echo ui_bozza_automatica('formConvenzione', 'fsl', (string)$cc['token'], \App\Core\App::per($conn)->get(\App\Portale\BozzaModulo::class)->leggi((string)\App\Portale\BozzaModulo::chiave('fsl', (string)$cc['token']))); ?>
 </div>
 <script>
 document.addEventListener('change', function (e) {

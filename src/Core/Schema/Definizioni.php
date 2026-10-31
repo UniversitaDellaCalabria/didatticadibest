@@ -212,6 +212,10 @@ final class Definizioni
         // v73: convenzioni per la tesi con enti e aziende esterne. L'azienda compila dal link personale (token), scarica la convenzione, la firma in PAdES e la ricarica;
         // l'ufficio protocolla in entrata, il Direttore firma (token_direttore), l'ufficio protocolla in uscita e la convenzione va in archivio e nell'elenco pubblico.
         // modifiche_json: articoli che l'azienda vuole cambiare {numero: {testo, stato (proposta|accettata|rifiutata), risposta}}; concordate si applicano al Word e al PDF.
+        // v117: bozza dei moduli lunghi delle convenzioni (salvata ogni 30 secondi mentre si compila; si cancella quando i dati vengono salvati davvero)
+        'bozze_moduli' => "CREATE TABLE IF NOT EXISTS bozze_moduli (
+            chiave VARCHAR(80) NOT NULL PRIMARY KEY, dati MEDIUMTEXT DEFAULT NULL, aggiornata_il DATETIME DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
         'convenzioni_tesi' => "CREATE TABLE IF NOT EXISTS convenzioni_tesi (
             id INT AUTO_INCREMENT PRIMARY KEY, token VARCHAR(40) NOT NULL, token_direttore VARCHAR(40) DEFAULT NULL, stato VARCHAR(20) NOT NULL DEFAULT 'invitata',
             origine VARCHAR(10) NOT NULL DEFAULT 'invito', azienda VARCHAR(200) NOT NULL DEFAULT '', email VARCHAR(255) NOT NULL DEFAULT '', dati_json MEDIUMTEXT DEFAULT NULL,

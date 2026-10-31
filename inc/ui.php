@@ -37,6 +37,30 @@ if (!function_exists('ui_avviso_modifiche')) {
     }
 }
 
+if (!function_exists('ui_bozza_automatica')) {
+    /**
+     * Salvataggio automatico della bozza di un modulo lungo (src/Portale/BozzaModulo, salva_bozza.php): ogni 30 secondi, se qualcosa è cambiato, i campi di testo
+     * vanno sul server; riaprendo la pagina col link personale la bozza si ripresenta (con l'ora). $bozza = risultato di BozzaModulo::leggi() o null.
+     * Va stampato dopo il modulo; il modulo deve avere il campo del codice di sicurezza.
+     *
+     * @param array{campi: array<string, string>, quando: string}|null $bozza
+     */
+    function ui_bozza_automatica(string $idModulo, string $tipo, string $token, ?array $bozza): string {
+        $h = static fn (string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+        $nota = $bozza ? '<div class="alert alert-info small py-2" role="status"><i class="fa fa-floppy-disk me-1" aria-hidden="true"></i>Abbiamo ripreso la bozza salvata il '
+            . $h(date('d/m/Y \a\l\l\e H:i', (int) strtotime($bozza['quando']))) . ': controlla i dati e poi premi «Salva».</div>' : '';
+        return $nota . '<div class="small text-secondary mt-1" id="' . $h($idModulo) . 'BozzaStato" aria-live="polite"></div><script>(function(){'
+            . 'var f=document.getElementById(' . json_encode($idModulo) . '),s=document.getElementById(' . json_encode($idModulo . 'BozzaStato') . ');if(!f)return;'
+            . 'var b=' . json_encode($bozza['campi'] ?? new stdClass(), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) . ',m=false,inviando=false;'
+            . "Object.keys(b).forEach(function(k){var e=f.elements[k];if(!e||e.type==='file'||e.type==='hidden')return;if(e.type==='checkbox'||e.type==='radio'){e.checked=(e.value===b[k]);}else if(e.value===''||" . ($bozza ? 'true' : 'false') . "){e.value=b[k];}});"
+            . "f.addEventListener('input',function(){m=true;});f.addEventListener('change',function(){m=true;});f.addEventListener('submit',function(){m=false;});"
+            . "setInterval(function(){if(!m||inviando)return;inviando=true;var d=new FormData();Array.prototype.forEach.call(f.elements,function(e){if(!e.name||e.disabled||e.type==='file'||e.type==='password'||e.type==='submit'||e.type==='button')return;"
+            . "if((e.type==='checkbox'||e.type==='radio')&&!e.checked)return;d.append(e.name,e.value);});d.set('tipo'," . json_encode($tipo) . ');d.set(\'token\',' . json_encode($token) . ");"
+            . "fetch('salva_bozza.php',{method:'POST',body:d,credentials:'same-origin'}).then(function(r){return r.json();}).then(function(j){inviando=false;if(j&&j.ok){m=false;s.textContent='Bozza salvata alle '+j.ora+'.';}}).catch(function(){inviando=false;});},30000);"
+            . '})();</script>';
+    }
+}
+
 if (!function_exists('ui_vuoto')) {
     /** Stato vuoto: cerchio leggero con l'icona, titolo, testo e un pulsante utile (facoltativo). */
     function ui_vuoto(string $icona, string $titolo, string $testo = '', string $href = '', string $etichetta = '', string $colore = '#64748b'): string {
