@@ -412,6 +412,7 @@ con lo stato; utile per sapere se un tesista ha inviato la richiesta.
 **4.4 Stati con le stesse parole e gli stessi colori** (M): `miei_eventi.php` usa ancora i badge Bootstrap con colori propri (righe 340-350); `registro_tutorato.php`,
 le pagine di firma e `convenzione_*.php` hanno stili in linea. Portarli ai cinque stati di `portale-ui.css` (fatto, in attesa, serve un'azione, informazione, chiuso)
 con un helper unico `ui_stato(string $tipo, string $testo)`.
+*Stato 1/11/2026:* fatto per `miei_eventi.php` (lista d'attesa, posto disponibile, convenzione, valutazione, rifiutata, annullata, confermata → `ui_stato()`). Restano da portare `registro_tutorato.php`, le pagine di firma e `convenzione_*.php` (solo stile, nessuna regola).
 
 **4.5 Link delle email sempre funzionanti** (S): verificare che ogni pagina con token, se l'utente non ha fatto l'accesso, porti al login e poi **ritorni** alla stessa
 pagina (il `middleware.php:12` lo fa; controllare le pagine con `PAGINA_SENZA_SSO`); se il token è scaduto o già usato, il messaggio porta all'area personale e

@@ -341,7 +341,7 @@ echo ui_tema_script();
                                     <div>
                                         <?php
                                         if ($st === 'in_attesa') {
-                                            echo '<span class="badge bg-warning text-dark px-3 py-2"><i class="fa fa-clock me-1" aria-hidden="true"></i>Lista d\'Attesa</span>';
+                                            echo ui_stato('attesa', 'Lista d\'Attesa', 'fa-clock');
                                             if (isset($pos_attesa[(int)$pr['id']])) {
                                                 $pa = $pos_attesa[(int)$pr['id']];
                                                 echo ' <span class="badge bg-light text-dark border px-3 py-2" title="Persone in lista d\'attesa per questo turno: ' . $pa['totale'] . '">'
@@ -349,12 +349,12 @@ echo ui_tema_script();
                                                    . ' <span class="fw-normal text-muted">su ' . $pa['totale'] . '</span></span>';
                                             }
                                         }
-                                        elseif ($st === 'richiesta_conferma') echo '<span class="badge bg-warning text-dark px-3 py-2"><i class="fa fa-bell me-1"></i>Posto disponibile</span> <a href="miei_eventi.php?conferma_posto=' . (int)$pr['id'] . '" class="btn btn-success btn-sm fw-bold ms-1"><i class="fa fa-check me-1"></i>Conferma ora</a>';
-                                        elseif ($st === 'da_approvare' && ($pr['convenzione'] ?? '') === 'no') echo '<span class="badge bg-warning text-dark px-3 py-2"><i class="fa fa-file-signature me-1"></i>In attesa della convenzione</span>';
-                                        elseif ($st === 'da_approvare') echo '<span class="badge bg-info text-dark px-3 py-2"><i class="fa fa-hourglass-half me-1"></i>In Valutazione</span>';
-                                        elseif ($st === 'rifiutata')  echo '<span class="badge bg-secondary px-3 py-2"><i class="fa fa-times me-1"></i>Rifiutata</span>';
-                                        elseif ($st === 'annullata')  echo '<span class="badge bg-danger px-3 py-2"><i class="fa fa-ban me-1"></i>Annullata</span>';
-                                        else                          echo '<span class="badge bg-success px-3 py-2"><i class="fa fa-check-circle me-1"></i>Confermata</span>';
+                                        elseif ($st === 'richiesta_conferma') echo ui_stato('azione', 'Posto disponibile', 'fa-bell') . ' <a href="miei_eventi.php?conferma_posto=' . (int)$pr['id'] . '" class="btn btn-success btn-sm fw-bold ms-1"><i class="fa fa-check me-1"></i>Conferma ora</a>';
+                                        elseif ($st === 'da_approvare' && ($pr['convenzione'] ?? '') === 'no') echo ui_stato('attesa', 'In attesa della convenzione', 'fa-file-signature');
+                                        elseif ($st === 'da_approvare') echo ui_stato('attesa', 'In Valutazione', 'fa-hourglass-half');
+                                        elseif ($st === 'rifiutata')  echo ui_stato('neutro', 'Rifiutata', 'fa-times');
+                                        elseif ($st === 'annullata')  echo ui_stato('neutro', 'Annullata', 'fa-ban');
+                                        else                          echo ui_stato('ok', 'Confermata', 'fa-check-circle');
                                         ?>
                                     </div>
                                     <div class="azioni-desktop">
