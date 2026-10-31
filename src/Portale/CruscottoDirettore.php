@@ -110,11 +110,11 @@ final class CruscottoDirettore
     /** Convenzioni FSL arrivate al passo della firma del Direttore. */
     private function convenzioniDaFirmare(): array
     {
-        $r = $this->db->righe("SELECT c.id, c.scuola_codice, COALESCE(s.denominazione, c.scuola_codice) AS scuola, DATEDIFF(NOW(), COALESCE(c.aggiornata_il, c.creata_il)) AS gg
+        $r = $this->db->righe("SELECT c.id, c.scuola_codice, c.token_direttore, COALESCE(s.denominazione, c.scuola_codice) AS scuola, DATEDIFF(NOW(), COALESCE(c.aggiornata_il, c.creata_il)) AS gg
             FROM convenzioni_compilate c LEFT JOIN scuole s ON s.codice = c.scuola_codice WHERE c.stato_iter = 'da_firmare' ORDER BY COALESCE(c.aggiornata_il, c.creata_il) LIMIT 20");
 
         return $this->gruppo('convenzioni_firma', 'Convenzioni FSL da firmare', 'fa-file-signature', '#0f766e', count($r), $r, fn (array $x): array => [
-            'testo' => (string) $x['scuola'], 'dettaglio' => 'convenzione con le scuole (Formazione Scuola Lavoro)', 'link' => 'admin/fsl.php', 'giorni' => max(0, (int) $x['gg']),
+            'testo' => (string) $x['scuola'], 'dettaglio' => 'convenzione con le scuole (Formazione Scuola Lavoro)', 'link' => (string) ($x['token_direttore'] ?? '') !== '' ? 'firma_convenzione.php?t=' . urlencode((string) $x['token_direttore']) : 'admin/fsl.php', 'giorni' => max(0, (int) $x['gg']),
         ], 'Nessuna convenzione aspetta la firma.', 'admin/fsl.php');
     }
 

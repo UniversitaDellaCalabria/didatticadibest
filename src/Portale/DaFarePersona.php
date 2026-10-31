@@ -48,7 +48,7 @@ final class DaFarePersona
         $out = [];
         // Le fonti per email non servono a chi non ha l'email; quelle per codice fiscale (il tutor) funzionano anche senza
         $fonti = $email !== '' ? ['convenzioniFsl' => $email, 'conferme' => $email, 'firme' => $email, 'convenzioniTesiFirma' => $email, 'convenzioniTesiUfficio' => $email, 'verbali' => $email,
-            'tutoratoLettere' => $email, 'tutoratoLettereDirettore' => $email] : [];
+            'tutoratoLettere' => $email, 'tutoratoLettereDirettore' => $email, 'convenzioniFslFirma' => $email] : [];
         if ($cf !== '') {
             $fonti['tutoratoAccettazione'] = $cf;
         }
@@ -189,6 +189,20 @@ final class DaFarePersona
 
         return $this->gruppo('tesi_firma', 'Convenzioni di tesi da firmare', 'fa-file-signature', '#0f766e', count($r), $r, static fn (array $x): array => [
             'testo' => (string) $x['azienda'], 'dettaglio' => 'convenzione per la tesi: firma digitale PAdES', 'link' => 'firma_convenzione_tesi.php?t=' . urlencode((string) $x['token_direttore']), 'giorni' => max(0, (int) $x['gg']),
+        ]);
+    }
+
+    /** Convenzioni FSL con le scuole arrivate alla firma di chi firma ora (il Direttore o, con «Direttore assente», il vice): il link porta direttamente alla firma. */
+    private function convenzioniFslFirma(string $email): array
+    {
+        $chi = mb_strtolower(trim($this->direzione->chiFirma()['email']));
+        $r = $chi !== '' && $chi === $email
+            ? $this->db->righe("SELECT c.token_direttore, COALESCE(s.denominazione, c.scuola_codice, 'Scuola') AS scuola, DATEDIFF(NOW(), COALESCE(c.da_firmare_il, c.aggiornata_il, c.creata_il)) AS gg
+                FROM convenzioni_compilate c LEFT JOIN scuole s ON s.codice = c.scuola_codice WHERE c.stato_iter = 'da_firmare' AND c.token_direttore IS NOT NULL AND c.token_direttore <> ''
+                ORDER BY COALESCE(c.da_firmare_il, c.aggiornata_il, c.creata_il) LIMIT " . $this->limite) : [];
+
+        return $this->gruppo('fsl_firma', 'Convenzioni FSL da firmare', 'fa-file-signature', '#0f766e', count($r), $r, static fn (array $x): array => [
+            'testo' => (string) $x['scuola'], 'dettaglio' => 'convenzione con le scuole (Formazione Scuola Lavoro): firma digitale PAdES', 'link' => 'firma_convenzione.php?t=' . urlencode((string) $x['token_direttore']), 'giorni' => max(0, (int) $x['gg']),
         ]);
     }
 

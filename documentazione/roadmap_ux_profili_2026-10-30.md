@@ -120,7 +120,8 @@ lato docente; bozze delle pratiche; percorsi a passi per convenzione FSL e conve
 
 > **Stato 31/10/2026: FATTE 3 fonti su 9, in locale (nessuna modifica allo schema):** lettere di tutorato da firmare per il Direttore (anche nel Cruscotto, gruppo `tutorato_firma`) e incarico di tutorato da accettare per il tutor.
 > **Fatte anche (1/11/2026):** pratiche con integrazione e posto liberato da confermare per lo studente (gruppi `pratiche_integrazione` e `posto_liberato`, inclusi nei candidati del riepilogo settimanale; prova `da_fare_studente.php`).
-> Restano: convenzioni FSL da firmare nel «Da fare» del Direttore, registro fermo/fine attività, sondaggi, scuola (autorizzazione), azienda. Il registro delle fonti (`FonteDaFare`) non è ancora stato fatto.
+> **Fatta anche:** convenzioni FSL da firmare nel «Da fare» di chi firma (gruppo `fsl_firma`, link diretto a `firma_convenzione.php`; lo stesso link nel Cruscotto); prova `da_fare_fsl_direttore.php`.
+> Restano: registro fermo/fine attività, sondaggi, scuola (autorizzazione), azienda. Il registro delle fonti (`FonteDaFare`) non è ancora stato fatto.
 - **Problema.** Le 12 fonti di `DaFarePersona` (riga 41) coprono soprattutto chi **firma**; mancano i compiti di chi **fa la richiesta** e alcuni del Direttore.
   Mancanti verificati nel codice:
 
