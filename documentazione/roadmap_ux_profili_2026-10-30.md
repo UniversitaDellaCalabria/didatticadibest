@@ -284,6 +284,8 @@ lato docente; bozze delle pratiche; percorsi a passi per convenzione FSL e conve
 ### Aziende
 
 **3.A1 Tessera «Le convenzioni della tua azienda»** (M, dopo 0.1)
+
+> **Stato 31/10/2026: FATTO in locale.** `PercorsoAzienda` (regole dei passi, prova `tesi_percorso_azienda.php`), `ServizioConvenzioniAzienda` (le convenzioni legate all'email verificata della persona; la stipulata sparisce un anno dopo la scadenza o appena c'è un rinnovo aperto), `ConvenzioneTesiRepository::perEmail()`, riquadro `convenzioni_azienda` (profili Azienda e Amministratore, ordine 16; compare con la semina della v110) disegnato da `inc/area/convenzioni_azienda.php`. Il «Rinnova» compare con la scadenza entro 60 giorni (la costante `GIORNI_AVVISO_SCADENZA`, non 90) e porta alla pagina con il link personale, dove c'è il modulo di rinnovo. Non visto nel browser (login SSO).
 - **Problema.** Il profilo Azienda esiste (`ProfiliPersona.php`, chiave AZIENDA, anche da `haConvenzione`) ma l'area personale non mostra la convenzione:
   si lavora solo dal link dell'email (`convenzione_tesi.php?t=`).
 - **Soluzione.** Riquadro `convenzioni_azienda`: per ogni convenzione legata a un'email **affidabile** della persona (0.1), stato a passi (dati → modifiche agli articoli →

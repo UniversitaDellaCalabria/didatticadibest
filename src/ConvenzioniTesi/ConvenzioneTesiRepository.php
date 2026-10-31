@@ -32,6 +32,22 @@ final class ConvenzioneTesiRepository
         return $token === '' ? null : Righe::riga($this->db->riga('SELECT * FROM convenzioni_tesi WHERE token_direttore = ?', [$token]));
     }
 
+    /**
+     * Le convenzioni legate a queste email (sempre minuscole), dalla più recente: per la tessera dell'azienda nell'area personale.
+     *
+     * @param list<string> $emails
+     * @return list<array<string, string|null>>
+     */
+    public function perEmail(array $emails): array
+    {
+        $emails = array_values(array_unique(array_filter(array_map(static fn (string $e): string => strtolower(trim($e)), $emails))));
+        if (!$emails) {
+            return [];
+        }
+
+        return Righe::testo($this->db->righe('SELECT * FROM convenzioni_tesi WHERE LOWER(email) IN (' . implode(',', array_fill(0, count($emails), '?')) . ') ORDER BY id DESC', $emails));
+    }
+
     /** Una convenzione ancora aperta (non stipulata) per la stessa email: serve a non aprirne due quando l'azienda richiede più volte il link. @return array<string, string|null>|null */
     public function apertaPerEmail(string $email): ?array
     {
