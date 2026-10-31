@@ -60,7 +60,7 @@ final class DaFarePersona
         }
         if ($email !== '') {
             $fonti += ['tutoratoRegistri' => $email, 'valutazioni' => $email, 'elenchi' => $email, 'risorse' => $email, 'pratiche' => $email,
-                'praticheIntegrazione' => $email, 'postoLiberato' => $email, 'documentiClasse' => $email];
+                'praticheIntegrazione' => $email, 'postoLiberato' => $email, 'documentiClasse' => $email, 'sondaggi' => $email];
         }
         foreach ($fonti as $metodo => $chi) {
             try {
@@ -256,6 +256,22 @@ final class DaFarePersona
                 'giorni' => max(0, (int) floor((time() - (int) strtotime((string) ($p['data_prenotazione'] ?: ($inizio ?? 'now')))) / 86400)),
             ];
         });
+    }
+
+    /** Sondaggi di gradimento degli eventi a cui hai partecipato (negli ultimi 90 giorni), una riga per evento, non ancora compilati. */
+    private function sondaggi(string $email): array
+    {
+        $dove = "IFNULL(pr.stato, 'confermata') = 'confermata' AND pr.sondaggio_completato = 0 AND LOWER(pr.email) = ? AND t.data_turno < CURDATE() AND t.data_turno >= CURDATE() - INTERVAL 90 DAY
+            AND (pr.presente = 1 OR IFNULL(e.abilita_presenze, 1) = 0) AND EXISTS (SELECT 1 FROM sondaggi s WHERE s.evento_id = e.id AND s.attivo = 1)";
+        $da = 'FROM prenotazioni pr JOIN turni t ON t.id = pr.turno_id JOIN eventi e ON e.id = t.evento_id';
+        $n = (int) $this->db->valore("SELECT COUNT(DISTINCT e.id) $da WHERE $dove", [$email]);
+        $r = $this->db->righe("SELECT e.id, e.titolo, MAX(pr.token_sondaggio) AS token, MAX(t.data_turno) AS data_turno, DATEDIFF(NOW(), MAX(t.data_turno)) AS gg $da WHERE $dove GROUP BY e.id, e.titolo
+            ORDER BY MAX(t.data_turno) LIMIT " . $this->limite, [$email]);
+
+        return $this->gruppo('sondaggi', 'Sondaggi da compilare', 'fa-poll-h', '#0891b2', $n, $r, static fn (array $x): array => [
+            'testo' => (string) $x['titolo'], 'dettaglio' => 'evento del ' . date('d/m/Y', (int) strtotime((string) $x['data_turno'])) . ': dicci com\'è andata',
+            'link' => (string) ($x['token'] ?? '') !== '' ? 'sondaggio.php?token=' . urlencode((string) $x['token']) : 'miei_eventi.php', 'giorni' => max(0, (int) $x['gg']),
+        ]);
     }
 
     /** Convenzioni di tesi che aspettano l'ufficio (modifiche da valutare, protocollo in entrata e in uscita), per le persone dell'ufficio convenzioni di tesi. */

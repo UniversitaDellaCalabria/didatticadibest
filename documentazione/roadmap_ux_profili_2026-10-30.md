@@ -123,7 +123,8 @@ lato docente; bozze delle pratiche; percorsi a passi per convenzione FSL e conve
 > **Fatta anche:** convenzioni FSL da firmare nel «Da fare» di chi firma (gruppo `fsl_firma`, link diretto a `firma_convenzione.php`; lo stesso link nel Cruscotto); prova `da_fare_fsl_direttore.php`.
 > **Fatta anche:** azienda con convenzione di tesi da completare (gruppo `convenzioni_azienda`, riusa `PercorsoAzienda`); prova `da_fare_azienda.php`.
 > **Fatta anche:** scuola con elenco studenti e autorizzazione da consegnare prima dell'attività FSL (gruppo `documenti_classe`, con la scadenza; `DocumentiClasseRepository::incomplete()` accetta l'email); prova `da_fare_scuola_documenti.php`. Nota: nei 3 giorni prima dell'attività può comparire anche «Elenchi degli studenti da inserire» per la stessa prenotazione.
-> Restano: registro fermo/fine attività, sondaggi. Il registro delle fonti (`FonteDaFare`) non è ancora stato fatto.
+> **Fatta anche:** sondaggi di gradimento da compilare (gruppo `sondaggi`, eventi degli ultimi 90 giorni con presenza, una riga per evento); prova `da_fare_sondaggi.php`. Volutamente NON nei candidati del riepilogo settimanale (arriverebbe a tutti i partecipanti dopo ogni evento): se lo vuoi, va deciso.
+> Restano: registro fermo/fine attività (il promemoria al tutor c'è già con 3.T3) e il registro delle fonti `FonteDaFare` (riordino interno, non cambia ciò che si vede). Il registro delle fonti (`FonteDaFare`) non è ancora stato fatto.
 - **Problema.** Le 12 fonti di `DaFarePersona` (riga 41) coprono soprattutto chi **firma**; mancano i compiti di chi **fa la richiesta** e alcuni del Direttore.
   Mancanti verificati nel codice:
 
