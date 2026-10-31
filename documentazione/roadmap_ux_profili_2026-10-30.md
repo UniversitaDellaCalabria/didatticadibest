@@ -304,6 +304,8 @@ lato docente; bozze delle pratiche; percorsi a passi per convenzione FSL e conve
 ### Studenti
 
 **3.St1 Tessera «Tesi e laurea»** (S)
+
+> **Stato 31/10/2026: FATTO in locale.** `App\Didattica\TesiStudente` (lettura della pratica del modulo con chiave `tesi` e della convenzione dell'azienda scelta; regole in `riepilogo()`), riquadro `tesi_laurea` (profili Studente e Amministratore, ordine 42; compare con la semina della v110) disegnato da `inc/area/tesi_laurea.php`: stato della richiesta, convenzione dell'azienda, «Fai la richiesta di tesi» (solo se il modulo è pubblicato), «Cerca un relatore», «I passi della tesi»; con una bozza o un'integrazione il pulsante è in evidenza e conta un «da fare». Prove: `tesi_studente.php`. Non visto nel browser (login SSO).
 - **Soluzione.** Scheda di sistema per gli studenti: percorso (`percorso_tesi.php`), «Fai la richiesta» (modulo della tesi se pubblicato), stato della propria
   pratica di tesi e della convenzione dell'azienda (riquadro di `AziendaDellaPratica`), «Cerca un relatore» (`disponibilita_tesi.php`).
 
