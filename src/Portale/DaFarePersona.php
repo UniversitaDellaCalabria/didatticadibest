@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Portale;
 
 use App\ConvenzioniTesi\Costanti as CostantiTesi;
+use App\ConvenzioniTesi\ConvenzioneTesiRepository;
+use App\ConvenzioniTesi\PercorsoAzienda;
 use App\Core\Database;
+use App\Core\Orologio;
 use App\Didattica\SostituzioniInCorso;
 use App\Uffici\Direzione;
 
@@ -26,7 +29,7 @@ final class DaFarePersona
 
     private int $limite = self::RIGHE_BREVI;
 
-    public function __construct(private Database $db, private Direzione $direzione, private SostituzioniInCorso $sostituzioni)
+    public function __construct(private Database $db, private Direzione $direzione, private SostituzioniInCorso $sostituzioni, private ConvenzioneTesiRepository $convTesi, private Orologio $orologio)
     {
     }
 
@@ -48,7 +51,7 @@ final class DaFarePersona
         $out = [];
         // Le fonti per email non servono a chi non ha l'email; quelle per codice fiscale (il tutor) funzionano anche senza
         $fonti = $email !== '' ? ['convenzioniFsl' => $email, 'conferme' => $email, 'firme' => $email, 'convenzioniTesiFirma' => $email, 'convenzioniTesiUfficio' => $email, 'verbali' => $email,
-            'tutoratoLettere' => $email, 'tutoratoLettereDirettore' => $email, 'convenzioniFslFirma' => $email] : [];
+            'tutoratoLettere' => $email, 'tutoratoLettereDirettore' => $email, 'convenzioniFslFirma' => $email, 'convenzioniAzienda' => $email] : [];
         if ($cf !== '') {
             $fonti['tutoratoAccettazione'] = $cf;
         }
@@ -94,6 +97,7 @@ final class DaFarePersona
             "SELECT email FROM risorse_responsabili WHERE puo_approvare = 1",
             "SELECT email FROM didattica_consigli_persone WHERE ruolo IN ('segretario', 'coordinatore')",
             "SELECT email FROM uffici_persone",
+            "SELECT email FROM convenzioni_tesi WHERE stato IN ('invitata', 'compilata', 'risposta', 'rifiutata') AND email <> ''",
             "SELECT email FROM pratiche WHERE stato = 'integrazione' AND email <> ''",
             "SELECT email FROM prenotazioni WHERE stato = 'richiesta_conferma' AND email <> ''",
         ];
@@ -204,6 +208,31 @@ final class DaFarePersona
         return $this->gruppo('fsl_firma', 'Convenzioni FSL da firmare', 'fa-file-signature', '#0f766e', count($r), $r, static fn (array $x): array => [
             'testo' => (string) $x['scuola'], 'dettaglio' => 'convenzione con le scuole (Formazione Scuola Lavoro): firma digitale PAdES', 'link' => 'firma_convenzione.php?t=' . urlencode((string) $x['token_direttore']), 'giorni' => max(0, (int) $x['gg']),
         ]);
+    }
+
+    /** Convenzioni di tesi della tua azienda o del tuo ente che aspettano un passo da te (dati da inserire, firma da caricare, risposta alle modifiche, nuovo caricamento). */
+    private function convenzioniAzienda(string $email): array
+    {
+        $oggi = $this->orologio->adesso()->format('Y-m-d');
+        $da_fare = [];
+        foreach ($this->convTesi->perEmail([$email]) as $c) {
+            if ((string) $c['stato'] === CostantiTesi::PROTOCOLLATA) {
+                continue;
+            }
+            $azione = PercorsoAzienda::per($c, $oggi)['azione'];
+            if ($azione !== null) {
+                $da_fare[] = ['c' => $c, 'azione' => $azione];
+            }
+        }
+
+        return $this->gruppo('convenzioni_azienda', 'Convenzione di tesi da completare', 'fa-handshake', '#0e7490', count($da_fare), array_slice($da_fare, 0, $this->limite), static function (array $x): array {
+            $dal = (string) (($x['c']['aggiornata_il'] ?? '') ?: ($x['c']['creata_il'] ?? ''));
+
+            return [
+                'testo' => (string) (($x['c']['azienda'] ?? '') ?: $x['c']['email']), 'dettaglio' => (string) $x['azione']['testo'], 'link' => (string) $x['azione']['link'],
+                'giorni' => $dal === '' ? 0 : max(0, (int) floor((time() - (int) strtotime($dal)) / 86400)),
+            ];
+        });
     }
 
     /** Convenzioni di tesi che aspettano l'ufficio (modifiche da valutare, protocollo in entrata e in uscita), per le persone dell'ufficio convenzioni di tesi. */
