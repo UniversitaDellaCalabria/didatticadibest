@@ -30,3 +30,16 @@ $q("DELETE FROM uffici_persone WHERE ufficio_id IN (SELECT id FROM uffici WHERE 
 foreach ($dir_pi as $r) {
     $q("INSERT INTO uffici_persone (ufficio_id, email, nominativo, ruolo) VALUES (" . (int) $r['ufficio_id'] . ", '" . $conn->real_escape_string((string) $r['email']) . "', '" . $conn->real_escape_string((string) $r['nominativo']) . "', '" . $conn->real_escape_string((string) $r['ruolo']) . "')");
 }
+
+// Moduli lunghi: avviso se si lascia la pagina con modifiche non salvate (6.2)
+sezione("Moduli lunghi: avviso prima di lasciare la pagina");
+$ui_pi = file_get_contents(dirname(__DIR__, 3) . '/inc/ui.php');
+$tutti_pi = true;
+foreach (['convenzione_online.php' => 'formConvenzione', 'dichiarazione_tutorato.php' => 'formDichiarazione1', 'convenzione_tesi.php' => 'formDati'] as $pag_pi => $id_pi) {
+    $src_pi = file_get_contents(dirname(__DIR__, 3) . '/' . $pag_pi);
+    $tutti_pi = $tutti_pi && str_contains($src_pi, "ui_avviso_modifiche('$id_pi')") && str_contains($src_pi, 'id="' . $id_pi . '"');
+}
+prova($tutti_pi && function_exists('ui_avviso_modifiche') || str_contains($ui_pi, 'function ui_avviso_modifiche'), "moduli lunghi: ognuno ha il suo avviso, con l'id del modulo che esiste");
+require_once dirname(__DIR__, 3) . '/inc/ui.php';
+$js_pi = ui_avviso_modifiche('formX');
+prova(str_contains($js_pi, '"formX"') && str_contains($js_pi, 'beforeunload') && str_contains($js_pi, "'submit'"), "avviso: spento all'invio del modulo, attivo con le modifiche");

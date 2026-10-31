@@ -190,7 +190,7 @@ require_once 'header.php';
         </form>
     </div></section>
 
-    <form method="POST" enctype="multipart/form-data">
+    <form method="POST" enctype="multipart/form-data" id="formConvenzione">
         <?php csrf_field(); ?>
         <section class="card border-0 shadow-sm mb-3"><div class="card-body">
             <h2 class="h5 fw-bold"><span class="cv-passo">1</span>Istituzione scolastica</h2>
@@ -251,6 +251,7 @@ require_once 'header.php';
         <button type="submit" name="salva_convenzione" value="1" class="btn btn-lg fw-bold text-white mb-2" style="background:#B30000;"><i class="fa fa-wand-magic-sparkles me-1" aria-hidden="true"></i><?php echo $dati ? 'Aggiorna i documenti' : 'Prepara i documenti'; ?></button>
         <p class="small text-secondary">Preferisci i modelli vuoti? <a href="<?php echo $h($cfg['modello']); ?>">Convenzione</a> · <a href="<?php echo $h($cfg['allegato']); ?>">Allegato A</a></p>
     </form>
+    <?php echo ui_avviso_modifiche('formConvenzione'); ?>
 </div>
 <script>
 document.addEventListener('change', function (e) {

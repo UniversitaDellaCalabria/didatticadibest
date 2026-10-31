@@ -51,7 +51,7 @@ require_once 'header.php';
         <?php if ($passo === 2): ?>
         <h1 class="fw-bold h3">Dichiarazione dei dati personali per assegni di tutorato</h1>
         <p class="text-secondary">Modello «N. 6 – Dichiarazione individuale». I dati che il portale conosce già sono precompilati.</p>
-        <form method="POST" autocomplete="off"><?php csrf_field(); ?>
+        <form method="POST" autocomplete="off" id="formDichiarazione1"><?php csrf_field(); ?>
             <section class="card border-0 shadow-sm mb-3"><div class="card-body"><h2 class="h6 fw-bold">I tuoi dati</h2>
                 <div class="row g-2">
                     <div class="col-md-4"><label class="form-label small fw-bold">Nome e cognome</label><input class="form-control" value="<?php echo $h($i['nome'] . ' ' . $i['cognome']); ?>" disabled></div>
@@ -84,6 +84,7 @@ require_once 'header.php';
                 </div></div></section>
             <p><a class="btn btn-outline-secondary" href="incarico.php?t=<?php echo $h(urlencode($tok)); ?>">‹ Torna alla lettera</a> <button type="submit" class="btn btn-danger fw-bold">Salva e continua ›</button></p>
         </form>
+        <?php echo ui_avviso_modifiche('formDichiarazione1'); ?>
         <script>
         (function () {
             var c = document.getElementById('dResInv'), b = document.getElementById('dResBox');
@@ -95,7 +96,7 @@ require_once 'header.php';
         <?php else: ?>
         <h1 class="fw-bold h3">Titolarità di posizione contributiva a fini previdenziali</h1>
         <p class="text-secondary">Collaborazione individuale · Gestione Separata INPS (art. 2 c. 26 L. 335/95). Scegli la tua situazione.</p>
-        <form method="POST" autocomplete="off"><?php csrf_field(); ?>
+        <form method="POST" autocomplete="off" id="formDichiarazione2"><?php csrf_field(); ?>
             <section class="card border-0 shadow-sm mb-3"><div class="card-body"><h2 class="h6 fw-bold">Aliquota contributiva INPS <span class="text-danger">*</span></h2>
                 <?php foreach (\App\Tutorato\DichiarazioneIndividuale::INPS as $k => $et): ?>
                     <label class="form-check d-block border rounded p-2 mb-2"><input class="form-check-input" type="radio" name="inps" value="<?php echo $k; ?>"<?php echo ($v['inps'] ?? '') === $k ? ' checked' : ''; ?> required> <?php echo $h($et); ?></label>
@@ -122,6 +123,7 @@ require_once 'header.php';
             </div></section>
             <p><a class="btn btn-outline-secondary" href="dichiarazione_tutorato.php?t=<?php echo $h(urlencode($tok)); ?>&amp;passo=2">‹ Indietro</a> <button type="submit" class="btn btn-danger fw-bold">Salva e continua ›</button></p>
         </form>
+        <?php echo ui_avviso_modifiche('formDichiarazione2'); ?>
         <style>.inps-box { display:none; margin-top:.5rem; }</style>
         <script>
         (function () {

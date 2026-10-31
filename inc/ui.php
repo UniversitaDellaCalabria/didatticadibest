@@ -25,6 +25,18 @@ if (!function_exists('ui_stato_colore')) {
     }
 }
 
+if (!function_exists('ui_avviso_modifiche')) {
+    /**
+     * Nei moduli lunghi: se si cerca di lasciare la pagina (chiusura, indietro, un link) con dei campi cambiati e non salvati, il browser chiede conferma.
+     * Il controllo si spegne all'invio del modulo. Va stampato dopo il modulo; $idModulo è l'id del <form>.
+     */
+    function ui_avviso_modifiche(string $idModulo): string {
+        return '<script>(function(){var f=document.getElementById(' . json_encode($idModulo) . ');if(!f)return;var m=false;'
+            . "f.addEventListener('input',function(){m=true;});f.addEventListener('change',function(){m=true;});f.addEventListener('submit',function(){m=false;});"
+            . "window.addEventListener('beforeunload',function(e){if(m){e.preventDefault();e.returnValue='';}});})();</script>";
+    }
+}
+
 if (!function_exists('ui_vuoto')) {
     /** Stato vuoto: cerchio leggero con l'icona, titolo, testo e un pulsante utile (facoltativo). */
     function ui_vuoto(string $icona, string $titolo, string $testo = '', string $href = '', string $etichetta = '', string $colore = '#64748b'): string {

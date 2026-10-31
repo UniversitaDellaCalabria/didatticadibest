@@ -202,6 +202,7 @@ require_once 'header.php';
             <span class="small text-secondary">Dopo il salvataggio puoi scaricare la convenzione compilata (se non hai chiesto modifiche, subito; altrimenti dopo la risposta del Dipartimento).</span>
         </div>
     </form>
+    <?php echo ui_avviso_modifiche('formDati'); ?>
     <?php endif; ?>
 
     <?php if ($stato === $S::MODIFICHE): ?>
