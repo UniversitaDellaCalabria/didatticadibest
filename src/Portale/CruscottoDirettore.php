@@ -51,7 +51,7 @@ final class CruscottoDirettore
     {
         $out = [];
         foreach ([
-            'firme' => 'firmeDelDirettore', 'convenzioni_firma' => 'convenzioniDaFirmare', 'tesi_firma' => 'convenzioniTesiDaFirmare', 'pratiche' => 'praticheFerme', 'conferme' => 'confermeFerme', 'verbali' => 'verbaliInFirma',
+            'firme' => 'firmeDelDirettore', 'convenzioni_firma' => 'convenzioniDaFirmare', 'tesi_firma' => 'convenzioniTesiDaFirmare', 'tutorato_firma' => 'lettereTutoratoDaFirmare', 'pratiche' => 'praticheFerme', 'conferme' => 'confermeFerme', 'verbali' => 'verbaliInFirma',
             'convenzioni' => 'convenzioniInScadenza', 'tutorato' => 'tutoratoFermo', 'risorse' => 'scadenzeRisorse', 'prenotazioni' => 'prenotazioniFerme',
         ] as $metodo) {
             try {
@@ -126,6 +126,17 @@ final class CruscottoDirettore
         return $this->gruppo('tesi_firma', 'Convenzioni di tesi da firmare', 'fa-file-signature', '#0f766e', count($r), $r, fn (array $x): array => [
             'testo' => (string) $x['azienda'], 'dettaglio' => 'convenzione per la tesi con un ente o un\'azienda', 'link' => 'firma_convenzione_tesi.php?t=' . urlencode((string) $x['token_direttore']), 'giorni' => max(0, (int) $x['gg']),
         ], 'Nessuna convenzione di tesi aspetta la firma.');
+    }
+
+    /** Lettere di incarico del tutorato firmate dal docente e arrivate al Direttore: il link porta direttamente alla firma. */
+    private function lettereTutoratoDaFirmare(): array
+    {
+        $r = $this->db->righe("SELECT codice, nome, cognome, token_direttore, DATEDIFF(NOW(), COALESCE(firmata_docente_il, aggiornata_il, creata_il)) AS gg FROM tutorato_incarichi
+            WHERE stato = 'firmata_docente' AND token_direttore IS NOT NULL AND token_direttore <> '' ORDER BY firmata_docente_il LIMIT 20");
+
+        return $this->gruppo('tutorato_firma', 'Lettere di tutorato da firmare', 'fa-user-graduate', '#b45309', count($r), $r, fn (array $x): array => [
+            'testo' => 'Tutor ' . self::nome($x), 'dettaglio' => 'incarico ' . $x['codice'] . ': firmata dal docente responsabile', 'link' => 'firma_incarico.php?t=' . urlencode((string) $x['token_direttore']), 'giorni' => max(0, (int) $x['gg']),
+        ], 'Nessuna lettera di tutorato aspetta la tua firma.');
     }
 
     /** Pratiche aperte ferme da più dei giorni del loro modulo (promemoria). */

@@ -108,6 +108,8 @@ lato docente; bozze delle pratiche; percorsi a passi per convenzione FSL e conve
 ## FASE 1 — «Da fare per te» completo, per tutti, visibile ovunque
 
 ### 1.1 «Da fare» è vuoto per chi non ha l'email
+
+> **Stato 31/10/2026: PARZIALE.** Per ora solo il tutor senza email vede «Incarico da accettare» (per codice fiscale); le altre fonti restano per email: serve ancora `IdentitaPersona`.
 - **Problema.** `DaFarePersona::gruppi()` restituisce `[]` se l'email è vuota (`src/Portale/DaFarePersona.php:36-38`). Tutte le fonti cercano per email.
 - **Impatto.** Il 32% degli utenti (quasi tutti studenti) non vede nessun compito, anche quelli legati al codice fiscale (tutor).
 - **Soluzione.** Le fonti ricevono l'oggetto `Identita` (email affidabili + CF + persona_id + utente_id) e cercano per tutto ciò che hanno.
@@ -115,6 +117,9 @@ lato docente; bozze delle pratiche; percorsi a passi per convenzione FSL e conve
 - **Fatto quando.** Prova: tutor senza email con incarico in stato `inviata` vede «Accetta l'incarico». **Peso.** S.
 
 ### 1.2 Compiti che mancano in «Da fare» (il punto più importante per «un clic»)
+
+> **Stato 31/10/2026: FATTE 3 fonti su 9, in locale (nessuna modifica allo schema):** lettere di tutorato da firmare per il Direttore (anche nel Cruscotto, gruppo `tutorato_firma`) e incarico di tutorato da accettare per il tutor.
+> Restano: convenzioni FSL da firmare nel «Da fare» del Direttore, registro fermo/fine attività, pratiche con integrazione, posto liberato, sondaggi, scuola (autorizzazione), azienda. Il registro delle fonti (`FonteDaFare`) non è ancora stato fatto.
 - **Problema.** Le 12 fonti di `DaFarePersona` (riga 41) coprono soprattutto chi **firma**; mancano i compiti di chi **fa la richiesta** e alcuni del Direttore.
   Mancanti verificati nel codice:
 

@@ -34,13 +34,23 @@ final class DaFarePersona
     public function gruppi(?array $utente): array
     {
         $email = mb_strtolower(trim((string) ($utente['email'] ?? '')));
-        if ($email === '') {
+        $cf = strtoupper(trim((string) ($utente['codice_fiscale'] ?? '')));
+        if ($email === '' && $cf === '') {
             return [];
         }
         $out = [];
-        foreach (['convenzioniFsl', 'conferme', 'firme', 'convenzioniTesiFirma', 'convenzioniTesiUfficio', 'verbali', 'tutoratoLettere', 'tutoratoRegistri', 'valutazioni', 'elenchi', 'risorse', 'pratiche'] as $metodo) {
+        // Le fonti per email non servono a chi non ha l'email; quelle per codice fiscale (il tutor) funzionano anche senza
+        $fonti = $email !== '' ? ['convenzioniFsl' => $email, 'conferme' => $email, 'firme' => $email, 'convenzioniTesiFirma' => $email, 'convenzioniTesiUfficio' => $email, 'verbali' => $email,
+            'tutoratoLettere' => $email, 'tutoratoLettereDirettore' => $email] : [];
+        if ($cf !== '') {
+            $fonti['tutoratoAccettazione'] = $cf;
+        }
+        if ($email !== '') {
+            $fonti += ['tutoratoRegistri' => $email, 'valutazioni' => $email, 'elenchi' => $email, 'risorse' => $email, 'pratiche' => $email];
+        }
+        foreach ($fonti as $metodo => $chi) {
             try {
-                $g = $this->$metodo($email);
+                $g = $this->$metodo($chi);
                 if ($g['n'] > 0) {
                     $out[] = $g;
                 }
@@ -69,6 +79,7 @@ final class DaFarePersona
             "SELECT email FROM pratiche_conferme WHERE stato = 'attesa'",
             "SELECT email FROM pratiche_firme WHERE stato = 'attesa'",
             "SELECT docente_email FROM tutorato_incarichi WHERE stato IN ('confermata', 'protocollata') AND docente_email <> ''",
+            "SELECT b.direttore_email FROM tutorato_incarichi i JOIN tutorato_bandi b ON b.id = i.bando_id WHERE i.stato = 'firmata_docente' AND b.direttore_email <> ''",
             "SELECT email FROM prenotazioni WHERE valutazione_inviata IS NOT NULL AND valutazione_inviata >= NOW() - INTERVAL 90 DAY",
             "SELECT pr.email FROM prenotazioni pr JOIN turni t ON t.id = pr.turno_id JOIN progetti_dettagli pd ON pd.evento_id = t.evento_id WHERE pd.attestati = 1 AND pr.email <> ''",
             "SELECT email FROM convenzioni_compilate WHERE stato_iter IN ('', 'rifiutata') AND email <> '' AND creata_il >= NOW() - INTERVAL 1 YEAR",
@@ -209,6 +220,34 @@ final class DaFarePersona
         return $this->gruppo('tutorato_lettere', 'Lettere di incarico da firmare (tutorato)', 'fa-user-graduate', '#b45309', $n, $r, fn (array $x): array => [
             'testo' => 'Tutor ' . self::nome($x), 'dettaglio' => 'incarico ' . $x['codice'] . ($x['attivita'] ? ': ' . mb_substr((string) $x['attivita'], 0, 80) : ''),
             'link' => 'firma_incarico.php?t=' . urlencode((string) $x['token_docente']), 'giorni' => max(0, (int) $x['gg']),
+        ]);
+    }
+
+    /** Lettere di incarico del tutorato già firmate dal docente, arrivate alla firma del Direttore del bando. */
+    private function tutoratoLettereDirettore(string $email): array
+    {
+        $dove = "i.stato = 'firmata_docente' AND LOWER(b.direttore_email) = ? AND i.token_direttore IS NOT NULL AND i.token_direttore <> ''";
+        $da = 'FROM tutorato_incarichi i JOIN tutorato_bandi b ON b.id = i.bando_id';
+        $n = (int) $this->db->valore("SELECT COUNT(*) $da WHERE $dove", [$email]);
+        $r = $this->db->righe("SELECT i.codice, i.nome, i.cognome, i.attivita, i.token_direttore, DATEDIFF(NOW(), COALESCE(i.firmata_docente_il, i.aggiornata_il, i.creata_il)) AS gg
+            $da WHERE $dove ORDER BY i.firmata_docente_il LIMIT 15", [$email]);
+
+        return $this->gruppo('tutorato_lettere_direttore', 'Lettere di incarico da firmare (tutorato, Direttore)', 'fa-file-signature', '#b45309', $n, $r, fn (array $x): array => [
+            'testo' => 'Tutor ' . self::nome($x), 'dettaglio' => 'incarico ' . $x['codice'] . ': firmata dal docente responsabile, aspetta la tua firma',
+            'link' => 'firma_incarico.php?t=' . urlencode((string) $x['token_direttore']), 'giorni' => max(0, (int) $x['gg']),
+        ]);
+    }
+
+    /** Lettere di incarico del tutorato mandate a te come tutor (riconosciuto dal codice fiscale): da controllare e accettare. */
+    private function tutoratoAccettazione(string $cf): array
+    {
+        $dove = "stato = 'inviata' AND UPPER(codice_fiscale) = ? AND token_studente IS NOT NULL AND token_studente <> '' AND anonimizzata = 0";
+        $n = (int) $this->db->valore("SELECT COUNT(*) FROM tutorato_incarichi WHERE $dove", [$cf]);
+        $r = $this->db->righe("SELECT codice, nome, cognome, attivita, token_studente, DATEDIFF(NOW(), COALESCE(inviata_il, aggiornata_il, creata_il)) AS gg FROM tutorato_incarichi WHERE $dove ORDER BY inviata_il LIMIT 15", [$cf]);
+
+        return $this->gruppo('tutorato_accettazione', 'Incarico di tutorato da accettare', 'fa-user-graduate', '#b45309', $n, $r, fn (array $x): array => [
+            'testo' => 'Incarico ' . $x['codice'] . ($x['attivita'] ? ': ' . mb_substr((string) $x['attivita'], 0, 80) : ''), 'dettaglio' => 'controlla i dati della lettera e accetta con SPID o CIE',
+            'link' => 'incarico.php?t=' . urlencode((string) $x['token_studente']), 'giorni' => max(0, (int) $x['gg']),
         ]);
     }
 
