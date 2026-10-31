@@ -24,4 +24,4 @@ if ($cod_ben !== '') {
 $q("DELETE FROM utenti WHERE id = 989500");
 
 $ben = \App\Portale\Area\CatalogoRiquadri::sistema()['benvenuto'] ?? null;
-prova($ben !== null && $ben['profili'] === [Profili::ESTERNO] && is_file(__DIR__ . '/../../../inc/area/benvenuto.php') && is_file(__DIR__ . '/../../../sono_una_scuola.php'), "riquadro benvenuto: solo per il profilo esterno, con tessera e pagina");
+prova($ben !== null && $ben['profili'] === [Profili::ESTERNO, Profili::AMMINISTRATORE] && is_file(__DIR__ . '/../../../inc/area/benvenuto.php') && is_file(__DIR__ . '/../../../sono_una_scuola.php'), "riquadro benvenuto: per il profilo esterno (e l'amministratore), con tessera e pagina");

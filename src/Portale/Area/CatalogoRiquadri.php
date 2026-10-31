@@ -46,7 +46,7 @@ final class CatalogoRiquadri
             'miei_studenti' => ['tipo' => self::SPECIALE, 'titolo' => 'I miei studenti', 'descrizione' => 'Per i docenti: le richieste degli studenti in cui sei indicato come relatore (o altra persona che firma), con lo stato della pratica e della tua firma, in sola lettura; compare solo a chi ne ha almeno una', 'icona' => 'fa-user-graduate', 'colore' => '#7c3aed',
                 'profili' => [Profili::DOCENTE, Profili::AMMINISTRATORE], 'ordine' => 17],
             'benvenuto' => ['tipo' => self::SPECIALE, 'titolo' => 'Benvenuto: chi sei?', 'descrizione' => 'Per chi entra la prima volta e non rientra in nessun profilo: sono una scuola (sceglie la scuola e passa al profilo Scuola), sono un\'azienda o un ente (convenzione di tesi), sono uno studente di un altro Ateneo', 'icona' => 'fa-hand-peace', 'colore' => '#0369a1',
-                'profili' => [Profili::ESTERNO], 'ordine' => 18],
+                'profili' => [Profili::ESTERNO, Profili::AMMINISTRATORE], 'ordine' => 18],
             'lavoro' => ['tipo' => self::SPECIALE, 'titolo' => 'Il mio lavoro', 'descrizione' => 'Per chi gestisce qualcosa: una tessera per ogni postazione (pratiche, protocollo, sedute, convenzioni, tutorato, assistenza, aree) con i numeri e i pulsanti sulla vista giusta; compare solo a chi ha almeno una postazione', 'icona' => 'fa-briefcase', 'colore' => '#1e293b',
                 'profili' => [Profili::DOCENTE, Profili::DIRETTORE, Profili::PERSONALE, Profili::GESTORE, Profili::AMMINISTRATORE], 'ordine' => 15],
             'cruscotto_direttore' => ['tipo' => self::SPECIALE, 'titolo' => 'Cruscotto del Direttore', 'descrizione' => 'Firme e cose ferme in tutti i moduli', 'icona' => 'fa-gauge-high', 'colore' => '#0f2a4a',
