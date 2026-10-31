@@ -74,3 +74,7 @@ prova($ps_d['al'] === '2026-11-05' && $ps_d['token'] === '' && $ps_d['iter'] ===
 $ps_d = \App\Fsl\ServizioPercorsiScuola::dati(['attestati' => 0] + $ps_pr, null, null);
 prova($ps_d['attestati'] === false && !isset($ps_stati(PercorsoScuola::per($ps_d, '2026-10-31'))['attestati']), "ServizioPercorsiScuola::dati(): senza attestati il passo non compare");
 prova(\App\Core\App::per($conn)->get(\App\Fsl\ServizioPercorsiScuola::class)->perUtente(0, 'nessuno@esempio.invalid') === [], "ServizioPercorsiScuola::perUtente(): il container la costruisce e senza prenotazioni FSL l'elenco è vuoto");
+
+// Il riquadro «fsl_scuola» dell'area personale: nel catalogo, per le scuole (e l'amministratore), con il file che lo disegna
+$ps_riq = \App\Portale\Area\CatalogoRiquadri::sistema()['fsl_scuola'] ?? null;
+prova($ps_riq !== null && $ps_riq['tipo'] === \App\Portale\Area\CatalogoRiquadri::SPECIALE && $ps_riq['profili'] === [\App\Portale\Area\Profili::SCUOLA, \App\Portale\Area\Profili::AMMINISTRATORE] && is_file(__DIR__ . '/../../../inc/area/fsl_scuola.php'), "riquadro fsl_scuola: nel catalogo di sistema per Scuola e Amministratore, disegnato da inc/area/fsl_scuola.php");

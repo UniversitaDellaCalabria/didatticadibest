@@ -34,6 +34,8 @@ final class CatalogoRiquadri
                 'profili' => self::TUTTI, 'ordine' => 10],
             'firme' => ['tipo' => self::SPECIALE, 'titolo' => 'Da firmare', 'descrizione' => 'I documenti che aspettano la tua firma in tutti i moduli (pratiche, convenzioni, lettere di tutorato, verbali), in una scrivania sola; compare solo a chi ha qualcosa da firmare', 'icona' => 'fa-file-signature', 'colore' => '#0f766e',
                 'profili' => self::TUTTI, 'ordine' => 12],
+            'fsl_scuola' => ['tipo' => self::SPECIALE, 'titolo' => 'La mia scuola: Formazione Scuola Lavoro', 'descrizione' => 'Per le scuole: ogni prenotazione di Formazione Scuola Lavoro con i passi (programma, convenzione, elenco studenti e autorizzazione, attività, attestati) e un solo pulsante per quello che c\'è da fare; compare solo a chi ha prenotazioni FSL', 'icona' => 'fa-school', 'colore' => '#15803d',
+                'profili' => [Profili::SCUOLA, Profili::AMMINISTRATORE], 'ordine' => 14],
             'lavoro' => ['tipo' => self::SPECIALE, 'titolo' => 'Il mio lavoro', 'descrizione' => 'Per chi gestisce qualcosa: una tessera per ogni postazione (pratiche, protocollo, sedute, convenzioni, tutorato, assistenza, aree) con i numeri e i pulsanti sulla vista giusta; compare solo a chi ha almeno una postazione', 'icona' => 'fa-briefcase', 'colore' => '#1e293b',
                 'profili' => [Profili::DOCENTE, Profili::DIRETTORE, Profili::PERSONALE, Profili::GESTORE, Profili::AMMINISTRATORE], 'ordine' => 15],
             'cruscotto_direttore' => ['tipo' => self::SPECIALE, 'titolo' => 'Cruscotto del Direttore', 'descrizione' => 'Firme e cose ferme in tutti i moduli', 'icona' => 'fa-gauge-high', 'colore' => '#0f2a4a',

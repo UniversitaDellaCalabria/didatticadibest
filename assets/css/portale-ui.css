@@ -80,6 +80,18 @@ body:not(.high-contrast) .badge.bg-secondary, body:not(.high-contrast) .badge.te
 .ui-riga-azioni .btn { display: inline-flex; align-items: center; font-size: .8rem; padding: .25rem .55rem; }
 .ui-sezione { font-size: .8rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--ui-testo-2); margin: 4px 0 0; }
 
+/* ---- Percorso a passi (Formazione Scuola Lavoro delle scuole) ---------------- */
+.ui-fsl { padding: 16px; background: var(--ui-card); border: 1px solid var(--ui-bordo); border-radius: 14px; box-shadow: 0 1px 6px var(--ui-ombra); }
+.ui-fsl-pr { padding: 12px 0; border-top: 1px solid var(--ui-bordo); }
+.ui-fsl-pr:first-of-type { border-top: 0; }
+.ui-passi { display: flex; flex-wrap: wrap; gap: 6px 4px; list-style: none; margin: 8px 0; padding: 0; counter-reset: passo; }
+.ui-passi li { counter-increment: passo; display: flex; align-items: center; gap: 6px; font-size: .78rem; color: var(--ui-testo-2); padding-right: 10px; }
+.ui-passi li::before { content: counter(passo); flex: 0 0 22px; width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: .72rem; font-weight: 700; background: var(--ui-lieve); border: 1px solid var(--ui-bordo); color: var(--ui-testo-2); }
+.ui-passi li.fatto { color: var(--ui-testo); }
+.ui-passi li.fatto::before { content: '\2713'; background: #15803d; border-color: #15803d; color: #fff; }
+.ui-passi li.qui { color: var(--ui-testo); font-weight: 700; }
+.ui-passi li.qui::before { background: var(--ui-rosso); border-color: var(--ui-rosso); color: #fff; }
+
 /* ---- Numeri in fila (eventi, presenze, attestati) --------------------------- */
 .ui-numeri { display: flex; flex-wrap: wrap; align-items: stretch; gap: 12px; margin-bottom: 20px; }
 .ui-numero { flex: 1 1 110px; text-align: center; padding: 12px 10px; background: var(--ui-lieve); border: 1px solid var(--ui-bordo); border-radius: 12px; }
