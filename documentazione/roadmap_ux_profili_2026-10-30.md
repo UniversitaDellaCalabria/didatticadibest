@@ -327,6 +327,8 @@ con lo stato; utile per sapere se un tesista ha inviato la richiesta.
 ### Tutor
 
 **3.T1 Ogni passo con il suo pulsante** (S)
+
+> **Stato 31/10/2026: FATTO in locale (nessuna modifica allo schema).** `area_tappe_tutorato()` restituisce `azione` (accetta l'incarico / compila la dichiarazione, apri il registro, dichiara la fine); pulsante in `il_mio_tutorato.php` e sulla tessera, che ha il numero rosso «da fare».
 - **Problema.** `il_mio_tutorato.php` elenca le tappe (`inc/area/_tutorato_tappe.php:16-23`) ma non offre azioni: accettazione e dichiarazione si fanno solo dal link
   dell'email; la tessera «Il mio tutorato» non ha numero rosso (`inc/area/tutorato_mio.php`, `area_tessera` senza `$novita`).
 - **Soluzione.** Sul passo corrente: «Accetta l'incarico» → `dichiarazione_tutorato.php?t=<token_studente>` (o `incarico.php` se la dichiarazione è completa);

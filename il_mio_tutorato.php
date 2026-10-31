@@ -44,7 +44,8 @@ foreach ($mio_tutorato as $mt):
                     <li class="mb-2 d-flex gap-2"><i class="fa <?php echo $fatto_t ? 'fa-circle-check text-success' : ($k === $prima_non_fatta ? 'fa-location-dot text-danger' : 'fa-circle text-secondary opacity-50'); ?> mt-1" aria-hidden="true"></i>
                         <span<?php echo $k === $prima_non_fatta ? ' class="fw-bold"' : ''; ?>><?php echo htmlspecialchars($tt); ?><?php echo $dett_t !== '' ? '<span class="d-block text-secondary fw-normal" style="font-size:.78rem;">' . htmlspecialchars($dett_t) . '</span>' : ''; ?></span></li>
                 <?php endforeach; ?>
-                </ol></div>
+                </ol>
+                <?php if (!empty($tp_t['azione'])): ?><a class="btn btn-sm btn-danger fw-bold mt-1" href="<?php echo htmlspecialchars($tp_t['azione'][1]); ?>"><?php echo htmlspecialchars($tp_t['azione'][0]); ?></a><?php endif; ?></div>
             <div class="col-md-6"><div class="small fw-bold mb-2">I tuoi documenti</div>
                 <?php $docs_t = array_filter($pag_sv->documenti($mt), fn($d) => $d['disponibile']);
                 foreach ($docs_t as $d): ?>

@@ -4,7 +4,7 @@ if (!function_exists('area_tappe_tutorato')) {
     /**
      * @param array<string, mixed> $mt  l'incarico (IncaricoRepository::delTutor)
      * @param bool $pagamenti  se i pagamenti passano dal portale (riquadro «Ufficio pagamenti del tutorato» acceso)
-     * @return array{tappe: list<array{0: string, 1: bool, 2: string}>, prima: int|null, firmata: bool}
+     * @return array{tappe: list<array{0: string, 1: bool, 2: string}>, prima: int|null, firmata: bool, azione: array{0: string, 1: string}|null}  azione = pulsante [etichetta, indirizzo] se la tappa corrente tocca al tutor
      */
     function area_tappe_tutorato($conn, array $mt, bool $pagamenti): array
     {
@@ -32,6 +32,18 @@ if (!function_exists('area_tappe_tutorato')) {
             }
         }
 
-        return ['tappe' => $tappe_t, 'prima' => $prima, 'firmata' => $firmata_t];
+        // Se la tappa corrente tocca al tutor, il pulsante che la porta a termine (le altre tappe aspettano il docente, il Direttore o l'ufficio)
+        $azione = null;
+        $token = (string) ($mt['token_studente'] ?? '');
+        if ($prima === 0 && $mt['stato'] === 'inviata' && $token !== '') {
+            $azione = !$dst['completa'] && \App\Core\App::per($conn)->get(\App\Tutorato\ServizioDichiarazione::class)->richiesta()
+                ? ["Compila la dichiarazione e accetta l'incarico", 'dichiarazione_tutorato.php?t=' . urlencode($token)]
+                : ["Accetta l'incarico", 'incarico.php?t=' . urlencode($token)];
+        } elseif ($prima === 2 && $firmata_t && (string) $mt['fine_stato'] === '') {
+            $finito = !empty($mt['data_fine']) && (string) $mt['data_fine'] < date('Y-m-d');
+            $azione = [$finito ? 'Dichiara la fine delle attività' : 'Apri il registro delle attività', 'registro_tutorato.php?id=' . (int) $mt['id']];
+        }
+
+        return ['tappe' => $tappe_t, 'prima' => $prima, 'firmata' => $firmata_t, 'azione' => $azione];
     }
 }
