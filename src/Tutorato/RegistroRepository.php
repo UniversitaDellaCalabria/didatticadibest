@@ -28,6 +28,12 @@ final class RegistroRepository
         $this->db->esegui('INSERT INTO tutorato_registro (incarico_id, data, ore, attivita) VALUES (?, ?, ?, ?)', [$incaricoId, $data, $ore, $attivita]);
     }
 
+    /** Corregge una riga non ancora approvata (da approvare o respinta): torna «da approvare», senza la nota del docente. True se l'ha cambiata. */
+    public function correggiSeNonApprovata(int $incaricoId, int $riga, string $data, float $ore, string $attivita): bool
+    {
+        return $this->db->esegui("UPDATE tutorato_registro SET data = ?, ore = ?, attivita = ?, stato = 'inviata', nota_docente = '', decisa_il = NULL WHERE id = ? AND incarico_id = ? AND stato <> 'approvata'", [$data, $ore, $attivita, $riga, $incaricoId]) > 0;
+    }
+
     /** Toglie una riga non ancora decisa; true se l'ha tolta. */
     public function togliSeDaApprovare(int $incaricoId, int $riga): bool
     {

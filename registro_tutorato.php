@@ -17,7 +17,13 @@ if ($i && $_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify($_POST['csrf_token'] ?? '');
     $err = null; $ok = '';
     $tutor = $i['_ruolo'] === 'tutor';
-    if ($tutor && isset($_POST['aggiungi'])) { $err = aggiungi_registro($conn, (int)$i['id'], (string)($_POST['data'] ?? ''), $_POST['ore'] ?? '', (string)($_POST['attivita'] ?? '')); $ok = "Attività segnata nel registro: il docente la approverà."; }
+    if ($tutor && isset($_POST['aggiungi'])) {
+        $date_p = array_map('strval', (array)($_POST['data'] ?? []));
+        $err = registro_tutorato_servizio($conn)->aggiungiDate((int)$i['id'], $date_p, $_POST['ore'] ?? '', (string)($_POST['attivita'] ?? ''));
+        $ok = count(array_filter($date_p)) > 1 ? "Attività segnata in " . count(array_unique(array_filter($date_p))) . " giorni: il docente le approverà." : "Attività segnata nel registro: il docente la approverà.";
+    }
+    elseif ($tutor && isset($_POST['ripeti'])) { $err = registro_tutorato_servizio($conn)->ripetiUltima((int)$i['id']); $ok = "Ripetuta l'ultima attività con la data di oggi."; }
+    elseif ($tutor && isset($_POST['salva_riga'])) { $err = registro_tutorato_servizio($conn)->modifica((int)$i['id'], (int)$_POST['salva_riga'], (string)($_POST['data'][0] ?? ''), $_POST['ore'] ?? '', (string)($_POST['attivita'] ?? '')); $ok = "Riga corretta: il docente la approverà."; }
     elseif ($tutor && isset($_POST['togli'])) { $err = togli_registro($conn, (int)$i['id'], (int)$_POST['togli']); $ok = "Riga tolta."; }
     elseif ($tutor && isset($_POST['concludi'])) { $err = empty($_POST['conferma']) ? "Spunta la conferma." : richiedi_fine_attivita($conn, (int)$i['id']); $ok = "Fatto: il docente responsabile riceve l'avviso per approvare le ore e confermare la fine."; }
     elseif (!$tutor && (isset($_POST['approva']) || isset($_POST['respingi']))) {
@@ -29,6 +35,15 @@ if ($i && $_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     flash_set($err ?? $ok, $err ? 'danger' : 'success');
     header('Location: registro_tutorato.php?id=' . (int)$i['id'] . '&r=' . time()); exit;
+}
+
+if ($i && preg_match('/^\d{4}-\d{2}$/', (string)($_GET['riepilogo'] ?? ''))) {
+    $mese_pdf = (string)$_GET['riepilogo'];
+    $pdf_mese = \App\Core\App::per($conn)->get(\App\Tutorato\RiepilogoRegistroPdf::class)->genera($i, registro_incarico($conn, (int)$i['id']), $mese_pdf);
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: attachment; filename="registro_' . preg_replace('/[^A-Za-z0-9_-]/', '', (string)$i['codice']) . '_' . $mese_pdf . '.pdf"');
+    header('Content-Length: ' . strlen($pdf_mese));
+    echo $pdf_mese; exit;
 }
 
 $page_cfg['titolo'] = 'Registro delle attività di tutorato';
@@ -80,13 +95,19 @@ echo ui_tema_script();
         <?php if ($tutor && $aperto && $i['fine_stato'] === ''): ?>
         <form method="POST" class="card border-0 shadow-sm mb-3" style="border-left:5px solid #047857 !important;"><div class="card-body">
             <?php csrf_field(); ?>
-            <h2 class="h6 fw-bold">Segna un'attività</h2>
+            <?php $riga_mod = null; foreach ($reg as $r_m) { if ((int)$r_m['id'] === (int)($_GET['modifica'] ?? 0) && $r_m['stato'] !== 'approvata') $riga_mod = $r_m; } ?>
+            <h2 class="h6 fw-bold"><?php echo $riga_mod ? 'Correggi l\'attività del ' . date('d/m/Y', strtotime($riga_mod['data'])) : 'Segna un\'attività'; ?></h2>
             <div class="row g-2 align-items-end">
-                <div class="col-md-3"><label class="form-label small fw-bold mb-0" for="rData">Giorno</label><input type="date" class="form-control" id="rData" name="data" value="<?php echo date('Y-m-d'); ?>" max="<?php echo date('Y-m-d'); ?>" required></div>
-                <div class="col-md-2"><label class="form-label small fw-bold mb-0" for="rOre">Ore</label><input type="number" class="form-control" id="rOre" name="ore" min="0.5" max="12" step="0.5" required></div>
-                <div class="col-md-5"><label class="form-label small fw-bold mb-0" for="rAtt">Attività svolta</label><input class="form-control" id="rAtt" name="attivita" maxlength="1000" required placeholder="es. esercitazione di stechiometria con 12 studenti"></div>
-                <div class="col-md-2"><button type="submit" name="aggiungi" value="1" class="btn btn-success fw-bold w-100"><i class="fa fa-plus me-1" aria-hidden="true"></i>Segna</button></div>
+                <div class="col-md-3"><label class="form-label small fw-bold mb-0" for="rData">Giorno</label><div id="rDate"><input type="date" class="form-control mb-1" id="rData" name="data[]" value="<?php echo $h($riga_mod ? $riga_mod['data'] : date('Y-m-d')); ?>" max="<?php echo date('Y-m-d'); ?>" required></div>
+                    <?php if (!$riga_mod): ?><button type="button" class="btn btn-link btn-sm p-0" id="rAltroGiorno"><i class="fa fa-calendar-plus me-1" aria-hidden="true"></i>Stessa attività in un altro giorno</button><?php endif; ?></div>
+                <div class="col-md-2"><label class="form-label small fw-bold mb-0" for="rOre">Ore (per giorno)</label><input type="number" class="form-control" id="rOre" name="ore" min="0.5" max="12" step="0.5" value="<?php echo $riga_mod ? $h(rtrim(rtrim(number_format((float)$riga_mod['ore'], 1, '.', ''), '0'), '.')) : ''; ?>" required></div>
+                <div class="col-md-5"><label class="form-label small fw-bold mb-0" for="rAtt">Attività svolta</label><input class="form-control" id="rAtt" name="attivita" maxlength="1000" required value="<?php echo $riga_mod ? $h($riga_mod['attivita']) : ''; ?>" placeholder="es. esercitazione di stechiometria con 12 studenti"></div>
+                <div class="col-md-2"><?php if ($riga_mod): ?><button type="submit" name="salva_riga" value="<?php echo (int)$riga_mod['id']; ?>" class="btn btn-success fw-bold w-100"><i class="fa fa-check me-1" aria-hidden="true"></i>Salva</button>
+                    <a href="registro_tutorato.php?id=<?php echo (int)$i['id']; ?>" class="btn btn-link btn-sm w-100">Annulla</a>
+                    <?php else: ?><button type="submit" name="aggiungi" value="1" class="btn btn-success fw-bold w-100"><i class="fa fa-plus me-1" aria-hidden="true"></i>Segna</button><?php endif; ?></div>
             </div>
+            <?php if (!$riga_mod && $reg): ?><div class="mt-2"><button type="submit" name="ripeti" value="1" class="btn btn-outline-secondary btn-sm" formnovalidate><i class="fa fa-clone me-1" aria-hidden="true"></i>Ripeti l'ultima (<?php echo $h(mb_strimwidth((string)$reg[count($reg) - 1]['attivita'], 0, 40, '…')); ?>, <?php echo ore_testo($reg[count($reg) - 1]['ore']); ?> h) con la data di oggi</button></div><?php endif; ?>
+            <script>(function(){var b=document.getElementById('rAltroGiorno'),c=document.getElementById('rDate');if(!b||!c)return;b.addEventListener('click',function(){var i=c.querySelector('input').cloneNode();i.removeAttribute('id');i.value='';i.required=false;i.setAttribute('aria-label','Altro giorno');c.appendChild(i);i.focus();});})();</script>
         </div></form>
         <?php endif; ?>
 
@@ -100,10 +121,14 @@ echo ui_tema_script();
                         <td class="text-nowrap"><?php echo date('d/m/Y', strtotime($r['data'])); ?></td><td class="text-center"><?php echo ore_testo($r['ore']); ?></td>
                         <td><?php echo $h($r['attivita']); ?><?php echo $r['nota_docente'] !== '' ? '<div class="text-secondary"><i class="fa fa-comment me-1" aria-hidden="true"></i>' . $h($r['nota_docente']) . '</div>' : ''; ?></td>
                         <td><?php echo ui_stato_colore($sc, $sn); ?></td>
-                        <?php if ($tutor && $aperto): ?><td><?php if ($r['stato'] === 'inviata'): ?><button type="submit" name="togli" value="<?php echo (int)$r['id']; ?>" class="btn btn-sm btn-link text-danger p-0" data-confirm="Togliere questa riga?" aria-label="Togli la riga"><i class="fa fa-trash" aria-hidden="true"></i></button><?php endif; ?></td><?php endif; ?></tr>
+                        <?php if ($tutor && $aperto): ?><td><?php if ($r['stato'] !== 'approvata'): ?><a href="registro_tutorato.php?id=<?php echo (int)$i['id']; ?>&amp;modifica=<?php echo (int)$r['id']; ?>" class="btn btn-sm btn-link p-0 me-2" aria-label="Correggi la riga"><i class="fa fa-pen" aria-hidden="true"></i></a><?php endif; ?><?php if ($r['stato'] === 'inviata'): ?><button type="submit" name="togli" value="<?php echo (int)$r['id']; ?>" class="btn btn-sm btn-link text-danger p-0" data-confirm="Togliere questa riga?" aria-label="Togli la riga"><i class="fa fa-trash" aria-hidden="true"></i></button><?php endif; ?></td><?php endif; ?></tr>
                 <?php endforeach; ?>
                 <?php if (!$reg): ?><tr><td colspan="6" class="text-center text-muted py-3">Nessuna attività segnata.</td></tr><?php endif; ?>
             </tbody></table></div>
+            <div class="d-flex flex-wrap gap-2 align-items-center small mb-2"><label for="rMese" class="fw-bold">Riepilogo mensile in PDF</label>
+                <input type="month" id="rMese" class="form-control form-control-sm" style="max-width:170px;" value="<?php echo date('Y-m'); ?>">
+                <a href="#" class="btn btn-outline-secondary btn-sm" onclick="this.href='registro_tutorato.php?id=<?php echo (int)$i['id']; ?>&amp;riepilogo='+document.getElementById('rMese').value;"><i class="fa fa-file-pdf me-1" aria-hidden="true"></i>Scarica</a></div>
+
             <?php if (!$tutor && $aperto && $o['inviata'] > 0): ?>
                 <div class="d-flex flex-wrap gap-2 align-items-center">
                     <input class="form-control form-control-sm" style="max-width:320px;" name="nota" maxlength="500" placeholder="Nota per il tutor (facoltativa)" aria-label="Nota per il tutor">

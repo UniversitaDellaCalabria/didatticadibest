@@ -53,6 +53,13 @@ if (!function_exists('aggiungi_registro')) {
     }
 }
 
+if (!function_exists('registro_tutorato_servizio')) {
+    // Le altre azioni del tutor sul registro (più giorni, ripeti l'ultima, correggi una riga) stanno nel servizio.
+    function registro_tutorato_servizio($conn): \App\Tutorato\ServizioRegistroTutorato {
+        return \App\Core\App::per($conn)->get(\App\Tutorato\ServizioRegistroTutorato::class);
+    }
+}
+
 if (!function_exists('togli_registro')) {
     function togli_registro($conn, int $id, int $riga): ?string {
         return \App\Core\App::per($conn)->get(\App\Tutorato\ServizioRegistroTutorato::class)->togli($id, $riga);

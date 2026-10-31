@@ -96,30 +96,99 @@ final class ServizioRegistroTutorato
     /** Il tutor segna un giorno di attività. Ritorna un errore o null. */
     public function aggiungi(int $id, string $data, mixed $ore, string $attivita): ?string
     {
-        $i = $this->incarichi->perId($id);
-        if (!$i || !self::aperto($i)) {
-            return "Il registro non è aperto per questo incarico.";
-        }
-        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $data) || $data > $this->orologio->adesso()->format('Y-m-d')) {
+        return $this->aggiungiDate($id, [$data], $ore, $attivita);
+    }
+
+    /**
+     * Il tutor segna la stessa attività (ore e testo) in più giorni: o si segnano tutti o nessuno (un solo controllo sul totale delle ore).
+     *
+     * @param list<string> $date
+     */
+    public function aggiungiDate(int $id, array $date, mixed $ore, string $attivita): ?string
+    {
+        $date = array_values(array_unique(array_filter(array_map('trim', $date), static fn ($d) => $d !== '')));
+        if (!$date) {
             return "Indica la data (non nel futuro).";
         }
-        if ($i['data_inizio'] && $data < $i['data_inizio']) {
-            return "La data è prima dell'inizio dell'incarico (" . date('d/m/Y', (int) strtotime($i['data_inizio'])) . ").";
+        [$errore, $ore, $attivita] = $this->controllaRiga($this->incarichi->perId($id), $date, $ore, $attivita, 0.0);
+        if ($errore !== null) {
+            return $errore;
+        }
+        foreach ($date as $d) {
+            $this->registro->aggiungi($id, $d, $ore, $attivita);
+        }
+
+        return null;
+    }
+
+    /** «Ripeti l'ultima»: stessa attività e stesse ore dell'ultima riga segnata, con la data di oggi. */
+    public function ripetiUltima(int $id): ?string
+    {
+        $righe = $this->registro->righe($id);
+        if (!$righe) {
+            return "Non c'è ancora nessuna riga da ripetere.";
+        }
+        $u = $righe[count($righe) - 1];
+
+        return $this->aggiungi($id, $this->orologio->adesso()->format('Y-m-d'), (string) $u['ore'], (string) $u['attivita']);
+    }
+
+    /** Il tutor corregge una riga non ancora approvata (con gli stessi controlli di aggiungi()): torna da approvare. */
+    public function modifica(int $id, int $riga, string $data, mixed $ore, string $attivita): ?string
+    {
+        $attuale = null;
+        foreach ($this->registro->righe($id) as $r) {
+            if ((int) $r['id'] === $riga) {
+                $attuale = $r;
+            }
+        }
+        if ($attuale === null || $attuale['stato'] === 'approvata') {
+            return "Si possono correggere solo le righe non ancora approvate.";
+        }
+        [$errore, $ore, $attivita] = $this->controllaRiga($this->incarichi->perId($id), [$data], $ore, $attivita, (float) $attuale['ore']);
+        if ($errore !== null) {
+            return $errore;
+        }
+
+        return $this->registro->correggiSeNonApprovata($id, $riga, $data, $ore, $attivita) ? null : "Non è stato possibile correggere la riga.";
+    }
+
+    /**
+     * Controlli comuni a aggiungi e modifica.
+     *
+     * @param array<string, mixed>|null $i
+     * @param list<string> $date
+     * @param float $oreTolte ore della riga che si sta correggendo (non contano nel totale)
+     * @return array{0: ?string, 1: float, 2: string} errore, ore, attività
+     */
+    private function controllaRiga(?array $i, array $date, mixed $ore, string $attivita, float $oreTolte): array
+    {
+        $no = static fn (string $m): array => [$m, 0.0, ''];
+        if (!$i || !self::aperto($i)) {
+            return $no("Il registro non è aperto per questo incarico.");
+        }
+        foreach ($date as $data) {
+            if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $data) || $data > $this->orologio->adesso()->format('Y-m-d')) {
+                return $no("Indica la data (non nel futuro).");
+            }
+            if ($i['data_inizio'] && $data < $i['data_inizio']) {
+                return $no("La data è prima dell'inizio dell'incarico (" . date('d/m/Y', (int) strtotime($i['data_inizio'])) . ").");
+            }
         }
         $ore = DatiLettera::numeroItaliano($ore);
         if ($ore === null || $ore <= 0 || $ore > 12 || fmod($ore * 2, 1) != 0) {
-            return "Indica le ore (da 0,5 a 12, a mezz'ore).";
+            return $no("Indica le ore (da 0,5 a 12, a mezz'ore).");
         }
         $attivita = mb_substr(trim($attivita), 0, 1000);
         if ($attivita === '') {
-            return "Scrivi l'attività svolta.";
+            return $no("Scrivi l'attività svolta.");
         }
-        $tot = self::ore($this->registro->righe($id))['totale'];
-        if ($i['ore'] !== null && $tot + $ore > (float)$i['ore'] + 0.001) {
-            return "Con queste ore superi le " . DatiLettera::oreTesto($i['ore']) . " ore dell'incarico (già segnate: " . DatiLettera::oreTesto($tot) . ").";
+        $tot = self::ore($this->registro->righe((int) $i['id']))['totale'] - $oreTolte;
+        if ($i['ore'] !== null && $tot + $ore * count($date) > (float) $i['ore'] + 0.001) {
+            return $no("Con queste ore superi le " . DatiLettera::oreTesto($i['ore']) . " ore dell'incarico (già segnate: " . DatiLettera::oreTesto($tot) . ").");
         }
-        $this->registro->aggiungi($id, $data, $ore, $attivita);
-        return null;
+
+        return [null, $ore, $attivita];
     }
 
     public function togli(int $id, int $riga): ?string
