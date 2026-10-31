@@ -17,6 +17,8 @@ if (isset($_GET['conferma_posto']) || isset($_GET['cancella_prenotazione'])) {
     exit;
 }
 
+// La pagina chiede più volte gli stessi uffici e la stessa Direzione (tessere, «Da fare», profili): si leggono una volta per richiesta.
+\App\Core\App::per($conn)->get(\App\Uffici\Direzione::class)->memorizzaLetture();
 // Profili della persona (studente, docente, direttore…) e riquadri da mostrare: li sceglie l'amministratore dal pannello (Sito > Area personale).
 // Con più profili si può restringere con ?p=; l'amministratore può «vedere come» un profilo con ?come= (solo per guardare, non cambia nulla).
 $profili_persona = \App\Core\App::per($conn)->get(\App\Portale\Area\ProfiliPersona::class)->di($user_info ?? null);

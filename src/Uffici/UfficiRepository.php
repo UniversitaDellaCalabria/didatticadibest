@@ -18,8 +18,19 @@ final class UfficiRepository
     /** Uffici fissi del Dipartimento: servono al portale, non si eliminano. Le loro persone non sono «operatori» della Didattica (senza op_id). */
     public const CHIAVI_FISSE = ['direzione', 'segreteria_direzione', 'convenzioni_fsl', 'verbali_scarico', 'assistenza'];
 
+    /** Letture ripetute nella stessa richiesta (la pagina chiede più volte gli stessi uffici): solo se la pagina lo chiede con memorizzaLetture(); si svuota a ogni scrittura fatta da qui. @var array<string, mixed> */
+    private array $memo = [];
+    private bool $memorizza = false;
+
     public function __construct(private Database $db)
     {
+    }
+
+    /** Le pagine che chiedono più volte gli stessi uffici (area personale) lo accendono per la durata della richiesta. */
+    public function memorizzaLetture(bool $si = true): void
+    {
+        $this->memorizza = $si;
+        $this->memo = [];
     }
 
     /**
@@ -55,7 +66,9 @@ final class UfficiRepository
     /** @return array<string, string|null>|null */
     public function perChiave(string $chiave): ?array
     {
-        return Righe::riga($this->db->riga('SELECT * FROM uffici WHERE chiave = ? ORDER BY id LIMIT 1', [$chiave]));
+        $leggi = fn () => Righe::riga($this->db->riga('SELECT * FROM uffici WHERE chiave = ? ORDER BY id LIMIT 1', [$chiave]));
+
+        return $this->memorizza ? ($this->memo['chiave:' . $chiave] ??= $leggi()) : $leggi();
     }
 
     /**
@@ -63,6 +76,7 @@ final class UfficiRepository
      */
     public function salva(int $id, string $ambito, string $nome, string $descrizione, bool $attivo, int $ordine, string $tipo, ?int $consiglioId, bool $smista, bool $segueCorsi): int
     {
+        $this->memo = [];
         if ($id > 0) {
             $this->db->esegui(
                 'UPDATE uffici SET nome = ?, descrizione = ?, attivo = ?, ordine = ?, tipo = ?, consiglio_id = ?, smista = ?, segue_corsi = ? WHERE id = ?',
@@ -81,12 +95,14 @@ final class UfficiRepository
     /** Collega o scollega l'ufficio a Didacticus (riceve le chat passate dall'assistente) con gli argomenti di cui si occupa. */
     public function impostaDidacticus(int $id, bool $collegato, string $argomenti): void
     {
+        $this->memo = [];
         $this->db->esegui('UPDATE uffici SET didacticus = ?, didacticus_argomenti = ? WHERE id = ?', [$collegato ? 1 : 0, $argomenti, $id]);
     }
 
     /** Elimina l'ufficio con le sue persone (i controlli su cosa lo usa sono del servizio). */
     public function elimina(int $id): void
     {
+        $this->memo = [];
         $this->db->esegui('DELETE FROM uffici_persone WHERE ufficio_id = ?', [$id]);
         $this->db->esegui('DELETE FROM uffici WHERE id = ?', [$id]);
     }
@@ -98,7 +114,9 @@ final class UfficiRepository
      */
     public function persone(int $ufficioId): array
     {
-        return Righe::testo($this->db->righe('SELECT * FROM uffici_persone WHERE ufficio_id = ? ORDER BY nominativo', [$ufficioId]));
+        $leggi = fn () => Righe::testo($this->db->righe('SELECT * FROM uffici_persone WHERE ufficio_id = ? ORDER BY nominativo', [$ufficioId]));
+
+        return $this->memorizza ? ($this->memo['persone:' . $ufficioId] ??= $leggi()) : $leggi();
     }
 
     /** @return array<string, string|null>|null */
@@ -113,6 +131,7 @@ final class UfficiRepository
      */
     public function aggiungiPersona(int $ufficioId, ?string $personaId, string $email, string $nominativo, string $struttura, string $ruolo, string $compiti, ?string $corsiJson): bool
     {
+        $this->memo = [];
         $email = strtolower(trim($email));
         if ((int) $this->db->valore('SELECT COUNT(*) FROM uffici_persone WHERE ufficio_id = ? AND email = ?', [$ufficioId, $email]) > 0) {
             return false;
@@ -133,11 +152,13 @@ final class UfficiRepository
 
     public function aggiornaPersona(int $id, string $ruolo, string $compiti, ?string $corsiJson): void
     {
+        $this->memo = [];
         $this->db->esegui('UPDATE uffici_persone SET ruolo = ?, compiti = ?, corsi = ? WHERE id = ?', [$ruolo, $compiti, $corsiJson, $id]);
     }
 
     public function togliPersona(int $id): void
     {
+        $this->memo = [];
         $this->db->esegui('DELETE FROM uffici_persone WHERE id = ?', [$id]);
     }
 

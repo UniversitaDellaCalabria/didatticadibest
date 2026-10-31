@@ -441,6 +441,7 @@ spiega dove trovare il compito.
 - **Soluzione.** Misurare (contatore di query in modalità sviluppo nel wrapper `Database`); memorizzare per la durata della richiesta i risultati condivisi
   (profili, identità, prenotazioni usate da più tessere); i totali «Da fare» in sessione per 5 minuti (1.4). Obiettivo: area personale sotto 25 query.
   *Stato 1/11/2026:* fatto il contatore `Database::numeroQuery()` (ogni query conta una volta). Manca la misura dell'area personale sul sito vero e, di conseguenza, la memorizzazione dei risultati condivisi: va decisa guardando i numeri.
+  *Misura 1/11/2026 (locale, utenti di prova):* area personale 80-100 query (studente 83, docente 102), «Da fare» 42. Le ripetizioni erano uffici (7 volte la Direzione e le sue persone), assenza del Direttore (5) e codice fiscale del firmatario (5): ora `UfficiRepository` e `Direzione` leggono una volta per richiesta se la pagina lo chiede (`memorizzaLetture()`, acceso solo da `area_personale.php`; altrove e nelle prove nulla cambia). Risultato: 63 (studente) e 81 (docente). Sotto 25 non si arriva senza memorizzare tra una richiesta e l'altra, che mostrerebbe compiti già svolti: scelta non fatta. Il resto sono query diverse di una tessera ciascuna.
 
 **5.3 Pagine con tante finestre già pronte** (S): `miei_eventi.php` crea due finestre modali per ogni prenotazione (chat e modifica, righe 361-446 e 579-593):
 caricarle alla prima apertura come fatto in `admin/utenti.php` (`?scheda=ID`).

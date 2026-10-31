@@ -18,8 +18,19 @@ final class Direzione
     public const DIRETTORE = 'Direttore';
     public const VICE = 'Vice direttore';
 
+    /** L'assenza e chi firma si leggono una volta per richiesta se la pagina lo chiede con memorizzaLetture(); si rileggono dopo imposta(). @var array<string, mixed> */
+    private array $memo = [];
+    private bool $memorizza = false;
+
     public function __construct(private Database $db, private UfficiRepository $uffici, private Orologio $orologio)
     {
+    }
+
+    public function memorizzaLetture(bool $si = true): void
+    {
+        $this->memorizza = $si;
+        $this->memo = [];
+        $this->uffici->memorizzaLetture($si);
     }
 
     /** @return array<string, string|null>|null */
@@ -47,6 +58,12 @@ final class Direzione
      */
     public function assenza(): array
     {
+        return $this->memorizza ? ($this->memo['assenza'] ??= $this->leggiAssenza()) : $this->leggiAssenza();
+    }
+
+    /** @return array{attiva: bool, impostata: bool, fino: ?string, da: string, il: ?string} */
+    private function leggiAssenza(): array
+    {
         $r = $this->db->riga('SELECT direttore_assente, direttore_assente_fino, direttore_assente_da, direttore_assente_il FROM impostazioni_sistema WHERE id = 1') ?: [];
         $impostata = (int) ($r['direttore_assente'] ?? 0) === 1;
         $fino = !empty($r['direttore_assente_fino']) ? (string) $r['direttore_assente_fino'] : null;
@@ -69,6 +86,12 @@ final class Direzione
      * @return array{nome: string, email: string, cf: string}
      */
     public function chiFirma(): array
+    {
+        return $this->memorizza ? ($this->memo['firma'] ??= $this->leggiChiFirma()) : $this->leggiChiFirma();
+    }
+
+    /** @return array{nome: string, email: string, cf: string} */
+    private function leggiChiFirma(): array
     {
         $p = $this->inCarica();
         if (!$p) {
@@ -149,6 +172,7 @@ final class Direzione
         if ($fino !== null && (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fino) || $fino < $this->orologio->adesso()->format('Y-m-d'))) {
             return 'La data di rientro non è valida (deve essere oggi o dopo).';
         }
+        $this->memo = [];
         $this->db->esegui(
             'UPDATE impostazioni_sistema SET direttore_assente = ?, direttore_assente_fino = ?, direttore_assente_da = ?, direttore_assente_il = NOW() WHERE id = 1',
             [$attiva ? 1 : 0, $attiva ? $fino : null, mb_substr($da, 0, 150)]
