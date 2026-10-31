@@ -380,6 +380,8 @@ con lo stato; utile per sapere se un tesista ha inviato la richiesta.
 **3.T4 Accettazione dell'incarico riprendibile** (S): la barra a passi di `dichiarazione_tutorato.php` (righe 40-45) diventa il passo corrente della tessera
 («Ti mancano: posizione contributiva»), così chi interrompe riprende dall'area personale senza cercare l'email.
 
+> **Stato 1/11/2026: FATTO in locale.** `area_tappe_tutorato()` guarda i due passi della dichiarazione: la tappa «Incarico accettato» dice «ti mancano: dati personali e pagamento, posizione contributiva» o «ti manca: posizione contributiva», e il pulsante porta al passo giusto (`dichiarazione_tutorato.php?...&passo=2` o `&passo=3`), poi all'accettazione. Prove in `area_personale.php`.
+
 ---
 
 ## FASE 4 — Navigazione: arrivare subito dove serve

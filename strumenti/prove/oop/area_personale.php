@@ -231,8 +231,24 @@ prova($az_ap([])[0] === 'Apri il registro delle attività' && $az_ap(['id' => 77
 prova($az_ap(['data_fine' => '2020-01-31'])[0] === 'Dichiara la fine delle attività', "tutor: a periodo concluso il pulsante è «Dichiara la fine delle attività»");
 prova($az_ap(['data_fine' => '2999-01-31'])[0] === 'Apri il registro delle attività', "tutor: a periodo non concluso resta «Apri il registro»");
 $ac_ap = $az_ap(['stato' => 'inviata', 'confermata_il' => null, 'token_studente' => 'tokacc77']);
-prova(is_array($ac_ap) && str_contains($ac_ap[0], "l'incarico") && (str_ends_with($ac_ap[1], 'incarico.php?t=tokacc77') || str_ends_with($ac_ap[1], 'dichiarazione_tutorato.php?t=tokacc77')), "tutor: lettera inviata, il pulsante porta ad accettare l'incarico (con la dichiarazione se richiesta)", json_encode($ac_ap));
+prova(is_array($ac_ap) && str_contains($ac_ap[0], "l'incarico") && (str_ends_with($ac_ap[1], 'incarico.php?t=tokacc77') || str_ends_with($ac_ap[1], 'dichiarazione_tutorato.php?t=tokacc77&passo=2')), "tutor: lettera inviata, il pulsante porta ad accettare l'incarico (con la dichiarazione se richiesta)", json_encode($ac_ap));
 prova($az_ap(['stato' => 'inviata', 'confermata_il' => null, 'token_studente' => '']) === null, "tutor: senza il link personale non c'è pulsante");
+// 3.T4 Accettazione riprendibile: la tappa dice cosa manca e il pulsante porta al passo giusto
+if (\App\Core\App::per($conn)->get(\App\Tutorato\ServizioDichiarazione::class)->richiesta()) {
+    $q("DELETE FROM tutorato_dichiarazioni WHERE incarico_id = 989400");
+    $acc_t4 = fn(array $m) => area_tappe_tutorato($conn, $m + ['id' => 989400, 'stato' => 'inviata', 'confermata_il' => null, 'token_studente' => 'tokt4'] + $inc_ap, false);
+    $t4 = $acc_t4([]);
+    prova(str_ends_with($t4['azione'][1], 'dichiarazione_tutorato.php?t=tokt4&passo=2') && str_contains($t4['tappe'][0][2], 'dati personali e pagamento, posizione contributiva'), "3.T4: senza niente compilato si riparte dal passo 2 e la tappa dice cosa manca", json_encode($t4['azione']));
+    $cifr_t4 = \App\Core\App::per($conn)->get(\App\Infrastructure\Sicurezza\Cifratura::class)->cifra(json_encode(['passo2' => true]));
+    $q("INSERT INTO tutorato_dichiarazioni (incarico_id, dati_cifrati) VALUES (989400, '" . $conn->real_escape_string((string) $cifr_t4) . "')");
+    $t4 = $acc_t4([]);
+    prova(str_ends_with($t4['azione'][1], 'dichiarazione_tutorato.php?t=tokt4&passo=3') && str_starts_with($t4['azione'][0], 'Completa la posizione contributiva') && $t4['tappe'][0][2] === 'ti manca: posizione contributiva', "3.T4: fatto il passo 2, il pulsante porta alla posizione contributiva e la tappa dice «ti manca»", json_encode($t4['azione']));
+    $cifr_t4 = \App\Core\App::per($conn)->get(\App\Infrastructure\Sicurezza\Cifratura::class)->cifra(json_encode(['passo2' => true, 'passo3' => true]));
+    $q("UPDATE tutorato_dichiarazioni SET dati_cifrati = '" . $conn->real_escape_string((string) $cifr_t4) . "' WHERE incarico_id = 989400");
+    $t4 = $acc_t4([]);
+    prova($t4['azione'][1] === 'incarico.php?t=tokt4' && $t4['tappe'][0][2] === '', "3.T4: dichiarazione completa, resta solo da accettare l'incarico", json_encode($t4['azione']));
+    $q("DELETE FROM tutorato_dichiarazioni WHERE incarico_id = 989400");
+}
 prova($az_ap(['stato' => 'confermata']) === null && $az_ap(['stato' => 'firmata_docente']) === null, "tutor: se la lettera aspetta il docente o il Direttore non c'è pulsante");
 prova($az_ap(['fine_stato' => 'richiesta']) === null, "tutor: fine attività già dichiarata, aspetta il docente: nessun pulsante");
 require_once __DIR__ . '/../../../inc/area/_tessera.php';

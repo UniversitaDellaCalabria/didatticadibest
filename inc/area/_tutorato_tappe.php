@@ -11,9 +11,12 @@ if (!function_exists('area_tappe_tutorato')) {
         $ps_t = (string) $mt['pagamento_stato'];
         $dst = \App\Core\App::per($conn)->get(\App\Tutorato\ServizioDichiarazione::class)->stato((int) $mt['id']);
         $firmata_t = in_array($mt['stato'], ['firmata', 'protocollata'], true);
+        // Chi interrompe l'accettazione riprende da qui: cosa gli manca della dichiarazione individuale (passo 2 dati e pagamento, passo 3 posizione contributiva)
+        $dichiarazione_t = $mt['stato'] === 'inviata' && \App\Core\App::per($conn)->get(\App\Tutorato\ServizioDichiarazione::class)->richiesta() && !$dst['completa'];
+        $mancano_t = !$dichiarazione_t ? '' : (!$dst['passo2'] ? 'ti mancano: dati personali e pagamento, posizione contributiva' : 'ti manca: posizione contributiva');
         $fine_t = in_array((string) $mt['fine_stato'], ['firmata', 'protocollata'], true);
         $tappe_t = [
-            ['Incarico accettato' . ($dst['completa'] ? ' e dichiarazione individuale compilata' : ''), !in_array($mt['stato'], ['bozza', 'inviata', 'annullata'], true), $mt['confermata_il'] ? 'accettato il ' . date('d/m/Y', strtotime($mt['confermata_il'])) : ''],
+            ['Incarico accettato' . ($dst['completa'] ? ' e dichiarazione individuale compilata' : ''), !in_array($mt['stato'], ['bozza', 'inviata', 'annullata'], true), $mt['confermata_il'] ? 'accettato il ' . date('d/m/Y', strtotime($mt['confermata_il'])) : $mancano_t],
             ['Lettera firmata dal docente e dal Direttore', $firmata_t, $mt['protocollo'] !== '' ? 'protocollo ' . $mt['protocollo'] : ''],
             ['Registro delle presenze', $mt['fine_stato'] !== '' || $fine_t, $mt['ore_approvate'] !== null ? \App\Tutorato\DatiLettera::oreTesto($mt['ore_approvate']) . ' ore approvate' : ''],
             ['Fine attività firmata dal docente titolare', $fine_t, $mt['fine_firmata_il'] ? date('d/m/Y', strtotime($mt['fine_firmata_il'])) : ''],
@@ -36,9 +39,11 @@ if (!function_exists('area_tappe_tutorato')) {
         $azione = null;
         $token = (string) ($mt['token_studente'] ?? '');
         if ($prima === 0 && $mt['stato'] === 'inviata' && $token !== '') {
-            $azione = !$dst['completa'] && \App\Core\App::per($conn)->get(\App\Tutorato\ServizioDichiarazione::class)->richiesta()
-                ? ["Compila la dichiarazione e accetta l'incarico", 'dichiarazione_tutorato.php?t=' . urlencode($token)]
-                : ["Accetta l'incarico", 'incarico.php?t=' . urlencode($token)];
+            $azione = !$dichiarazione_t
+                ? ["Accetta l'incarico", 'incarico.php?t=' . urlencode($token)]
+                : (!$dst['passo2']
+                    ? ["Compila la dichiarazione e accetta l'incarico", 'dichiarazione_tutorato.php?t=' . urlencode($token) . '&passo=2']
+                    : ["Completa la posizione contributiva e accetta l'incarico", 'dichiarazione_tutorato.php?t=' . urlencode($token) . '&passo=3']);
         } elseif ($prima === 2 && $firmata_t && (string) $mt['fine_stato'] === '') {
             $finito = !empty($mt['data_fine']) && (string) $mt['data_fine'] < date('Y-m-d');
             $azione = [$finito ? 'Dichiara la fine delle attività' : 'Apri il registro delle attività', 'registro_tutorato.php?id=' . (int) $mt['id']];
