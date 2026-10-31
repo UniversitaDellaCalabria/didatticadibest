@@ -63,3 +63,14 @@ prova(!isset($ps_stati($r)['attestati']) && $r['fatto'] && $r['azione'] === null
 // Il codice nel link è ripulito
 $r = PercorsoScuola::per(['codice' => 'A B&C', 'convenzione' => 'si', 'documenti' => $senza] + $ps_base, $ps_oggi);
 prova($r['azione']['link'] === 'elenco_studenti.php?code=A+B%26C', "PercorsoScuola: il codice nel link è codificato");
+
+// ServizioPercorsiScuola::dati(): dalla riga della prenotazione alla forma di PercorsoScuola
+$ps_pr = ['id' => 5, 'codice_prenotazione' => 'FSL-ZZ99', 'stato' => 'confermata', 'evento_tipo' => 'progetto', 'attestati' => 1, 'per_scuole' => 1, 'progetto_fine' => '2026-12-20', 'data_turno' => '2026-11-05', 'attestato_inviato' => 0];
+$ps_conv = ['token' => 'abc', 'convenzione' => 'no', 'iter' => Costanti::ITER_CARICATA];
+$ps_d = \App\Fsl\ServizioPercorsiScuola::dati($ps_pr, $ps_conv, null);
+prova($ps_d['token'] === 'abc' && $ps_d['iter'] === Costanti::ITER_CARICATA && $ps_d['al'] === '2026-12-20' && $ps_d['attestati'] === true && $ps_d['attestato_inviato'] === false, "ServizioPercorsiScuola::dati(): un progetto finisce a fine progetto, ha gli attestati per le scuole");
+$ps_d = \App\Fsl\ServizioPercorsiScuola::dati(['evento_tipo' => 'evento', 'per_scuole' => 0] + $ps_pr, null, null);
+prova($ps_d['al'] === '2026-11-05' && $ps_d['token'] === '' && $ps_d['iter'] === '', "ServizioPercorsiScuola::dati(): un evento finisce nel giorno del turno; senza compilazione niente link");
+$ps_d = \App\Fsl\ServizioPercorsiScuola::dati(['attestati' => 0] + $ps_pr, null, null);
+prova($ps_d['attestati'] === false && !isset($ps_stati(PercorsoScuola::per($ps_d, '2026-10-31'))['attestati']), "ServizioPercorsiScuola::dati(): senza attestati il passo non compare");
+prova(\App\Core\App::per($conn)->get(\App\Fsl\ServizioPercorsiScuola::class)->perUtente(0, 'nessuno@esempio.invalid') === [], "ServizioPercorsiScuola::perUtente(): il container la costruisce e senza prenotazioni FSL l'elenco è vuoto");
