@@ -94,4 +94,18 @@ final class ConfermaPraticaRepository
             [strtolower($email)]
         );
     }
+
+    /**
+     * Le conferme in attesa di una persona: per l'email a cui è arrivato il link o per la scheda dell'anagrafe (se entra con un altro indirizzo).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function inAttesaDi(string $email, string $personaId): array
+    {
+        return $this->db->righe(
+            "SELECT c.*, p.codice, p.nome AS studente_nome, p.cognome AS studente_cognome, m.titolo AS modulo_titolo, DATEDIFF(NOW(), c.richiesta_il) AS gg FROM pratiche_conferme c JOIN pratiche p ON p.id = c.pratica_id
+             JOIN didattica_moduli m ON m.id = p.modulo_id WHERE c.stato = 'attesa' AND p.stato IN ('inviata', 'in_lavorazione') AND ((c.email <> '' AND c.email = ?) OR (? <> '' AND c.persona_id = ?)) ORDER BY c.richiesta_il",
+            [strtolower($email), $personaId, $personaId]
+        );
+    }
 }

@@ -111,3 +111,27 @@ prova(count($ex_fi) === 4 && $ex_fi[0]['nome'] === 'verbale_1_C_signed.pdf' && $
 @unlink($zf_fi); @unlink($pf_fi); @unlink($xf_fi);
 $pag3_fi = (string) file_get_contents($radice . '/firme.php');
 prova(str_contains($pag3_fi, "'carica'") && str_contains($pag3_fi, 'RicaricaFirmati') && substr_count($pag3_fi, 'csrf_verify') === 2 && str_contains($pag3_fi, 'enctype="multipart/form-data"'), "firme.php: modulo «Carica i firmati» con CSRF");
+
+// ---- Conferme degli attestati in blocco ----
+sezione("Conferme degli attestati in blocco");
+foreach (["DELETE FROM pratiche_conferme WHERE pratica_id IN (98971, 98972)", "DELETE FROM pratiche WHERE id IN (98971, 98972)", "DELETE FROM didattica_moduli WHERE id = 98970"] as $sql) $q($sql);
+$q("INSERT INTO didattica_moduli (id, titolo) VALUES (98970, 'Attestato di frequenza 98970')");
+$q("INSERT INTO pratiche (id, modulo_id, utente_id, codice, stato, nome, cognome) VALUES (98971, 98970, 1, 'P-9897-1', 'inviata', 'Anna', 'Rossi'), (98972, 98970, 1, 'P-9897-2', 'inviata', 'Luca', 'Bianchi')");
+$q("INSERT INTO pratiche_conferme (id, pratica_id, passo, nome, email, token, persona_id, richiesta_il) VALUES
+    (989711, 98971, 1, 'Verdi Marco', 'marco.verdi@x.it', 'tcbl9897a', 'm.verdi', NOW() - INTERVAL 9 DAY),
+    (989721, 98972, 1, 'Verdi Marco', 'marco.verdi@x.it', 'tcbl9897b', 'm.verdi', NOW() - INTERVAL 1 DAY),
+    (989712, 98971, 1, 'Neri Giulia', 'giulia.neri@x.it', 'tcbl9897c', 'g.neri', NOW())");
+$blocco_fi = \App\Core\App::per($conn)->get(\App\Didattica\ConfermeInBlocco::class);
+$marco_fi = ['id' => 5, 'email' => 'Marco.Verdi@x.it', 'persona_id' => ''];
+$att_fi = $blocco_fi->inAttesa($marco_fi);
+prova(array_column($att_fi, 'id') === [989711, 989721] && (int) $att_fi[0]['gg'] >= 9, "conferme in blocco: il docente vede le sue richieste, le più vecchie prima", json_encode(array_column($att_fi, 'id')));
+$alias_fi = array_column($blocco_fi->inAttesa(['id' => 6, 'email' => 'altro@x.it', 'persona_id' => 'm.verdi']), 'id');
+prova($alias_fi === [989711, 989721], "conferme in blocco: con un altro indirizzo ma la stessa scheda le vede lo stesso", json_encode($alias_fi));
+prova($blocco_fi->inAttesa(['id' => 7, 'email' => 'estraneo@x.it', 'persona_id' => '']) === [] && $blocco_fi->inAttesa(null) === [] && $blocco_fi->inAttesa(['id' => 8, 'email' => '', 'persona_id' => '']) === [], "conferme in blocco: un estraneo o chi non ha né email né scheda non vede niente");
+$es_cf = $blocco_fi->conferma($marco_fi, [989711, 989712, 989721, 989711]);
+prova(array_column($es_cf, 'ok') === [true, false, true] && array_column($es_cf, 'id') === [989711, 989712, 989721], "conferme in blocco: si confermano le proprie richieste, non quelle di un altro docente, senza doppioni", json_encode($es_cf));
+prova(array_column($conn->query("SELECT id, stato FROM pratiche_conferme WHERE pratica_id IN (98971, 98972) ORDER BY id")->fetch_all(MYSQLI_ASSOC), 'stato', 'id') === [989711 => 'confermata', 989712 => 'attesa', 989721 => 'confermata'], "conferme in blocco: nel database restano in attesa solo quelle dell'altro docente");
+prova($blocco_fi->inAttesa($marco_fi) === [] && $blocco_fi->conferma($marco_fi, [989711])[0]['ok'] === false, "conferme in blocco: una richiesta già confermata non si conferma due volte");
+$mc_fi = (string) file_get_contents($radice . '/mie_conferme.php');
+prova(str_contains($mc_fi, 'csrf_verify') && str_contains($mc_fi, "empty(\$_POST['dichiaro'])") && str_contains($mc_fi, 'ConfermeInBlocco') && str_contains((string) file_get_contents($radice . '/conferma_attestato.php'), 'mie_conferme.php'), "mie_conferme.php: CSRF e dichiarazione obbligatoria; la pagina della singola conferma rimanda qui");
+foreach (["DELETE FROM pratiche_conferme WHERE pratica_id IN (98971, 98972)", "DELETE FROM pratiche WHERE id IN (98971, 98972)", "DELETE FROM didattica_moduli WHERE id = 98970"] as $sql) $q($sql);

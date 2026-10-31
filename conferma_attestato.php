@@ -94,7 +94,7 @@ $altre = $user_info ? array_values(array_filter($svc->inAttesaPerEmail((string)(
         <?php endif; ?>
         <?php if ($altre): ?>
         <div class="card border-0 shadow-sm mt-3"><div class="card-body">
-            <h2 class="h6 fw-bold mb-2">Altre richieste che aspettano la tua conferma</h2>
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-2"><h2 class="h6 fw-bold mb-0">Altre richieste che aspettano la tua conferma</h2><a class="btn btn-sm btn-outline-success fw-bold ms-auto" href="mie_conferme.php">Confermale tutte insieme</a></div>
             <ul class="mb-0 small"><?php foreach ($altre as $a): ?><li><a href="conferma_attestato.php?t=<?php echo $h(urlencode($a['token'])); ?>"><?php echo $h($a['modulo_titolo']); ?> · <?php echo $h(trim($a['studente_nome'] . ' ' . $a['studente_cognome'])); ?></a> <span class="text-secondary">(dal <?php echo date('d/m/Y', strtotime($a['richiesta_il'])); ?>)</span></li><?php endforeach; ?></ul>
         </div></div>
         <?php endif; ?>
