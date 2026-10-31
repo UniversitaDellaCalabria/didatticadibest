@@ -12,6 +12,15 @@ if ($fase === 'azioni') {
         admin_redirect("$base&tab=pratiche&id=$id&r=" . time());
     }
 
+    // Promemoria a richiesta: a chi deve fare il passo successivo (studente, firmatario, docenti)
+    if (isset($_POST['ricorda_pratica'])) {
+        $id = (int)$_POST['ricorda_pratica'];
+        $esito_r = \App\Core\App::per($conn)->get(\App\Didattica\RicordaPratica::class)->ricorda($id);
+        if ($esito_r->riuscito) registra_log_audit($conn, "Pratica: promemoria a chi deve agire", ["Pratica" => $id]);
+        flash_set($esito_r->messaggio, $esito_r->riuscito ? 'success' : 'danger');
+        admin_redirect("$base&tab=pratiche&id=$id&r=" . time());
+    }
+
     // ── Pratiche: stato, integrazioni, messaggi, attività, iter, istruttoria, seduta ──
     if (isset($_POST['stato_pratica'])) {
         $id = (int)$_POST['pratica_id'];
@@ -490,6 +499,16 @@ echo pn_prossima($prossima_p[0], $prossima_p[1], $prossima_p[2], $prossima_p[3])
                 <textarea class="form-control form-control-sm mb-2" name="testo_operatore" rows="2" maxlength="3000" placeholder="Cosa serve (es. il verbale del CdL firmato)" aria-label="Cosa serve"></textarea>
                 <button type="submit" name="richiedi_operatore" value="1" class="btn btn-sm fw-bold text-white" style="background:#7c3aed;">Invia la richiesta</button>
             </div></form>
+            <?php endif; ?>
+
+            <?php if (in_array($p['stato'], ['inviata', 'in_lavorazione', 'integrazione'], true)): ?>
+            <div class="card border-0 shadow-sm mb-3"><div class="card-body">
+                <h6 class="fw-bold">Promemoria</h6>
+                <form method="POST" class="m-0"><?php csrf_field(); ?>
+                    <button type="submit" name="ricorda_pratica" value="<?php echo (int)$p['id']; ?>" class="btn btn-sm btn-outline-danger fw-bold w-100" data-confirm="Mandare un promemoria a chi deve fare il passo successivo di questa pratica?"><i class="fa fa-bell me-1" aria-hidden="true"></i>Ricorda a chi deve agire</button>
+                </form>
+                <p class="small text-secondary mt-2 mb-0">Scrive allo studente (se deve integrare), al firmatario o al Direttore (se deve firmare) o ai docenti (se devono confermare), con il link per farlo.</p>
+            </div></div>
             <?php endif; ?>
 
             <div class="card border-0 shadow-sm"><div class="card-body">

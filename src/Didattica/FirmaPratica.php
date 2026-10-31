@@ -308,6 +308,24 @@ final class FirmaPratica
         }
     }
 
+    /**
+     * Promemoria a richiesta dell'ufficio a chi deve ancora firmare la pratica.
+     *
+     * @param array<string, mixed> $p
+     * @return string|null la persona a cui è stato scritto, null se non c'è nessuna firma in attesa
+     */
+    public function ricorda(array $p): ?string
+    {
+        $f = $this->firme->inAttesa((int) $p['id']);
+        if ($f === null) {
+            return null;
+        }
+        $this->emailFirma($p, (string) $f['nome'], (string) $f['email'], (string) $f['token'], $f['tipo'] === 'direttore' ? 'Direttore' : 'firmatario', true);
+        $this->firme->segnaSollecito((int) $f['id']);
+
+        return (string) $f['nome'];
+    }
+
     /** Promemoria a chi deve ancora firmare: dopo i giorni del passo (o del modulo), al massimo tre volte. Ritorna le email inviate. */
     public function solleciti(): int
     {

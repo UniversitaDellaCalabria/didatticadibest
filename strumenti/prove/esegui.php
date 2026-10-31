@@ -1576,6 +1576,12 @@ prova($err_d === null && ($fd = $fp->inAttesa($id_d)) && $fd['tipo'] === 'dirett
 $conn->query("DELETE FROM pratiche_firme WHERE pratica_id = $id_d");
 $fa_rel = $fp->inAttesa($id_t2);
 prova(str_ends_with($fa_rel['file_origine'], basename(pratica($conn, $id_t2)['domanda_pdf'])), "firma del relatore: il documento è la domanda dello studente");
+// Promemoria a richiesta dell'ufficio: a chi deve firmare, o errore se nessuno deve agire
+$rp_did = \App\Core\App::per($conn)->get(\App\Didattica\RicordaPratica::class);
+$EMAIL = [];
+$es_rp = $rp_did->ricorda($id_t2);
+prova($es_rp->riuscito && ($EMAIL[0]['a'] ?? '') === 'paolo.neri@unical.it' && str_contains($EMAIL[0]['oggetto'] ?? '', 'Promemoria'), "promemoria a richiesta: la pratica in firma riscrive al firmatario", $es_rp->messaggio);
+prova(!$rp_did->ricorda(99999999)->riuscito && !$rp_did->ricorda($id_d)->riuscito, "promemoria a richiesta: pratica inesistente o senza nessuno da sollecitare, nessun invio");
 // Tempi per passo e pratiche fuori verbale
 $conn->query("UPDATE pratiche SET stato = 'in_lavorazione', passo = 2, ufficio_id = $u_prot, assegnata_a = NULL, aggiornata_il = NOW() - INTERVAL 3 DAY, promemoria_il = NULL WHERE id = $id_t");
 $conn->query("UPDATE pratiche_firme SET stato = 'annullata' WHERE stato = 'attesa'");

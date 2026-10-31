@@ -379,6 +379,25 @@ final class ServizioConfermeDocenti
         return 'accesso con ' . $metodo . (!empty($a['livello']) ? ' livello ' . (int) $a['livello'] : '');
     }
 
+    /**
+     * Promemoria a richiesta dell'ufficio ai docenti che devono ancora confermare la pratica.
+     *
+     * @param array<string, mixed> $p
+     * @return list<string> i docenti a cui è stato scritto
+     */
+    public function ricorda(array $p): array
+    {
+        $nomi = [];
+        foreach ($this->conferme->inAttesa((int) $p['id']) as $c) {
+            $nome = $this->nomeVisibile((string) $c['nome']);
+            $this->emailConferma($p, $nome, (string) $c['email'], (string) $c['token'], count($this->righeDelDocente($p, $c)), true);
+            $this->conferme->segnaSollecito((int) $c['id']);
+            $nomi[] = $nome;
+        }
+
+        return $nomi;
+    }
+
     /** Promemoria ai docenti che non hanno ancora risposto: dopo i giorni del passo (o del modulo), al massimo tre volte. Ritorna le email inviate. */
     public function solleciti(): int
     {
