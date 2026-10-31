@@ -88,7 +88,7 @@ require_once 'header.php';
                         <h2 class="h6 fw-bold"><i class="fa fa-upload me-1" aria-hidden="true"></i><?php echo firma_remota_disponibile() ? 'Oppure: carica il PDF firmato' : 'Firma e carica il PDF'; ?></h2>
                         <ol class="small ps-3 mb-2"><li><a href="firma_incarico.php?t=<?php echo $h(urlencode($tok)); ?>&amp;pdf=1&amp;scarica=1">Scarica il PDF</a> <?php echo $fine ? 'della dichiarazione' : 'della lettera'; ?>.</li>
                             <li>Firmalo con il tuo strumento di firma (es. ArubaSign, Dike, Acrobat) scegliendo <strong>PAdES</strong> (PDF), non CAdES (.p7m).</li><li>Carica qui il PDF firmato, senza modificarlo.</li></ol>
-                        <input type="file" name="pdf_firmato" class="form-control form-control-sm mb-2" accept=".pdf,application/pdf" required aria-label="PDF firmato in PAdES">
+                        <input type="file" name="pdf_firmato" class="form-control form-control-sm mb-2" accept=".pdf,application/pdf" required aria-label="PDF firmato in PAdES" data-pdf-firmato="firmato"><script src="assets/js/controllo-pdf-firmato.js" defer></script>
                         <button type="submit" name="carica" value="1" class="btn btn-primary fw-bold">Carica il PDF firmato</button>
                     </div></form>
                 <?php elseif (array_search($stato_ora, $sequenza, true) > array_search($atteso, $sequenza, true)): ?>

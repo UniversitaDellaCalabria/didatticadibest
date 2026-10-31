@@ -229,7 +229,7 @@ require_once 'header.php';
         <?php if ($errore_firmata): ?><div class="alert alert-danger" role="alert"><i class="fa fa-triangle-exclamation me-1" aria-hidden="true"></i><?php echo $h($errore_firmata); ?></div><?php endif; ?>
         <?php if (!empty($c['file_firmato']) && $stato === $S::CARICATA): ?><div class="alert alert-success small"><i class="fa fa-circle-check me-1" aria-hidden="true"></i>Hai già caricato il PDF firmato (<?php echo $h($c['firmatario'] ?: 'firmatario non indicato'); ?>, <?php echo $h(date('d/m/Y H:i', strtotime((string)$c['firmata_il']))); ?>). Puoi sostituirlo fino alla presa in carico.</div><?php endif; ?>
         <form method="POST" enctype="multipart/form-data" class="d-flex flex-wrap gap-2 align-items-end"><?php csrf_field(); ?>
-            <div class="flex-grow-1"><label class="form-label small fw-bold mb-0" for="pdf_firmato">PDF firmato digitalmente (PAdES)</label><input type="file" class="form-control" id="pdf_firmato" name="pdf_firmato" accept=".pdf,application/pdf" required></div>
+            <div class="flex-grow-1"><label class="form-label small fw-bold mb-0" for="pdf_firmato">PDF firmato digitalmente (PAdES)</label><input type="file" class="form-control" id="pdf_firmato" name="pdf_firmato" accept=".pdf,application/pdf" required data-pdf-firmato="firmato"><script src="assets/js/controllo-pdf-firmato.js" defer></script></div>
             <button type="submit" name="carica_firmata" value="1" class="btn btn-danger fw-bold"><i class="fa fa-upload me-1" aria-hidden="true"></i>Carica il PDF firmato</button>
         </form>
     </div></section>

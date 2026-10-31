@@ -156,10 +156,10 @@ require_once 'header.php';
             <form method="POST" enctype="multipart/form-data" class="row g-2 align-items-end">
                 <?php csrf_field(); ?>
                 <div class="col-md-8"><label class="form-label small fw-bold" for="cvFirmata"><?php echo empty($cc['file_firmato']) ? 'Carica la convenzione firmata digitalmente in PAdES' : 'Hai sbagliato file? Carica la versione corretta'; ?> (PDF fino a 10 MB)</label>
-                    <input type="file" class="form-control" id="cvFirmata" name="convenzione_firmata" accept=".pdf,application/pdf" required>
+                    <input type="file" class="form-control" id="cvFirmata" name="convenzione_firmata" accept=".pdf,application/pdf" required data-pdf-firmato="firmato"><script src="assets/js/controllo-pdf-firmato.js" defer></script>
                     <div class="form-text">Deve essere il PDF firmato dal Dirigente Scolastico in formato <strong>PAdES</strong>, senza modifiche dopo la firma. I file .p7m non sono accettati.</div></div>
                 <div class="col-md-8"><label class="form-label small fw-bold" for="cvAllegatoA"><?php echo empty($cc['file_allegato_scuola']) ? 'Carica l\'Allegato A' : 'Allegato A (già caricato: scegli un file solo per sostituirlo)'; ?> (PDF fino a 10 MB)</label>
-                    <input type="file" class="form-control" id="cvAllegatoA" name="allegato_a" accept=".pdf,application/pdf"<?php echo empty($cc['file_allegato_scuola']) ? ' required' : ''; ?>>
+                    <input type="file" class="form-control" id="cvAllegatoA" name="allegato_a" accept=".pdf,application/pdf" data-pdf-firmato="semplice"<?php echo empty($cc['file_allegato_scuola']) ? ' required' : ''; ?>>
                     <div class="form-text">Puoi usare l'Allegato A in PDF scaricato qui sopra: non serve la firma digitale.</div></div>
                 <div class="col-md-4"><button type="submit" name="carica_firmata" value="1" class="btn btn-lg fw-bold text-white w-100" style="background:#B30000;"><i class="fa fa-upload me-1" aria-hidden="true"></i><?php echo empty($cc['file_firmato']) ? 'Carica la convenzione' : 'Sostituisci il file'; ?></button></div>
             </form>
