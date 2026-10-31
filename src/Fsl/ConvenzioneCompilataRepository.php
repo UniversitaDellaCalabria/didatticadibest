@@ -63,6 +63,18 @@ final class ConvenzioneCompilataRepository
     }
 
     /**
+     * Le compilazioni fatte con questa email (le più recenti), per rimandare il link a chi l'ha perso.
+     *
+     * @return list<array<string, string|null>>
+     */
+    public function perEmail(string $email, int $limite = 3): array
+    {
+        $email = strtolower(trim($email));
+
+        return $email === '' ? [] : Righe::testo($this->db->righe('SELECT * FROM convenzioni_compilate WHERE LOWER(email) = ? ORDER BY id DESC LIMIT ' . max(1, $limite), [$email]));
+    }
+
+    /**
      * Apre la compilazione di una prenotazione con un link personale nuovo.
      *
      * @return array<string, string|null>|null la riga appena creata

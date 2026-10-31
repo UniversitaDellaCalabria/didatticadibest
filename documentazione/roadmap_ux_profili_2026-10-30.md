@@ -294,6 +294,8 @@ lato docente; bozze delle pratiche; percorsi a passi per convenzione FSL e conve
 - **Requisiti.** Metodo `ConvenzioneTesiRepository::perEmail(list<string>)`; nessun token mostrato a chi non corrisponde.
 
 **3.A2 «Ho perso il link»** (S)
+
+> **Stato 31/10/2026: FATTO in locale.** Aziende: la richiesta con un'email che ha già una convenzione in corso (già così) o stipulata e ancora valida rimanda lo stesso link e non ne apre un'altra (`ServizioConvenzioniTesi::avvia`); una scaduta ne apre una nuova. Scuole: nuova pagina `ricevi_link_convenzione.php` (email + domanda di controllo + limite per IP, risposta sempre uguale) che rimanda il link delle compilazioni fatte con quell'email (`ServizioConvenzioneOnline::rimandaLink`, modello email `fsl_link_ripreso`); vi si arriva da `convenzione_online.php` senza link né codice e dal messaggio «Convenzione non disponibile». Prove: `link_perso.php`.
 - **Problema.** Senza link l'azienda deve ripartire da `richiedi_convenzione_tesi.php`; il servizio `rimandaLink()` esiste (`ServizioConvenzioniTesi.php:281`) ma
   serve all'ufficio.
 - **Soluzione.** Su `richiedi_convenzione_tesi.php`, se per quell'email c'è già una convenzione in corso, si **rimanda lo stesso link** invece di crearne una nuova

@@ -271,6 +271,14 @@ final class ServizioConvenzioniTesi
 
             return [null, (int) $aperta['id']];
         }
+        // Convenzione già stipulata e ancora valida: si rimanda lo stesso link (lì c'è lo stato e, a fine validità, il rinnovo) invece di aprirne un'altra
+        foreach ($this->conv->perEmail([$email]) as $s) {
+            if ((string) $s['stato'] === Costanti::PROTOCOLLATA && (string) ($s['valida_al'] ?? '') >= $this->oggi()) {
+                $this->notifiche->invitoRipreso($email, (string) ($s['azienda'] ?: $azienda), (string) $s['token']);
+
+                return [null, (int) $s['id']];
+            }
+        }
         $id = $this->conv->crea($email, $azienda, $origine, $da);
         $c = $this->conv->perId($id);
         $this->notifiche->invito($email, $azienda, (string) $c['token'], $da);

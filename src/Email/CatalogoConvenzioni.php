@@ -74,6 +74,15 @@ final class CatalogoConvenzioni
                 'Formazione Scuola Lavoro – riepilogo delle attività richieste',
                 "Gentile docente,\n\necco il riepilogo delle attività di Formazione Scuola Lavoro richieste per **{{scuola}}**:\n\n{{!tabella}}\n\n{{!avvisi}}\n\n{{!documenti}}",
                 'Scarica i documenti'),
+            'fsl_link_ripreso' => $m($S, 'Link della convenzione rimandato', 'Una scuola ha perso il link e lo richiede con la sua email.', 'La scuola',
+                self::sp('scuola'),
+                'Convenzione Formazione Scuola Lavoro: il tuo link',
+                "Gentile docente,
+
+hai chiesto di nuovo il link per la convenzione di **{{scuola}}**: da questa pagina riprendi dove eri rimasto, scarichi i documenti e carichi la convenzione firmata.
+
+Se non sei stato tu a chiederlo, ignora questa email: nessun dato è stato modificato.",
+                'Apri la pagina della convenzione'),
             'fsl_firmata_ricevuta' => $m($S, 'Convenzione firmata ricevuta', 'La scuola carica la convenzione firmata.', 'La scuola',
                 self::sp('scuola'),
                 'Convenzione ricevuta: {{scuola}}',

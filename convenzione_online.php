@@ -12,7 +12,7 @@ $nega = function (string $msg) use ($h) {
     while (ob_get_level() > 0) ob_end_clean();
     http_response_code(404);
     exit('<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Convenzione non disponibile</title></head>'
-       . '<body style="font-family:system-ui,sans-serif;max-width:640px;margin:3rem auto;padding:0 1rem;"><h1>Convenzione non disponibile</h1><p>' . $h($msg) . '</p><p><a href="index.php">Torna al portale</a></p></body></html>');
+       . '<body style="font-family:system-ui,sans-serif;max-width:640px;margin:3rem auto;padding:0 1rem;"><h1>Convenzione non disponibile</h1><p>' . $h($msg) . '</p><p><a href="ricevi_link_convenzione.php">Hai perso il link? Fattelo rimandare per email</a> · <a href="index.php">Torna al portale</a></p></body></html>');
 };
 if (!check_rate_limit($conn, 'convenzione_online', 120, 3600)) $nega("Troppe richieste: riprova tra poco.");
 
@@ -25,6 +25,8 @@ if ($tok !== '') {
     if (!$cc) $nega("Il link non è valido o è scaduto.");
 } else {
     $codice = strtoupper(trim((string)($_GET['code'] ?? '')));
+    // Senza link né codice: si va alla pagina «Ho perso il link»
+    if ($codice === '') { header('Location: ricevi_link_convenzione.php'); exit; }
     // Una sola compilazione per prenotazione: se c'è già si riprende
     $tok = $conv_online->tokenDaCodice($codice);
     if ($tok === null) $nega("Controlla il codice della prenotazione: la convenzione si compila dal link della conferma o dell'email.");

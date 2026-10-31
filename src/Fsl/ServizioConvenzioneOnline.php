@@ -34,6 +34,28 @@ final class ServizioConvenzioneOnline
     ) {
     }
 
+    /**
+     * «Ho perso il link»: rimanda per email il link personale delle compilazioni fatte con quell'indirizzo (le più recenti). Chi chiede non
+     * sa se ne esiste una: la risposta a schermo è sempre la stessa. Ritorna quante email sono partite.
+     */
+    public function rimandaLink(string $email): int
+    {
+        $email = strtolower(trim($email));
+        if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+            return 0;
+        }
+        $n = 0;
+        foreach ($this->compilate->perEmail($email) as $cc) {
+            $dati = json_decode((string) ($cc['dati_json'] ?? ''), true) ?: [];
+            $scuola = (string) (($dati['scuola']['denominazione'] ?? '') ?: 'la tua scuola');
+            if ($this->invio->invia($email, 'fsl_link_ripreso', ['scuola' => $scuola], $this->sito->urlBase() . '/convenzione_online.php?t=' . $cc['token'])) {
+                ++$n;
+            }
+        }
+
+        return $n;
+    }
+
     /** @return array<string, mixed>|null */
     public function perToken(string $token): ?array
     {
