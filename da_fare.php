@@ -46,7 +46,7 @@ echo ui_tema_script();
                 <?php foreach ($g_df['righe'] as $r_df): ?>
                     <div class="d-flex align-items-center justify-content-between gap-2 py-2 border-top">
                         <div>
-                            <span class="fw-semibold"><?php echo htmlspecialchars($r_df['testo']); ?></span><?php if ($r_df['giorni'] >= \App\Portale\DaFarePersona::GIORNI_FERMA): ?> <span class="badge text-bg-danger"><?php echo (int)$r_df['giorni']; ?> giorni</span><?php endif; ?>
+                            <span class="fw-semibold"><?php echo htmlspecialchars($r_df['testo']); ?></span><?php if ($r_df['giorni'] >= \App\Portale\DaFarePersona::GIORNI_FERMA): ?> <span class="badge text-bg-danger"><?php echo (int)$r_df['giorni']; ?> giorni</span><?php endif; ?> <?php $sc_df = \App\Portale\DaFarePersona::scadenzaDi($r_df, date('Y-m-d')); if ($sc_df): ?><span class="badge <?php echo $sc_df['urgente'] ? 'text-bg-danger' : 'text-bg-light border'; ?>"><?php echo htmlspecialchars($sc_df['testo']); ?></span><?php endif; ?>
                             <span class="d-block small text-secondary"><?php echo htmlspecialchars($r_df['dettaglio']); ?></span>
                         </div>
                         <a class="btn btn-sm btn-outline-secondary text-nowrap" href="<?php echo htmlspecialchars($r_df['link']); ?>">Apri</a>

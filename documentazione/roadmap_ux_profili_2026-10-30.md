@@ -171,6 +171,8 @@ lato docente; bozze delle pratiche; percorsi a passi per convenzione FSL e conve
 - **Fatto quando.** Il numero compare su tutte le pagine pubbliche per un utente con compiti e scende subito dopo una firma. **Peso.** S.
 
 ### 1.5 Scadenze ben visibili
+
+> **Stato 1/11/2026: FATTO per le fonti che hanno una scadenza** (posto liberato, elenco e autorizzazione della scuola). Ogni riga può avere `scadenza` (Y-m-d): `DaFarePersona::scadenzaDi()` dà «entro il gg/mm» (rosso se mancano al massimo 3 giorni) o «scaduto il gg/mm»; le righe con scadenza vengono prima, dalla più vicina (area personale e `da_fare.php`). Le altre fonti non hanno una scadenza nei dati: se ne serve una, basta aggiungere `scadenza` alla riga. Prova: `da_fare_scuola_documenti.php`.
 - **Soluzione.** Ogni compito con scadenza mostra «entro il gg/mm» e, se mancano ≤ 3 giorni, è in cima e rosso; oltre la scadenza resta con «scaduto».
 - **Requisiti.** Campo `scadenza` di 1.2; ordinamento in `DaFarePersona`. **Peso.** S.
 

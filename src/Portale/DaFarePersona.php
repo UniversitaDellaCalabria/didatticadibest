@@ -129,7 +129,33 @@ final class DaFarePersona
      */
     private function gruppo(string $chiave, string $titolo, string $icona, string $colore, int $n, array $righe, callable $riga): array
     {
-        return ['chiave' => $chiave, 'titolo' => $titolo, 'icona' => $icona, 'colore' => $colore, 'n' => $n, 'righe' => array_map($riga, $righe)];
+        $righe = array_map($riga, $righe);
+        // Le righe con una scadenza vengono prima, dalla più vicina; le altre restano nell'ordine in cui le ha date la fonte
+        usort($righe, static fn (array $a, array $b): int => ($a['scadenza'] ?? '9999-12-31') <=> ($b['scadenza'] ?? '9999-12-31'));
+
+        return ['chiave' => $chiave, 'titolo' => $titolo, 'icona' => $icona, 'colore' => $colore, 'n' => $n, 'righe' => $righe];
+    }
+
+    /** Giorni entro i quali una scadenza è «vicina» e si mostra in rosso. */
+    public const GIORNI_SCADENZA_VICINA = 3;
+
+    /**
+     * Come mostrare la scadenza di una riga (se ce l'ha): «entro il gg/mm», in rosso se mancano al massimo tre giorni, «scaduto il gg/mm» se è passata.
+     *
+     * @param array<string, mixed> $riga riga di un gruppo
+     * @param string $oggi data di oggi (Y-m-d)
+     * @return array{testo: string, urgente: bool}|null
+     */
+    public static function scadenzaDi(array $riga, string $oggi): ?array
+    {
+        $data = (string) ($riga['scadenza'] ?? '');
+        if ($data === '') {
+            return null;
+        }
+        $giorni = (int) floor(((int) strtotime($data) - (int) strtotime($oggi)) / 86400);
+        $quando = date('d/m', (int) strtotime($data));
+
+        return $giorni < 0 ? ['testo' => 'scaduto il ' . $quando, 'urgente' => true] : ['testo' => 'entro il ' . $quando, 'urgente' => $giorni <= self::GIORNI_SCADENZA_VICINA];
     }
 
     private static function nome(array $r): string
@@ -252,7 +278,7 @@ final class DaFarePersona
 
             return [
                 'testo' => (string) $p['titolo'], 'dettaglio' => 'carica ' . implode(' e ', $mancano) . ($s['scadenza'] !== null ? ' entro il ' . date('d/m/Y', (int) strtotime($s['scadenza'])) . ($s['scaduti'] ? ' (scaduto)' : '') : ''),
-                'link' => 'elenco_studenti.php?code=' . urlencode((string) $p['codice_prenotazione']),
+                'link' => 'elenco_studenti.php?code=' . urlencode((string) $p['codice_prenotazione']), 'scadenza' => $s['scadenza'],
                 'giorni' => max(0, (int) floor((time() - (int) strtotime((string) ($p['data_prenotazione'] ?: ($inizio ?? 'now')))) / 86400)),
             ];
         });
@@ -440,6 +466,7 @@ final class DaFarePersona
         return $this->gruppo('posto_liberato', 'Posti liberati da confermare', 'fa-hourglass-half', '#B30000', $n, $r, fn (array $x): array => [
             'testo' => (string) $x['titolo'], 'dettaglio' => 'si è liberato un posto per te' . ($x['scadenza_conferma'] ? ': conferma entro il ' . date('d/m/Y \a\l\l\e H:i', (int) strtotime((string) $x['scadenza_conferma'])) : ''),
             'link' => 'miei_eventi.php?conferma_posto=' . (int) $x['id'], 'giorni' => 0,
+            'scadenza' => $x['scadenza_conferma'] ? date('Y-m-d', (int) strtotime((string) $x['scadenza_conferma'])) : null,
         ]);
     }
 
