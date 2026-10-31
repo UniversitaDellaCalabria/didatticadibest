@@ -94,6 +94,51 @@ final class ServizioPush
         return null;
     }
 
+    /**
+     * La persona attiva gli avvisi sul dispositivo per i compiti urgenti (profilo). Ritorna l'errore o null.
+     *
+     * @param array<string, mixed> $dati
+     */
+    public function iscriviPersona(int $utenteId, array $dati, string $agente): ?string
+    {
+        if (!$this->attivo()) {
+            return 'Le notifiche non sono ancora attive sul server.';
+        }
+        $s = self::sottoscrizioneValida($dati);
+        if ($s === null) {
+            return 'Il browser non ha dato un recapito valido: riprova.';
+        }
+        $this->repo->salva($s, SottoscrizioniRepository::PERSONA, $utenteId, null, $agente, $this->adesso());
+
+        return null;
+    }
+
+    /** Questo browser è iscritto agli avvisi dei compiti per quella persona? */
+    public function iscrittoPersona(string $endpoint, int $utenteId): bool
+    {
+        $s = $this->repo->perEndpoint($endpoint);
+
+        return $s !== null && $s['ruolo'] === SottoscrizioniRepository::PERSONA && (int) $s['utente_id'] === $utenteId;
+    }
+
+    /** Persone con almeno un dispositivo iscritto agli avvisi dei compiti, con l'ultimo invio ('' se mai). @return array<int, string> id utente => ultimo invio */
+    public function personeIscritte(): array
+    {
+        $out = [];
+        foreach ($this->repo->persone() as $r) {
+            $id = (int) $r['utente_id'];
+            $out[$id] = max($out[$id] ?? '', (string) ($r['ultimo_invio_il'] ?? ''));
+        }
+
+        return $out;
+    }
+
+    /** Un avviso per la persona (tutti i suoi dispositivi iscritti). Ritorna quanti ne sono partiti. */
+    public function avvisaPersona(int $utenteId, string $titolo, string $corpo, string $link): int
+    {
+        return $this->manda($this->repo->perUtente($utenteId, SottoscrizioniRepository::PERSONA), ['titolo' => $titolo, 'corpo' => $corpo, 'url' => $link, 'tag' => 'da-fare'], 'normal');
+    }
+
     /** Toglie il recapito di questo browser. Gli operatori possono togliere solo i propri. */
     public function disiscrivi(string $endpoint, ?int $soloDiUtente = null): void
     {

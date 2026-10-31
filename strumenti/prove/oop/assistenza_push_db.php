@@ -160,3 +160,46 @@ $q("UPDATE assistenza_conversazioni SET ultimo_il = '2025-01-01 10:00:00' WHERE 
 prova($rep_pu->perEndpoint($br3['sott']['endpoint']) === null && $rep_pu->perEndpoint($br1['sott']['endpoint']) !== null, "conservazione: con la chat si cancellano i recapiti di chi ha chiesto aiuto (non quelli degli operatori)");
 
 foreach (["DELETE FROM push_sottoscrizioni", "DELETE FROM assistenza_messaggi", "DELETE FROM assistenza_conversazioni", "DELETE FROM utenti WHERE id IN (98921, 98922, 98923)"] as $sql) $q($sql);
+
+// ---------------------------------------------------------------------------
+// Avvisi sul dispositivo per i compiti in scadenza (profilo → AvvisiPush, 1.6)
+sezione("Avvisi sul dispositivo: compiti in scadenza");
+foreach (["DELETE FROM push_sottoscrizioni", "DELETE FROM prenotazioni WHERE id = 989851", "DELETE FROM turni WHERE id = 989850", "DELETE FROM eventi WHERE id = 989850", "DELETE FROM utenti WHERE id IN (989850, 989852)"] as $sql) $q($sql);
+$q("INSERT INTO utenti (id, nome, cognome, email, ruolo_id, ruoli_secondari) VALUES (989850, 'Anna', 'Avvisi', 'avvisi9898@example.org', 3, ''), (989852, 'Poco', 'Urgente', 'pocourg9898@example.org', 3, '')");
+$q("INSERT INTO eventi (id, titolo, archiviato) VALUES (989850, 'Evento avvisi 9898', 0)");
+$q("INSERT INTO turni (id, evento_id, nome_turno, data_turno) VALUES (989850, 989850, 'Turno', CURDATE() + INTERVAL 10 DAY)");
+$q("INSERT INTO prenotazioni (id, turno_id, nome, cognome, email, stato, scadenza_conferma, num_posti) VALUES (989851, 989850, 'Anna', 'Avvisi', 'avvisi9898@example.org', 'richiesta_conferma', NOW() + INTERVAL 1 DAY, 1)");
+
+$ora_av = new class implements \App\Core\Orologio {
+    public DateTimeImmutable $t;
+    public function adesso(): DateTimeImmutable { return $this->t; }
+};
+$ora_av->t = new DateTimeImmutable('now');
+$vapid_av = new ChiaviVapid($cfg, $ora_av);
+$finto->richieste = [];
+$push_av = new ServizioPush(new InvioPush($vapid_av, $finto), $rep_pu, $vapid_av, $ora_av);
+$cont_av = AppPu::per($conn);
+$av = new \App\Portale\AvvisiPush($cont_av->get(\App\Portale\DaFarePersona::class), $push_av, $cont_av->get(\App\Auth\UtenteRepository::class), $ora_av, $cont_av->get(\App\Core\Sito::class), $cont_av->get(\App\Sistema\FileEnv::class));
+
+$brA = $mk('anna-avvisi');
+$brB = $mk('poco-urgente');
+prova($push_av->iscriviPersona(989850, $brA['sott'], 'Chrome') === null && $push_av->iscriviPersona(989852, $brB['sott'], 'Chrome') === null && $push_spento->iscriviPersona(989850, $brA['sott'], 'x') !== null, "iscrizione: la persona attiva gli avvisi dal profilo (senza le chiavi del server, no)");
+prova($push_av->iscrittoPersona($brA['sott']['endpoint'], 989850) && !$push_av->iscrittoPersona($brA['sott']['endpoint'], 989852) && !$push_av->iscrittoPersona($brA['sott']['endpoint'], 98921), "iscrizione: il browser è iscritto solo per la sua persona");
+prova(array_keys($push_av->personeIscritte()) === [989850, 989852] || array_keys($push_av->personeIscritte()) === [989852, 989850], "persone iscritte: chi ha attivato gli avvisi");
+
+$r_av = $av->invia();
+$ricA = $ricevuto($brA);
+prova($r_av['inviati'] === 1 && $r_av['saltati'] === 1 && count($ricA) === 1 && ($ricA[0]['titolo'] ?? '') === 'Hai una cosa in scadenza' && str_contains((string) ($ricA[0]['url'] ?? ''), 'area_personale.php') && $ricevuto($brB) === [], "avviso: parte solo per chi ha un compito con scadenza vicina, e dice solo quante cose sono", json_encode([$r_av, $ricA]));
+$finto->richieste = [];
+$r_av2 = $av->invia();
+prova($r_av2['inviati'] === 0 && $ricevuto($brA) === [], "avviso: al massimo uno al giorno");
+prova($av->ora(new DateTimeImmutable('2026-11-02 09:00:00')) && !$av->ora(new DateTimeImmutable('2026-11-02 07:30:00')) && !$av->ora(new DateTimeImmutable('2026-11-02 20:00:00')) && !$av->ora(new DateTimeImmutable('2026-11-01 10:00:00')), "avviso: solo di giorno e nei giorni feriali");
+prova(\App\Portale\AvvisiPush::urgenti([['righe' => [['scadenza' => '2026-11-02'], ['scadenza' => '2026-11-20'], ['scadenza' => null], []]]], '2026-11-01') === 1 && \App\Portale\AvvisiPush::testo(3) === 'Hai 3 cose in scadenza', "urgenti: contano le scadenze entro tre giorni o passate");
+
+$push_av->disiscrivi($brA['sott']['endpoint'], 989852);
+prova($push_av->iscrittoPersona($brA['sott']['endpoint'], 989850), "disiscrizione: non si può togliere il recapito di un'altra persona");
+$push_av->disiscrivi($brA['sott']['endpoint'], 989850);
+prova(!$push_av->iscrittoPersona($brA['sott']['endpoint'], 989850), "disiscrizione: la persona toglie il suo");
+$rad_av = dirname(__DIR__, 3);
+prova(str_contains(file_get_contents($rad_av . '/cron_background.php'), 'AvvisiPush') && str_contains(file_get_contents($rad_av . '/profilo.php'), 'push_persona_ajax.php') && is_file($rad_av . '/push_persona_ajax.php'), "cron, profilo ed endpoint collegati");
+foreach (["DELETE FROM push_sottoscrizioni", "DELETE FROM prenotazioni WHERE id = 989851", "DELETE FROM turni WHERE id = 989850", "DELETE FROM eventi WHERE id = 989850", "DELETE FROM utenti WHERE id IN (989850, 989852)"] as $sql) $q($sql);

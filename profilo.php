@@ -194,6 +194,41 @@ echo ui_tema_script();
             </div>
             <?php endif; ?>
 
+            <?php if (\App\Core\App::per($conn)->get(\App\Assistenza\Push\ServizioPush::class)->attivo()): ?>
+            <!-- Avvisi sul dispositivo per i compiti in scadenza -->
+            <div class="card shadow-sm border-0 mb-4" id="avvisi-dispositivo">
+                <div class="card-header fw-bold"><i class="fa fa-bell me-2 text-secondary" aria-hidden="true"></i>Avvisi sul dispositivo</div>
+                <div class="card-body">
+                    <p class="small text-secondary mb-2">Ricevi una notifica su questo dispositivo quando una cosa da fare sta per scadere (al massimo una al giorno, nei giorni feriali). Non dice nulla di personale: basta toccarla per aprire «Da fare per te».</p>
+                    <div id="pushPersonaStato" class="small mb-2" aria-live="polite"></div>
+                    <button type="button" class="btn btn-outline-primary btn-sm fw-bold" id="pushPersonaBtn" hidden>Attiva gli avvisi</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="pushPersonaProva" hidden>Manda una prova</button>
+                </div>
+            </div>
+            <script src="assets/js/assistenza-push.js"></script>
+            <script>
+            (function () {
+                var btn = document.getElementById('pushPersonaBtn'), prova = document.getElementById('pushPersonaProva'), st = document.getElementById('pushPersonaStato'), P = window.AssistenzaPush;
+                var csrf = <?php echo json_encode(csrf_token()); ?>, chiave = '', iscritto = false, endpoint = '';
+                if (!P || !P.supportato()) { st.textContent = 'Questo browser non supporta le notifiche (su iPhone servono l\'app installata e iOS recente).'; return; }
+                function chiama(dati) { var b = new URLSearchParams(Object.assign({ csrf_token: csrf }, dati)); return fetch('push_persona_ajax.php', { method: 'POST', body: b, credentials: 'same-origin' }).then(function (r) { return r.json(); }); }
+                function mostra() { btn.hidden = false; btn.textContent = iscritto ? 'Disattiva gli avvisi' : 'Attiva gli avvisi'; prova.hidden = !iscritto; st.textContent = iscritto ? 'Gli avvisi sono attivi su questo dispositivo.' : 'Gli avvisi non sono attivi su questo dispositivo.'; }
+                P.stato().then(function (s) {
+                    endpoint = s.sottoscrizione ? s.sottoscrizione.endpoint : '';
+                    return fetch('push_persona_ajax.php?endpoint=' + encodeURIComponent(endpoint), { credentials: 'same-origin' }).then(function (r) { return r.json(); });
+                }).then(function (j) { chiave = j.chiave || ''; iscritto = !!j.iscritto; mostra(); });
+                btn.addEventListener('click', function () {
+                    btn.disabled = true;
+                    var op = iscritto
+                        ? P.disiscrivi().then(function (e) { return chiama({ azione: 'disiscrivi', endpoint: e || endpoint }); }).then(function () { iscritto = false; })
+                        : P.iscrivi(chiave).then(function (s) { endpoint = s.endpoint; return chiama({ azione: 'iscrivi', sottoscrizione: JSON.stringify(s.toJSON()) }); }).then(function (j) { if (!j.ok) throw new Error(j.errore); iscritto = true; });
+                    op.then(mostra).catch(function (e) { st.textContent = e.message || 'Non è stato possibile.'; }).then(function () { btn.disabled = false; });
+                });
+                prova.addEventListener('click', function () { chiama({ azione: 'prova' }).then(function (j) { st.textContent = j.ok ? 'Prova inviata: dovresti vederla subito.' : (j.errore || 'Prova non riuscita.'); }); });
+            })();
+            </script>
+            <?php endif; ?>
+
             <!-- Email -->
             <div class="card shadow-sm border-0 mb-4">
                 <div class="card-header fw-bold" id="email"><i class="fa fa-envelope me-2 text-secondary"></i>Indirizzo email</div>

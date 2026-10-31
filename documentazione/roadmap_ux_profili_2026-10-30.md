@@ -179,6 +179,7 @@ lato docente; bozze delle pratiche; percorsi a passi per convenzione FSL e conve
 ### 1.6 Notifiche sul telefono (facoltativo, dopo 1.2)
 - **Soluzione.** Riutilizzare le notifiche push già fatte per l'assistenza (`src/Assistenza/Push`) per un avviso quando nasce un compito urgente (firma, posto liberato).
   Interruttore nel profilo. Serve anche a chi non ha email.
+- **Stato 1/11/2026: FATTO (nessuna modifica allo schema).** Decisione: solo scadenze vicine. `ServizioPush::iscriviPersona/avvisaPersona` (ruolo `persona`), `src/Portale/AvvisiPush.php` (cron 1j-bis: giorni feriali 8-20, al massimo uno al giorno, solo se c'è una scadenza entro 3 giorni o passata; il testo dice quante cose, non quali; `AVVISI_PUSH=0` lo spegne), `push_persona_ajax.php` e scheda «Avvisi sul dispositivo» in `profilo.php` (compare solo se le chiavi VAPID del server ci sono). Prove in `assistenza_push_db.php`. Da verificare sul server con un dispositivo vero (il pulsante «Manda una prova»).
 - **Peso.** M.
 
 ---

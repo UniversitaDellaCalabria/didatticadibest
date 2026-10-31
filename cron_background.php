@@ -162,6 +162,11 @@ if (date('N') >= 1) {
 echo \App\Core\App::get(\App\Portale\RiepilogoPersone::class)->cron();
 
 // =========================================================================
+// TASK 1j-bis: AVVISI SUL DISPOSITIVO (push) per i compiti in scadenza, solo a chi li ha attivati dal profilo, al massimo uno al giorno. AVVISI_PUSH=0 li spegne.
+// =========================================================================
+echo \App\Core\App::get(\App\Portale\AvvisiPush::class)->cron();
+
+// =========================================================================
 // TASK 1k: CONVENZIONI DI TESI CON ENTI E AZIENDE: promemoria alle aziende ferme (ogni 7 giorni, fino a 120 giorni dall'invito) e avviso di scadenza
 // (60 giorni prima) all'azienda e all'ufficio, una volta sola
 // =========================================================================

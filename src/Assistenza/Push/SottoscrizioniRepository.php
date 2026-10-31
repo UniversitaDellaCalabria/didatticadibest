@@ -12,6 +12,7 @@ final class SottoscrizioniRepository
 {
     public const OPERATORE = 'operatore';
     public const UTENTE = 'utente';
+    public const PERSONA = 'persona';   // chi attiva gli avvisi sul dispositivo per i compiti urgenti di «Da fare per te» (dal profilo)
     /** Dopo tanti invii falliti di fila una sottoscrizione si elimina. */
     public const MAX_ERRORI = 5;
 
@@ -59,6 +60,12 @@ final class SottoscrizioniRepository
     public function operatori(): array
     {
         return Righe::testo($this->db->righe("SELECT * FROM push_sottoscrizioni WHERE ruolo = 'operatore'"));
+    }
+
+    /** @return list<array<string, string|null>> i dispositivi iscritti agli avvisi dei compiti (una riga per dispositivo) */
+    public function persone(): array
+    {
+        return Righe::testo($this->db->righe("SELECT * FROM push_sottoscrizioni WHERE ruolo = 'persona' AND utente_id IS NOT NULL"));
     }
 
     /** @return list<array<string, string|null>> */
