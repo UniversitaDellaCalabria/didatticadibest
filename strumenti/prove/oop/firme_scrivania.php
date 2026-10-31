@@ -46,3 +46,12 @@ prova(count($scrivania->fonti()) === 5, "scrivania: le cinque fonti (pratiche, c
 
 foreach (["DELETE FROM tutorato_incarichi WHERE bando_id = 9896", "DELETE FROM tutorato_bandi WHERE id = 9896", "DELETE FROM didattica_sedute WHERE id = 98961"] as $sql) $q($sql);
 @unlink($pdf_verbale);
+
+// ---- Pagina e riquadro ----
+sezione("Scrivania delle firme — pagina e riquadro");
+$cat_fi = \App\Portale\Area\CatalogoRiquadri::sistema()['firme'] ?? null;
+prova($cat_fi !== null && $cat_fi['tipo'] === \App\Portale\Area\CatalogoRiquadri::SPECIALE && is_file($radice . '/inc/area/firme.php'), "riquadro «Da firmare»: nel catalogo e con il suo file in inc/area");
+$pag_fi = (string) file_get_contents($radice . '/firme.php');
+prova(str_contains($pag_fi, 'ScrivaniaFirme') && str_contains($pag_fi, 'linkFirma') && str_contains($pag_fi, 'linkPdf()'), "firme.php: legge la scrivania e porta alla pagina di firma e all'anteprima");
+$cru_fi = (string) file_get_contents($radice . '/cruscotto_direttore.php');
+prova(str_contains($cru_fi, 'Firma ora (') && str_contains($cru_fi, 'firme.php'), "cruscotto del Direttore: pulsante «Firma ora (N)»");

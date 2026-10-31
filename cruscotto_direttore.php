@@ -30,6 +30,10 @@ require_once 'header.php';
             <div class="text-secondary small">Le cose che aspettano la tua firma o che si sono fermate, in tutti i moduli del portale · aggiornato alle <?php echo date('H:i'); ?></div></div>
         <span class="ms-auto badge rounded-pill text-bg-<?php echo $tot ? 'warning' : 'success'; ?> fs-6"><?php echo $tot ? $tot . ' da guardare' : 'Tutto in ordine'; ?></span>
     </div>
+    <?php $da_firmare_c = 0; try { $da_firmare_c = count(\App\Core\App::per($conn)->get(\App\Firme\ScrivaniaFirme::class)->documenti($user_info ?? null)); } catch (\Throwable $e_c) { error_log('[Cruscotto] firme non disponibili: ' . $e_c->getMessage()); }
+    if ($da_firmare_c > 0): ?>
+    <div class="alert alert-danger d-flex flex-wrap gap-2 align-items-center py-2"><i class="fa fa-file-signature" aria-hidden="true"></i><span><?php echo $da_firmare_c === 1 ? 'Un documento aspetta la tua firma' : $da_firmare_c . ' documenti aspettano la tua firma'; ?>.</span><a class="btn btn-sm btn-danger fw-bold ms-auto" href="firme.php">Firma ora (<?php echo $da_firmare_c; ?>)</a></div>
+    <?php endif; ?>
     <?php $dz_c = \App\Core\App::per($conn)->get(\App\Uffici\Direzione::class); $ass_c = $dz_c->assenza(); $firma_c = $dz_c->chiFirma(); ?>
     <div class="alert alert-<?php echo $ass_c['attiva'] ? 'warning' : 'light border'; ?> small d-flex flex-wrap gap-2 align-items-center py-2">
         <i class="fa fa-user-clock" aria-hidden="true"></i>

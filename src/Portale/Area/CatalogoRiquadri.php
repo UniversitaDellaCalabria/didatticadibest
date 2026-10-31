@@ -32,6 +32,8 @@ final class CatalogoRiquadri
         return [
             'da_fare' => ['tipo' => self::SPECIALE, 'titolo' => 'Da fare per te', 'descrizione' => 'Le cose che aspettano la persona nei vari moduli: firme, conferme, registri, pratiche da lavorare', 'icona' => 'fa-list-check', 'colore' => '#b45309',
                 'profili' => self::TUTTI, 'ordine' => 10],
+            'firme' => ['tipo' => self::SPECIALE, 'titolo' => 'Da firmare', 'descrizione' => 'I documenti che aspettano la tua firma in tutti i moduli (pratiche, convenzioni, lettere di tutorato, verbali), in una scrivania sola; compare solo a chi ha qualcosa da firmare', 'icona' => 'fa-file-signature', 'colore' => '#0f766e',
+                'profili' => self::TUTTI, 'ordine' => 12],
             'lavoro' => ['tipo' => self::SPECIALE, 'titolo' => 'Il mio lavoro', 'descrizione' => 'Per chi gestisce qualcosa: una tessera per ogni postazione (pratiche, protocollo, sedute, convenzioni, tutorato, assistenza, aree) con i numeri e i pulsanti sulla vista giusta; compare solo a chi ha almeno una postazione', 'icona' => 'fa-briefcase', 'colore' => '#1e293b',
                 'profili' => [Profili::DOCENTE, Profili::DIRETTORE, Profili::PERSONALE, Profili::GESTORE, Profili::AMMINISTRATORE], 'ordine' => 15],
             'cruscotto_direttore' => ['tipo' => self::SPECIALE, 'titolo' => 'Cruscotto del Direttore', 'descrizione' => 'Firme e cose ferme in tutti i moduli', 'icona' => 'fa-gauge-high', 'colore' => '#0f2a4a',
