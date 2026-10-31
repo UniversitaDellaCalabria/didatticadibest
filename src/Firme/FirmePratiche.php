@@ -6,12 +6,29 @@ namespace App\Firme;
 
 use App\Core\Database;
 use App\Didattica\FirmaPratica;
+use App\Didattica\ServizioFlussoConvalide;
+use App\Didattica\StoricoPratica;
 
 /** Documenti delle pratiche degli studenti (tesi, attestati, certificati) che aspettano la firma della persona collegata. */
 final class FirmePratiche implements FonteFirme
 {
-    public function __construct(private Database $db, private FirmaPratica $firma)
+    public function __construct(private Database $db, private FirmaPratica $firma, private ServizioFlussoConvalide $flusso, private StoricoPratica $storico)
     {
+    }
+
+    /** Registra il PDF firmato e, come fa la pagina di firma, fa proseguire la pratica al passo successivo dell'iter. */
+    private function carica(array $f, string $pdf): ?string
+    {
+        $err = $this->firma->caricaFirmato($f, $pdf);
+        if ($err !== null) {
+            return $err;
+        }
+        [$e2] = $this->flusso->trasmettiAlPasso((int) $f['pratica_id'], (int) $f['passo'], 0, (string) ($f['nome'] ?: 'Firmatario'));
+        if ($e2) {
+            $this->storico->evento((int) $f['pratica_id'], 'messaggio', 'ufficio', 0, null, 'Dopo la firma: ' . $e2, null, null, true);
+        }
+
+        return null;
     }
 
     public function tipo(): string
@@ -44,7 +61,8 @@ final class FirmePratiche implements FonteFirme
                 max(0, (int) $r['gg']),
                 'firma_pratica.php?t=' . urlencode((string) $r['token']),
                 $this->firma->pdfDaFirmare($r),
-                DocumentoDaFirmare::nomeSicuro($this->tipo(), (int) $r['id'], (string) $r['codice'])
+                DocumentoDaFirmare::nomeSicuro($this->tipo(), (int) $r['id'], (string) $r['codice']),
+                fn (string $pdf): ?string => $this->carica($r, $pdf)
             );
         }
 

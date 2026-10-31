@@ -43,7 +43,8 @@ final class FirmeConvenzioniTesi implements FonteFirme
                 max(0, (int) $r['gg']),
                 'firma_convenzione_tesi.php?t=' . urlencode((string) $r['token_direttore']),
                 $this->servizio->pdfDaFirmare($r),
-                DocumentoDaFirmare::nomeSicuro($this->tipo(), (int) $r['id'], '')
+                DocumentoDaFirmare::nomeSicuro($this->tipo(), (int) $r['id'], ''),
+                fn (string $pdf): ?string => $this->servizio->caricaFirmatoDirettore($r, $pdf)
             );
         }
 

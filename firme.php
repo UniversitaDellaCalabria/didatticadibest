@@ -41,6 +41,29 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['azione'] ?? '') ==
     }
 }
 
+// Ricarica dei PDF firmati (uno o più, anche in uno ZIP): ogni file si abbina al documento dal nome e si registra come nella pagina di firma
+$esiti_fi = [];
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['azione'] ?? '') === 'carica') {
+    csrf_verify($_POST['csrf_token'] ?? '');
+    $caricati_fi = [];
+    $up_fi = $_FILES['firmati'] ?? null;
+    foreach ((array) ($up_fi['name'] ?? []) as $k_fi => $nome_fi) {
+        if (($up_fi['error'][$k_fi] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK && is_uploaded_file((string) $up_fi['tmp_name'][$k_fi])) {
+            $caricati_fi[] = ['nome' => (string) $nome_fi, 'percorso' => (string) $up_fi['tmp_name'][$k_fi]];
+        }
+    }
+    if (!$caricati_fi) {
+        $errore_fi = 'Scegli i PDF firmati (o lo ZIP) da caricare.';
+    } else {
+        $ric_fi = \App\Core\App::per($conn)->get(\App\Firme\RicaricaFirmati::class);
+        $esiti_fi = $ric_fi->registra($documenti_fi, $ric_fi->espandi($caricati_fi), (int) ($user_info['id'] ?? 0));
+        if (array_filter($esiti_fi, static fn ($e): bool => $e['ok'])) {
+            // L'elenco si rilegge: i documenti firmati non aspettano più
+            try { $documenti_fi = $scrivania_fi->documenti($user_info ?? null); } catch (\Throwable $e_fi2) { error_log('[Firme] rilettura: ' . $e_fi2->getMessage()); }
+        }
+    }
+}
+
 // Filtri per tipo di documento, con il loro conteggio
 $etichette_fi = [];
 $conteggi_fi = [];
@@ -76,6 +99,14 @@ echo ui_tema_script();
                 <a href="firme.php?tipo=<?php echo urlencode($tipo_fi); ?>" class="btn btn-sm <?php echo $filtro_fi === $tipo_fi ? 'btn-danger' : 'btn-outline-danger'; ?> fw-bold"><?php echo $h($etichette_fi[$tipo_fi] ?? $tipo_fi); ?> <span class="ui-badge-rosso ms-1"><?php echo $n_fi; ?></span></a>
             <?php endforeach; ?>
         </div>
+        <?php if ($esiti_fi): $ok_fi = count(array_filter($esiti_fi, static fn ($e): bool => $e['ok'])); ?>
+            <div class="card border-0 shadow-sm mb-3" style="border-radius: 12px;"><div class="card-body">
+                <h2 class="h6 fw-bold mb-2"><?php echo $ok_fi; ?> su <?php echo count($esiti_fi); ?> firme registrate</h2>
+                <?php foreach ($esiti_fi as $e_fi): ?>
+                    <div class="fi-riga small"><i class="fa <?php echo $e_fi['ok'] ? 'fa-circle-check text-success' : 'fa-circle-xmark text-danger'; ?> me-1" aria-hidden="true"></i><strong><?php echo $h($e_fi['file']); ?></strong><?php echo $e_fi['titolo'] !== '' ? ' · ' . $h($e_fi['titolo']) : ''; ?><span class="d-block text-secondary"><?php echo $h($e_fi['messaggio']); ?></span></div>
+                <?php endforeach; ?>
+            </div></div>
+        <?php endif; ?>
         <?php if ($errore_fi !== ''): ?><div class="alert alert-warning py-2"><?php echo $h($errore_fi); ?></div><?php endif; ?>
         <div class="row g-3">
             <div class="col-lg-6">
@@ -108,6 +139,14 @@ echo ui_tema_script();
                     <?php endforeach; ?>
                 </div></div>
                 </form>
+                <form method="post" action="firme.php" enctype="multipart/form-data" class="card border-0 shadow-sm mt-3 d-print-none" style="border-radius: 12px;"><div class="card-body">
+                    <?php csrf_field(); ?>
+                    <input type="hidden" name="azione" value="carica">
+                    <h2 class="h6 fw-bold mb-1"><i class="fa fa-upload me-1" aria-hidden="true"></i>Carica i firmati</h2>
+                    <p class="small text-secondary mb-2">Dopo aver firmato i PDF sul tuo computer (firma PAdES), caricali qui: uno per uno, tanti insieme o in uno ZIP. Tieni i nomi originali (puoi aggiungere un suffisso come «_signed»): il portale li abbina da solo ai documenti e controlla che siano gli stessi PDF con la tua firma in più.</p>
+                    <div class="d-flex flex-wrap gap-2"><input type="file" name="firmati[]" class="form-control form-control-sm" style="max-width: 320px;" accept=".pdf,.zip,application/pdf,application/zip" multiple required>
+                        <button type="submit" class="btn btn-sm btn-danger fw-bold">Carica e registra</button></div>
+                </div></form>
                 <p class="small text-secondary mt-2 mb-0">«Firma» apre la pagina del documento, dove puoi firmare con la firma remota o scaricare il PDF, firmarlo sul tuo computer e ricaricarlo; con «Scarica i selezionati» ne prendi più d'uno in un solo ZIP, con i nomi che servono per ricaricarli. I più fermi stanno in alto.</p>
             </div>
             <div class="col-lg-6">

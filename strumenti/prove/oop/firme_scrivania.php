@@ -74,3 +74,40 @@ prova(\App\Firme\PacchettoFirme::crea([$mk_fi('pratica', 3, null)])['percorso'] 
 @unlink($f1_fi); @unlink($f2_fi);
 $pag2_fi = (string) file_get_contents($radice . '/firme.php');
 prova(str_contains($pag2_fi, "csrf_verify") && str_contains($pag2_fi, 'PacchettoFirme::scelti($documenti_fi'), "firme.php: lo ZIP vale solo per i documenti dell'elenco e con il controllo CSRF");
+
+// ---- Ricarica dei firmati ----
+sezione("Scrivania delle firme — ricarica dei firmati");
+prova(array_filter($d, fn($x) => $x->registra === null) === [] && array_filter($dv, fn($x) => $x->registra === null) === [], "ricarica: ogni documento della scrivania sa come registrare il suo PDF firmato");
+$chiavi_fi = ['verbale_98961_20261001.pdf' => 'verbale_98961', 'tutorato-lettera_5_TU-1_signed.pdf' => 'tutorato-lettera_5', 'convenzione_tesi_7.pdf' => 'convenzione_tesi_7', 'Pratica_12_PR-1-firmato.PDF' => 'pratica_12',
+    'convenzione_tesi_70_x.pdf' => 'convenzione_tesi_70', 'documento.pdf' => null, 'verbale.pdf' => null, 'C:\temp\pratica_3_a.pdf' => 'pratica_3'];
+$sbagliate_fi = [];
+foreach ($chiavi_fi as $nome_k => $att_k) { if (\App\Firme\DocumentoDaFirmare::chiaveDaNome($nome_k) !== $att_k) $sbagliate_fi[] = $nome_k; }
+prova($sbagliate_fi === [], "ricarica: il nome del file dice di quale documento si tratta, con o senza suffisso", implode(', ', $sbagliate_fi));
+
+$ric_fi = \App\Core\App::per($conn)->get(\App\Firme\RicaricaFirmati::class);
+$reg_fi = new \ArrayObject();
+$mk2_fi = fn(string $tipo, int $id, ?string $err) => new \App\Firme\DocumentoDaFirmare($tipo, $id, 'Doc ' . $tipo . $id, '', 1, 'firma_x.php?t=a', null, \App\Firme\DocumentoDaFirmare::nomeSicuro($tipo, $id, 'C'),
+    function (string $pdf) use ($reg_fi, $tipo, $id, $err): ?string { $reg_fi[] = $tipo . $id . ':' . strlen($pdf); return $err; });
+$docs_fi = [$mk2_fi('verbale', 1, null), $mk2_fi('pratica', 2, 'Il PDF non è quello da firmare.'), $mk2_fi('tutorato', 3, null)];
+$file_fi = [
+    ['nome' => 'verbale_1_C_signed.pdf', 'dati' => "%PDF-1.4\nok", 'errore' => null],
+    ['nome' => 'pratica_2_C.pdf', 'dati' => "%PDF-1.4\nx", 'errore' => null],
+    ['nome' => 'verbale_1_C.pdf', 'dati' => "%PDF-1.4\naltro", 'errore' => null],
+    ['nome' => 'verbale_9_C.pdf', 'dati' => "%PDF-1.4\n", 'errore' => null],
+    ['nome' => 'misterioso.pdf', 'dati' => "%PDF-1.4\n", 'errore' => null],
+    ['nome' => 'tutorato_3_C.pdf', 'dati' => 'non un pdf', 'errore' => null],
+    ['nome' => 'rotto.zip', 'dati' => null, 'errore' => 'Lo ZIP non si apre.'],
+];
+$es_fi = $ric_fi->registra($docs_fi, $file_fi, 0);
+prova(array_column($es_fi, 'ok') === [true, false, false, false, false, false, false] && $reg_fi->getArrayCopy() === ['verbale1:11', 'pratica2:10'], "ricarica: ogni file ha il suo esito e solo i file giusti vengono registrati", json_encode([array_column($es_fi, 'ok'), $reg_fi]));
+prova($es_fi[1]['messaggio'] === 'Il PDF non è quello da firmare.' && str_contains($es_fi[2]['messaggio'], 'già caricato') && str_contains($es_fi[3]['messaggio'], 'aspettano la tua firma') && str_contains($es_fi[4]['messaggio'], 'nome del file') && $es_fi[5]['messaggio'] === 'Non è un PDF.', "ricarica: i messaggi spiegano perché un file non è stato accettato", json_encode(array_column($es_fi, 'messaggio')));
+
+$zf_fi = tempnam(sys_get_temp_dir(), 'rz'); $pf_fi = tempnam(sys_get_temp_dir(), 'rp'); $xf_fi = tempnam(sys_get_temp_dir(), 'rx');
+file_put_contents($pf_fi, "%PDF-1.4\nsingolo\n"); file_put_contents($xf_fi, 'x');
+$zz_fi = new \ZipArchive(); $zz_fi->open($zf_fi, \ZipArchive::OVERWRITE);
+$zz_fi->addFromString('cartella/verbale_1_C_signed.pdf', "%PDF-1.4\ndentro"); $zz_fi->addFromString('__MACOSX/._x.pdf', 'x'); $zz_fi->addFromString('letto.txt', 'x'); $zz_fi->addFromString('.nascosto.pdf', 'x'); $zz_fi->close();
+$ex_fi = $ric_fi->espandi([['nome' => 'firmati.zip', 'percorso' => $zf_fi], ['nome' => 'C:\Users\a\pratica_2_C.pdf', 'percorso' => $pf_fi], ['nome' => 'cosa.p7m', 'percorso' => $xf_fi]]);
+prova(count($ex_fi) === 4 && $ex_fi[0]['nome'] === 'verbale_1_C_signed.pdf' && $ex_fi[0]['dati'] === "%PDF-1.4\ndentro" && $ex_fi[1]['errore'] !== null && $ex_fi[2]['nome'] === 'pratica_2_C.pdf' && $ex_fi[3]['errore'] !== null && str_contains($ex_fi[3]['errore'], 'p7m'), "ricarica: lo ZIP si apre nei suoi PDF (senza cartelle e file nascosti), il .p7m è rifiutato", json_encode(array_map(fn($e) => [$e['nome'], $e['errore']], $ex_fi)));
+@unlink($zf_fi); @unlink($pf_fi); @unlink($xf_fi);
+$pag3_fi = (string) file_get_contents($radice . '/firme.php');
+prova(str_contains($pag3_fi, "'carica'") && str_contains($pag3_fi, 'RicaricaFirmati') && substr_count($pag3_fi, 'csrf_verify') === 2 && str_contains($pag3_fi, 'enctype="multipart/form-data"'), "firme.php: modulo «Carica i firmati» con CSRF");

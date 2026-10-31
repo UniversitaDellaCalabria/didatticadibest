@@ -44,7 +44,8 @@ final class FirmeConvenzioniFsl implements FonteFirme
                 max(0, (int) $r['gg']),
                 'firma_convenzione.php?t=' . urlencode((string) $r['token_direttore']),
                 $this->firma->pdfDaFirmare($r),
-                DocumentoDaFirmare::nomeSicuro($this->tipo(), (int) $r['id'], (string) $r['scuola_codice'])
+                DocumentoDaFirmare::nomeSicuro($this->tipo(), (int) $r['id'], (string) $r['scuola_codice']),
+                fn (string $pdf): ?string => $this->firma->caricaFirmato($r, $pdf)
             );
         }
 

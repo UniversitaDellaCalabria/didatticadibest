@@ -44,7 +44,8 @@ final class FirmeVerbali implements FonteFirme
                 max(0, (int) $s['gg']),
                 'firma_verbale.php?t=' . urlencode((string) $s['verbale_token']),
                 $this->verbali->percorso($s),
-                DocumentoDaFirmare::nomeSicuro($this->tipo(), (int) $s['id'], $quando ? date('Ymd', $quando) : '')
+                DocumentoDaFirmare::nomeSicuro($this->tipo(), (int) $s['id'], $quando ? date('Ymd', $quando) : ''),
+                fn (string $pdf): ?string => $this->verbali->registraFirma((int) $s['id'], $pdf, 'PDF firmato caricato')
             );
         }
 

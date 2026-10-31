@@ -19,7 +19,22 @@ final class DocumentoDaFirmare
         public readonly ?string $percorso,
         /** Nome univoco del file per lo scarico in blocco e l'abbinamento alla ricarica: <tipo>_<id>_<codice>.pdf */
         public readonly string $nomeFile,
+        /** Registra il PDF firmato caricato (stessa logica della pagina di firma del modulo): torna il messaggio d'errore, null se la firma è registrata. */
+        public readonly ?\Closure $registra = null,
     ) {
+    }
+
+    /** Chiave per abbinare un file al documento: la parte del nome fino al numero («tutorato-lettera_5»), qualunque cosa segua (codice, «_signed»…). */
+    public static function chiaveDaNome(string $nomeFile): ?string
+    {
+        $base = (string) preg_replace('/\.pdf$/i', '', basename(str_replace('\\', '/', $nomeFile)));
+
+        return preg_match('/^([a-z]+(?:_[a-z]+)*(?:-[a-z]+)?_\d+)(?:[_\- .].*)?$/i', $base, $m) ? strtolower($m[1]) : null;
+    }
+
+    public function chiave(): string
+    {
+        return (string) self::chiaveDaNome($this->nomeFile);
     }
 
     /** Anteprima del PDF: la stessa pagina di firma con ?pdf=1. */
