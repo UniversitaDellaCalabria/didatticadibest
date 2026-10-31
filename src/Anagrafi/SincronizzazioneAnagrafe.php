@@ -147,7 +147,7 @@ final class SincronizzazioneAnagrafe
 
     /**
      * Insegnamenti di tutto l'Ateneo (o di un solo dipartimento) tenuti dall'anno accademico 2026/2027 (o in corso, se precedente)
-     * fino al successivo a quello in corso. Nelle API "academic_year" è la coorte (anno di immatricolazione) e ogni coorte elenca
+     * e tutti gli anni successivi che le API già pubblicano (coorti fino a 5 anni avanti). Nelle API "academic_year" è la coorte (anno di immatricolazione) e ogni coorte elenca
      * tutto il suo percorso: l'insegnamento si tiene nell'anno coorte + anno di corso - 1. Si scaricano le coorti degli ultimi
      * 6 anni; l'intero percorso di ogni coorte va anche nel catalogo dei moduli. I CFU (solo nel dettaglio) si completano a parte
      * (ServizioCatalogo::completaDettagli). Ritorna quanti ne sono arrivati, null se le API non rispondono.
@@ -157,7 +157,7 @@ final class SincronizzazioneAnagrafe
         $aa = $this->catalogo->annoCorrente();
         $dal = min($aa, InsegnamentoRepository::PRIMO_ANNO_ARCHIVIO);
         $elenchi = [];
-        for ($coorte = $aa - 5; $coorte <= $aa + 1; $coorte++) {
+        for ($coorte = $aa - 5; $coorte <= $aa + 5; $coorte++) {
             $el = $this->api->tutte('activities/', ($dip !== null ? ['department' => $dip] : []) + ['academic_year' => $coorte]);
             if ($el === null) {
                 return null;
@@ -177,7 +177,7 @@ final class SincronizzazioneAnagrafe
                     $perCorso[$x['cds_cod']][] = $r;
                 }
                 $erog = $coorte + max(1, (int) ($r['StudyActivityYear'] ?? 1)) - 1;
-                if ($erog < $dal || $erog > $aa + 1) {
+                if ($erog < $dal) {
                     continue;
                 }
                 $x = $x + ['anno_accademico' => $erog, 'coorte' => $coorte];
