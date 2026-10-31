@@ -9,6 +9,12 @@ error_reporting(E_ALL);
 
 require_once __DIR__ . '/middleware.php';
 
+// Le finestre di ogni prenotazione (chat e modifica) non stanno nella pagina: si caricano alla prima apertura (?modale=chat-ID oppure mod-ID).
+// La pagina si disegna per intero in un buffer e si risponde solo con la finestra chiesta: stessi dati e stessi controlli di sempre.
+$modale_richiesta = preg_match('/^(chat|mod)-(\d+)$/', (string)($_GET['modale'] ?? ''), $m_rich) ? $m_rich[0] : '';
+$modali_differite = [];
+if ($modale_richiesta !== '') ob_start();
+
 // =======================================================================
 // AZIONE: ANNULLA UNA PRENOTAZIONE DI AULA, LABORATORIO O SPORTELLO (Calendari e risorse)
 // =======================================================================
@@ -358,7 +364,7 @@ echo ui_tema_script();
                                         ?>
                                     </div>
                                     <div class="azioni-desktop">
-                                        <button type="button" class="btn btn-outline-secondary btn-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modChatStudente<?php echo $pr['id']; ?>">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm fw-bold" data-modale="chat-<?php echo $pr['id']; ?>">
                                             <i class="fa fa-comments me-1"></i>Assistenza<?php if ($unread > 0): ?> <span class="badge bg-danger"><?php echo $unread; ?></span><?php endif; ?>
                                         </button>
                                         <?php if ($st !== 'rifiutata'): ?>
@@ -368,7 +374,7 @@ echo ui_tema_script();
                                         <?php endif; ?>
                                         <?php echo pulsanti_attestato_pr($conn, $pr); ?>
                                         <?php if ($st !== 'annullata' && $st !== 'rifiutata'): ?>
-                                        <button type="button" class="btn btn-sm fw-bold text-white" style="background:<?php echo $col_p; ?>;border:none;" data-bs-toggle="modal" data-bs-target="#modEditUser<?php echo $pr['id']; ?>">
+                                        <button type="button" class="btn btn-sm fw-bold text-white" style="background:<?php echo $col_p; ?>;border:none;" data-modale="mod-<?php echo $pr['id']; ?>">
                                             <i class="fa fa-edit me-1"></i>Modifica
                                         </button>
                                         <?php if (!$bloccata_pr): ?>
@@ -386,6 +392,7 @@ echo ui_tema_script();
                         </div>
 
                         <!-- MODALE CHAT STUDENTE -->
+                        <?php ob_start(); ?>
                         <div class="modal fade" id="modChatStudente<?php echo $pr['id']; ?>" tabindex="-1">
                             <div class="modal-dialog modal-lg">
                                 <div class="modal-content shadow-lg border-0">
@@ -441,8 +448,10 @@ echo ui_tema_script();
                                 </div>
                             </div>
                         </div>
+                        <?php $modali_differite['chat-' . $pr['id']] = ob_get_clean(); ?>
 
                         <!-- MODALE MODIFICA UTENTE -->
+                        <?php ob_start(); ?>
                         <div class="modal fade" id="modEditUser<?php echo $pr['id']; ?>" tabindex="-1">
                             <div class="modal-dialog modal-dialog-centered modal-lg">
                                 <div class="modal-content shadow-lg border-0" style="border-radius: 12px;">
@@ -528,6 +537,7 @@ echo ui_tema_script();
                                 </div>
                             </div>
                         </div>
+                        <?php $modali_differite['mod-' . $pr['id']] = ob_get_clean(); ?>
 
                     <?php endforeach; ?>
                 </div>
@@ -576,7 +586,7 @@ echo ui_tema_script();
                                 </div>
 
                                 <div class="azioni-desktop">
-                                    <button type="button" class="btn btn-outline-secondary btn-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modChatStudente<?php echo $pr['id']; ?>">
+                                    <button type="button" class="btn btn-outline-secondary btn-sm fw-bold" data-modale="chat-<?php echo $pr['id']; ?>">
                                         <i class="fa fa-comments me-1"></i>Assistenza<?php if ($unread > 0): ?> <span class="badge bg-danger"><?php echo $unread; ?></span><?php endif; ?>
                                     </button>
                                     <?php if ($st !== 'rifiutata'): ?>
@@ -590,6 +600,7 @@ echo ui_tema_script();
                         </div>
 
                         <!-- MODALE CHAT STUDENTE -->
+                        <?php ob_start(); ?>
                         <div class="modal fade" id="modChatStudente<?php echo $pr['id']; ?>" tabindex="-1">
                             <div class="modal-dialog modal-lg">
                                 <div class="modal-content shadow-lg border-0">
@@ -645,6 +656,7 @@ echo ui_tema_script();
                                 </div>
                             </div>
                         </div>
+                        <?php $modali_differite['chat-' . $pr['id']] = ob_get_clean(); ?>
 
                     <?php endforeach; ?>
                 </div>
@@ -824,4 +836,24 @@ function apriFinestraAnnulla(btn) {
 })();
 </script>
 
+<?php if ($modale_richiesta !== '') { while (ob_get_level()) ob_end_clean(); header('Content-Type: text/html; charset=utf-8'); header('Cache-Control: no-store'); echo $modali_differite[$modale_richiesta] ?? ''; exit; } ?>
+<script>
+(function () {
+    // Finestre di chat e modifica: si scaricano alla prima apertura (vedi ?modale=…) invece di stare tutte nella pagina
+    document.addEventListener('click', function (e) {
+        var b = e.target.closest ? e.target.closest('[data-modale]') : null;
+        if (!b) return;
+        e.preventDefault();
+        var k = b.getAttribute('data-modale'), id = (k.indexOf('chat-') === 0 ? 'modChatStudente' : 'modEditUser') + k.split('-')[1];
+        function apri() { var el = document.getElementById(id); if (el && window.bootstrap) window.bootstrap.Modal.getOrCreateInstance(el).show(); }
+        if (document.getElementById(id)) { apri(); return; }
+        b.disabled = true;
+        fetch('miei_eventi.php?modale=' + encodeURIComponent(k), { credentials: 'same-origin' }).then(function (r) { return r.text(); }).then(function (h) {
+            var d = document.createElement('div'); d.innerHTML = h;
+            while (d.firstElementChild) document.body.appendChild(d.firstElementChild);
+            apri();
+        }).catch(function () { window.alert('Non è stato possibile aprire la finestra: riprova.'); }).then(function () { b.disabled = false; });
+    });
+})();
+</script>
 <?php require_once 'footer.php'; ?>

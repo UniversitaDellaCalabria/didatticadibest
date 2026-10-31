@@ -444,6 +444,7 @@ spiega dove trovare il compito.
 
 **5.3 Pagine con tante finestre già pronte** (S): `miei_eventi.php` crea due finestre modali per ogni prenotazione (chat e modifica, righe 361-446 e 579-593):
 caricarle alla prima apertura come fatto in `admin/utenti.php` (`?scheda=ID`).
+  *Stato 1/11/2026:* fatto: le finestre di chat e modifica si scaricano alla prima apertura (`miei_eventi.php?modale=chat-ID|mod-ID`); con 6 prenotazioni la pagina passa da circa 150 KB a 81 KB. Provata la chat nel browser.
 
 **5.4 Compressione e cache sul server** (S, sul server): il `.htaccess` locale ha `mod_deflate` e `mod_expires` (righe 32-44) ma la misura del 30/10 sul sito vero
 non trovava compressione né cache: verificare che i moduli Apache siano attivi e che `AllowOverride` permetta queste direttive nella cartella del portale.
