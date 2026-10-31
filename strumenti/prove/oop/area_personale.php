@@ -25,8 +25,8 @@ foreach ($cat_ap as $k => $v) {
     $ordini[] = $v['ordine'];
 }
 prova($profili_ok && count(array_unique($ordini)) === count($ordini), "catalogo: profili, icone, colori e collegamenti validi; ordini tutti diversi");
-prova(in_array(Profili::AMMINISTRATORE, $cat_ap['da_fare']['profili'], true) && in_array(Profili::DOCENTE, $cat_ap['tutorato_registro']['profili'], true) && ($cat_ap['tutorato_pagamenti']['attivo'] ?? 1) === 0
-    && str_contains($cat_ap['tirocini']['link2'], 'tsp.esse3.cineca.it'), "catalogo: l'amministratore ha tutto, il docente il tutorato, i pagamenti del tutorato spenti, i tirocini rimandano a TSP 2.0");
+prova(in_array(Profili::AMMINISTRATORE, $cat_ap['da_fare']['profili'], true) && in_array(Profili::DOCENTE, $cat_ap['approvazioni_docente']['profili'], true) && ($cat_ap['tutorato_pagamenti']['attivo'] ?? 1) === 0
+    && str_contains($cat_ap['tirocini']['link2'], 'tsp.esse3.cineca.it'), "catalogo: l'amministratore ha tutto, il docente le approvazioni, i pagamenti del tutorato spenti, i tirocini rimandano a TSP 2.0");
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 // L'archivio: il seme e le modifiche dell'amministratore
@@ -51,7 +51,7 @@ $chiavi_di = fn(array $profili) => array_column($rep_ap->perProfili($profili), '
 $stu_ap = $chiavi_di([Profili::STUDENTE]);
 prova(in_array('tirocini', $stu_ap, true) && in_array('pratiche', $stu_ap, true) && in_array('tutorato_mio', $stu_ap, true) && !in_array('cruscotto_direttore', $stu_ap, true) && !in_array('ricevimento', $stu_ap, true), "riquadri: lo studente vede tirocini, pratiche e il suo tutorato, non il cruscotto del Direttore");
 $doc_ap = $chiavi_di([Profili::DOCENTE]);
-prova(in_array('tutorato_registro', $doc_ap, true) && in_array('ricevimento', $doc_ap, true) && in_array('tirocini', $doc_ap, true) && in_array('tutorato_mio', $doc_ap, true), "riquadri: il docente vede il tutorato (registro, lettera e fine attività, il suo incarico), il ricevimento e i tirocini");
+prova(in_array('approvazioni_docente', $doc_ap, true) && !in_array('tutorato_registro', $doc_ap, true) && !in_array('firme', $doc_ap, true) && in_array('ricevimento', $doc_ap, true) && in_array('tirocini', $doc_ap, true) && in_array('tutorato_mio', $doc_ap, true), "riquadri: il docente vede «Le mie approvazioni» (firme, conferme e registri dei tutor al posto delle due tessere), il ricevimento, i tirocini e il suo tutorato");
 foreach ([Profili::PERSONALE, Profili::SCUOLA, Profili::AZIENDA, Profili::ESTERNO, Profili::GESTORE, Profili::DIRETTORE] as $pf_t_) {
     $k_t_ = $chiavi_di([$pf_t_]);
     prova(in_array('tutorato_mio', $k_t_, true) && in_array('tutorato_registro', $k_t_, true), "riquadri: il profilo «{$pf_t_}» ha le tessere del tutorato (compaiono solo con un incarico)");
@@ -177,6 +177,19 @@ $q("UPDATE area_riquadri SET profili = 'scuola,studente' WHERE chiave = 'tirocin
 (new ReflectionMethod($mig_s4, 'datiDiPartenza'))->invoke($mig_s4);
 prova($pr_s4() === ['scuola', 'studente'] || $pr_s4() === ['studente', 'scuola'], "migrazione v110: se l'amministratore aveva scelto i profili, non si toccano");
 $q("UPDATE area_riquadri SET profili = '" . \App\Portale\Area\Profili::inCsv(array_map('strval', $cat_ap['tirocini']['profili'])) . "' WHERE chiave = 'tirocini'");
+// Migrazione v111: «Da firmare» e il registro del tutorato perdono il Docente solo se i profili sono ancora quelli di partenza
+$mig_d11 = new \App\Core\Schema\Migrazioni(\App\Core\App::per($conn)->get(\App\Core\Database::class), sys_get_temp_dir());
+$tutti_d11 = 'studente,docente,direttore,personale,gestore,amministratore,scuola,azienda,esterno';
+$q("UPDATE area_riquadri SET profili = '$tutti_d11' WHERE chiave IN ('firme', 'tutorato_registro')");
+(new ReflectionMethod($mig_d11, 'datiDiPartenza'))->invoke($mig_d11);
+$pr_d11 = fn(string $k) => array_column($rep_ap->tutti(), 'profili', 'chiave')[$k];
+prova(!in_array('docente', $pr_d11('firme'), true) && !in_array('docente', $pr_d11('tutorato_registro'), true) && in_array('direttore', $pr_d11('firme'), true) && in_array('studente', $pr_d11('tutorato_registro'), true), "migrazione v111: «Da firmare» e registro del tutorato perdono il Docente e restano agli altri profili");
+$q("UPDATE area_riquadri SET profili = 'docente,studente' WHERE chiave = 'firme'");
+(new ReflectionMethod($mig_d11, 'datiDiPartenza'))->invoke($mig_d11);
+prova($pr_d11('firme') === ['docente', 'studente'] || $pr_d11('firme') === ['studente', 'docente'], "migrazione v111: se l'amministratore aveva scelto i profili, non si toccano");
+foreach (['firme', 'tutorato_registro'] as $k_d11) {
+    $q("UPDATE area_riquadri SET profili = '" . \App\Portale\Area\Profili::inCsv(array_map('strval', $cat_ap[$k_d11]['profili'])) . "' WHERE chiave = '$k_d11'");
+}
 // Il gruppo «Aziende» e il profilo «Azienda»: dall'email di una convenzione di tesi o dal gruppo dato a mano
 $ga_ap = new \App\Auth\GruppoAziende($db_oop);
 $id_ga = $ga_ap->id();
@@ -234,8 +247,8 @@ prova(!str_contains($cruscotto_ap, 'name="aggiorna_email"') && !str_contains($cr
 $riq_t_ap = $rep_ap->tutti();
 $pag_riq_ap = array_values(array_filter($riq_t_ap, fn($r) => $r['chiave'] === 'tutorato_pagamenti'));
 prova($pag_riq_ap && !$pag_riq_ap[0]['attivo'], "i pagamenti del tutorato partono spenti");
-$doc_ap = array_filter($rep_ap->perProfili(['docente']), fn($r) => in_array($r['chiave'], ['tutorato_registro', 'tirocini'], true));
-prova(count($doc_ap) === 2, "il docente vede il registro del tutorato (lettera di incarico e fine attività) e i tirocini");
+$doc_ap = array_column(array_filter($rep_ap->perProfili(['docente']), fn($r) => in_array($r['chiave'], ['tutorato_registro', 'firme', 'approvazioni_docente', 'tirocini'], true)), 'chiave');
+prova(count($doc_ap) === 2 && in_array('approvazioni_docente', $doc_ap, true) && in_array('tirocini', $doc_ap, true), "il docente vede le approvazioni e i tirocini, non più le due tessere sovrapposte");
 $amm_ap = array_column($rep_ap->perProfili(['amministratore']), 'chiave');
 $tutte_ap = array_keys(array_filter(CatalogoRiquadri::sistema(), fn($v) => ($v['attivo'] ?? 1) === 1));
 prova(array_diff($tutte_ap, $amm_ap) === [], "l'amministratore vede tutti i riquadri accesi", implode(', ', array_diff($tutte_ap, $amm_ap)));

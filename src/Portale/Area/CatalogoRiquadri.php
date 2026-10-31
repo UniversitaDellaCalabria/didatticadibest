@@ -20,6 +20,9 @@ final class CatalogoRiquadri
     /** Forma «icona»: una piccola tessera (tre per riga, in alto) per i servizi che si usano spesso; le altre sono tessere grandi. */
     public const ICONA = 'icona';
 
+    /** Tutti i profili tranne il docente, che ha «Le mie approvazioni» al posto di «Da firmare» e del registro del tutorato (v111). */
+    private const SENZA_DOCENTE = [Profili::STUDENTE, Profili::DIRETTORE, Profili::PERSONALE, Profili::GESTORE, Profili::AMMINISTRATORE, Profili::SCUOLA, Profili::AZIENDA, Profili::ESTERNO];
+
     private const TUTTI = [Profili::STUDENTE, Profili::DOCENTE, Profili::DIRETTORE, Profili::PERSONALE, Profili::GESTORE, Profili::AMMINISTRATORE, Profili::SCUOLA, Profili::AZIENDA, Profili::ESTERNO];
 
     /**
@@ -33,7 +36,7 @@ final class CatalogoRiquadri
             'da_fare' => ['tipo' => self::SPECIALE, 'titolo' => 'Da fare per te', 'descrizione' => 'Le cose che aspettano la persona nei vari moduli: firme, conferme, registri, pratiche da lavorare', 'icona' => 'fa-list-check', 'colore' => '#b45309',
                 'profili' => self::TUTTI, 'ordine' => 10],
             'firme' => ['tipo' => self::SPECIALE, 'titolo' => 'Da firmare', 'descrizione' => 'I documenti che aspettano la tua firma in tutti i moduli (pratiche, convenzioni, lettere di tutorato, verbali), in una scrivania sola; compare solo a chi ha qualcosa da firmare', 'icona' => 'fa-file-signature', 'colore' => '#0f766e',
-                'profili' => self::TUTTI, 'ordine' => 12],
+                'profili' => self::SENZA_DOCENTE, 'ordine' => 12],
             'fsl_scuola' => ['tipo' => self::SPECIALE, 'titolo' => 'La mia scuola: Formazione Scuola Lavoro', 'descrizione' => 'Per le scuole: ogni prenotazione di Formazione Scuola Lavoro con i passi (programma, convenzione, elenco studenti e autorizzazione, attività, attestati) e un solo pulsante per quello che c\'è da fare; compare solo a chi ha prenotazioni FSL', 'icona' => 'fa-school', 'colore' => '#15803d',
                 'profili' => [Profili::SCUOLA, Profili::AMMINISTRATORE], 'ordine' => 14],
             'convenzioni_azienda' => ['tipo' => self::SPECIALE, 'titolo' => 'Le convenzioni della tua azienda', 'descrizione' => 'Per le aziende e gli enti: la convenzione per le tesi con i passi (dati, firma e caricamento, protocollo e firma del Direttore, stipulata), il pulsante del passo corrente e il rinnovo; compare solo a chi ha una convenzione legata alla sua email', 'icona' => 'fa-handshake', 'colore' => '#0e7490',
@@ -61,7 +64,7 @@ final class CatalogoRiquadri
             'tutorato_mio' => ['tipo' => self::SPECIALE, 'titolo' => 'Il mio tutorato', 'descrizione' => 'Per chi ha un incarico di tutorato (anche dottorandi e personale): a che punto è e i suoi documenti; compare solo a chi ha un incarico', 'icona' => 'fa-user-graduate', 'colore' => '#0f766e',
                 'profili' => self::TUTTI, 'ordine' => 70],
             'tutorato_registro' => ['tipo' => self::SPECIALE, 'titolo' => 'Registro delle attività di tutorato', 'descrizione' => 'Per il tutor e per il docente titolare dell\'attività: registro, lettera di incarico e fine attività da firmare', 'icona' => 'fa-clipboard-list', 'colore' => '#0f766e',
-                'profili' => self::TUTTI, 'ordine' => 72],
+                'profili' => self::SENZA_DOCENTE, 'ordine' => 72],
             'tutorato_pagamenti' => ['tipo' => self::SPECIALE, 'titolo' => 'Ufficio pagamenti del tutorato', 'descrizione' => 'Per le persone dell\'ufficio pagamenti: spento finché i pagamenti non passano dal portale', 'icona' => 'fa-euro-sign', 'colore' => '#15803d',
                 'profili' => [Profili::PERSONALE, Profili::AMMINISTRATORE], 'ordine' => 74, 'attivo' => 0],
             'disponibilita' => ['tipo' => self::SPECIALE, 'forma' => self::ICONA, 'titolo' => 'La mia disponibilità per tesi e tirocini', 'descrizione' => 'Per i docenti: posti per tesisti e tirocinanti, corsi di laurea, attività e obiettivi; compaiono sulle pagine pubbliche con un semaforo', 'icona' => 'fa-traffic-light', 'colore' => '#0e7490',
