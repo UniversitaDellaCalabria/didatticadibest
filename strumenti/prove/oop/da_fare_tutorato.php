@@ -58,6 +58,6 @@ $p_df = (string) file_get_contents(__DIR__ . '/../../../da_fare.php');
 $ar_df = (string) file_get_contents(__DIR__ . '/../../../inc/area/da_fare.php');
 $sl_df = (string) file_get_contents(__DIR__ . '/../../../saml_login.php');
 prova(str_contains($p_df, 'middleware.php') && str_contains($p_df, 'gruppi($user_info ?? null, 200)') && str_contains($ar_df, 'da_fare.php?g='), "pagina «Da fare»: richiede l'accesso, legge fino a 200 righe e l'area personale rimanda lì per le altre");
-prova(str_contains($sl_df, "\$redirect = 'area_personale.php'") && str_contains($sl_df, "strpos(\$redirect_raw, '//') !== 0"), "accesso: senza pagina di partenza si va all'area personale e il controllo anti open-redirect resta");
+prova(str_contains($sl_df, 'PaginaIniziale::AREA') && str_contains($sl_df, "strpos(\$redirect_raw, '//') !== 0"), "accesso: senza pagina di partenza si va all'area personale e il controllo anti open-redirect resta");
 $q("DELETE FROM utenti WHERE id IN (98951, 98952)");
 foreach (["DELETE FROM tutorato_incarichi WHERE bando_id = 9895", "DELETE FROM tutorato_bandi WHERE id = 9895"] as $sql) $q($sql);
