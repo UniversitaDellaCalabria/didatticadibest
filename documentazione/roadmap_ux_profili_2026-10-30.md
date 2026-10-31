@@ -242,6 +242,8 @@ lato docente; bozze delle pratiche; percorsi a passi per convenzione FSL e conve
 ### Scuole
 
 **3.S1 Tessera «La mia scuola — Formazione Scuola Lavoro»** (M)
+
+> **Stato 31/10/2026: passo 1 fatto.** `src/Fsl/PercorsoScuola.php` (regole pure, prova `fsl_percorso_scuola.php`): per ogni prenotazione i passi programma → prenotazione → convenzione → elenco e autorizzazione (solo se l'attività li chiede) → attività → attestati, con l'unico pulsante del passo corrente. Restano: passo 2 raccolta dei dati e tessera `fsl_scuola`, passo 3 disegno della barra a passi. La valutazione non è nei passi (si compila dal link dell'email, senza collegamento dall'area personale).
 - **Problema.** Tutto il lavoro della scuola (programma, convenzione, Allegato A, elenco studenti, autorizzazione, valutazione, attestati) è nella 4ª scheda
   di `miei_eventi.php` (righe 266-272 e 690-758) dietro l'icona «Eventi e attestati», il cui numero conta solo i posti liberati (`inc/area/eventi.php`).
 - **Soluzione.** Riquadro di sistema `fsl_scuola` (tessera grande, profili Scuola e Amministratore) con, per ogni prenotazione FSL, una **barra a passi**:
